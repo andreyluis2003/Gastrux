@@ -1,0 +1,29 @@
+--- a/app/dashboard/monitoring/page.tsx
++++ b/app/dashboard/monitoring/page.tsx
+@@ -33,6 +33,28 @@ export default function MonitoringDashboard() {
+     }
+   };
+ 
++  const checkAlerts = async () => {
++    try {
++      const response = await fetch('/api/admin/monitoring/check-alerts', {
++        method: 'POST',
++      });
++      if (!response.ok) {
++        throw new Error('Failed to check alerts');
++      }
++      const data = await response.json();
++      if (data.mrrDropDetected) {
++        toast.warning('Alerta: Queda de MRR detectada');
++      }
++      if (data.highChurnDetected) {
++        toast.warning('Alerta: Taxa de churn elevada detectada');
++      }
++      if (!data.mrrDropDetected && !data.highChurnDetected) {
++        toast.success('Nenhum alerta critico detectado');
++      }
++    } catch (error) {
++      toast.error('Erro ao verificar alertas');
++    }
++  };
++

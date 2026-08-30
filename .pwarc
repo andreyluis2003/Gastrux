@@ -1,0 +1,34 @@
+# PWA Configuration Record
+# Generated: 2026-04-16
+# Status: Phase 11 Complete
+
+SERVICE_WORKER_PATH=/public/sw.js
+MANIFEST_PATH=/public/manifest.json
+ICONS_DIRECTORY=/public/icons
+
+# Icons
+ICON_192=icon-192.png
+ICON_512=icon-512.png
+ICON_192_MASKABLE=icon-192-maskable.png
+ICON_512_MASKABLE=icon-512-maskable.png
+
+# Caching
+CACHE_VERSION=1
+STATIC_CACHE=app-static-v1
+PAGES_CACHE=app-pages-v1
+API_CACHE=app-api-v1
+
+# Offline Storage
+INDEXEDDB_NAME=restaurantes-app
+INDEXEDDB_VERSION=1
+STORES=stock,recipes,production-plans,pending-changes,metadata
+
+# Sync Configuration
+SYNC_MANAGER_ENABLED=true
+RETRY_ATTEMPTS=3
+BACKOFF_DELAYS=100,200,400
+SYNC_TIMEOUT=30000
+
+# Offline Detection
+OFFLINE_INDICATOR_ENABLED=true
+SYNC_STATUS_WIDGET_ENABLED=true

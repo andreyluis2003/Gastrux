@@ -1,0 +1,292 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 84% 5%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 84% 5%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 84% 5%;
+
+    /* Primary: Modern Blue (#3B82F6) - vibrant and trustworthy */
+    --primary: 217 91% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Warm Amber (#F59E0B) - inviting for restaurant */
+    --secondary: 39 89% 49%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted: Soft gray for subtle elements */
+    --muted: 220 13% 91%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent: Elegant Violet (#7C3AED) - sophisticated */
+    --accent: 262 80% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 52%;
+
+    --radius: 0.625rem;
+    --radius-sm: calc(0.625rem - 4px);
+    --radius-lg: calc(0.625rem + 4px);
+    --radius-full: 9999px;
+
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    --spacing-3xl: 64px;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 350ms;
+
+    /* Functional colors for data viz - Rich and harmonious palette */
+    --chart-1: 217 91% 52%;     /* Primary Blue */
+    --chart-2: 39 89% 49%;      /* Secondary Amber */
+    --chart-3: 142 71% 45%;     /* Emerald Green (success) */
+    --chart-4: 262 80% 50%;     /* Accent Violet */
+    --chart-5: 38 92% 50%;      /* Warning Amber */
+    
+    /* Color palette tokens */
+    --success: 142 71% 45%;     /* Emerald Green */
+    --warning: 38 92% 50%;      /* Amber */
+    --info: 217 91% 52%;        /* Primary Blue */
+    --error: 0 84% 60%;         /* Coral Red */
+  }
+
+  .dark {
+    --background: 222 84% 5%;
+    --foreground: 0 0% 98%;
+
+    --card: 222 84% 7%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 222 84% 7%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary: Modern Blue (lighter for dark mode) */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Warm Amber (adjusted for dark mode) */
+    --secondary: 39 89% 55%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 222 84% 12%;
+    --muted-foreground: 220 8% 65%;
+
+    /* Accent: Elegant Violet (lighter for dark mode) */
+    --accent: 262 80% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 84% 12%;
+    --input: 222 84% 12%;
+    --ring: 217 91% 60%;
+
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.15), 0 1px 2px -1px rgb(0 0 0 / 0.15);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -2px rgb(0 0 0 / 0.15);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.25), 0 4px 6px -4px rgb(0 0 0 / 0.15);
+
+    /* Functional colors for data viz (dark mode) */
+    --chart-1: 217 91% 60%;     /* Primary Blue */
+    --chart-2: 39 89% 55%;      /* Secondary Amber */
+    --chart-3: 142 71% 55%;     /* Emerald Green */
+    --chart-4: 262 80% 60%;     /* Accent Violet */
+    --chart-5: 38 92% 55%;      /* Warning Amber */
+
+    /* Color palette tokens */
+    --success: 142 71% 55%;
+    --warning: 38 92% 55%;
+    --info: 217 91% 60%;
+    --error: 0 84% 65%;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary));
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background-color: transparent; }
+  ::-webkit-scrollbar-thumb { background-color: hsl(var(--border)); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--muted-foreground) / 0.5); }
+}
+
+@layer utilities {
+  /* Hide scrollbar */
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Hero background - Modern gradient with primary blue and secondary amber */
+  .hero-gradient {
+    background:
+      radial-gradient(ellipse 60% 50% at 50% -10%, hsl(217 91% 52% / 0.12), transparent),
+      radial-gradient(ellipse 40% 40% at 80% 0%, hsl(39 89% 49% / 0.08), transparent),
+      radial-gradient(ellipse 40% 30% at 20% 10%, hsl(262 80% 50% / 0.06), transparent);
+  }
+
+  .dark .hero-gradient {
+    background:
+      radial-gradient(ellipse 60% 50% at 50% -10%, hsl(217 91% 60% / 0.2), transparent),
+      radial-gradient(ellipse 40% 40% at 80% 0%, hsl(39 89% 55% / 0.1), transparent),
+      radial-gradient(ellipse 40% 30% at 20% 10%, hsl(262 80% 60% / 0.08), transparent);
+  }
+}
+/* Mobile-specific optimizations */
+
+/* Ensure minimum touch target sizes (48x48px) for WCAG compliance */
+.touch-target-48 {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Mobile-friendly spacing */
+@media (max-width: 640px) {
+  body {
+    font-size: 16px; /* Prevents auto-zoom on input focus in iOS */
+  }
+
+  /* Optimize padding on mobile */
+  .mobile-padding {
+    padding: 1rem;
+  }
+
+  /* Better spacing for touch */
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Prevent horizontal scroll */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Better scrolling on mobile */
+  body {
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea,
+  select {
+    -webkit-user-select: text;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  .mobile-hide-in-landscape {
+    display: none;
+  }
+
+  .space-y-6 {
+    gap: 1rem;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .tablet-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tablet-hidden {
+    display: none;
+  }
+}
+
+/* Prevent zoom on input focus */
+@supports (padding: max(0px)) {
+  body,
+  input,
+  select,
+  textarea {
+    padding-left: max(padding, env(safe-area-inset-left));
+    padding-right: max(padding, env(safe-area-inset-right));
+  }
+}
+
+/* Safe area support for notch devices */
+@media (max-width: 640px) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus states for touch devices */
+@media (hover: none) {
+  button:focus,
+  a:focus,
+  input:focus {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Suppress hydration error overlays */
+[data-hydration-error] { display: none !important; }

@@ -1,0 +1,65 @@
+// @ts-nocheck
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const programId = searchParams.get('programId');
+  const where: any = {};
+  if (programId) where.programId = programId;
+
+  const items = await prisma.loyaltyMilestone.findMany({
+    where,
+    orderBy: { orderCount: 'asc' },
+    include: {
+      program: { select: { id: true, name: true } },
+      _count: { select: { } },
+    },
+  });
+  return NextResponse.json({ items });
+}
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const role = (session?.user as any)?.role;
+  if (!session || (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'MANAGER')) {
+    return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { programId, name, description, orderCount, bonusPoints, discountPercent, freeItem, active, notifyCustomer } = body;
+
+  if (!programId || !name || orderCount == null) {
+    return NextResponse.json({ error: 'Campos obrigatorios: programId, name, orderCount' }, { status: 400 });
+  }
+
+  try {
+    const milestone = await prisma.loyaltyMilestone.create({
+      data: {
+        programId,
+        name,
+        description: description || null,
+        orderCount: Number(orderCount),
+        bonusPoints: Number(bonusPoints || 0),
+        discountPercent: discountPercent != null ? Number(discountPercent) : null,
+        freeItem: freeItem || null,
+        active: active !== false,
+        notifyCustomer: notifyCustomer !== false,
+      },
+    });
+    return NextResponse.json({ milestone });
+  } catch (e: any) {
+    if (e.code === 'P2002') {
+      return NextResponse.json({ error: 'Já existe um marco para esse número de pedidos' }, { status: 409 });
+    }
+    console.error('[loyalty/milestones]', e);
+    return NextResponse.json({ error: 'Erro ao criar marco' }, { status: 500 });
+  }
+}

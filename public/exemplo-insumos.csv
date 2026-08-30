@@ -1,0 +1,11 @@
+código,nome,descrição,categoria,unidade,unidade_compra,fator_conversão,estoque_mínimo,custo_referência,fornecedor
+ARR001,Arroz Integral,Arroz integral orgânico,Grãos,kg,kg,1.0,5.0,8.50,Fornecedor A
+FEI001,Feijão Carioca,Feijão carioca seco,Grãos,kg,kg,1.0,3.0,7.20,Fornecedor A
+CEB001,Cebola,Cebola roxa fresca,Verduras,kg,kg,1.0,2.0,3.50,Fornecedor B
+ALH001,Alho,Alho descascado,Verduras,kg,kg,1.0,1.0,15.00,Fornecedor B
+CARN001,Carne Vermelha,Carne bovina magra,Carnes,kg,kg,1.0,2.0,35.00,Fornecedor C
+FRG001,Frango,Peito de frango resfriado,Carnes,kg,kg,1.0,3.0,22.00,Fornecedor C
+OLE001,Óleo de Soja,Óleo de soja refinado,Óleos,ml,l,1000,5.0,5.50,Fornecedor D
+SAL001,Sal,Sal fino iodizado,Condimentos,g,kg,1000,1.0,2.00,Fornecedor D
+TOMA001,Tomate,Tomate caqui fresco,Verduras,kg,kg,1.0,1.0,4.00,Fornecedor B
+BATATA001,Batata,Batata inglesa fresca,Verduras,kg,kg,1.0,3.0,3.80,Fornecedor B
