@@ -43,6 +43,15 @@ async function main() {
   });
   console.log('✓ Restaurant created:', restaurant.name);
 
+  // Link the test user to the restaurant they own
+  if (testUser.currentRestaurantId !== restaurant.id) {
+    await prisma.user.update({
+      where: { id: testUser.id },
+      data: { currentRestaurantId: restaurant.id },
+    });
+  }
+  console.log('✓ Test user linked to restaurant (currentRestaurantId set)');
+
   // Create default ingredient categories
   const categories = [
     { name: 'Proteína', color: '#ef4444' },
@@ -340,6 +349,7 @@ async function main() {
       update: {},
       create: {
         ...customer,
+        restaurantId: restaurant.id,
         lastOrderAt: new Date(now.getTime() - Math.random() * 30 * 24 * 60 * 60 * 1000),
         averageTicket: customer.totalSpent.div(customer.totalOrders),
       },
