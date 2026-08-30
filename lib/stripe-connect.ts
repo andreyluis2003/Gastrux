@@ -9,19 +9,31 @@
 
 import Stripe from 'stripe';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_CONNECT_CLIENT_ID = process.env.STRIPE_CONNECT_CLIENT_ID;
 
-if (!STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY not configured');
+// Lazily instantiate Stripe (via Proxy, so existing `stripe.x.y()` call sites are
+// unchanged) so the module can be imported during `next build`'s page-data
+// collection even when STRIPE_SECRET_KEY isn't available at build time.
+let _stripe: Stripe | null = null;
+function getStripeClient(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+      throw new Error('STRIPE_SECRET_KEY not configured');
+    }
+    _stripe = new Stripe(key, { apiVersion: '2026-04-22.dahlia' });
+  }
+  return _stripe;
 }
 
-export const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: '2026-04-22.dahlia',
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getStripeClient(), prop, receiver);
+  },
 });
 
 export function isStripeConnectConfigured(): boolean {
-  return !!STRIPE_SECRET_KEY && !!STRIPE_CONNECT_CLIENT_ID;
+  return !!process.env.STRIPE_SECRET_KEY && !!STRIPE_CONNECT_CLIENT_ID;
 }
 
 // ============================================================

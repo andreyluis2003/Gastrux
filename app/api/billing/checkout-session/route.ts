@@ -8,14 +8,20 @@ import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 
 export const dynamic = 'force-dynamic';
 
-// Validate Stripe credentials at initialization
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+// Lazily instantiate Stripe so the module can be imported (e.g. during `next build`'s
+// page-data collection) even when STRIPE_SECRET_KEY isn't available at build time.
+let stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+  }
+  if (!stripe) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2026-04-22.dahlia',
+    });
+  }
+  return stripe;
 }
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2026-04-22.dahlia',
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     let stripeCustomerId = user.stripeCustomerId;
+    const stripe = getStripe();
 
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({

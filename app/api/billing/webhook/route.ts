@@ -18,27 +18,30 @@ import { handleWebhookError } from '@/lib/payment-error-handler';
 
 export const dynamic = 'force-dynamic';
 
-// Validate Stripe credentials at initialization
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+// Lazily instantiate Stripe so the module can be imported (e.g. during `next build`'s
+// page-data collection) even when Stripe env vars aren't available at build time.
+let stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+  }
+  if (!stripe) {
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2026-04-22.dahlia',
+    });
+  }
+  return stripe;
 }
-
-if (!process.env.STRIPE_WEBHOOK_SECRET) {
-  throw new Error('STRIPE_WEBHOOK_SECRET environment variable is not set');
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2026-04-22.dahlia',
-});
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 async function verifyWebhookSignature(
   body: string,
   signature: string
 ): Promise<Stripe.Event> {
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    throw new Error('STRIPE_WEBHOOK_SECRET environment variable is not set');
+  }
   try {
-    return stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    return getStripe().webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (error) {
     throw new Error('Invalid webhook signature');
   }
