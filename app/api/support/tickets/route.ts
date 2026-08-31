@@ -19,9 +19,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { currentRestaurantId: true, restaurants: { select: { id: true }, take: 1 } },
+    select: { currentRestaurantId: true, restaurants: { select: { restaurantId: true }, take: 1 } },
   })
-  const restaurantId = user?.currentRestaurantId || user?.restaurants?.[0]?.id
+  const restaurantId = user?.currentRestaurantId || user?.restaurants?.[0]?.restaurantId
   if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 400 })
   const body = await req.json()
   const { subject, description, category, priority } = body

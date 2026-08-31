@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { prisma } from '@/lib/db'
 import { sendNotificationEmail } from '@/lib/email-service'
+import { isPlatformAdminIdentity, getPlatformAdminEmails } from '@/lib/admin/guard'
 
 function ticketConfirmationEmail(ticket: any, userName: string): string {
   const appUrl = process.env.NEXTAUTH_URL || ''
@@ -109,8 +110,14 @@ export async function createTicket(params: {
   }
 
   try {
+    const platformAdminEmails = getPlatformAdminEmails()
     const admins = await prisma.user.findMany({
-      where: { role: { in: ['OWNER', 'ADMIN'] } },
+      where: {
+        OR: [
+          { role: 'ADMIN' },
+          ...(platformAdminEmails.length ? [{ email: { in: platformAdminEmails } }] : []),
+        ],
+      },
       select: { email: true },
       take: 10,
     })
@@ -142,8 +149,7 @@ export async function addMessage(params: {
   if (!ticket) throw new Error('Ticket não encontrado')
 
   const author = await prisma.user.findUnique({ where: { id: params.authorId } })
-  const role = author?.role
-  const senderRole = (role === 'OWNER' || role === 'ADMIN') ? 'agent' : 'customer'
+  const senderRole = isPlatformAdminIdentity(author?.role, author?.email) ? 'agent' : 'customer'
 
   const msg = await prisma.supportMessage.create({
     data: {
