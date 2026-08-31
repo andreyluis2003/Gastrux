@@ -378,9 +378,10 @@ async function main() {
   
   const loyaltyProgram = await prisma.loyaltyProgram.upsert({
     where: { id: 'default-program' },
-    update: {},
+    update: { restaurantId: restaurant.id },
     create: {
       id: 'default-program',
+      restaurantId: restaurant.id,
       name: 'Programa de Fidelização Premium',
       description: 'Programa de pontos para clientes frequentes com recompensas exclusivas',
       active: true,

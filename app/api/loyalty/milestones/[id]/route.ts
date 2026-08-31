@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;
-  if (!session || (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'MANAGER')) {
+  if (!session || !['OWNER', 'MANAGER', 'ADMIN'].includes(role)) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
 
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;
-  if (!session || (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'MANAGER')) {
+  if (!session || !['OWNER', 'MANAGER', 'ADMIN'].includes(role)) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
 

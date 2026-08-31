@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
     orderBy: { orderCount: 'asc' },
     include: {
       program: { select: { id: true, name: true } },
-      _count: { select: { } },
     },
   });
   return NextResponse.json({ items });
@@ -33,7 +32,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;
-  if (!session || (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'MANAGER')) {
+  if (!session || !['OWNER', 'MANAGER', 'ADMIN'].includes(role)) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
 
