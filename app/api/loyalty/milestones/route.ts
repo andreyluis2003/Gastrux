@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,12 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) return NextResponse.json({ items: [] });
+
   const { searchParams } = new URL(req.url);
   const programId = searchParams.get('programId');
-  const where: any = {};
+  const where: any = { program: { restaurantId } };
   if (programId) where.programId = programId;
 
   const items = await prisma.loyaltyMilestone.findMany({
@@ -33,11 +37,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+
   const body = await req.json();
   const { programId, name, description, orderCount, bonusPoints, discountPercent, freeItem, active, notifyCustomer } = body;
 
   if (!programId || !name || orderCount == null) {
     return NextResponse.json({ error: 'Campos obrigatorios: programId, name, orderCount' }, { status: 400 });
+  }
+
+  const program = await prisma.loyaltyProgram.findFirst({ where: { id: programId, restaurantId }, select: { id: true } });
+  if (!program) {
+    return NextResponse.json({ error: 'Programa de fidelidade não encontrado' }, { status: 404 });
   }
 
   try {

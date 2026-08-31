@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!session || (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'MANAGER')) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
+
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+
+  const owned = await prisma.loyaltyMilestone.findFirst({ where: { id: params.id, program: { restaurantId } }, select: { id: true } });
+  if (!owned) return NextResponse.json({ error: 'Marco não encontrado' }, { status: 404 });
 
   const body = await req.json();
   const data: any = {};
@@ -39,6 +46,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   if (!session || (role !== 'ADMIN' && role !== 'SUPER_ADMIN' && role !== 'MANAGER')) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
+
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+
+  const owned = await prisma.loyaltyMilestone.findFirst({ where: { id: params.id, program: { restaurantId } }, select: { id: true } });
+  if (!owned) return NextResponse.json({ error: 'Marco não encontrado' }, { status: 404 });
 
   try {
     await prisma.loyaltyMilestone.delete({ where: { id: params.id } });
