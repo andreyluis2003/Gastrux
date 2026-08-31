@@ -1,0 +1,11 @@
+-- The RestaurantUser model has declared @@unique([restaurantId, userId]) since
+-- before this migration history was baselined, but the constraint was never
+-- actually created on the live database (the initial schema was applied via
+-- `prisma db push` before this field combination's index existed there).
+-- Every prisma.restaurantUser.upsert({ where: { restaurantId_userId: ... } })
+-- call compiles to `INSERT ... ON CONFLICT ("restaurantId","userId")`, which
+-- Postgres rejects outright (42P10) without a matching unique constraint -
+-- breaking staff creation and any other restaurantUser upsert. No duplicate
+-- (restaurantId, userId) pairs exist in production, verified before this
+-- migration was written.
+CREATE UNIQUE INDEX "restaurant_users_restaurantId_userId_key" ON "restaurant_users"("restaurantId", "userId");
