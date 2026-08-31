@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getRestaurantContext } from '@/lib/api/restaurant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +12,10 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
+    const { restaurantId } = await getRestaurantContext();
+
     const ingredients = await prisma.ingredient.findMany({
-      where: { active: true },
+      where: { active: true, restaurantId },
       include: {
         category: { select: { name: true, color: true } },
         currentStock: { select: { currentQuantity: true, lastUpdated: true } },
@@ -44,6 +47,8 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
+    const { restaurantId } = await getRestaurantContext();
+
     const body = await req.json();
     const { counts } = body; // Array of { ingredientId, countedQuantity }
 
@@ -56,6 +61,10 @@ export async function POST(req: NextRequest) {
       const { ingredientId, countedQuantity } = item;
       if (!ingredientId || countedQuantity === undefined) continue;
 
+      // Scope by restaurantId so a client can't adjust another tenant's stock.
+      const ingredient = await prisma.ingredient.findFirst({ where: { id: ingredientId, restaurantId } });
+      if (!ingredient) continue;
+
       const stock = await prisma.stock.findUnique({ where: { ingredientId } });
       const systemQty = stock?.currentQuantity || 0;
       const difference = countedQuantity - systemQty;
@@ -64,6 +73,7 @@ export async function POST(req: NextRequest) {
         // Create adjustment movement
         await prisma.stockMovement.create({
           data: {
+            restaurantId,
             ingredientId,
             quantity: Math.abs(difference),
             movementType: 'ADJUSTMENT',
