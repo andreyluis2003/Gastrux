@@ -5,6 +5,7 @@ import { ApiErrors } from '@/lib/api/api-response';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
     const lists = await prisma.shoppingList.findMany({
+      where: { restaurantId },
       include: {
         items: {
           include: {
@@ -52,12 +58,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { notes, autoGenerate } = body;
 
     if (autoGenerate) {
       // Auto-generate based on ingredients below minimum stock
       const stocks = await prisma.stock.findMany({
+        where: { restaurantId },
         include: {
           ingredient: {
             include: {
@@ -72,6 +84,7 @@ export async function POST(req: NextRequest) {
       });
 
       const itemsToCreate: {
+        restaurantId: string;
         ingredientId: string;
         supplierId: string;
         quantity: number;
@@ -98,6 +111,7 @@ export async function POST(req: NextRequest) {
             : 'MEDIUM';
 
         itemsToCreate.push({
+          restaurantId,
           ingredientId: ingredient.id,
           supplierId: supplier.id,
           quantity: parseFloat(neededQty.toFixed(2)),
@@ -121,6 +135,7 @@ export async function POST(req: NextRequest) {
 
       const list = await prisma.shoppingList.create({
         data: {
+          restaurantId,
           listDate: new Date(),
           notes: notes || 'Lista gerada automaticamente baseada no estoque mínimo',
           totalCost: parseFloat(totalCost.toFixed(2)),
@@ -154,6 +169,7 @@ export async function POST(req: NextRequest) {
       // Create empty list for manual item addition
       const list = await prisma.shoppingList.create({
         data: {
+          restaurantId,
           listDate: new Date(),
           notes: notes || '',
           totalCost: 0,

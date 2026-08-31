@@ -216,6 +216,7 @@ export async function POST(
       items.map((item: any) =>
         prisma.shoppingListItem.create({
           data: {
+            restaurantId,
             shoppingListId: params.id,
             ingredientId: item.ingredientId || null,
             supplierId: item.supplierId || null,
