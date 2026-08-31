@@ -12,7 +12,12 @@ interface AvailableTable {
   section: { name: string };
 }
 
-export default function ReservationsPage() {
+export default function ReservationsPage({
+  params,
+}: {
+  params: { restaurantId: string };
+}) {
+  const { restaurantId } = params;
   const [step, setStep] = useState<'date' | 'details' | 'confirmation'>('date');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
@@ -38,7 +43,7 @@ export default function ReservationsPage() {
     try {
       setLoading(true);
       const response = await fetch(
-        `/api/reservations?date=${selectedDate}&time=${selectedTime}&partySize=${partySize}`
+        `/api/reservations?restaurantId=${restaurantId}&date=${selectedDate}&time=${selectedTime}&partySize=${partySize}`
       );
 
       if (!response.ok) throw new Error('Failed to fetch tables');
@@ -65,6 +70,7 @@ export default function ReservationsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          restaurantId,
           guestName,
           guestEmail,
           guestPhone,
