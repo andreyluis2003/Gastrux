@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       completedCount,
       totalSteps,
       allCompleted,
-      isOnboardingDone: onboarding?.completedAt !== null || onboarding?.skippedAt !== null,
+      isOnboardingDone: !!onboarding && (onboarding.completedAt !== null || onboarding.skippedAt !== null),
     });
   } catch (error) {
     console.error('Error fetching onboarding progress:', error);

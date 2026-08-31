@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = session.user.id;
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 400 });
+    }
 
     // Check if user already has onboarding started
     let onboarding = await prisma.userOnboarding.findUnique({
@@ -48,9 +53,10 @@ export async function POST(request: NextRequest) {
     // Create default categories
     for (const category of DEFAULT_CATEGORIES) {
       await prisma.ingredientCategory.upsert({
-        where: { name: category.name },
+        where: { restaurantId_name: { restaurantId, name: category.name } },
         update: {},
         create: {
+          restaurantId,
           name: category.name,
           color: category.color,
         },
@@ -59,19 +65,24 @@ export async function POST(request: NextRequest) {
 
     // Create example recipe with example ingredients
     const vegetaisCategory = await prisma.ingredientCategory.findUnique({
-      where: { name: 'Verduras' },
+      where: { restaurantId_name: { restaurantId, name: 'Verduras' } },
     });
 
     const graosCategory = await prisma.ingredientCategory.findUnique({
-      where: { name: 'Grãos' },
+      where: { restaurantId_name: { restaurantId, name: 'Grãos' } },
     });
 
     const oleoCategory = await prisma.ingredientCategory.findUnique({
-      where: { name: 'Óleos' },
+      where: { restaurantId_name: { restaurantId, name: 'Óleos' } },
+    });
+
+    const condimentosCategory = await prisma.ingredientCategory.findUnique({
+      where: { restaurantId_name: { restaurantId, name: 'Condimentos' } },
     });
 
     // Create example ingredients
     const arrozId = await createOrGetIngredient(
+      restaurantId,
       'ARR001',
       'Arroz Integral',
       'Arroz integral orgânico',
@@ -80,6 +91,7 @@ export async function POST(request: NextRequest) {
     );
 
     const feijaoId = await createOrGetIngredient(
+      restaurantId,
       'FEI001',
       'Feijão Carioca',
       'Feijão carioca seco',
@@ -88,6 +100,7 @@ export async function POST(request: NextRequest) {
     );
 
     const cebolId = await createOrGetIngredient(
+      restaurantId,
       'CEB001',
       'Cebola',
       'Cebola roxa',
@@ -96,6 +109,7 @@ export async function POST(request: NextRequest) {
     );
 
     const alhoId = await createOrGetIngredient(
+      restaurantId,
       'ALH001',
       'Alho',
       'Alho fresco descascado',
@@ -104,6 +118,7 @@ export async function POST(request: NextRequest) {
     );
 
     const oleoId = await createOrGetIngredient(
+      restaurantId,
       'OLE001',
       'Óleo de Soja',
       'Óleo de soja refinado',
@@ -112,16 +127,20 @@ export async function POST(request: NextRequest) {
     );
 
     const salId = await createOrGetIngredient(
+      restaurantId,
       'SAL001',
       'Sal',
       'Sal fino',
-      await prisma.ingredientCategory.findUnique({ where: { name: 'Condimentos' } }).then(c => c!.id),
+      condimentosCategory!.id,
       2.0
     );
 
     // Create example recipe
-    const recipe = await prisma.recipe.create({
-      data: {
+    const recipe = await prisma.recipe.upsert({
+      where: { restaurantId_code: { restaurantId, code: 'REC001' } },
+      update: {},
+      create: {
+        restaurantId,
         code: 'REC001',
         name: 'Arroz com Feijão',
         description: 'Receita clássica brasileira com arroz integral e feijão carioca',
@@ -197,6 +216,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function createOrGetIngredient(
+  restaurantId: string,
   code: string,
   name: string,
   description: string,
@@ -204,9 +224,10 @@ async function createOrGetIngredient(
   referenceCost: number
 ): Promise<string> {
   const ingredient = await prisma.ingredient.upsert({
-    where: { code },
+    where: { restaurantId_code: { restaurantId, code } },
     update: {},
     create: {
+      restaurantId,
       code,
       name,
       description,
@@ -221,9 +242,10 @@ async function createOrGetIngredient(
 
   // Create stock entry if it doesn't exist
   await prisma.stock.upsert({
-    where: { ingredientId: ingredient.id },
+    where: { restaurantId_ingredientId: { restaurantId, ingredientId: ingredient.id } },
     update: {},
     create: {
+      restaurantId,
       ingredientId: ingredient.id,
       currentQuantity: 0,
     },
