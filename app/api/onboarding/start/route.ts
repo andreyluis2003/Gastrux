@@ -34,18 +34,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 400 });
     }
 
-    // Check if user already has onboarding started
+    // Check if the default categories/example recipe were already created.
+    // GET /api/onboarding/status auto-creates a bare UserOnboarding record on
+    // first visit, so by the time this route runs a record almost always
+    // already exists - checking mere existence (instead of whether the
+    // categories/recipe step actually ran) would skip this every time.
     let onboarding = await prisma.userOnboarding.findUnique({
       where: { userId },
     });
 
-    if (onboarding) {
+    if (onboarding?.defaultCategoriesCreated) {
       return NextResponse.json(onboarding);
     }
 
-    // Create onboarding record
-    onboarding = await prisma.userOnboarding.create({
-      data: {
+    // Create (or reuse) the onboarding record
+    onboarding = await prisma.userOnboarding.upsert({
+      where: { userId },
+      update: {},
+      create: {
         userId,
       },
     });
