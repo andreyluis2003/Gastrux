@@ -2072,6 +2072,7 @@ model Subscription {
   @@index([gateway])
   @@index([cancelledAt])
   @@index([createdAt])
+  @@unique([gateway, gatewaySubscriptionId])
   @@map("subscriptions")
 }
 
