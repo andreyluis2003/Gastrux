@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +14,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { customerId, accountId, rewardId } = body;
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
 
-    // Verify reward exists
-    const reward = await prisma.loyaltyReward.findUnique({
-      where: { id: rewardId },
+    const body = await request.json();
+    const { accountId, rewardId } = body;
+
+    // Verify reward exists and belongs to this restaurant's loyalty program
+    const reward = await prisma.loyaltyReward.findFirst({
+      where: { id: rewardId, program: { restaurantId } },
       include: { program: true },
     });
 
@@ -29,9 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify account exists and has enough points
-    const account = await prisma.customerLoyaltyAccount.findUnique({
-      where: { id: accountId },
+    // Verify account exists, belongs to this restaurant, and is enrolled in
+    // the same program as the reward (an account's points from one program
+    // can't be spent on another program's rewards).
+    const account = await prisma.customerLoyaltyAccount.findFirst({
+      where: { id: accountId, programId: reward.programId, program: { restaurantId } },
     });
 
     if (!account) {
@@ -59,10 +67,10 @@ export async function POST(request: NextRequest) {
     // Process the redemption
     const newPoints = account.currentPoints - reward.pointsCost;
 
-    const [transaction, updatedAccount, updatedReward] = await Promise.all([
+    const [transaction, updatedAccount, updatedReward] = await prisma.$transaction([
       prisma.loyaltyTransaction.create({
         data: {
-          customerId,
+          customerId: account.customerId,
           accountId,
           programId: account.programId,
           type: 'REDEMPTION',
