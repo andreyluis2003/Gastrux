@@ -11,7 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
-import { getPayment, getMerchantOrder, getPreApproval, mapMPStatusToPaymentStatus, mapMPPaymentType, validateWebhookTopic, MP_WEBHOOK_SECRET, MP_IS_PRODUCTION } from '@/lib/mercado-pago';
+import { getPayment, getMerchantOrder, getPreApproval, mapMPStatusToPaymentStatus, mapMPPaymentType, mapMPPreApprovalStatus, validateWebhookTopic, MP_WEBHOOK_SECRET } from '@/lib/mercado-pago';
+import { upsertSubscriptionFromGatewayEvent } from '@/lib/billing/subscription-sync';
 import { logPaymentEvent, PaymentEventType } from '@/lib/payment-logger';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
@@ -32,7 +33,11 @@ function verifyMercadoPagoSignature(
   dataId: string,
   secret: string
 ): { ok: boolean; reason?: string } {
-  if (!secret) return { ok: true }; // No secret configured -> skip verification (dev)
+  // Fail closed regardless of environment - a missing secret is a
+  // configuration bug, not a reason to accept unsigned payloads. Configure
+  // MERCADO_PAGO_WEBHOOK_SECRET (or _PROD) for every environment, including
+  // local/staging (via an MP test-application secret + a tunnel).
+  if (!secret) return { ok: false, reason: 'webhook secret not configured' };
 
   const xSignature = request.headers.get('x-signature') || '';
   const xRequestId = request.headers.get('x-request-id') || '';
@@ -72,13 +77,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Signature verification (required in production)
+    // Signature verification - always enforced, in every environment.
     const sig = verifyMercadoPagoSignature(request, id, MP_WEBHOOK_SECRET);
     if (!sig.ok) {
       console.warn(`[MP Webhook] Invalid signature: ${sig.reason}`);
-      if (MP_IS_PRODUCTION) {
-        return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
-      }
+      return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
     }
 
     const validTopic = validateWebhookTopic(topic);
@@ -152,7 +155,15 @@ async function handlePaymentNotification(paymentId: string) {
     }
 
     if (!payment) {
-      console.warn(`[MP Webhook] No payment record found for: ${externalReference || paymentId}`);
+      // Not an order payment - recurring SaaS subscription charges (from a
+      // PreApproval) never get a Payment row, only their externalReference
+      // (which we set to our Subscription.id at PreApproval creation time)
+      // to go on.
+      if (externalReference) {
+        await handleSubscriptionRecurringCharge(externalReference, mpPayment, mappedStatus, paymentType);
+      } else {
+        console.warn(`[MP Webhook] No payment record found for: ${externalReference || paymentId}`);
+      }
       return;
     }
 
@@ -354,6 +365,109 @@ async function handlePaymentNotification(paymentId: string) {
   }
 }
 
+/**
+ * Recurring charges generated automatically by a PreApproval (SaaS
+ * subscription) have no order Payment row - only the externalReference we
+ * set at PreApproval creation time (our Subscription.id) to identify them.
+ * Records a BillingInvoice for the charge and refreshes the Subscription's
+ * current billing period.
+ */
+async function handleSubscriptionRecurringCharge(
+  subscriptionId: string,
+  mpPayment: any,
+  mappedStatus: string,
+  paymentType: string
+) {
+  const subscription = await prisma.subscription.findFirst({
+    where: { id: subscriptionId, gateway: 'MERCADO_PAGO' },
+  });
+  if (!subscription || !subscription.userId || !subscription.gatewaySubscriptionId) {
+    console.warn(`[MP Webhook] Recurring charge for unknown/incomplete Subscription: ${subscriptionId}`);
+    return;
+  }
+
+  if (mappedStatus !== 'APPROVED') {
+    console.log(`[MP Webhook] Recurring charge for Subscription ${subscriptionId} not approved (${mappedStatus}), skipping invoice`);
+    return;
+  }
+
+  const mpPaymentIdStr = String(mpPayment.id);
+  const currentPeriodStart = mpPayment.date_approved ? new Date(mpPayment.date_approved) : new Date();
+  let currentPeriodEnd: Date | null = null;
+  try {
+    const preApproval = await getPreApproval(subscription.gatewaySubscriptionId);
+    if (preApproval.next_payment_date) currentPeriodEnd = new Date(preApproval.next_payment_date);
+  } catch (e) {
+    console.warn('[MP Webhook] Could not fetch PreApproval for period dates (non-fatal):', e);
+  }
+
+  await upsertSubscriptionFromGatewayEvent({
+    gateway: 'MERCADO_PAGO',
+    gatewaySubscriptionId: subscription.gatewaySubscriptionId,
+    userId: subscription.userId,
+    restaurantId: subscription.restaurantId,
+    tier: subscription.tier,
+    planName: subscription.planName,
+    billingCycle: subscription.billingCycle as 'monthly' | 'annual',
+    amount: Number(subscription.amount),
+    currency: subscription.currency,
+    status: 'active',
+    currentPeriodStart,
+    currentPeriodEnd,
+    metadata: { mpPaymentId: mpPaymentIdStr },
+  });
+
+  const existingInvoice = await prisma.billingInvoice.findFirst({
+    where: {
+      OR: [
+        { paymentId: mpPaymentIdStr },
+        { metadata: { contains: `"mpPaymentId":"${mpPaymentIdStr}"` } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (existingInvoice) {
+    console.log(`[MP Webhook] BillingInvoice already exists for MP payment ${mpPaymentIdStr}`);
+    return;
+  }
+
+  try {
+    const { createInvoice } = await import('@/lib/billing/invoice-service');
+    const user = await prisma.user.findUnique({
+      where: { id: subscription.userId },
+      select: { name: true, email: true },
+    });
+    const amount = Number(subscription.amount);
+    await createInvoice({
+      userId: subscription.userId,
+      restaurantId: subscription.restaurantId,
+      customerName: user?.name || user?.email || 'Cliente',
+      customerEmail: user?.email || '',
+      subscriptionId: subscription.id,
+      description: `Assinatura ${subscription.planName || subscription.tier} — Mercado Pago`,
+      periodStart: currentPeriodStart,
+      periodEnd: currentPeriodEnd,
+      subtotal: amount,
+      tax: 0,
+      discount: 0,
+      total: amount,
+      currency: subscription.currency || 'BRL',
+      status: 'PAID',
+      paidAt: new Date(),
+      paymentMethod: 'mercadopago',
+      paymentId: mpPaymentIdStr,
+    });
+    await prisma.billingInvoice.updateMany({
+      where: { paymentId: mpPaymentIdStr },
+      data: {
+        metadata: JSON.stringify({ mpPaymentId: mpPaymentIdStr, subscriptionId: subscription.id, paymentType }),
+      },
+    });
+  } catch (err) {
+    console.error('[MP Webhook] BillingInvoice creation failed for recurring charge (non-fatal):', err);
+  }
+}
+
 async function handleMerchantOrderNotification(orderId: string) {
   try {
     const order = await getMerchantOrder(orderId);
@@ -375,20 +489,30 @@ async function handlePreApprovalNotification(preApprovalId: string) {
       externalReference: preApproval.external_reference,
     });
 
-    // Update subscription if linked
-    if (preApproval.external_reference) {
-      const subscription = await prisma.subscription.findFirst({
-        where: { gatewaySubscriptionId: preApprovalId },
-      });
-      if (subscription) {
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            status: preApproval.status === 'authorized' ? 'active' : 'cancelled',
-          },
-        });
-      }
+    const subscription = await prisma.subscription.findFirst({
+      where: { gatewaySubscriptionId: preApprovalId },
+    });
+    if (!subscription || !subscription.userId) {
+      console.warn(`[MP Webhook] No Subscription found for PreApproval ${preApprovalId}`);
+      return;
     }
+
+    await upsertSubscriptionFromGatewayEvent({
+      gateway: 'MERCADO_PAGO',
+      gatewaySubscriptionId: preApprovalId,
+      userId: subscription.userId,
+      restaurantId: subscription.restaurantId,
+      tier: subscription.tier,
+      planName: subscription.planName,
+      billingCycle: subscription.billingCycle as 'monthly' | 'annual',
+      amount: Number(subscription.amount),
+      currency: subscription.currency,
+      status: mapMPPreApprovalStatus(preApproval.status),
+      trialStart: subscription.trialStart,
+      trialEnd: subscription.trialEnd,
+      cancelledAt: preApproval.status === 'cancelled' ? new Date() : null,
+      metadata: { mpPreApprovalId: preApprovalId },
+    });
   } catch (error) {
     console.error(`[MP Webhook] PreApproval error for ${preApprovalId}:`, error);
     throw error;

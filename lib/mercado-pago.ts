@@ -38,7 +38,9 @@ const MP_PUBLIC_KEY = IS_PROD
   ? (process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY_PROD || process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY)
   : process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY;
 
-export const MP_WEBHOOK_SECRET = process.env.MERCADO_PAGO_WEBHOOK_SECRET || '';
+export const MP_WEBHOOK_SECRET = IS_PROD
+  ? (process.env.MERCADO_PAGO_WEBHOOK_SECRET_PROD || process.env.MERCADO_PAGO_WEBHOOK_SECRET || '')
+  : (process.env.MERCADO_PAGO_WEBHOOK_SECRET || '');
 export const MP_IS_PRODUCTION = IS_PROD;
 
 let mpClient: MercadoPagoConfig | null = null;
@@ -254,6 +256,41 @@ export async function updatePreApproval(preApprovalId: string, status: 'paused' 
     id: preApprovalId,
     body: { status },
   });
+}
+
+/**
+ * Maps Mercado Pago's PreApproval status to our normalized subscription
+ * vocabulary (see lib/billing/subscription-sync.ts). MP has no native
+ * "trialing" status - the sync helper derives that separately from
+ * trialEnd, so `authorized` maps straight to `active` here regardless of
+ * whether the subscription is currently inside its free trial period.
+ */
+export function mapMPPreApprovalStatus(
+  mpStatus: string
+): 'trialing' | 'active' | 'past_due' | 'canceled' | 'incomplete' {
+  switch (mpStatus) {
+    case 'authorized':
+      return 'active';
+    case 'paused':
+      return 'past_due';
+    case 'cancelled':
+      return 'canceled';
+    case 'pending':
+    default:
+      return 'incomplete';
+  }
+}
+
+/**
+ * MP's PreApproval only accepts frequency_type 'days' or 'months' (no
+ * 'years') - annual billing is expressed as 12 months.
+ */
+export function getMPAutoRecurringForBillingCycle(
+  billingCycle: 'monthly' | 'annual'
+): { frequency: number; frequencyType: 'months' } {
+  return billingCycle === 'annual'
+    ? { frequency: 12, frequencyType: 'months' }
+    : { frequency: 1, frequencyType: 'months' };
 }
 
 // ============================================================
