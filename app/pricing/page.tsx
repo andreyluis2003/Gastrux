@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 import { TestimonialsCarousel } from '@/components/marketing/testimonials-carousel';
 import { FAQSection } from '@/components/marketing/faq-section';
+import { GatewayChoiceDialog } from '@/components/billing/gateway-choice-dialog';
 import { cn } from '@/lib/utils';
 
 const FEATURES_COMPARISON = [
@@ -75,28 +76,19 @@ export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
+  const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
+  const [gatewayDialogTier, setGatewayDialogTier] = useState<{ id: string; name: string } | null>(null);
 
   const tiers = Object.values(STRIPE_PRICING_TIERS);
 
-  const handleUpgrade = async (tierId: string) => {
-    if (!session?.user?.email) {
-      toast.info('Faça login ou crie sua conta para continuar');
-      router.push('/auth/signup?redirect=/pricing');
-      return;
-    }
+  useEffect(() => {
+    fetch('/api/billing/gateways')
+      .then((res) => res.json())
+      .then((data) => setMercadoPagoEnabled(!!data.mercadoPago))
+      .catch(() => setMercadoPagoEnabled(false));
+  }, []);
 
-    if (tierId === 'starter') {
-      toast.success('Você já tem acesso ao plano Starter. Bem-vindo!');
-      router.push('/dashboard');
-      return;
-    }
-
-    if (tierId === 'enterprise') {
-      toast.info('Um consultor vai falar com você para montar o plano Enterprise');
-      router.push('/suporte/novo?tipo=enterprise');
-      return;
-    }
-
+  const startStripeCheckout = async (tierId: string) => {
     setLoading(tierId);
     try {
       const response = await fetch('/api/billing/checkout-session', {
@@ -117,6 +109,35 @@ export default function PricingPage() {
     } finally {
       setLoading(null);
     }
+  };
+
+  const handleUpgrade = async (tier: { id: string; name: string }) => {
+    const tierId = tier.id;
+
+    if (!session?.user?.email) {
+      toast.info('Faça login ou crie sua conta para continuar');
+      router.push('/auth/signup?redirect=/pricing');
+      return;
+    }
+
+    if (tierId === 'starter') {
+      toast.success('Você já tem acesso ao plano Starter. Bem-vindo!');
+      router.push('/dashboard');
+      return;
+    }
+
+    if (tierId === 'enterprise') {
+      toast.info('Um consultor vai falar com você para montar o plano Enterprise');
+      router.push('/suporte/novo?tipo=enterprise');
+      return;
+    }
+
+    if (mercadoPagoEnabled) {
+      setGatewayDialogTier(tier);
+      return;
+    }
+
+    await startStripeCheckout(tierId);
   };
 
   const annualSavings = (tier: any) => {
@@ -269,7 +290,7 @@ export default function PricingPage() {
 
                     {/* CTA */}
                     <Button
-                      onClick={() => handleUpgrade(tier.id)}
+                      onClick={() => handleUpgrade(tier)}
                       disabled={loading === tier.id}
                       className={cn(
                         'w-full mb-6',
@@ -455,6 +476,17 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+
+      {gatewayDialogTier && (
+        <GatewayChoiceDialog
+          open={!!gatewayDialogTier}
+          onOpenChange={(open) => { if (!open) setGatewayDialogTier(null); }}
+          tierId={gatewayDialogTier.id}
+          tierName={gatewayDialogTier.name}
+          billing={billing}
+          mercadoPagoEnabled={mercadoPagoEnabled}
+        />
+      )}
     </div>
   );
 }

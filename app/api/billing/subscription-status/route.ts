@@ -84,7 +84,25 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(subscriptionData);
+    // Best-effort: surface which gateway is billing this subscription so the
+    // UI can show "via Mercado Pago" / "via Stripe". Not authoritative for
+    // tier/status - Restaurant/User above remain the source of truth for that.
+    const latestSubscription = await prisma.subscription.findFirst({
+      where: {
+        OR: [
+          { userId: user.id },
+          user.currentRestaurantId ? { restaurantId: user.currentRestaurantId } : undefined,
+        ].filter(Boolean) as any,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { gateway: true, cancelAtPeriodEnd: true },
+    });
+
+    return NextResponse.json({
+      ...subscriptionData,
+      gateway: latestSubscription?.gateway ?? null,
+      cancelAtPeriodEnd: latestSubscription?.cancelAtPeriodEnd ?? false,
+    });
   } catch (error) {
     console.error('Subscription status error:', error);
     return NextResponse.json(
