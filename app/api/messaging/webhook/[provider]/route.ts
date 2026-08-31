@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,12 +72,12 @@ export async function POST(req: NextRequest, { params }: any) {
   if (status === 'DELIVERED') {
     await prisma.messageCampaign.update({
       where: { id: recipient.campaignId },
-        restaurantId,
+      data: { totalDelivered: { increment: 1 } },
     });
   } else if (status === 'READ') {
     await prisma.messageCampaign.update({
       where: { id: recipient.campaignId },
-        restaurantId,
+      data: { totalRead: { increment: 1 } },
     });
   }
 

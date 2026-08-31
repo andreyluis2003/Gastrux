@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { orderSessionId, customerCPF, customerName, customerEmail, paymentMethod } = body || {};
 
@@ -35,9 +41,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'orderSessionId obrigatório' }, { status: 400 });
     }
 
-    // Carregar session com items
-    const orderSession = await prisma.orderSession.findUnique({
-      where: { id: orderSessionId },
+    // Carregar session com items (escopado ao restaurante do chamador - nunca
+    // emitir NFC-e de uma comanda de outro restaurante)
+    const orderSession = await prisma.orderSession.findFirst({
+      where: { id: orderSessionId, restaurantId },
       include: {
         items: { include: { recipe: true } },
       },
@@ -63,10 +70,9 @@ export async function POST(request: NextRequest) {
       }, { status: 409 });
     }
 
-    // Config
+    // Config (uma por restaurante - nunca emitir sob o CNPJ de outro restaurante)
     const config = await prisma.nFeConfig.findFirst({
-      where: { active: true },
-      orderBy: { createdAt: 'desc' },
+      where: { restaurantId, active: true },
     });
     if (!config) {
       return NextResponse.json({ error: 'NFeConfig não configurada. Configure em /admin/nfe/config' }, { status: 400 });

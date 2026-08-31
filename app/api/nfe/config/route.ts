@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-    const config = await prisma.nFeConfig.findFirst();
+    const config = await prisma.nFeConfig.findUnique({ where: { restaurantId } });
     if (!config) {
       return NextResponse.json(
         { error: 'NF-e configuration not found' },
@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if config already exists
-    const existingConfig = await prisma.nFeConfig.findFirst();
+    // Check if config already exists for this restaurant
+    const existingConfig = await prisma.nFeConfig.findUnique({ where: { restaurantId } });
 
     if (existingConfig) {
       const data: any = {
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       if (nfeApiKey) data.nfeApiKey = nfeApiKey;
       const updated = await prisma.nFeConfig.update({
         where: { id: existingConfig.id },
-          restaurantId,
+        data,
       });
       return NextResponse.json(updated);
     } else {
@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
       }
       const config = await prisma.nFeConfig.create({
         data: {
+          restaurantId,
           cnpj,
           stateRegistration,
           municipalRegistration,

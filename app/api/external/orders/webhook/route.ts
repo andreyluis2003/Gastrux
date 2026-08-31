@@ -5,27 +5,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createOrderFromExternalOrder } from '@/lib/kds-integration';
 import crypto from 'crypto';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
     const signature = req.headers.get('x-webhook-signature');
     const body = await req.text();
 
     // Parse platform type from URL or header
     const platform = req.headers.get('x-platform') || 'ifood';
 
-    // Get integration
+    // This is an external platform webhook (iFood etc) - there is no logged-in
+    // user session to resolve a restaurant from. The restaurant is identified
+    // by matching the payload's storeId against the integration configured for
+    // that platform (set up via /api/admin/integrations/delivery). Signature
+    // verification against that integration's own secret is what actually
+    // authenticates the caller.
+    const preParsed = JSON.parse(body);
+    const storeId = preParsed.storeId || preParsed.merchantId || null;
+    if (!storeId) {
+      return NextResponse.json({ error: 'storeId/merchantId ausente no payload' }, { status: 400 });
+    }
+
     const integration = await prisma.deliveryIntegration.findFirst({
-      where: { restaurantId, platform: platform as any },
+      where: { platform: platform as any, storeId },
     });
 
     if (!integration) {
@@ -34,6 +38,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const restaurantId = integration.restaurantId;
 
     // Verify signature
     if (integration.webhookSecret && signature) {
@@ -50,12 +55,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const data = JSON.parse(body);
+    const data = preParsed;
 
     // Handle different webhook types
     if (data.type === 'order.new' || data.type === 'ORDER_RECEIVED') {
       const externalOrder = await prisma.externalOrder.create({
         data: {
+          restaurantId,
           integrationId: integration.id,
           externalOrderId: data.orderId || data.id,
           externalCustomerId: data.customerId,
@@ -96,10 +102,10 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      if (externalOrder) {
+      if (externalOrder && data.status) {
         await prisma.externalOrder.update({
           where: { id: externalOrder.id },
-            restaurantId,
+          data: { status: data.status },
         });
       }
     }

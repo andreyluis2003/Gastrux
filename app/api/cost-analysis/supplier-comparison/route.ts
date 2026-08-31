@@ -35,6 +35,16 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    // Verify the ingredient belongs to this restaurant before exposing its
+    // suppliers' pricing data
+    const ingredient = await prisma.ingredient.findFirst({
+      where: { id: ingredientId, restaurantId },
+      include: { category: true },
+    });
+    if (!ingredient) {
+      return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
+    }
+
     // Get all suppliers for this ingredient
     const suppliers = await prisma.ingredientSupplier.findMany({
       where: { ingredientId },
@@ -76,18 +86,12 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Get ingredient info
-    const ingredient = await prisma.ingredient.findUnique({
-      where: { id: ingredientId },
-        restaurantId,
-    });
-
     return NextResponse.json({
       ingredient: {
-        id: ingredient?.id,
-        name: ingredient?.name,
-        code: ingredient?.code,
-        category: ingredient?.category.name,
+        id: ingredient.id,
+        name: ingredient.name,
+        code: ingredient.code,
+        category: ingredient.category?.name,
       },
       period: { startDate, endDate, days },
       suppliers: supplierComparison.sort((a, b) => a.avgPrice - b.avgPrice),

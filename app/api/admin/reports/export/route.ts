@@ -33,8 +33,7 @@ export async function GET(request: NextRequest) {
     switch (type) {
       case 'sales': {
         const payments = await prisma.payment.findMany({
-          where: { status: 'APPROVED', createdAt: { gte: startDate } },
-            restaurantId,
+          where: { status: 'APPROVED', createdAt: { gte: startDate }, restaurantId },
           orderBy: { createdAt: 'desc' },
         });
         csvContent = 'ID,Valor,M\u00e9todo,Status,Data\n';
@@ -59,8 +58,8 @@ export async function GET(request: NextRequest) {
       }
       case 'staff': {
         const staff = await prisma.staffMember.findMany({
-          where: {},
-            restaurantId,
+          where: { restaurantId },
+          include: { user: { select: { name: true, email: true } } },
         });
         csvContent = 'Nome,Email,Cargo,Status,Sal\u00e1rio Base,Pedidos Processados\n';
         staff.forEach((s) => {
@@ -70,10 +69,14 @@ export async function GET(request: NextRequest) {
         break;
       }
       case 'users': {
-        const users = await prisma.user.findMany({
-          select: { name: true, email: true, role: true, active: true, createdAt: true, lastSignInAt: true },
+        const memberships = await prisma.restaurantUser.findMany({
+          where: { restaurantId },
+          select: {
+            user: { select: { name: true, email: true, role: true, active: true, createdAt: true, lastSignInAt: true } },
+          },
           orderBy: { createdAt: 'desc' },
         });
+        const users = memberships.map((m) => m.user);
         csvContent = 'Nome,Email,Cargo,Ativo,Criado Em,\u00daltimo Acesso\n';
         users.forEach((u) => {
           csvContent += `"${u.name || 'N/A'}",${u.email},${u.role},${u.active ? 'Sim' : 'N\u00e3o'},${u.createdAt.toISOString()},${u.lastSignInAt?.toISOString() || 'N/A'}\n`;

@@ -19,8 +19,18 @@ export async function GET(
   const { error } = await requireAdminSession();
   if (error) return error;
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
+  }
+
   try {
     const { id } = await params;
+    const membership = await prisma.restaurantUser.findFirst({ where: { userId: id, restaurantId }, select: { id: true } });
+    if (!membership) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -92,6 +102,11 @@ export async function PUT(
 
   try {
     const { id } = await params;
+    const membership = await prisma.restaurantUser.findFirst({ where: { userId: id, restaurantId }, select: { id: true } });
+    if (!membership) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
+    }
+
     const body = await request.json();
     const { name, email, role, active, password, phone, cpf } = body;
 
@@ -142,11 +157,12 @@ export async function PUT(
         if (role !== undefined) staffUpdate.role = role;
         await prisma.staffMember.update({
           where: { id: existingUser.staffMember.id },
-            restaurantId,
+          data: staffUpdate,
         });
       } else if (phone || cpf) {
         await prisma.staffMember.create({
           data: {
+            restaurantId,
             userId: id,
             phone: phone || null,
             cpf: cpf || null,
@@ -196,6 +212,11 @@ export async function DELETE(
   const { error, session } = await requireAdminSession([UserRole.OWNER]);
   if (error) return error;
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
+  }
+
   try {
     const { id } = await params;
     const userId = (session.user as any).id;
@@ -203,6 +224,11 @@ export async function DELETE(
     // Não permitir auto-exclusão
     if (id === userId) {
       return NextResponse.json({ error: 'Não é possível desativar sua própria conta' }, { status: 400 });
+    }
+
+    const membership = await prisma.restaurantUser.findFirst({ where: { userId: id, restaurantId }, select: { id: true } });
+    if (!membership) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
@@ -218,7 +244,7 @@ export async function DELETE(
     // Desativar StaffMember também
     await prisma.staffMember.updateMany({
       where: { userId: id },
-        restaurantId,
+      data: { status: 'TERMINATED' },
     });
 
     const ctx = getRequestContext(request);

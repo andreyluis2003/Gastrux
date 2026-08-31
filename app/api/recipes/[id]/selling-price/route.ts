@@ -20,9 +20,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     const { sellingPrice } = await req.json();
 
+    const owned = await prisma.recipe.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Receita não encontrada' }, { status: 404 });
+    }
+
     const recipe = await prisma.recipe.update({
       where: { id: params.id },
-        restaurantId,
+      data: { sellingPrice },
     });
 
     return NextResponse.json(recipe);

@@ -19,8 +19,7 @@ export async function GET(req: NextRequest) {
   if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
   const configs = await prisma.messagingProviderConfig.findMany({
-    where: {},
-      restaurantId,
+    where: { restaurantId },
   });
 
   const masked = configs.map((c: any) => ({
@@ -32,8 +31,7 @@ export async function GET(req: NextRequest) {
 
   // Include WhatsApp (Meta) status to show the user connected sources
   const wa = await prisma.whatsAppConfig.findUnique({
-    where: {},
-      restaurantId,
+    where: { restaurantId },
   });
 
   return NextResponse.json({ configs: masked, metaWhatsapp: wa });
@@ -64,7 +62,7 @@ export async function PATCH(req: NextRequest) {
   const saved = existing
     ? await prisma.messagingProviderConfig.update({
         where: { id: existing.id },
-          restaurantId,
+        data: cleaned,
       })
     : await prisma.messagingProviderConfig.create({
         data: { restaurantId, provider, ...cleaned },

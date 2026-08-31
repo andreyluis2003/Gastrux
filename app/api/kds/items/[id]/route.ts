@@ -26,6 +26,14 @@ export async function PUT(
     }
 
 
+    const owned = await prisma.orderItem.findFirst({
+      where: { id: params.id, order: { restaurantId } },
+      select: { id: true },
+    });
+    if (!owned) {
+      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
+    }
+
     const body = await req.json();
     const { status, stationId, startedAt, completedAt } = body;
 
@@ -47,9 +55,9 @@ export async function PUT(
 
     // Update station assignment status if item is ready/completed
     if (status === 'COMPLETED' && item.stationId) {
-      const order = await prisma.order.findUnique({
-        where: { id: item.orderId },
-          restaurantId,
+      const order = await prisma.order.findFirst({
+        where: { id: item.orderId, restaurantId },
+        include: { items: true },
       });
 
       if (order) {

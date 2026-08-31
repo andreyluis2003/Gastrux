@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest) {
 
   const updated = await prisma.whatsAppConfig.update({
     where: { id: existing.id },
-      restaurantId,
+    data,
   });
 
   return NextResponse.json({

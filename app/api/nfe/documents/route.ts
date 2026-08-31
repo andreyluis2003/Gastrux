@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const where: any = {};
+    const where: any = { config: { restaurantId } };
     if (status) {
       where.status = status;
     }
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Get configuration
-    const config = await prisma.nFeConfig.findFirst();
+    const config = await prisma.nFeConfig.findUnique({ where: { restaurantId } });
     if (!config) {
       return NextResponse.json(
         { error: 'NF-e configuration not found' },
@@ -169,12 +169,12 @@ export async function POST(request: NextRequest) {
     if (documentType === 'NFCe') {
       await prisma.nFeConfig.update({
         where: { id: config.id },
-          restaurantId,
+        data: { nextNumberNFCe: nextNumber + 1 },
       });
     } else {
       await prisma.nFeConfig.update({
         where: { id: config.id },
-          restaurantId,
+        data: { nextNumberNFe: nextNumber + 1 },
       });
     }
 

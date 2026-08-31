@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
     let sessionRef = orderSessionId;
 
     if (orderSessionId) {
-      const orderSession = await prisma.orderSession.findUnique({
-        where: { id: orderSessionId },
-          restaurantId,
+      const orderSession = await prisma.orderSession.findFirst({
+        where: { id: orderSessionId, restaurantId },
+        include: { items: { include: { recipe: true } } },
       });
 
       if (!orderSession || !orderSession.items?.length) {
@@ -82,9 +82,10 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Check for existing NFC-e
+      // Check for existing NFC-e (NFeDocument has no restaurantId field - already
+      // scoped via the orderSession lookup above, which is tenant-checked)
       const existing = await prisma.nFeDocument.findFirst({
-        where: { restaurantId, orderSessionId, status: { in: ['authorized', 'submitted', 'processing'] } },
+        where: { orderSessionId, status: { in: ['authorized', 'submitted', 'processing'] } },
       });
       if (existing) {
         return NextResponse.json({
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
     // Increment NFC-e number
     await prisma.nFeConfig.update({
       where: { id: nfeConfig.id },
-        restaurantId,
+      data: { nextNumberNFCe: docNumber + 1 },
     });
 
     // Try to submit to SEFAZ via provider

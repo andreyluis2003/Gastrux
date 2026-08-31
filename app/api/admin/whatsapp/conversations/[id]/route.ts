@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const updated = await prisma.whatsAppConversation.update({
     where: { id: conv.id },
-      restaurantId,
+    data,
   });
   return NextResponse.json({ conversation: updated });
 }

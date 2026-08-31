@@ -49,9 +49,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Get ingredient details
-    const ingredient = await prisma.ingredient.findUnique({
-      where: { id: ingredientId },
-        restaurantId,
+    const ingredient = await prisma.ingredient.findFirst({
+      where: { id: ingredientId, restaurantId },
+      include: { category: true },
     });
 
     if (!ingredient) {

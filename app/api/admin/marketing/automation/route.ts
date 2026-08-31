@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { calculateLeadScore } from '@/lib/marketing/lead-scoring';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,13 +29,9 @@ export async function POST(req: NextRequest) {
       // Authenticated via bearer
     } else {
       const session = await getServerSession(authOptions);
-      if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
+      if (!session || !isPlatformAdminIdentity((session.user as any)?.role, (session.user as any)?.email)) {
+        return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+      }
     }
   }
 
@@ -48,11 +44,7 @@ export async function POST(req: NextRequest) {
     };
 
     // 1. Recalcular scores de todos os leads ativos
-    const activeLeads = await prisma.marketingLead.findMany({
-      where: {
-        restaurantId,
-      },
-    });
+    const activeLeads = await prisma.marketingLead.findMany();
 
     for (const lead of activeLeads) {
       const newScore = calculateLeadScore({
@@ -69,7 +61,7 @@ export async function POST(req: NextRequest) {
       if (newScore !== lead.score) {
         await prisma.marketingLead.update({
           where: { id: lead.id },
-            restaurantId,
+          data: { score: newScore },
         });
         results.scoresUpdated++;
       }
@@ -79,7 +71,6 @@ export async function POST(req: NextRequest) {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const unresponsive = await prisma.marketingLead.updateMany({
       where: {
-        restaurantId,
         contactAttempts: { gte: 3 },
         lastContactAt: { lt: thirtyDaysAgo },
       },
@@ -91,7 +82,6 @@ export async function POST(req: NextRequest) {
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const toWelcome = await prisma.marketingLead.updateMany({
       where: {
-        restaurantId,
         createdAt: { lt: oneDayAgo },
         status: { notIn: ['CONVERTED', 'LOST', 'UNRESPONSIVE'] },
       },
@@ -102,7 +92,6 @@ export async function POST(req: NextRequest) {
     // 4. Leads com score alto e WELCOME_SENT → ENGAGED
     const toEngaged = await prisma.marketingLead.updateMany({
       where: {
-        restaurantId,
         score: { gte: 50 },
         status: { notIn: ['CONVERTED', 'LOST', 'UNRESPONSIVE'] },
       },

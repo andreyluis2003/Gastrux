@@ -21,8 +21,14 @@ export async function GET(req: NextRequest) {
 
   const [conversations, stats] = await Promise.all([
     prisma.whatsAppConversation.findMany({
-      where: {},
-        restaurantId,
+      where,
+      orderBy: { lastMessageAt: 'desc' },
+      take: limit,
+    }),
+    prisma.whatsAppConversation.groupBy({
+      by: ['state'],
+      where: { restaurantId },
+      _count: { state: true },
     }),
   ]);
 

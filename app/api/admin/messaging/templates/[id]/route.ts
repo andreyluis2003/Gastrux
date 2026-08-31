@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: any) {
 
   const updated = await prisma.messageTemplate.update({
     where: { id: params.id },
-      restaurantId,
+    data,
   });
   return NextResponse.json({ ok: true, template: updated });
 }

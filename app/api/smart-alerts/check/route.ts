@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     for (const alert of alerts) {
       const conditions = JSON.parse(alert.conditions);
-      const triggered = await checkAlertCondition(alert.triggerType, conditions);
+      const triggered = await checkAlertCondition(alert.triggerType, conditions, restaurantId);
 
       if (triggered.length > 0) {
         // Check cooldown
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         // Update last triggered time
         await prisma.smartAlert.update({
           where: { id: alert.id },
-            restaurantId,
+          data: { lastTriggeredAt: new Date() },
         });
       }
     }
@@ -85,7 +85,8 @@ export async function POST(req: NextRequest) {
 
 async function checkAlertCondition(
   triggerType: string,
-  conditions: any
+  conditions: any,
+  restaurantId: string
 ): Promise<any[]> {
   const triggered = [];
 
