@@ -42,10 +42,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
     }
 
-    // Resolve menu items and compute totals
+    // Resolve menu items and compute totals (scoped to this restaurant - a
+    // client could otherwise mix in another restaurant's menuItemIds/prices)
     const menuItemIds = items.map((i: any) => i.menuItemId);
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds }, active: true, available: true },
+      where: { id: { in: menuItemIds }, restaurantId, active: true, available: true },
       include: { images: { take: 1 } },
     });
 
@@ -72,22 +73,30 @@ export async function POST(req: NextRequest) {
     const total = subtotal + Number(deliveryFee);
     const orderNumber = generateOrderNumber();
 
-    // Find or create customer
+    // Find or create customer, scoped to this restaurant. Customer.email is
+    // globally unique (not per-restaurant), so if this email already belongs
+    // to a customer at a different restaurant, skip linking a Customer to
+    // this order rather than misattributing someone else's CRM record or
+    // crashing on the unique constraint.
     let customer = null;
     if (customerEmail) {
-      customer = await prisma.customer.findUnique({ where: { email: customerEmail } });
-    }
-    if (!customer && customerEmail) {
-      customer = await prisma.customer.create({
-        data: {
-          name: customerName,
-          email: customerEmail,
-          phone: customerPhone,
-          address: deliveryAddress,
-          city: deliveryCity || '',
-          zipCode: deliveryZipCode || '',
-        },
-      });
+      customer = await prisma.customer.findFirst({ where: { email: customerEmail, restaurantId } });
+      if (!customer) {
+        const emailTakenElsewhere = await prisma.customer.findUnique({ where: { email: customerEmail } });
+        if (!emailTakenElsewhere) {
+          customer = await prisma.customer.create({
+            data: {
+              restaurantId,
+              name: customerName,
+              email: customerEmail,
+              phone: customerPhone,
+              address: deliveryAddress,
+              city: deliveryCity || '',
+              zipCode: deliveryZipCode || '',
+            },
+          });
+        }
+      }
     }
 
     const order = await prisma.order.create({
