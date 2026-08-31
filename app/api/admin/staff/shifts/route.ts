@@ -46,11 +46,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sem permiss\u00e3o' }, { status: 403 });
   }
 
+  const userId = (session.user as any).id;
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { currentRestaurantId: true, restaurants: { take: 1, select: { restaurantId: true } } },
+  });
+  const restaurantId = u?.currentRestaurantId || u?.restaurants?.[0]?.restaurantId;
+  if (!restaurantId) return NextResponse.json({ error: 'Restaurante n\u00e3o encontrado' }, { status: 403 });
+
   const body = await req.json();
   const { staffMemberId, shiftDate, startTime, endTime, shiftType, notes } = body;
 
   if (!staffMemberId || !shiftDate || !startTime || !endTime) {
     return NextResponse.json({ error: 'Campos obrigat\u00f3rios: staffMemberId, shiftDate, startTime, endTime' }, { status: 400 });
+  }
+
+  const staffMember = await prisma.staffMember.findFirst({ where: { id: staffMemberId, restaurantId }, select: { id: true } });
+  if (!staffMember) {
+    return NextResponse.json({ error: 'Funcion\u00e1rio n\u00e3o encontrado' }, { status: 404 });
   }
 
   const shift = await prisma.staffShift.upsert({

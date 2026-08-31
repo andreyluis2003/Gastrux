@@ -67,6 +67,21 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // A person can only be a StaffMember at one restaurant at a time (userId is
+  // globally unique on StaffMember). If this email already belongs to staff
+  // at a different restaurant, refuse instead of silently overwriting their
+  // role/salary/commission there.
+  const existingMember = await prisma.staffMember.findUnique({
+    where: { userId: staffUser.id },
+    select: { restaurantId: true },
+  });
+  if (existingMember && existingMember.restaurantId !== restaurantId) {
+    return NextResponse.json(
+      { error: 'Este email já está cadastrado como funcionário em outro restaurante' },
+      { status: 409 }
+    );
+  }
+
   // Link to restaurant
   await prisma.restaurantUser.upsert({
     where: { restaurantId_userId: { restaurantId, userId: staffUser.id } },
