@@ -52,6 +52,21 @@ async function main() {
   }
   console.log('✓ Test user linked to restaurant (currentRestaurantId set)');
 
+  // Mirror the signup flow's RestaurantUser membership row - endpoints like
+  // /api/restaurants join through RestaurantUser, not just ownerId/currentRestaurantId.
+  await prisma.restaurantUser.upsert({
+    where: { restaurantId_userId: { restaurantId: restaurant.id, userId: testUser.id } },
+    update: {},
+    create: {
+      restaurantId: restaurant.id,
+      userId: testUser.id,
+      role: 'OWNER',
+      permissions: ['ALL'],
+      acceptedAt: new Date(),
+    },
+  });
+  console.log('✓ Test user linked via RestaurantUser (role: OWNER)');
+
   // Create default ingredient categories
   const categories = [
     { name: 'Proteína', color: '#ef4444' },
