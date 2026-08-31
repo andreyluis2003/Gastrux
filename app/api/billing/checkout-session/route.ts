@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { tierId } = await request.json();
+    const { tierId, billing } = await request.json();
     if (!tierId) {
       return NextResponse.json(
         { error: 'Missing tierId' },
@@ -46,10 +46,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isAnnual = billing === 'annual';
+    const stripePriceId = isAnnual ? tier.stripePriceIdAnnual : tier.stripePriceId;
+
     // Validate Stripe Price ID for paid tiers
-    if (tierId !== 'starter' && !tier.stripePriceId) {
+    if (tierId !== 'starter' && !stripePriceId) {
       return NextResponse.json(
-        { error: `Stripe Price ID not configured for tier: ${tierId}` },
+        { error: `Stripe Price ID not configured for tier: ${tierId} (${isAnnual ? 'annual' : 'monthly'})` },
         { status: 500 }
       );
     }
@@ -96,13 +99,13 @@ export async function POST(request: NextRequest) {
       locale: 'pt-BR',
       billing_address_collection: 'auto',
       line_items: isSubscription
-        ? [{ price: tier.stripePriceId || '', quantity: 1 }]
+        ? [{ price: stripePriceId || '', quantity: 1 }]
         : undefined,
       ...(isSubscription
         ? {
             subscription_data: {
               trial_period_days: 30,
-              metadata: { userId: user.id, tierId },
+              metadata: { userId: user.id, tierId, billing: isAnnual ? 'annual' : 'monthly' },
             },
           }
         : {}),

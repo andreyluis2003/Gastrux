@@ -6,6 +6,7 @@ import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 import { logPaymentEvent, logSubscriptionEvent, logInvoiceEvent, logWebhookEvent } from '@/lib/payment-logger';
 import { queuePaymentForRetry } from '@/lib/dunning-flow';
 import { createInvoice } from '@/lib/billing/invoice-service';
+import { upsertSubscriptionFromGatewayEvent, NormalizedSubscriptionStatus } from '@/lib/billing/subscription-sync';
 import {
   alertPaymentSucceeded,
   alertPaymentFailed,
@@ -61,11 +62,15 @@ export async function POST(request: NextRequest) {
     }
 
     const event = await verifyWebhookSignature(body, signature);
-    
+
     // Log webhook received
     await logWebhookEvent(event.id, event.type, 'received');
 
     switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+        break;
+
       case 'customer.subscription.created':
         await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
         break;
@@ -101,13 +106,13 @@ export async function POST(request: NextRequest) {
     console.error('[WEBHOOK] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await logWebhookEvent('unknown', 'unknown', 'failed', errorMessage);
-    
+
     // Alert Sentry about webhook error
     if (error instanceof Error) {
       await handleWebhookError(error, 'unknown', 'unknown');
       await alertWebhookProcessingError('unknown', 'unknown', error.message);
     }
-    
+
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 400 }
@@ -115,11 +120,25 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * Fires the instant a Stripe Checkout session completes. For subscription-mode
+ * sessions this lets us sync state a beat earlier than waiting on the separate
+ * customer.subscription.created event (useful for /billing/success polling).
+ * For setup-mode sessions (the free "starter" tier) there's no subscription to
+ * sync - nothing to do beyond logging.
+ */
+async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+  if (session.mode !== 'subscription' || !session.subscription) {
+    return;
+  }
+  const subscription = await getStripe().subscriptions.retrieve(session.subscription as string);
+  await syncFromStripeSubscription(subscription);
+}
+
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const user = await prisma.user.findFirst({
     where: { stripeCustomerId: subscription.customer as string },
   });
-
   if (!user) return;
 
   const items = subscription.items.data;
@@ -127,77 +146,99 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const tierId = getTierIdFromPriceId(priceId);
 
   await logSubscriptionEvent(user.id, subscription.id, 'created', 'starter', tierId);
-  
-  // Send Sentry alert
-  const planName = getPlanNameFromTierId(tierId);
-  await alertSubscriptionCreated(subscription.customer as string, subscription.id, planName);
+  await alertSubscriptionCreated(subscription.customer as string, subscription.id, getPlanNameFromTierId(tierId));
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      subscriptionId: subscription.id,
-      subscriptionTier: tierId,
-      subscriptionStatus: subscription.status,
-      billingCycleStart: new Date((subscription.current_period_start as number) * 1000),
-      billingCycleEnd: new Date((subscription.current_period_end as number) * 1000),
-      trialEndsAt: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000)
-        : null,
-    },
-  });
-
-  // Also sync tier to Restaurant
-  await syncRestaurantTier(user.id, tierId, subscription.status);
+  await syncFromStripeSubscription(subscription);
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const user = await prisma.user.findFirst({
     where: { stripeCustomerId: subscription.customer as string },
   });
-
   if (!user) return;
 
-  const items = subscription.items.data;
-  const priceId = items[0]?.price.id;
+  const priceId = subscription.items.data[0]?.price.id;
   const tierId = getTierIdFromPriceId(priceId);
+  await logSubscriptionEvent(user.id, subscription.id, 'updated', user.subscriptionTier, tierId);
 
-  const oldTier = user.subscriptionTier;
-  await logSubscriptionEvent(user.id, subscription.id, 'updated', oldTier, tierId);
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      subscriptionTier: tierId,
-      subscriptionStatus: subscription.status,
-      billingCycleStart: new Date((subscription.current_period_start as number) * 1000),
-      billingCycleEnd: new Date((subscription.current_period_end as number) * 1000),
-    },
-  });
-
-  // Also sync tier to Restaurant
-  await syncRestaurantTier(user.id, tierId, subscription.status);
+  await syncFromStripeSubscription(subscription);
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const user = await prisma.user.findFirst({
     where: { stripeCustomerId: subscription.customer as string },
   });
-
   if (!user) return;
 
   await logSubscriptionEvent(user.id, subscription.id, 'deleted', user.subscriptionTier, 'starter');
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      subscriptionId: null,
-      subscriptionStatus: 'canceled',
-      subscriptionTier: 'starter',
-    },
+  await upsertSubscriptionFromGatewayEvent({
+    gateway: 'STRIPE',
+    gatewaySubscriptionId: subscription.id,
+    userId: user.id,
+    restaurantId: user.currentRestaurantId,
+    tier: 'starter',
+    billingCycle: 'monthly',
+    amount: 0,
+    status: 'canceled',
+    cancelAtPeriodEnd: false,
+    cancelledAt: new Date(),
   });
+}
 
-  // Also sync tier to Restaurant
-  await syncRestaurantTier(user.id, 'starter', 'canceled');
+/**
+ * Shared by handleSubscriptionCreated/Updated/handleCheckoutSessionCompleted -
+ * resolves tier/billing cycle/status from a live Stripe Subscription object
+ * and writes it through the gateway-agnostic sync helper.
+ */
+async function syncFromStripeSubscription(subscription: Stripe.Subscription) {
+  const user = await prisma.user.findFirst({
+    where: { stripeCustomerId: subscription.customer as string },
+  });
+  if (!user) return;
+
+  const price = subscription.items.data[0]?.price;
+  const tierId = getTierIdFromPriceId(price?.id);
+  const billingCycle = price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
+
+  await upsertSubscriptionFromGatewayEvent({
+    gateway: 'STRIPE',
+    gatewaySubscriptionId: subscription.id,
+    userId: user.id,
+    restaurantId: user.currentRestaurantId,
+    tier: tierId,
+    planName: getPlanNameFromTierId(tierId),
+    billingCycle,
+    amount: (price?.unit_amount || 0) / 100,
+    currency: (price?.currency || 'brl').toUpperCase(),
+    status: mapStripeSubscriptionStatus(subscription.status),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    currentPeriodStart: new Date((subscription.current_period_start as number) * 1000),
+    currentPeriodEnd: new Date((subscription.current_period_end as number) * 1000),
+    trialStart: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
+    trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+    metadata: { stripePriceId: price?.id },
+  });
+}
+
+function mapStripeSubscriptionStatus(status: Stripe.Subscription.Status): NormalizedSubscriptionStatus {
+  switch (status) {
+    case 'trialing':
+      return 'trialing';
+    case 'active':
+      return 'active';
+    case 'past_due':
+      return 'past_due';
+    case 'canceled':
+      return 'canceled';
+    case 'unpaid':
+    case 'paused':
+      return 'past_due';
+    case 'incomplete':
+    case 'incomplete_expired':
+    default:
+      return 'incomplete';
+  }
 }
 
 async function handleInvoiceCreated(invoice: Stripe.Invoice) {
@@ -345,6 +386,13 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, eventId: stri
       subscriptionStatus: 'past_due',
     },
   });
+
+  if (subscriptionId) {
+    await prisma.subscription.updateMany({
+      where: { gateway: 'STRIPE', gatewaySubscriptionId: subscriptionId },
+      data: { status: 'past_due' },
+    });
+  }
 }
 
 function getTierIdFromPriceId(priceId?: string): string {
@@ -373,21 +421,4 @@ function getPlanNameFromTierId(tierId: string): string {
     enterprise: 'Enterprise',
   };
   return tierMap[tierId] || tierId;
-}
-
-/**
- * Sync subscription tier from User to their owned Restaurant(s)
- */
-async function syncRestaurantTier(userId: string, tierId: string, status: string) {
-  try {
-    await prisma.restaurant.updateMany({
-      where: { ownerId: userId },
-      data: {
-        subscriptionTier: tierId,
-        subscriptionStatus: status === 'active' ? 'active' : status === 'canceled' ? 'canceled' : status,
-      },
-    });
-  } catch (err) {
-    console.error('[WEBHOOK] syncRestaurantTier failed (non-fatal):', err);
-  }
 }
