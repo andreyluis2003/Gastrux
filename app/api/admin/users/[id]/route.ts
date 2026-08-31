@@ -4,13 +4,18 @@ import { requireAdminSession, logAdminAction, getRequestContext } from '@/lib/ad
 import { prisma } from '@/lib/prisma';
 import { UserRole } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/admin/users/[id]
  * Detalhes completos de um usuário
+ *
+ * /api/admin/users/* is a platform-admin-only route (gated in middleware.ts
+ * via PLATFORM_ADMIN_API_PREFIXES, independent of this handler's own role
+ * check) for Gastrux staff to manage any user across the whole platform -
+ * it is not scoped to "the caller's restaurant" the way /api/admin/staff is,
+ * since platform admins have no restaurant of their own.
  */
 export async function GET(
   request: NextRequest,
@@ -19,18 +24,8 @@ export async function GET(
   const { error } = await requireAdminSession();
   if (error) return error;
 
-  const restaurantId = await getCurrentRestaurantId();
-  if (!restaurantId) {
-    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
-  }
-
   try {
     const { id } = await params;
-    const membership = await prisma.restaurantUser.findFirst({ where: { userId: id, restaurantId }, select: { id: true } });
-    if (!membership) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-    }
-
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -95,18 +90,8 @@ export async function PUT(
   const { error, session } = await requireAdminSession([UserRole.OWNER, UserRole.ADMIN]);
   if (error) return error;
 
-  const restaurantId = await getCurrentRestaurantId();
-  if (!restaurantId) {
-    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
-  }
-
   try {
     const { id } = await params;
-    const membership = await prisma.restaurantUser.findFirst({ where: { userId: id, restaurantId }, select: { id: true } });
-    if (!membership) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
-    }
-
     const body = await request.json();
     const { name, email, role, active, password, phone, cpf } = body;
 
@@ -160,15 +145,24 @@ export async function PUT(
           data: staffUpdate,
         });
       } else if (phone || cpf) {
-        await prisma.staffMember.create({
-          data: {
-            restaurantId,
-            userId: id,
-            phone: phone || null,
-            cpf: cpf || null,
-            role: updatedUser.role,
-          },
+        // StaffMember requires a restaurantId - resolve it from wherever this
+        // user already belongs (there is no "caller's restaurant" here; this
+        // is a platform-admin tool, not a restaurant-scoped one)
+        const targetMembership = await prisma.restaurantUser.findFirst({
+          where: { userId: id },
+          select: { restaurantId: true },
         });
+        if (targetMembership) {
+          await prisma.staffMember.create({
+            data: {
+              restaurantId: targetMembership.restaurantId,
+              userId: id,
+              phone: phone || null,
+              cpf: cpf || null,
+              role: updatedUser.role,
+            },
+          });
+        }
       }
     }
 
@@ -212,11 +206,6 @@ export async function DELETE(
   const { error, session } = await requireAdminSession([UserRole.OWNER]);
   if (error) return error;
 
-  const restaurantId = await getCurrentRestaurantId();
-  if (!restaurantId) {
-    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
-  }
-
   try {
     const { id } = await params;
     const userId = (session.user as any).id;
@@ -224,11 +213,6 @@ export async function DELETE(
     // Não permitir auto-exclusão
     if (id === userId) {
       return NextResponse.json({ error: 'Não é possível desativar sua própria conta' }, { status: 400 });
-    }
-
-    const membership = await prisma.restaurantUser.findFirst({ where: { userId: id, restaurantId }, select: { id: true } });
-    if (!membership) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
