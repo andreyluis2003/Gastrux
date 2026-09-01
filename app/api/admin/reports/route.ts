@@ -204,7 +204,7 @@ async function getInventoryReport(restaurantId: string) {
     select: {
       id: true,
       name: true,
-      unit: true,
+      standardUnit: true,
       currentStock: { select: { currentQuantity: true } },
       minimumStock: true,
       referenceCost: true,
@@ -241,7 +241,7 @@ async function getInventoryReport(restaurantId: string) {
       items: lowStock.map((i) => ({
         id: i.id,
         name: i.name,
-        unit: i.unit,
+        unit: i.standardUnit,
         currentStock: qtyOf(i),
         minimumStock: Number(i.minimumStock),
         deficit: Number(i.minimumStock) - qtyOf(i),
