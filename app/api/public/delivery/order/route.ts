@@ -52,22 +52,43 @@ export async function POST(req: NextRequest) {
 
     const menuMap = new Map(menuItems.map((m) => [m.id, m]));
 
+    const unknownItems = items.filter((item: any) => !menuMap.has(item.menuItemId));
+    if (unknownItems.length > 0) {
+      return NextResponse.json(
+        { error: 'Um ou mais itens do pedido não foram encontrados no cardápio deste restaurante' },
+        { status: 400 }
+      );
+    }
+
+    // OrderItem.recipeId is required (no menuItemId fallback on that model),
+    // so any requested menu item without a linked recipe cannot become a
+    // kitchen-visible line item. Silently dropping it would still charge the
+    // customer for something the kitchen never sees - refuse instead.
+    const unlinkedItems = items.filter((item: any) => {
+      const mi = menuMap.get(item.menuItemId);
+      return mi && !mi.recipeId;
+    });
+    if (unlinkedItems.length > 0) {
+      const names = unlinkedItems.map((item: any) => menuMap.get(item.menuItemId)?.name).filter(Boolean);
+      return NextResponse.json(
+        { error: `Itens sem receita vinculada não podem ser pedidos ainda: ${names.join(', ')}. Peça ao restaurante para vincular uma receita a esses itens do cardápio.` },
+        { status: 422 }
+      );
+    }
+
     let subtotal = 0;
     const orderItems: { recipeId: string; quantity: number; specialInstructions?: string }[] = [];
 
     for (const item of items) {
       const mi = menuMap.get(item.menuItemId);
-      if (!mi) continue;
+      if (!mi || !mi.recipeId) continue;
       const price = Number(mi.price);
       subtotal += price * (item.quantity || 1);
-      // OrderItem requires recipeId - use menuItem's recipeId if available, otherwise skip
-      if (mi.recipeId) {
-        orderItems.push({
-          recipeId: mi.recipeId,
-          quantity: item.quantity || 1,
-          specialInstructions: item.specialInstructions || undefined,
-        });
-      }
+      orderItems.push({
+        recipeId: mi.recipeId,
+        quantity: item.quantity || 1,
+        specialInstructions: item.specialInstructions || undefined,
+      });
     }
 
     const total = subtotal + Number(deliveryFee);
