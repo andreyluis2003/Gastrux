@@ -30,9 +30,8 @@ export async function GET(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-
-    const batch = await prisma.ingredientBatch.findUnique({
-      where: { id: params.id },
+    const batch = await prisma.ingredientBatch.findFirst({
+      where: { id: params.id, ingredient: { restaurantId } },
       include: {
         ingredient: true,
         supplier: true,
@@ -92,15 +91,14 @@ export async function PUT(
       );
     }
 
-    const batch = await prisma.ingredientBatch.findUnique({
-      where: { id: params.id },
-    });
-
-
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
+
+    const batch = await prisma.ingredientBatch.findFirst({
+      where: { id: params.id, ingredient: { restaurantId } },
+    });
 
     if (!batch) {
       return NextResponse.json(

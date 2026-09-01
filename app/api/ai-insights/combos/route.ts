@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
     // Get sales co-occurrence data (items ordered together)
     const recentSessions = await prisma.orderSession.findMany({
       where: {
+        restaurantId,
         status: { not: 'CANCELLED' as any },
         openedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
       },
