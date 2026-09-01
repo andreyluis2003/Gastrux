@@ -75,7 +75,7 @@ Regras:
         content: JSON.stringify({ question, answer }),
         timeRange: 'instant',
         score: 0,
-        tags: ['chat', 'pergunte-ao-gastrux'],
+        tags: JSON.stringify(['chat', 'pergunte-ao-gastrux']),
         restaurantId,
         createdById: userId,
       },

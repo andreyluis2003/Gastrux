@@ -178,15 +178,15 @@ Responda APENAS em JSON válido com este formato:
           title: combo.name,
           summary: combo.description,
           content: combo.strategy || combo.description,
-          dataSnapshot: {
+          dataSnapshot: JSON.stringify({
             items: combo.items,
             originalPrice: combo.originalPrice,
             comboPrice: combo.comboPrice,
             discountPercent: combo.discountPercent,
-          },
+          }),
           timeRange: 'monthly',
           score: 70,
-          tags: ['combo', 'automatico', 'sprint2'],
+          tags: JSON.stringify(['combo', 'automatico', 'sprint2']),
           pinned: false,
           restaurantId,
           createdById: userId,
