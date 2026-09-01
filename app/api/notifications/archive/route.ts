@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const { notificationId, archiveRead } = body;
 
     if (archiveRead) {
-      await archiveReadNotifications(userId);
+      await archiveReadNotifications(userId, restaurantId);
       return NextResponse.json({ success: true });
     }
 

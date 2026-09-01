@@ -322,11 +322,13 @@ export async function markAsRead(notificationId: string) {
 }
 
 /**
- * Mark all notifications as read for a user
+ * Mark all notifications as read for a user, scoped to one restaurant (a
+ * user can belong to more than one - marking read in restaurant A must not
+ * touch unread notifications in restaurant B).
  */
-export async function markAllAsRead(userId: string) {
+export async function markAllAsRead(userId: string, restaurantId: string) {
   return prisma.notification.updateMany({
-    where: { userId, read: false },
+    where: { userId, restaurantId, read: false },
     data: {
       read: true,
       readAt: new Date(),
@@ -348,11 +350,12 @@ export async function archiveNotification(notificationId: string) {
 }
 
 /**
- * Archive all read notifications for a user
+ * Archive all read notifications for a user, scoped to one restaurant (same
+ * reasoning as markAllAsRead - a user can belong to more than one).
  */
-export async function archiveReadNotifications(userId: string) {
+export async function archiveReadNotifications(userId: string, restaurantId: string) {
   return prisma.notification.updateMany({
-    where: { userId, read: true, archived: false },
+    where: { userId, restaurantId, read: true, archived: false },
     data: {
       archived: true,
       archivedAt: new Date(),

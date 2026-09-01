@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       userId,
+      restaurantId,
       archived: includeArchived ? undefined : false,
     };
 

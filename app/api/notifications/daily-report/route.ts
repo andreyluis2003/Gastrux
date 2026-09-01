@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendNotificationEmail, buildDailyReportEmail } from '@/lib/email-service';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,12 +15,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     // Get statistics
     const [totalIngredients, criticalForecasts, todayMovements, stocks] = await Promise.all([
-      prisma.ingredient.count({ where: { active: true } }),
-      prisma.stockForecast.count({ where: { riskLevel: 'CRITICAL' } }),
+      prisma.ingredient.count({ where: { restaurantId, active: true } }),
+      prisma.stockForecast.count({ where: { restaurantId, riskLevel: 'CRITICAL' } }),
       prisma.stockMovement.count({
         where: {
+          restaurantId,
           createdAt: {
             gte: new Date(new Date().setHours(0, 0, 0, 0)),
             lte: new Date(),
@@ -27,6 +34,7 @@ export async function POST(request: NextRequest) {
         },
       }),
       prisma.stock.findMany({
+        where: { restaurantId },
         include: { ingredient: true },
       }),
     ]);
@@ -45,7 +53,17 @@ export async function POST(request: NextRequest) {
       totalValue
     );
 
-    const ownerEmail = process.env.OWNER_EMAIL || 'admin@restaurante.local';
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { email: true, ownerId: true },
+    });
+    const owner = restaurant?.ownerId
+      ? await prisma.user.findUnique({ where: { id: restaurant.ownerId }, select: { email: true } })
+      : null;
+    const ownerEmail = owner?.email || restaurant?.email;
+    if (!ownerEmail) {
+      return NextResponse.json({ success: true, message: 'No recipient email configured' });
+    }
 
     await sendNotificationEmail({
       notificationId: process.env.NOTIF_ID_RELATRIO_DIRIO_DE_OPERAES || '',

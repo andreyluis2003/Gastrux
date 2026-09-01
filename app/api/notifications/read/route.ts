@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const { notificationId, markAll } = body;
 
     if (markAll) {
-      await markAllAsRead(userId);
+      await markAllAsRead(userId, restaurantId);
       const unreadCount = await prisma.notification.count({
         where: { restaurantId, userId, read: false, archived: false },
       });

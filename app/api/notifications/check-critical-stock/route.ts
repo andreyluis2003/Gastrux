@@ -35,11 +35,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check if we already sent an alert in the last 6 hours
+    // Check if we already sent an alert in the last 6 hours (entityType must
+    // match exactly - any other recent CREATE audit log for this restaurant
+    // would otherwise falsely suppress every real alert)
     const lastAlert = await prisma.auditLog.findFirst({
       where: {
         restaurantId,
         action: 'CREATE',
+        entityType: 'CriticalStockAlert',
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -66,8 +69,21 @@ export async function POST(request: NextRequest) {
 
     const htmlBody = buildCriticalStockAlertEmail(emailData);
 
-    // Get app owner email (from environment)
-    const ownerEmail = process.env.OWNER_EMAIL || 'admin@restaurante.local';
+    // Get this restaurant's own owner email - not a single hardcoded
+    // platform-wide address, which would send every restaurant's critical
+    // stock alerts to the same inbox. Restaurant.ownerId has no declared
+    // Prisma relation, so the owner has to be looked up separately.
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { email: true, ownerId: true },
+    });
+    const owner = restaurant?.ownerId
+      ? await prisma.user.findUnique({ where: { id: restaurant.ownerId }, select: { email: true } })
+      : null;
+    const ownerEmail = owner?.email || restaurant?.email;
+    if (!ownerEmail) {
+      return NextResponse.json({ success: true, message: 'No recipient email configured', sent: false });
+    }
 
     // Send email
     await sendNotificationEmail({
