@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const searchParams = req.nextUrl.searchParams;
     const days = parseInt(searchParams.get('days') || '7');
     const status = searchParams.get('status');
@@ -24,6 +30,7 @@ export async function GET(req: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     const where: any = {
+      restaurantId,
       transactionDate: { gte: startDate },
     };
 
@@ -77,6 +84,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     // Check transaction limit BEFORE processing
     const limitCheck = await checkTransactionLimit(session.user.id);
     if (!limitCheck.allowed) {
@@ -122,6 +134,7 @@ export async function POST(req: NextRequest) {
     // Create transaction
     const transaction = await prisma.pOSTransaction.create({
       data: {
+        restaurantId,
         transactionId,
         provider,
         amount,

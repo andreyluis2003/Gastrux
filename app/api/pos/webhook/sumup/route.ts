@@ -8,16 +8,27 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const settings = await prisma.pOSSettings.findFirst();
+    // Formato esperado SumUp: { transaction_code, amount, currency, payment_type, status, timestamp, ... }
+    const tx = body.transaction || body;
+
+    // No session on an external webhook - resolve the restaurant from the
+    // payload's merchant id, matched against the POSSettings row that
+    // restaurant configured (see stone/route.ts for the full rationale).
+    const merchantId = tx.merchant_code || tx.merchant_id || body.merchant_code || body.merchant_id || null;
+    if (!merchantId) {
+      return NextResponse.json({ error: 'merchant identifier missing' }, { status: 400 });
+    }
+    const settings = await prisma.pOSSettings.findFirst({ where: { sumupMerchantId: String(merchantId) } });
+    if (!settings) {
+      return NextResponse.json({ error: 'unknown merchant' }, { status: 404 });
+    }
 
     // Validacao opcional de secret
     const sig = req.headers.get('x-sumup-signature');
-    if (settings?.webhookSecret && sig && settings.webhookSecret !== sig) {
+    if (settings.webhookSecret && sig && settings.webhookSecret !== sig) {
       return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
     }
 
-    // Formato esperado SumUp: { transaction_code, amount, currency, payment_type, status, timestamp, ... }
-    const tx = body.transaction || body;
     const transactionId = tx.transaction_code || tx.id || `sumup_${Date.now()}`;
     const amount = Number(tx.amount || 0);
     const paymentMethod = (tx.payment_type || tx.payment_method || 'CARD').toUpperCase();
@@ -28,6 +39,7 @@ export async function POST(req: NextRequest) {
       where: { transactionId },
       update: { status, amount, paymentMethod },
       create: {
+        restaurantId: settings.restaurantId,
         transactionId,
         provider: 'SUMUP',
         amount,

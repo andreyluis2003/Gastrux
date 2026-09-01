@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const settings = await prisma.pOSSettings.findFirst();
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const settings = await prisma.pOSSettings.findFirst({ where: { restaurantId } });
     if (!settings) {
       return NextResponse.json(
         { error: 'POS not configured' },
@@ -51,6 +57,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const body = await req.json();
     const {
       provider,
@@ -61,12 +72,15 @@ export async function POST(req: NextRequest) {
       sumupMerchantId,
     } = body;
 
-    // Find or create settings
-    let settings = await prisma.pOSSettings.findFirst();
+    // Find or create settings, scoped to this restaurant - an unscoped
+    // lookup here would silently overwrite a different restaurant's live
+    // payment provider credentials.
+    let settings = await prisma.pOSSettings.findFirst({ where: { restaurantId } });
 
     if (!settings) {
       settings = await prisma.pOSSettings.create({
         data: {
+          restaurantId,
           provider: provider || 'SQUARE',
           isConfigured: true,
           squareAccessToken,
