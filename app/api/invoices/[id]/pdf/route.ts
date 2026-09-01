@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getInvoice, buildInvoicePdfHtml } from '@/lib/billing/invoice-service'
 import { generatePdfFromHtml } from '@/lib/pdf-generator'
+import { isPlatformAdminIdentity } from '@/lib/admin/guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,8 +14,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
   const invoice = await getInvoice(params.id)
   if (!invoice) return NextResponse.json({ error: 'Não encontrada' }, { status: 404 })
-  const role = session.user.role as string
-  const isAdmin = role === 'OWNER' || role === 'ADMIN'
+  const isAdmin = isPlatformAdminIdentity(session.user.role as string, session.user.email as string)
   if (!isAdmin && invoice.userId !== session.user.id) {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }

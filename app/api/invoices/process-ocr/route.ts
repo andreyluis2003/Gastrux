@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getCurrentRestaurantId } from "@/lib/whatsapp/get-restaurant";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +49,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify invoice exists
-    const invoice = await prisma.invoice.findUnique({
-      where: { id: invoiceId },
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: "Restaurant not found" }, { status: 400 });
+    }
+
+    // Verify invoice exists and belongs to this restaurant
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, restaurantId },
     });
 
     if (!invoice) {
@@ -197,6 +203,7 @@ Retorne APENAS JSON válido, sem formatação markdown ou explicações.`,
         // Try to match with existing ingredient
         const matchedIngredient = await prisma.ingredient.findFirst({
           where: {
+            restaurantId,
             OR: [
               {
                 name: {

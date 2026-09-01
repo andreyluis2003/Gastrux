@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getInvoice } from '@/lib/billing/invoice-service'
+import { isPlatformAdminIdentity } from '@/lib/admin/guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,8 +15,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!invoice) {
     return NextResponse.json({ error: 'Fatura não encontrada' }, { status: 404 })
   }
-  const role = session.user.role as string
-  const isAdmin = role === 'OWNER' || role === 'ADMIN'
+  const isAdmin = isPlatformAdminIdentity(session.user.role as string, session.user.email as string)
   if (!isAdmin && invoice.userId !== session.user.id) {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
