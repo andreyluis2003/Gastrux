@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +28,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     // Get the supplier and its integration
-    const supplier = await prisma.supplier.findUnique({
-      where: { id: supplierId },
+    const supplier = await prisma.supplier.findFirst({
+      where: { id: supplierId, restaurantId },
       include: {
         integrations: true,
         ingredients: {
@@ -106,6 +112,7 @@ export async function POST(req: NextRequest) {
         action: 'CREATE',
         entityType: 'SupplierSync',
         entityId: supplierId,
+        restaurantId,
         changes: JSON.stringify({
           itemsSynced: results.length,
           status: 'SUCCESS',
@@ -137,7 +144,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     const syncStatuses = await prisma.supplierIntegration.findMany({
+      where: { supplier: { restaurantId } },
       include: {
         supplier: true,
       },

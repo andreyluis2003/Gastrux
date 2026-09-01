@@ -116,6 +116,7 @@ export async function PUT(
         action: 'UPDATE',
         entityType: 'Supplier',
         entityId: params.id,
+        restaurantId,
         changes: JSON.stringify({
           previous: previousSupplier,
           updated: updatedSupplier,
@@ -176,6 +177,7 @@ export async function DELETE(
         action: 'DELETE',
         entityType: 'Supplier',
         entityId: params.id,
+        restaurantId,
         changes: JSON.stringify({ deactivated: true }),
       },
     });
