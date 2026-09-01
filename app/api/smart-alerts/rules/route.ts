@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     }
 
     const alerts = await prisma.smartAlert.findMany({
+      where: { restaurantId },
       include: {
         _count: { select: { logs: true } },
       },
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
 
     const alert = await prisma.smartAlert.create({
       data: {
+        restaurantId,
         name,
         description,
         triggerType,
