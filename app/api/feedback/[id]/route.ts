@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +12,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || !['OWNER', 'ADMIN'].includes(role)) {
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, (session.user as any)?.email)) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
   const body = await req.json();
@@ -35,8 +35,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  if (!session || role !== 'OWNER') {
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, (session.user as any)?.email)) {
     return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
   }
   await prisma.feedback.delete({ where: { id: params.id } });

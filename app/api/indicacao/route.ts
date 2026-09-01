@@ -91,6 +91,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'N\u00e3o pode indicar a si mesmo' }, { status: 400 });
     }
 
+    // Both customers must belong to the caller's own restaurant - otherwise
+    // this would credit bonus points across two different restaurants using
+    // the wrong loyalty program.
+    const callerRestaurantId = await getCurrentRestaurantId();
+    if (!callerRestaurantId) {
+      return NextResponse.json({ error: 'Restaurante n\u00e3o encontrado' }, { status: 403 });
+    }
+    const [referrerRestaurantId, referredRestaurantId] = await Promise.all([
+      getRestaurantIdForCustomer(referrerCustomerId),
+      getRestaurantIdForCustomer(referredCustomerId),
+    ]);
+    if (referrerRestaurantId !== callerRestaurantId || referredRestaurantId !== callerRestaurantId) {
+      return NextResponse.json({ error: 'Cliente n\u00e3o encontrado' }, { status: 404 });
+    }
+
     // Check if already referred
     const existing = await prisma.loyaltyTransaction.findFirst({
       where: { customerId: referredCustomerId, reason: { startsWith: 'Indicado por:' } },
@@ -98,7 +113,7 @@ export async function POST(req: NextRequest) {
     if (existing) return NextResponse.json({ error: 'Cliente j\u00e1 foi indicado' }, { status: 409 });
 
     // Find or create program escopado pela loja do cliente indicador (isolamento multi-tenant)
-    const restaurantId = await getRestaurantIdForCustomer(referrerCustomerId);
+    const restaurantId = callerRestaurantId;
     const program = await getOrCreateLoyaltyProgram(restaurantId);
 
     // Credit referrer
