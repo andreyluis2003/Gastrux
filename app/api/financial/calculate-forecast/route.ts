@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
   } else if (type === 'cash_flow') {
     const records = await prisma.cashFlowRecord.findMany({
       where: {
+        restaurantId,
         date: { gte: startDate },
       },
     });
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest) {
   // Create forecast record
   const forecast = await prisma.financialForecast.create({
     data: {
+      restaurantId,
       forecastType: type,
       startDate: new Date(),
       endDate: new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days from now

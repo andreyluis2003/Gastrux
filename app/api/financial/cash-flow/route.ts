@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
 
-  const where: any = {};
+  const where: any = { restaurantId };
   if (type) where.type = type;
   if (category) where.category = category;
   if (status) where.status = status;
@@ -63,16 +63,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+  }
+
   const body = await request.json();
   const { type, category, amount, description, date, status, paymentId } = body;
 
   if (!type || !category || amount === undefined) {
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
     return NextResponse.json(
       { error: 'Missing required fields' },
       { status: 400 }
@@ -81,6 +80,7 @@ export async function POST(request: NextRequest) {
 
   const record = await prisma.cashFlowRecord.create({
     data: {
+      restaurantId,
       type,
       category,
       amount: parseFloat(amount),

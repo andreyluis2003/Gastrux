@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-helpers';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,11 @@ export async function GET(request: NextRequest) {
   const { error } = await requireAdminSession();
   if (error) return error;
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'summary'; // summary | sales | financial | inventory | staff | customers
@@ -22,17 +28,17 @@ export async function GET(request: NextRequest) {
 
     switch (type) {
       case 'sales':
-        return await getSalesReport(startDate, days);
+        return await getSalesReport(restaurantId, startDate, days);
       case 'financial':
-        return await getFinancialReport(startDate, days);
+        return await getFinancialReport(restaurantId, startDate, days);
       case 'inventory':
-        return await getInventoryReport();
+        return await getInventoryReport(restaurantId);
       case 'staff':
-        return await getStaffReport(startDate);
+        return await getStaffReport(restaurantId, startDate);
       case 'customers':
-        return await getCustomerReport(startDate);
+        return await getCustomerReport(restaurantId, startDate);
       default:
-        return await getSummaryReport(startDate, days);
+        return await getSummaryReport(restaurantId, startDate, days);
     }
   } catch (error) {
     console.error('[Admin Reports] Erro:', error);
@@ -40,22 +46,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getSummaryReport(startDate: Date, days: number) {
+async function getSummaryReport(restaurantId: string, startDate: Date, days: number) {
   const [payments, orders, snapshots, customers, staff] = await Promise.all([
     prisma.payment.findMany({
-      where: { status: { in: ['APPROVED'] }, createdAt: { gte: startDate } },
+      where: { restaurantId, status: { in: ['APPROVED'] }, createdAt: { gte: startDate } },
       select: { amount: true, method: true, createdAt: true },
     }),
     prisma.order.findMany({
-      where: { createdAt: { gte: startDate } },
+      where: { restaurantId, createdAt: { gte: startDate } },
       select: { status: true, total: true, createdAt: true },
     }),
     prisma.metricSnapshot.findMany({
-      where: { snapshotDate: { gte: startDate } },
+      where: { restaurantId, snapshotDate: { gte: startDate } },
       orderBy: { snapshotDate: 'desc' },
     }),
-    prisma.customer.count({ where: { createdAt: { gte: startDate } } }),
-    prisma.staffMember.count({ where: { status: 'ACTIVE' } }),
+    prisma.customer.count({ where: { restaurantId, createdAt: { gte: startDate } } }),
+    prisma.staffMember.count({ where: { restaurantId, status: 'ACTIVE' } }),
   ]);
 
   const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -80,9 +86,9 @@ async function getSummaryReport(startDate: Date, days: number) {
   });
 }
 
-async function getSalesReport(startDate: Date, days: number) {
+async function getSalesReport(restaurantId: string, startDate: Date, days: number) {
   const payments = await prisma.payment.findMany({
-    where: { status: { in: ['APPROVED', 'PROCESSING'] }, createdAt: { gte: startDate } },
+    where: { restaurantId, status: { in: ['APPROVED', 'PROCESSING'] }, createdAt: { gte: startDate } },
     select: { amount: true, method: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   });
@@ -111,7 +117,7 @@ async function getSalesReport(startDate: Date, days: number) {
     _sum: { quantity: true },
     _count: { id: true },
     where: {
-      order: { createdAt: { gte: startDate }, status: { in: ['COMPLETED', 'READY'] } },
+      order: { restaurantId, createdAt: { gte: startDate }, status: { in: ['COMPLETED', 'READY'] } },
     },
     orderBy: { _sum: { quantity: 'desc' } },
     take: 10,
@@ -119,7 +125,7 @@ async function getSalesReport(startDate: Date, days: number) {
 
   const recipeIds = topRecipes.map((r) => r.recipeId);
   const recipes = await prisma.recipe.findMany({
-    where: { id: { in: recipeIds } },
+    where: { id: { in: recipeIds }, restaurantId },
     select: { id: true, name: true, sellingPrice: true },
   });
 
@@ -143,19 +149,20 @@ async function getSalesReport(startDate: Date, days: number) {
   });
 }
 
-async function getFinancialReport(startDate: Date, days: number) {
+async function getFinancialReport(restaurantId: string, startDate: Date, days: number) {
   const [payments, cashFlow, forecasts] = await Promise.all([
     prisma.payment.findMany({
-      where: { createdAt: { gte: startDate } },
+      where: { restaurantId, createdAt: { gte: startDate } },
       select: { amount: true, status: true, method: true, createdAt: true },
     }),
     prisma.cashFlowRecord.findMany({
-      where: { date: { gte: startDate } },
+      where: { restaurantId, date: { gte: startDate } },
       select: { type: true, category: true, amount: true, date: true },
       orderBy: { date: 'asc' },
     }),
     prisma.financialForecast.findMany({
-      orderBy: { forecastDate: 'desc' },
+      where: { restaurantId },
+      orderBy: { startDate: 'desc' },
       take: 7,
     }),
   ]);
@@ -183,22 +190,22 @@ async function getFinancialReport(startDate: Date, days: number) {
     expensesByCategory: Object.entries(expensesByCategory).map(([category, amount]) => ({ category, amount })),
     rejectedPayments: { count: rejectedPayments.length, total: rejectedPayments.reduce((sum, p) => sum + Number(p.amount), 0) },
     forecasts: forecasts.map((f) => ({
-      date: f.forecastDate,
-      predictedRevenue: Number(f.predictedRevenue),
-      confidence: Number(f.confidence),
-      methodology: f.methodology,
+      date: f.startDate,
+      predictedRevenue: Number(f.forecastedValue),
+      confidence: f.confidence ? Number(f.confidence) : null,
+      methodology: f.method,
     })),
   });
 }
 
-async function getInventoryReport() {
+async function getInventoryReport(restaurantId: string) {
   const ingredients = await prisma.ingredient.findMany({
-    where: { active: true },
+    where: { restaurantId, active: true },
     select: {
       id: true,
       name: true,
       unit: true,
-      currentStock: true,
+      currentStock: { select: { currentQuantity: true } },
       minimumStock: true,
       referenceCost: true,
       category: { select: { name: true } },
@@ -206,12 +213,14 @@ async function getInventoryReport() {
     orderBy: { name: 'asc' },
   });
 
+  const qtyOf = (i: (typeof ingredients)[number]) => Number(i.currentStock?.currentQuantity ?? 0);
+
   const lowStock = ingredients.filter(
-    (i) => i.currentStock !== null && i.minimumStock !== null && Number(i.currentStock) < Number(i.minimumStock)
+    (i) => i.currentStock !== null && i.minimumStock !== null && qtyOf(i) < Number(i.minimumStock)
   );
 
   const totalValue = ingredients.reduce((sum, i) => {
-    return sum + (Number(i.currentStock || 0) * Number(i.referenceCost || 0));
+    return sum + (qtyOf(i) * Number(i.referenceCost || 0));
   }, 0);
 
   // Categorias
@@ -220,7 +229,7 @@ async function getInventoryReport() {
     const cat = i.category?.name || 'Sem Categoria';
     if (!byCategory[cat]) byCategory[cat] = { count: 0, value: 0 };
     byCategory[cat].count += 1;
-    byCategory[cat].value += Number(i.currentStock || 0) * Number(i.referenceCost || 0);
+    byCategory[cat].value += qtyOf(i) * Number(i.referenceCost || 0);
   });
 
   return NextResponse.json({
@@ -233,17 +242,18 @@ async function getInventoryReport() {
         id: i.id,
         name: i.name,
         unit: i.unit,
-        currentStock: Number(i.currentStock),
+        currentStock: qtyOf(i),
         minimumStock: Number(i.minimumStock),
-        deficit: Number(i.minimumStock) - Number(i.currentStock),
+        deficit: Number(i.minimumStock) - qtyOf(i),
       })),
     },
     byCategory: Object.entries(byCategory).map(([category, data]) => ({ category, ...data })),
   });
 }
 
-async function getStaffReport(startDate: Date) {
+async function getStaffReport(restaurantId: string, startDate: Date) {
   const staff = await prisma.staffMember.findMany({
+    where: { restaurantId },
     include: {
       user: { select: { name: true, email: true } },
       shifts: {
@@ -278,17 +288,19 @@ async function getStaffReport(startDate: Date) {
   });
 }
 
-async function getCustomerReport(startDate: Date) {
+async function getCustomerReport(restaurantId: string, startDate: Date) {
   const [totalCustomers, newCustomers, segments, topCustomers] = await Promise.all([
-    prisma.customer.count(),
-    prisma.customer.count({ where: { createdAt: { gte: startDate } } }),
+    prisma.customer.count({ where: { restaurantId } }),
+    prisma.customer.count({ where: { restaurantId, createdAt: { gte: startDate } } }),
     prisma.customerSegment.groupBy({
       by: ['segment'],
+      where: { customer: { restaurantId } },
       _count: { id: true },
       _sum: { totalSpent: true, totalOrders: true },
       _avg: { averageTicket: true },
     }),
     prisma.customerSegment.findMany({
+      where: { customer: { restaurantId } },
       orderBy: { totalSpent: 'desc' },
       take: 10,
       include: {

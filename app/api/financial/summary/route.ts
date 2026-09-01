@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
   // Today's cash flow
   const todayCashFlow = await prisma.cashFlowRecord.findMany({
     where: {
+      restaurantId,
       date: { gte: today, lt: tomorrow },
     },
   });

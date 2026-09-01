@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
   // Get cash flow records
   const cashFlowRecords = await prisma.cashFlowRecord.findMany({
     where: {
+      restaurantId,
       date: { gte: startDate },
     },
   });
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
   // Get top metrics
   const metrics = await prisma.financialMetric.findMany({
     where: {
+      restaurantId,
       date: { gte: startDate },
     },
     orderBy: { date: 'desc' },
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest) {
   // Get forecasts
   const forecasts = await prisma.financialForecast.findMany({
     where: {
+      restaurantId,
       startDate: { gte: startDate },
     },
     orderBy: { startDate: 'desc' },

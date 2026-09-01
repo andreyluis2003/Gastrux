@@ -2497,19 +2497,22 @@ model LoyaltyReward {
 }
 
 model CashFlowRecord {
-  id          String         @id @default(cuid())
-  type        CashFlowType
-  category    String
-  amount      Decimal        @db.Decimal(12, 2)
-  currency    String         @default("BRL")
-  paymentId   String?
-  description String?
-  date        DateTime       @default(now())
-  dueDate     DateTime?
-  status      CashFlowStatus @default(COMPLETED)
-  metadata    Json?
-  payment     Payment?       @relation(fields: [paymentId], references: [id])
+  id           String         @id @default(cuid())
+  restaurantId String
+  type         CashFlowType
+  category     String
+  amount       Decimal        @db.Decimal(12, 2)
+  currency     String         @default("BRL")
+  paymentId    String?
+  description  String?
+  date         DateTime       @default(now())
+  dueDate      DateTime?
+  status       CashFlowStatus @default(COMPLETED)
+  metadata     Json?
+  payment      Payment?       @relation(fields: [paymentId], references: [id])
+  restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  @@index([restaurantId])
   @@index([type])
   @@index([category])
   @@index([date])
@@ -2518,34 +2521,40 @@ model CashFlowRecord {
 }
 
 model FinancialMetric {
-  id               String   @id @default(cuid())
+  id               String     @id @default(cuid())
+  restaurantId     String
   metricType       String
   period           String
   date             DateTime
-  value            Decimal  @db.Decimal(12, 2)
-  target           Decimal? @db.Decimal(12, 2)
-  percentageChange Decimal? @db.Decimal(5, 2)
+  value            Decimal    @db.Decimal(12, 2)
+  target           Decimal?   @db.Decimal(12, 2)
+  percentageChange Decimal?   @db.Decimal(5, 2)
   metadata         Json?
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  @@unique([metricType, period, date])
+  @@unique([restaurantId, metricType, period, date])
+  @@index([restaurantId])
   @@index([metricType])
   @@index([date])
   @@map("financial_metrics")
 }
 
 model FinancialForecast {
-  id              String   @id @default(cuid())
+  id              String     @id @default(cuid())
+  restaurantId    String
   forecastType    String
   startDate       DateTime
   endDate         DateTime
-  forecastedValue Decimal  @db.Decimal(12, 2)
-  confidence      Decimal? @db.Decimal(3, 2)
+  forecastedValue Decimal    @db.Decimal(12, 2)
+  confidence      Decimal?   @db.Decimal(3, 2)
   method          String
-  actualValue     Decimal? @db.Decimal(12, 2)
-  variance        Decimal? @db.Decimal(12, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  actualValue     Decimal?   @db.Decimal(12, 2)
+  variance        Decimal?   @db.Decimal(12, 2)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  @@index([restaurantId])
   @@index([forecastType])
   @@index([startDate])
   @@map("financial_forecasts")
@@ -2645,19 +2654,23 @@ model AdminLog {
 }
 
 model MetricSnapshot {
-  snapshotDate        DateTime @unique @db.Date
-  totalRevenue        Decimal  @default(0) @db.Decimal(12, 2)
-  totalCost           Decimal  @default(0) @db.Decimal(12, 2)
-  totalOrders         Int      @default(0)
-  averageTicket       Decimal  @default(0) @db.Decimal(12, 2)
-  profitMargin        Decimal  @default(0) @db.Decimal(5, 2)
-  newCustomers        Int      @default(0)
-  returningCustomers  Int      @default(0)
-  totalStaffWorking   Int      @default(0)
+  restaurantId        String
+  snapshotDate        DateTime   @db.Date
+  totalRevenue        Decimal    @default(0) @db.Decimal(12, 2)
+  totalCost           Decimal    @default(0) @db.Decimal(12, 2)
+  totalOrders         Int        @default(0)
+  averageTicket       Decimal    @default(0) @db.Decimal(12, 2)
+  profitMargin        Decimal    @default(0) @db.Decimal(5, 2)
+  newCustomers        Int        @default(0)
+  returningCustomers  Int        @default(0)
+  totalStaffWorking   Int        @default(0)
   averagePrepTime     Int?
-  ingredientsLowStock Int      @default(0)
-  createdAt           DateTime @default(now())
+  ingredientsLowStock Int        @default(0)
+  createdAt           DateTime   @default(now())
+  restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  @@id([restaurantId, snapshotDate])
+  @@index([restaurantId])
   @@index([snapshotDate])
   @@map("metric_snapshots")
 }
@@ -2807,6 +2820,10 @@ model Restaurant {
   posSettings           POSSettings[]
   posTransactions       POSTransaction[]
   nfeConfig             NFeConfig?
+  cashFlowRecords       CashFlowRecord[]
+  financialMetrics      FinancialMetric[]
+  financialForecasts    FinancialForecast[]
+  metricSnapshots       MetricSnapshot[]
 
   @@index([status])
   @@index([subscriptionStatus])

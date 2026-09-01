@@ -2,12 +2,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-helpers';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const { error } = await requireAdminSession();
   if (error) return error;
+
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -28,17 +34,18 @@ export async function GET(request: NextRequest) {
       todayRevenue,
       restaurantInfo,
     ] = await Promise.all([
-      // Total de usuários
-      prisma.user.count(),
-      // Usuários ativos
-      prisma.user.count({ where: { active: true } }),
+      // Total de usuários deste restaurante
+      prisma.restaurantUser.count({ where: { restaurantId } }),
+      // Usuários ativos deste restaurante
+      prisma.restaurantUser.count({ where: { restaurantId, isActive: true, user: { active: true } } }),
       // Total de pedidos no período
       prisma.order.count({
-        where: { createdAt: { gte: startDate } },
+        where: { restaurantId, createdAt: { gte: startDate } },
       }),
       // Pagamentos aprovados no período
       prisma.payment.findMany({
         where: {
+          restaurantId,
           status: { in: ['APPROVED', 'PROCESSING'] },
           createdAt: { gte: startDate },
         },
@@ -46,16 +53,23 @@ export async function GET(request: NextRequest) {
       }),
       // Snapshots de métricas
       prisma.metricSnapshot.findMany({
-        where: { snapshotDate: { gte: startDate } },
+        where: { restaurantId, snapshotDate: { gte: startDate } },
         orderBy: { snapshotDate: 'desc' },
         take: 30,
       }),
       // Staff ativo
-      prisma.staffMember.count({ where: { status: 'ACTIVE' } }),
-      // Ingredientes com estoque baixo (placeholder - será calculado com stock model)
-      Promise.resolve(0),
-      // Últimos logs de auditoria
-      prisma.adminLog.findMany({
+      prisma.staffMember.count({ where: { restaurantId, status: 'ACTIVE' } }),
+      // Ingredientes com estoque baixo
+      (async () => {
+        const stocks = await prisma.stock.findMany({
+          where: { restaurantId, ingredient: { active: true } },
+          select: { currentQuantity: true, ingredient: { select: { minimumStock: true } } },
+        });
+        return stocks.filter((s) => Number(s.currentQuantity) < Number(s.ingredient.minimumStock)).length;
+      })(),
+      // Últimos logs de auditoria deste restaurante
+      prisma.auditLog.findMany({
+        where: { restaurantId },
         orderBy: { createdAt: 'desc' },
         take: 10,
         include: { user: { select: { name: true, email: true, role: true } } },
@@ -66,6 +80,7 @@ export async function GET(request: NextRequest) {
         today.setHours(0, 0, 0, 0);
         const payments = await prisma.payment.findMany({
           where: {
+            restaurantId,
             status: { in: ['APPROVED'] },
             createdAt: { gte: today },
           },
@@ -74,7 +89,7 @@ export async function GET(request: NextRequest) {
         return payments.reduce((sum, p) => sum + Number(p.amount), 0);
       })(),
       // Info do restaurante
-      prisma.restaurant.findFirst({ where: { status: 'ACTIVE' } }),
+      prisma.restaurant.findUnique({ where: { id: restaurantId } }),
     ]);
 
     // Calcular KPIs

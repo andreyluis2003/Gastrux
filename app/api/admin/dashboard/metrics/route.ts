@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     const snapshots = await prisma.metricSnapshot.findMany({
-      where: { snapshotDate: { gte: startDate } },
+      where: { restaurantId, snapshotDate: { gte: startDate } },
       orderBy: { snapshotDate: 'asc' },
     });
 
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
     // Segmentação de clientes
     const segmentStats = await prisma.customerSegment.groupBy({
       by: ['segment'],
+      where: { customer: { restaurantId } },
       _count: { id: true },
       _sum: { totalSpent: true },
     });
