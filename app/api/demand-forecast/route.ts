@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const searchParams = req.nextUrl.searchParams;
     const ingredientId = searchParams.get('ingredientId');
     const days = parseInt(searchParams.get('days') || '30');
@@ -23,6 +29,7 @@ export async function GET(req: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     const where: any = {
+      restaurantId,
       forecastDate: { gte: startDate },
       confidenceScore: { gte: minConfidence },
     };
@@ -71,9 +78,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all ingredients
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    // Get all ingredients for this restaurant
     const ingredients = await prisma.ingredient.findMany({
-      where: { active: true },
+      where: { restaurantId, active: true },
       select: { id: true, code: true, name: true },
     });
 
@@ -84,6 +96,7 @@ export async function POST(req: NextRequest) {
       // Get historical consumption (last 30 days)
       const movements = await prisma.stockMovement.findMany({
         where: {
+          restaurantId,
           ingredientId: ingredient.id,
           createdAt: {
             gte: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000),
@@ -129,6 +142,7 @@ export async function POST(req: NextRequest) {
         if (!existing) {
           const forecast = await prisma.demandForecast.create({
             data: {
+              restaurantId,
               ingredientId: ingredient.id,
               forecastDate,
               dayOfWeek,
