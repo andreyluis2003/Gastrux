@@ -51,8 +51,16 @@ export async function POST(request: NextRequest) {
 
     const { tableId, customerName, tableNumber, notes } = await request.json();
 
+    if (tableId) {
+      const table = await prisma.table.findFirst({ where: { id: tableId, restaurantId }, select: { id: true } });
+      if (!table) {
+        return NextResponse.json({ error: 'Mesa não encontrada' }, { status: 404 });
+      }
+    }
+
     const newSession = await prisma.orderSession.create({
       data: {
+        restaurantId,
         userId: session.user.id,
         tableId: tableId || null,
         customerName: customerName || null,

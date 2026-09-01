@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,13 @@ export async function GET(
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     const modifiers = await prisma.orderSessionItemModifier.findMany({
-      where: { sessionItemId: params.itemId },
+      where: { sessionItemId: params.itemId, sessionItem: { session: { restaurantId } } },
       include: {
         modifier: true,
       },
@@ -58,6 +64,11 @@ export async function POST(
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { modifierId } = body;
 
@@ -68,9 +79,9 @@ export async function POST(
       );
     }
 
-    // Verify session item exists
-    const sessionItem = await prisma.orderSessionItem.findUnique({
-      where: { id: params.itemId },
+    // Verify session item exists and belongs to this restaurant
+    const sessionItem = await prisma.orderSessionItem.findFirst({
+      where: { id: params.itemId, session: { restaurantId } },
     });
 
     if (!sessionItem) {
@@ -80,9 +91,9 @@ export async function POST(
       );
     }
 
-    // Get modifier
-    const modifier = await prisma.itemModifier.findUnique({
-      where: { id: modifierId },
+    // Get modifier, also scoped to this restaurant
+    const modifier = await prisma.itemModifier.findFirst({
+      where: { id: modifierId, restaurantId },
     });
 
     if (!modifier) {
@@ -131,6 +142,11 @@ export async function DELETE(
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { sessionItemModifierId } = body;
 
@@ -141,8 +157,8 @@ export async function DELETE(
       );
     }
 
-    const modifier = await prisma.orderSessionItemModifier.findUnique({
-      where: { id: sessionItemModifierId },
+    const modifier = await prisma.orderSessionItemModifier.findFirst({
+      where: { id: sessionItemModifierId, sessionItem: { session: { restaurantId } } },
     });
 
     if (!modifier || modifier.sessionItemId !== params.itemId) {

@@ -46,9 +46,11 @@ export async function POST(
       ...orderSession.items.map(item => item.recipe.prepTimeMinutes || 10)
     );
 
-    // Generate order number
-    const orderCount = await prisma.order.count();
+    // Generate order number (scoped to this restaurant, not a global count)
+    const orderCount = await prisma.order.count({ where: { restaurantId } });
     const orderNumber = `KDS-${String(orderCount + 1).padStart(6, '0')}`;
+
+    const firstStation = await prisma.kitchenStation.findFirst({ where: { restaurantId, active: true } });
 
     // Create Order with OrderItems from SessionItems
     const order = await prisma.order.create({
@@ -69,15 +71,19 @@ export async function POST(
             status: 'PENDING',
           })),
         },
-        stationAssignments: {
-          create: [
-            {
-              stationId: (await prisma.kitchenStation.findFirst())?.id || '',
-              status: 'PENDING',
-              totalItems: orderSession.items.length,
-            },
-          ],
-        },
+        ...(firstStation
+          ? {
+              stationAssignments: {
+                create: [
+                  {
+                    stationId: firstStation.id,
+                    status: 'PENDING',
+                    totalItems: orderSession.items.length,
+                  },
+                ],
+              },
+            }
+          : {}),
       },
       include: {
         items: { include: { recipe: { select: { name: true } } } },
