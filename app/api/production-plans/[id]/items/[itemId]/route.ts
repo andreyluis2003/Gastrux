@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,15 +18,20 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não selecionado' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { quantity, notes } = body;
 
-    const item = await prisma.productionPlanItem.findUnique({
-      where: { id: params.itemId },
+    const item = await prisma.productionPlanItem.findFirst({
+      where: { id: params.itemId, planId: params.id, restaurantId },
       include: { recipe: true },
     });
 
-    if (!item || item.planId !== params.id) {
+    if (!item) {
       return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
     }
 
@@ -81,11 +87,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const item = await prisma.productionPlanItem.findUnique({
-      where: { id: params.itemId },
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não selecionado' }, { status: 400 });
+    }
+
+    const item = await prisma.productionPlanItem.findFirst({
+      where: { id: params.itemId, planId: params.id, restaurantId },
     });
 
-    if (!item || item.planId !== params.id) {
+    if (!item) {
       return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
     }
 

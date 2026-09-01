@@ -155,6 +155,7 @@ export async function POST(
 
     const item = await prisma.productionPlanItem.create({
       data: {
+        restaurantId,
         planId: params.id,
         recipeId: recipeId,
         quantity: parseFloat(quantity),
