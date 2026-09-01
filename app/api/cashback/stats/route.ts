@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,12 +12,18 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     const accounts = await prisma.customerLoyaltyAccount.findMany({
-      where: { active: true },
+      where: { active: true, program: { restaurantId } },
       select: { currentPoints: true, totalPointsEarned: true, totalPointsRedeemed: true },
     });
 
     const recentTransactions = await prisma.loyaltyTransaction.findMany({
+      where: { program: { restaurantId } },
       orderBy: { createdAt: 'desc' },
       take: 20,
       select: { type: true, amount: true, reason: true, createdAt: true },

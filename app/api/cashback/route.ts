@@ -22,19 +22,23 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId');
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
     if (!customerId) {
       // Return general cashback config (escopado pela loja da sessão)
-      const restaurantId = await getCurrentRestaurantId();
-      const program = restaurantId ? await getOrCreateLoyaltyProgram(restaurantId) : null;
+      const program = await getOrCreateLoyaltyProgram(restaurantId);
       return NextResponse.json({
         cashbackPercent: DEFAULT_CASHBACK_PERCENT,
         program: program || null,
       });
     }
 
-    // Get customer loyalty account
+    // Get customer loyalty account, scoped to this restaurant
     const account = await prisma.customerLoyaltyAccount.findFirst({
-      where: { customerId, active: true },
+      where: { customerId, active: true, program: { restaurantId } },
       include: {
         program: true,
         transactions: {
@@ -86,8 +90,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'customerId, orderId e orderTotal obrigat\u00f3rios' }, { status: 400 });
     }
 
+    // The customer must actually belong to the caller's own restaurant -
+    // otherwise this would credit cashback to (and inflate the loyalty
+    // balance of) another restaurant's customer.
+    const callerRestaurantId = await getCurrentRestaurantId();
+    if (!callerRestaurantId) {
+      return NextResponse.json({ error: 'Restaurante n\u00e3o encontrado' }, { status: 403 });
+    }
+    const customerRestaurantId = await getRestaurantIdForCustomer(customerId);
+    if (customerRestaurantId !== callerRestaurantId) {
+      return NextResponse.json({ error: 'Cliente n\u00e3o encontrado' }, { status: 404 });
+    }
+
     // Find or create program escopado pela loja do cliente (isolamento multi-tenant)
-    const restaurantId = await getRestaurantIdForCustomer(customerId);
+    const restaurantId = callerRestaurantId;
     const program = await getOrCreateLoyaltyProgram(restaurantId);
 
     // Find or create loyalty account
