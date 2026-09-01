@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,9 +31,11 @@ function buildRecommendation(cls: string, foodCostPercent: number, margin: numbe
 export async function POST(req: NextRequest) {
   try {
     const isInternal = req.headers.get('x-internal-trigger') === process.env.CRON_SECRET;
+    let restaurantId: string | null = null;
     if (!isInternal) {
       const session = await getServerSession(authOptions);
       if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+      restaurantId = await getCurrentRestaurantId();
     }
 
     const body = await req.json().catch(() => ({}));
@@ -42,8 +45,9 @@ export async function POST(req: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - period);
 
-    const restaurant = await prisma.restaurant.findFirst({ select: { id: true } });
-    const restaurantId = body.restaurantId || restaurant?.id;
+    if (isInternal) {
+      restaurantId = body.restaurantId || null;
+    }
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const recipes = await prisma.recipe.findMany({
@@ -105,6 +109,7 @@ export async function POST(req: NextRequest) {
 
       const snap = await (prisma as any).menuEngineeringSnapshot.create({
         data: {
+          restaurantId,
           recipeId: item.recipe.id,
           periodStart: startDate,
           periodEnd: endDate,

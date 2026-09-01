@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,12 +21,12 @@ export async function GET(req: NextRequest) {
     const recipeId = searchParams.get('recipeId');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    const restaurant = await prisma.restaurant.findFirst({ select: { id: true } });
-    if (!restaurant) return NextResponse.json({ snapshots: [], trends: [] });
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) return NextResponse.json({ snapshots: [], trends: [] });
 
     if (recipeId) {
       const snapshots = await (prisma as any).menuEngineeringSnapshot.findMany({
-        where: { restaurantId: restaurant.id, recipeId },
+        where: { restaurantId, recipeId },
         orderBy: { periodEnd: 'desc' },
         take: limit,
       });
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     // Build trends: for each recipe, compare last 2 classifications
     const all = await (prisma as any).menuEngineeringSnapshot.findMany({
-      where: { restaurantId: restaurant.id },
+      where: { restaurantId },
       orderBy: { periodEnd: 'desc' },
       include: { recipe: { select: { id: true, name: true, code: true } } },
       take: 200,

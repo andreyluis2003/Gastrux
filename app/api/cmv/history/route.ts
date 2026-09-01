@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,11 +15,11 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get('limit') || '30');
 
-    const restaurant = await prisma.restaurant.findFirst({ select: { id: true } });
-    if (!restaurant) return NextResponse.json({ snapshots: [] });
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) return NextResponse.json({ snapshots: [] });
 
     const snapshots = await (prisma as any).cMVSnapshot.findMany({
-      where: { restaurantId: restaurant.id },
+      where: { restaurantId },
       orderBy: { periodEnd: 'desc' },
       take: limit,
     });

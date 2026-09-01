@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +16,11 @@ export async function POST(req: NextRequest) {
   try {
     // Permitir via sessão OU via CRON_SECRET header
     const isInternal = req.headers.get('x-internal-trigger') === process.env.CRON_SECRET;
+    let restaurantId: string | null = null;
     if (!isInternal) {
       const session = await getServerSession(authOptions);
       if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+      restaurantId = await getCurrentRestaurantId();
     }
 
     const body = await req.json().catch(() => ({}));
@@ -27,8 +30,12 @@ export async function POST(req: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - period);
 
-    const restaurant = await prisma.restaurant.findFirst({ select: { id: true } });
-    const restaurantId = body.restaurantId || restaurant?.id;
+    // Internal/cron calls have no session, so they must name the restaurant
+    // explicitly; session-authenticated calls always use the caller's own
+    // restaurant (never trust a client-supplied restaurantId over the session).
+    if (isInternal) {
+      restaurantId = body.restaurantId || null;
+    }
     if (!restaurantId) {
       return NextResponse.json({ error: 'Nenhum restaurante encontrado' }, { status: 404 });
     }
@@ -92,6 +99,7 @@ export async function POST(req: NextRequest) {
 
     const snapshot = await (prisma as any).cMVSnapshot.create({
       data: {
+        restaurantId,
         periodStart: startDate,
         periodEnd: endDate,
         periodDays: period,

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,8 +34,7 @@ export async function GET(req: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - period);
 
-    const restaurant = await prisma.restaurant.findFirst({ select: { id: true } });
-    const restaurantId = restaurant?.id;
+    const restaurantId = await getCurrentRestaurantId();
 
     // Get all active recipes
     const recipes = await prisma.recipe.findMany({
