@@ -19,9 +19,12 @@ export async function GET(req: NextRequest) {
 
     const restaurantUser = await prisma.restaurantUser.findFirst({ where: { userId: (session as any).user?.id || (session as any).id } });
     const restaurantId = restaurantUser?.restaurantId;
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
 
     const wasteLogs = await prisma.wasteLog.findMany({
-      where: { restaurantId: restaurantId || undefined, date: { gte: start } },
+      where: { restaurantId, date: { gte: start } },
       include: { ingredient: { select: { name: true, standardUnit: true } } },
       orderBy: { date: 'desc' },
     });

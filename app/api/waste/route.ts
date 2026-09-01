@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get ingredient cost
-    const ingredient = await prisma.ingredient.findUnique({ where: { id: ingredientId } });
+    const ingredient = await prisma.ingredient.findFirst({ where: { id: ingredientId, restaurantId } });
     if (!ingredient) return NextResponse.json({ error: 'Insumo não encontrado' }, { status: 404 });
 
     const estimatedCost = quantity * ingredient.referenceCost;
@@ -129,15 +129,14 @@ export async function POST(req: NextRequest) {
       data: {
         restaurantId,
         ingredientId,
-        type: 'LOSS',
+        movementType: 'LOSS',
         quantity: -parseFloat(String(quantity)),
-        unit: unit || ingredient.standardUnit,
         reason: `Desperdício: ${reason}`,
       },
     });
 
     // Update stock if exists
-    const currentStock = await prisma.stock.findUnique({ where: { ingredientId } });
+    const currentStock = await prisma.stock.findFirst({ where: { ingredientId, restaurantId } });
     if (currentStock) {
       await prisma.stock.update({
         where: { ingredientId },
