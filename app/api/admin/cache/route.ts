@@ -2,16 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { cache, invalidate } from '@/lib/cache';
-import { UserRole } from '@prisma/client';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role as UserRole | undefined;
-  const allowed: UserRole[] = [UserRole.OWNER, UserRole.ADMIN];
-  if (!session || !role || !allowed.includes(role)) {
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, session.user?.email)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return null;

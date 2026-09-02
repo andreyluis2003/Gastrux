@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,13 +24,7 @@ export async function GET() {
       );
     }
 
-    // Apenas OWNER pode ver stats globais
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== 'OWNER') {
+    if (!isPlatformAdminIdentity((session.user as any)?.role, session.user?.email)) {
       return NextResponse.json(
         { error: 'Nao autorizado' },
         { status: 403 }
