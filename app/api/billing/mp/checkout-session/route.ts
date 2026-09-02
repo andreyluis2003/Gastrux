@@ -9,7 +9,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getTierById } from '@/lib/stripe-config';
-import { createPreApproval, getMPAutoRecurringForBillingCycle, MP_IS_PRODUCTION } from '@/lib/mercado-pago';
+import { createPreApproval, getMPAutoRecurringForBillingCycle } from '@/lib/mercado-pago';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,7 +99,11 @@ export async function POST(request: NextRequest) {
       subscriptionId: subscription.id,
       // Mirrors Stripe's checkout-session route response shape ({ url }) so
       // the frontend doesn't need to know which gateway it called.
-      url: MP_IS_PRODUCTION ? preApproval.init_point : preApproval.sandbox_init_point,
+      // Unlike the Preference (order-checkout) API, PreApproval's response
+      // only ever has `init_point` - there is no separate sandbox_init_point
+      // field. Sandbox vs production is determined entirely by which access
+      // token (TEST- vs APP_USR-) created the PreApproval, not by the URL.
+      url: preApproval.init_point,
     });
   } catch (error) {
     console.error('[MP checkout-session] Error:', error);
