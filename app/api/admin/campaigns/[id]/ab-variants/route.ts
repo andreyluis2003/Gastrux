@@ -18,6 +18,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    if (!isPlatformAdminIdentity(session.user.role, session.user.email)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const variants = await prisma.campaignABVariant.findMany({
       where: { campaignId: params.id },
       include: { performanceBySegment: true },
