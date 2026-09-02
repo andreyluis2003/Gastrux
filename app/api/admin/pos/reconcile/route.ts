@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
   if (!restaurantId) return NextResponse.json({ error: 'Restaurante não selecionado' }, { status: 400 });
 
   const [total, pending, completed] = await Promise.all([
-    prisma.pOSTransaction.count({ where: {} }),
+    prisma.pOSTransaction.count({ where: { restaurantId } }),
     prisma.pOSTransaction.count({ where: { restaurantId, reconciled: false } }),
     prisma.pOSTransaction.count({ where: { restaurantId, reconciled: true } }),
   ]);

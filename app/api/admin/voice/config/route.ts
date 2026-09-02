@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof body.defaultDurationMin === 'number') updateData.defaultDurationMin = body.defaultDurationMin;
 
   const cfg = await prisma.voiceAgentConfig.upsert({
-    where: {},
+    where: { restaurantId },
     update: updateData,
     create: { restaurantId, ...updateData },
   });

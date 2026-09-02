@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-helpers';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,11 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const { error } = await requireAdminSession();
   if (error) return error;
+
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
+  }
 
   try {
     const alerts: {
@@ -31,6 +37,7 @@ export async function GET(request: NextRequest) {
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
     const pendingOrders = await prisma.order.count({
       where: {
+        restaurantId,
         status: { in: ['PENDING', 'PREPARING'] },
         createdAt: { lt: thirtyMinAgo },
       },
@@ -50,6 +57,7 @@ export async function GET(request: NextRequest) {
     today.setHours(0, 0, 0, 0);
     const failedPayments = await prisma.payment.count({
       where: {
+        restaurantId,
         status: 'DECLINED',
         createdAt: { gte: today },
       },
@@ -71,9 +79,10 @@ export async function GET(request: NextRequest) {
     const tomorrowEnd = new Date(tomorrow);
     tomorrowEnd.setHours(23, 59, 59, 999);
 
-    const activeStaff = await prisma.staffMember.count({ where: { status: 'ACTIVE' } });
+    const activeStaff = await prisma.staffMember.count({ where: { restaurantId, status: 'ACTIVE' } });
     const staffWithShift = await prisma.staffShift.findMany({
       where: {
+        staffMember: { restaurantId },
         shiftDate: { gte: tomorrow, lte: tomorrowEnd },
         shiftType: { not: 'OFF_DAY' },
       },
@@ -93,7 +102,7 @@ export async function GET(request: NextRequest) {
 
     // 5. Comissões pendentes de aprovação
     const pendingCommissions = await prisma.staffCommission.count({
-      where: { status: 'PENDING' },
+      where: { staffMember: { restaurantId }, status: 'PENDING' },
     });
     if (pendingCommissions > 0) {
       alerts.push({

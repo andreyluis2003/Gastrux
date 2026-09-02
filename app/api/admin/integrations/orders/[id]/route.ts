@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ExternalOrderStatus } from '@prisma/client';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +17,14 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+  }
+
   try {
-    const order = await prisma.externalOrder.findUnique({
-      where: { id: params.id },
+    const order = await prisma.externalOrder.findFirst({
+      where: { id: params.id, restaurantId },
       include: {
         integration: true,
         deliveryLogs: {
@@ -50,6 +56,11 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+  }
+
   try {
     const { status } = await request.json();
 
@@ -60,8 +71,8 @@ export async function PUT(
       );
     }
 
-    const order = await prisma.externalOrder.findUnique({
-      where: { id: params.id },
+    const order = await prisma.externalOrder.findFirst({
+      where: { id: params.id, restaurantId },
     });
 
     if (!order) {

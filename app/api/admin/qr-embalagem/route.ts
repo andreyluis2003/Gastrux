@@ -6,22 +6,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import QRCode from 'qrcode';
-
-async function getRestaurantId(session: any) {
-  const userId = session?.user?.id;
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { restaurants: { include: { restaurant: true }, take: 1 } },
-  });
-  return user?.currentRestaurantId || user?.restaurants?.[0]?.restaurantId || null;
-}
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    const restaurantId = await getRestaurantId(session);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const restaurant = await prisma.restaurant.findUnique({
@@ -83,7 +74,7 @@ export async function PUT(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    const restaurantId = await getRestaurantId(session);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const body = await req.json();

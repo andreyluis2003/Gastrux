@@ -3,24 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
-
-async function getRestaurantId(userId: string): Promise<string | null> {
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { currentRestaurantId: true, restaurants: { take: 1, select: { restaurantId: true } } },
-  });
-  return u?.currentRestaurantId || u?.restaurants?.[0]?.restaurantId || null;
-}
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-    const userId = (session.user as any).id;
-    const restaurantId = await getRestaurantId(userId);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const restaurant = await prisma.restaurant.findUnique({
@@ -52,8 +44,7 @@ export async function PUT(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-    const userId = (session.user as any).id;
-    const restaurantId = await getRestaurantId(userId);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const body = await req.json();
