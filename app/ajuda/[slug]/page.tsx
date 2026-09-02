@@ -27,7 +27,7 @@ interface Related {
   summary: string | null;
 }
 
-// Super light markdown renderer (h2, h3, bold, lists, blockquote, code)
+// Super light markdown renderer (h2, h3, bold, lists, blockquote, code, images)
 function renderMarkdown(md: string): string {
   const escape = (s: string) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const lines = md.split('\n');
@@ -46,14 +46,28 @@ function renderMarkdown(md: string): string {
     }
   };
 
+  // Escaping happens first so an attacker-controlled alt/src can't break out
+  // of the attribute; the src is additionally restricted to http(s) below.
   const inline = (s: string) =>
     escape(s)
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 rounded">$1</code>');
 
+  const imageLine = /^!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)$/;
+
   for (const raw of lines) {
     const line = raw.trimEnd();
-    if (/^##\s+/.test(line)) {
+    const imageMatch = line.match(imageLine);
+    if (imageMatch) {
+      flush();
+      const [, alt, src] = imageMatch;
+      out.push(
+        `<figure class="my-5">` +
+          `<img src="${escape(src)}" alt="${escape(alt)}" loading="lazy" class="w-full rounded-lg border shadow-sm" />` +
+          (alt ? `<figcaption class="text-xs text-muted-foreground text-center mt-2">${inline(alt)}</figcaption>` : '') +
+          `</figure>`
+      );
+    } else if (/^##\s+/.test(line)) {
       flush();
       out.push(`<h2 class="text-2xl font-semibold mt-8 mb-3">${inline(line.replace(/^##\s+/, ''))}</h2>`);
     } else if (/^###\s+/.test(line)) {
