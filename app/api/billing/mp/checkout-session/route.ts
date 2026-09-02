@@ -13,7 +13,7 @@ import { createPreApproval, getMPAutoRecurringForBillingCycle, MP_IS_PRODUCTION 
 
 export const dynamic = 'force-dynamic';
 
-const TRIAL_DAYS = 30;
+const TRIAL_DAYS = 0; // TEMP: sandbox test only, revert to 30 after MP recurring-charge verification
 
 export async function POST(request: NextRequest) {
   try {
