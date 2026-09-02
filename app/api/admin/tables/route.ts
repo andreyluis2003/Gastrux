@@ -104,9 +104,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if section exists
-    const section = await prisma.tableSection.findUnique({
-      where: { id: sectionId },
+    // Check if section exists and belongs to the caller's restaurant
+    const section = await prisma.tableSection.findFirst({
+      where: { id: sectionId, restaurantId },
     });
     if (!section) {
       return NextResponse.json(
