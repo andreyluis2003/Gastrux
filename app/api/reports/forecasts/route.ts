@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch forecast data
     const forecasts = await prisma.stockForecast.findMany({
+      where: { restaurantId },
       include: {
         ingredient: true,
       },

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +14,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = new Date(searchParams.get('startDate') || '');
     const endDate = new Date(searchParams.get('endDate') || '');
 
     const recipes = await prisma.recipe.findMany({
+      where: { restaurantId },
       include: {
         ingredients: true,
       },
@@ -25,6 +32,7 @@ export async function GET(request: NextRequest) {
 
     const orders = await prisma.order.findMany({
       where: {
+        restaurantId,
         createdAt: {
           gte: startDate,
           lte: endDate,
@@ -48,8 +56,8 @@ export async function GET(request: NextRequest) {
           dishMetrics.set(key, {
             id: key,
             name: item.recipe.name,
-            costPrice: Number(item.recipe.costPrice || 0),
-            sellingPrice: Number(item.price || 0),
+            costPrice: Number(item.recipe.costPerPortion || 0),
+            sellingPrice: Number(item.recipe.sellingPrice || 0),
             quantitySold: 0,
             totalRevenue: 0,
             totalCost: 0,
@@ -57,8 +65,8 @@ export async function GET(request: NextRequest) {
         }
         const metric = dishMetrics.get(key);
         metric.quantitySold += item.quantity;
-        metric.totalRevenue += Number(item.price || 0) * item.quantity;
-        metric.totalCost += (Number(item.recipe.costPrice || 0)) * item.quantity;
+        metric.totalRevenue += Number(item.recipe.sellingPrice || 0) * item.quantity;
+        metric.totalCost += (Number(item.recipe.costPerPortion || 0)) * item.quantity;
       });
     });
 

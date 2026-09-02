@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generatePdfFromHtml, PDF_STYLES } from '@/lib/pdf-generator';
 import { formatBRL, formatDate, formatQuantity } from '@/lib/formatters';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +19,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     // Fetch all data in parallel
     const [stocks, suppliers, forecasts, plans, recipes, ingredients] = await Promise.all([
       prisma.stock.findMany({
+        where: { restaurantId },
         include: {
           ingredient: {
             include: { category: true },
@@ -28,12 +35,13 @@ export async function POST(request: NextRequest) {
         },
       }),
       prisma.supplier.findMany({
+        where: { restaurantId },
         include: { integrations: true },
       }),
-      prisma.stockForecast.findMany(),
-      prisma.productionPlan.findMany(),
-      prisma.recipe.findMany(),
-      prisma.ingredient.findMany(),
+      prisma.stockForecast.findMany({ where: { restaurantId } }),
+      prisma.productionPlan.findMany({ where: { restaurantId } }),
+      prisma.recipe.findMany({ where: { restaurantId } }),
+      prisma.ingredient.findMany({ where: { restaurantId } }),
     ]);
 
     // Calculate metrics

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { generateProductionPlanReportHtml, type ProductionPlanReportData } from '@/lib/report-templates';
 import { generatePdfFromHtml, PDF_STYLES } from '@/lib/pdf-generator';
 import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,11 @@ export async function POST(request: NextRequest) {
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
     // Check transaction limit BEFORE processing
@@ -37,6 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch production plan data
     const plans = await prisma.productionPlan.findMany({
+      where: { restaurantId },
       include: {
         items: {
           include: {

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { generateStockReportHtml, type StockReportData } from '@/lib/report-templates';
 import { generatePdfFromHtml, PDF_STYLES } from '@/lib/pdf-generator';
 import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,11 @@ export async function POST(request: NextRequest) {
         { error: 'Unauthorized' },
         { status: 401 }
       );
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
     // Check transaction limit BEFORE processing
@@ -37,6 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch stock data
     const stocks = await prisma.stock.findMany({
+      where: { restaurantId },
       include: {
         ingredient: {
           include: {

@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch supplier data
     const suppliers = await prisma.supplier.findMany({
+      where: { restaurantId },
       include: {
         integrations: true,
       },
