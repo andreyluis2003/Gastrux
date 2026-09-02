@@ -1,23 +1,18 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/nfe/webhook
  * Receive webhook callbacks from NF-e provider (Focus NFe, Brasil NFe, etc)
- * This handles status updates from SEFAZ
+ * This handles status updates from SEFAZ. No browser session is present on
+ * these calls - the target document (and therefore its restaurant) is
+ * resolved from the payload's globally-unique accessKey below.
  */
 export async function POST(request: NextRequest) {
   try {
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
     const body = await request.json();
 
     // Log webhook for debugging
