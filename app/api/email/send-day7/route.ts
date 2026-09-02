@@ -7,6 +7,11 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = request.headers.get('x-cron-secret');
+    if (!process.env.CRON_SECRET || auth !== process.env.CRON_SECRET) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
     const { userId, userEmail, userName } = await request.json();
 
     if (!userId || !userEmail) {

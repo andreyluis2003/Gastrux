@@ -69,6 +69,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (recipeId) {
+      const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, restaurantId }, select: { id: true } });
+      if (!recipe) {
+        return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
+      }
+    }
+
     const item = await prisma.menuItem.create({
       data: {
         categoryId,

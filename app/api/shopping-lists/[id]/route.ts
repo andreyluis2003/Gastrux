@@ -211,6 +211,29 @@ export async function POST(
       );
     }
 
+    // Validar que ingredientId/supplierId (quando informados) pertencem ao tenant
+    const ingredientIds = [...new Set(items.map((i: any) => i.ingredientId).filter(Boolean))];
+    const supplierIds = [...new Set(items.map((i: any) => i.supplierId).filter(Boolean))];
+    const [validIngredients, validSuppliers] = await Promise.all([
+      ingredientIds.length
+        ? prisma.ingredient.findMany({ where: { id: { in: ingredientIds }, restaurantId }, select: { id: true } })
+        : [],
+      supplierIds.length
+        ? prisma.ingredientSupplier.findMany({ where: { id: { in: supplierIds }, ingredient: { restaurantId } }, select: { id: true } })
+        : [],
+    ]);
+    const validIngredientIds = new Set(validIngredients.map((i) => i.id));
+    const validSupplierIds = new Set(validSuppliers.map((s) => s.id));
+    if (
+      ingredientIds.some((id) => !validIngredientIds.has(id)) ||
+      supplierIds.some((id) => !validSupplierIds.has(id))
+    ) {
+      return NextResponse.json(
+        { error: 'Insumo ou fornecedor inválido' },
+        { status: 404 }
+      );
+    }
+
     // Criar os itens
     const createdItems = await Promise.all(
       items.map((item: any) =>
