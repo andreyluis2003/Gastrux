@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,11 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
 
     const body = await req.json();
     const { cashRegisterId, type, amount, description, reference, operatorName, notes } = body;
@@ -22,9 +28,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify cash register exists
-    const register = await prisma.cashRegister.findUnique({
-      where: { id: cashRegisterId },
+    // Verify cash register exists and belongs to the caller's restaurant
+    const register = await prisma.cashRegister.findFirst({
+      where: { id: cashRegisterId, restaurantId },
     });
 
     if (!register) {

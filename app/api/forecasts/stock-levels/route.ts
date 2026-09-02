@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     const riskLevel = searchParams.get('riskLevel');
     const ingredientId = searchParams.get('ingredientId');
 
-    const where: any = {};
+    const where: any = { restaurantId };
 
     if (riskLevel) {
       where.riskLevel = riskLevel;
@@ -105,12 +105,19 @@ export async function POST(req: NextRequest) {
     let results;
 
     if (ingredientId) {
-      // Calculate for single ingredient
+      // Verify the ingredient belongs to the caller's restaurant
+      const ingredient = await prisma.ingredient.findFirst({
+        where: { id: ingredientId, restaurantId },
+        select: { id: true },
+      });
+      if (!ingredient) {
+        return NextResponse.json({ error: 'Ingredient not found' }, { status: 404 });
+      }
       const forecast = await calculateStockForecast(ingredientId);
       results = forecast ? [forecast] : [];
     } else {
-      // Calculate for all ingredients
-      results = await calculateAllForecasts();
+      // Calculate for all ingredients of this restaurant
+      results = await calculateAllForecasts(restaurantId);
     }
 
     // Log audit
