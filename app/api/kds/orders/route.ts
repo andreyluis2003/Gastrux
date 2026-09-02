@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    const where: any = {};
+    const where: any = { restaurantId };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (station) {
@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
 
     // Generate order number
     const lastOrder = await prisma.order.findFirst({
+      where: { restaurantId },
       orderBy: { createdAt: 'desc' },
       select: { orderNumber: true },
     });
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
     // Create order with items
     const order = await prisma.order.create({
       data: {
+        restaurantId,
         orderNumber,
         orderType,
         externalOrderId: externalOrderId || undefined,
@@ -163,6 +165,7 @@ export async function POST(req: NextRequest) {
       where: {
         role: { in: ['COOK', 'MANAGER', 'OWNER'] },
         active: true,
+        restaurants: { some: { restaurantId, isActive: true } },
       },
       select: { id: true },
     });

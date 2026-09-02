@@ -106,8 +106,8 @@ export async function POST(request: NextRequest) {
       totalAmount = orderItems.reduce((sum: number, i: any) => sum + i.totalPrice, 0);
     } else if (transactionId) {
       // POS transaction-based emission
-      const transaction = await prisma.cashTransaction.findUnique({
-        where: { id: transactionId },
+      const transaction = await prisma.cashTransaction.findFirst({
+        where: { id: transactionId, cashRegister: { restaurantId } },
       });
       if (!transaction) {
         return NextResponse.json({

@@ -40,8 +40,8 @@ export async function POST(
       );
     }
 
-    const document = await prisma.nFeDocument.findUnique({
-      where: { id: params.id },
+    const document = await prisma.nFeDocument.findFirst({
+      where: { id: params.id, config: { restaurantId } },
       include: { config: true },
     });
 
