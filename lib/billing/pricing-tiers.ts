@@ -68,6 +68,7 @@ export const BASE_PRICING_TIERS = {
       '5 usuários',
       'Integração com iFood',
       'Relatórios avançados',
+      'Nota Fiscal Eletrônica (NF-e)',
       'Suporte pelo WhatsApp',
     ],
     limits: {

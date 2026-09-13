@@ -64,7 +64,7 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
         : false,
     'Suporte Email': true,
     'Suporte pelo WhatsApp': tierId === 'business',
-    'Nota Fiscal Eletrônica (NF-e)': tierId === 'enterprise',
+    'Nota Fiscal Eletrônica (NF-e)': ['business', 'enterprise'].includes(tierId),
     'API customizada': tierId === 'enterprise',
   };
 
