@@ -1,6 +1,6 @@
 'use client';
 
-import { Package, BarChart3, ChefHat, Monitor, Building2, CreditCard, Boxes, Truck, Users, Bell, Calendar, TrendingUp } from 'lucide-react';
+import { Package, BarChart3, ChefHat, Monitor, Bell, Truck } from 'lucide-react';
 
 const features = [
   {
@@ -22,12 +22,6 @@ const features = [
     color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400',
   },
   {
-    icon: Boxes,
-    title: 'Lista de compra inteligente',
-    description: 'A Gastrux vê o que está acabando e sugere o que comprar. Você só confere e vai pro fornecedor.',
-    color: 'bg-lime-50 dark:bg-lime-950/40 text-lime-700 dark:text-lime-400',
-  },
-  {
     icon: Bell,
     title: 'Alertas no celular',
     description: 'Estoque baixo, custo subiu demais, margem caiu. Você recebe o alerta antes do problema virar prejuízo.',
@@ -44,36 +38,6 @@ const features = [
     title: 'Tela da cozinha (KDS)',
     description: 'Os pedidos aparecem na tela da cozinha na ordem certa. Zero papel, zero confusão.',
     color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Previsão de vendas',
-    description: 'O sistema aprende seu histórico e avisa quantos pratos você vai vender amanhã. Compre só o necessário.',
-    color: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    icon: Users,
-    title: 'Conheça seus clientes',
-    description: 'Cadastro de clientes, programa de fidelidade e campanhas pra trazer quem sumiu de volta.',
-    color: 'bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400',
-  },
-  {
-    icon: CreditCard,
-    title: 'Caixa organizado',
-    description: 'Recebimentos, pagamentos e fechamento diário em um lugar só. Sem retrabalho, sem erro.',
-    color: 'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-400',
-  },
-  {
-    icon: Building2,
-    title: 'Multi-loja',
-    description: 'Tem mais de uma unidade? Compare performance e controle tudo de um painel só.',
-    color: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400',
-  },
-  {
-    icon: Calendar,
-    title: 'Planejamento de produção',
-    description: 'Saiba o que preparar por dia, calcule insumos e evite sobras que viram prejuízo.',
-    color: 'bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400',
   },
 ];
 

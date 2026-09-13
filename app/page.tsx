@@ -9,7 +9,6 @@ import { useScrollTracking } from '@/hooks/use-scroll-tracking';
 import { useTimeTracking } from '@/hooks/use-time-tracking';
 import { useABTest } from '@/hooks/use-ab-test';
 import { AB_TESTS } from '@/lib/ab-testing';
-import { MetricStrip } from '@/components/marketing/metric-strip';
 import { HowItWorks } from '@/components/marketing/how-it-works';
 import { FeaturesShowcase } from '@/components/marketing/features-showcase';
 import { TestimonialsCarousel } from '@/components/marketing/testimonials-carousel';
@@ -23,6 +22,13 @@ const heroBenefits = [
   'Veja seu lucro real todo dia',
   'Funciona no celular',
   'Começa grátis, sem cartão',
+];
+
+const heroStats = [
+  { value: '500+', label: 'Donos largaram o caderno' },
+  { value: 'R$ 3.200', label: 'Economia média/mês' },
+  { value: '10 min', label: 'Pra começar a usar' },
+  { value: '4,8/5', label: 'Nota dos donos' },
 ];
 
 function HomePageContent() {
@@ -165,10 +171,20 @@ function HomePageContent() {
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Sem cartão • Sem contrato • Se não gostar, volta pro caderno
           </p>
+
+          {/* Trust stats - right under the fold, before the visitor scrolls past */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 pt-8 border-t border-slate-200 dark:border-slate-700">
+            {heroStats.map((s) => (
+              <div key={s.label}>
+                <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
+                  {s.value}
+                </div>
+                <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
-
-      <MetricStrip />
 
       <FeaturesShowcase />
 
@@ -177,40 +193,6 @@ function HomePageContent() {
       <TestimonialsCarousel />
 
       <SegmentsSection />
-
-      {/* ROI Snapshot */}
-      <section className="py-20 px-4 sm:px-6 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white">
-        <div className="max-w-5xl mx-auto text-center">
-          <span className="inline-block px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold tracking-wide uppercase mb-4">
-            ROI médio em 45 dias
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-            No caderno, você não vê o dinheiro sumindo. Aqui, você vê.
-          </h2>
-          <p className="text-base sm:text-lg text-slate-300 max-w-3xl mx-auto mb-10">
-            Quem controla na mão perde entre 8% e 18% do faturamento sem perceber — em desperdício, preço errado e compra a mais. Com a Gastrux, você enxerga cada centavo em menos de 2 meses.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-            {[
-              { v: 'R$ 3.200', l: 'Economia média/mês' },
-              { v: '21h', l: 'Horas salvas/semana' },
-              { v: '22%', l: 'Menos desperdício' },
-              { v: '+18%', l: 'Margem de contribuição' },
-            ].map((m, i) => (
-              <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <div className="text-2xl sm:text-3xl font-bold text-white">{m.v}</div>
-                <div className="text-sm text-slate-300 mt-1">{m.l}</div>
-              </div>
-            ))}
-          </div>
-          <Link href="/auth/signup" onClick={() => trackCTAClick('roi_cta', '/auth/signup')}>
-            <Button size="lg" variant="secondary" className="gap-2">
-              Calcular meu ROI na prática
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Link>
-        </div>
-      </section>
 
       <WhyGastrux />
 
