@@ -57,6 +57,10 @@ model User {
   emailTrialEndingSentAt DateTime?
   emailWelcomeSentAt     DateTime?
   acceptedTermsAt        DateTime?
+  businessStage          String?
+  locationCount          String?
+  mainPainPoint          String?
+  leadQuality            String?
   notifications          Notification[]          @relation("UserNotifications")
   accounts               Account[]
   adminLogs              AdminLog[]              @relation("AdminLogsUser")
