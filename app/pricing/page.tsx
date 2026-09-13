@@ -161,7 +161,7 @@ export default function PricingPage() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup">
-              <Button>Começar Grátis</Button>
+              <Button variant="cta">Começar Grátis</Button>
             </Link>
           </div>
         </div>
@@ -292,11 +292,8 @@ export default function PricingPage() {
                     <Button
                       onClick={() => handleUpgrade(tier)}
                       disabled={loading === tier.id}
-                      className={cn(
-                        'w-full mb-6',
-                        isPopular && 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white'
-                      )}
-                      variant={isPopular ? 'default' : tier.id === 'starter' ? 'default' : 'outline'}
+                      className="w-full mb-6"
+                      variant="cta"
                     >
                       {loading === tier.id ? (
                         'Processando...'
@@ -461,16 +458,11 @@ export default function PricingPage() {
           <p className="text-base sm:text-lg mb-8 text-blue-100">
             Comece gratuitamente hoje. Se não servir, é só cancelar.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth/signup">
-              <Button size="lg" variant="secondary" className="gap-2">
+              <Button size="lg" variant="cta" className="gap-2">
                 Começar Grátis
                 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/suporte/novo">
-              <Button size="lg" variant="outline" className="gap-2 bg-transparent border-white text-white hover:bg-white hover:text-blue-700">
-                Falar com vendas
               </Button>
             </Link>
           </div>

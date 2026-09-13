@@ -31,7 +31,6 @@ function HomePageContent() {
 
   const heroHeadline = useABTest(AB_TESTS.HERO_HEADLINE);
   const heroPrimaryBtn = useABTest(AB_TESTS.HERO_CTA_PRIMARY);
-  const heroSecondaryBtn = useABTest(AB_TESTS.HERO_CTA_SECONDARY);
   const finalCtaHeadline = useABTest(AB_TESTS.FINAL_CTA_HEADLINE);
   const finalCtaBtn = useABTest(AB_TESTS.FINAL_CTA_BUTTON);
   const heroDescription = useABTest(AB_TESTS.HERO_DESCRIPTION);
@@ -76,7 +75,7 @@ function HomePageContent() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup" className="hidden sm:block">
-              <Button className="gap-1">Começar Grátis</Button>
+              <Button variant="cta" className="gap-1">Começar Grátis</Button>
             </Link>
             <button
               className="md:hidden p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -107,7 +106,7 @@ function HomePageContent() {
                 <Button variant="outline" className="w-full">Entrar</Button>
               </Link>
               <Link href="/auth/signup" onClick={() => setMobileMenuOpen(false)}>
-                <Button className="w-full">Começar Grátis</Button>
+                <Button variant="cta" className="w-full">Começar Grátis</Button>
               </Link>
             </div>
           </div>
@@ -152,16 +151,11 @@ function HomePageContent() {
             ))}
           </ul>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handlePrimaryCtaClick}>
-              <Button size="lg" className="w-full sm:w-auto gap-2 shadow-lg shadow-blue-600/20">
+              <Button size="lg" variant="cta" className="w-full sm:w-auto gap-2 shadow-lg shadow-orange-600/20">
                 {heroPrimaryBtn.isLoaded ? heroPrimaryBtn.content : 'Trocar o Caderno Agora'}
                 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="#features" onClick={() => trackCTAClick('hero_view_features', '#features')}>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                {heroSecondaryBtn.isLoaded ? heroSecondaryBtn.content : 'Ver Como Funciona'}
               </Button>
             </Link>
           </div>
@@ -231,16 +225,11 @@ function HomePageContent() {
           <p className="text-lg mb-8 text-blue-100 max-w-2xl mx-auto">
             Começa grátis em 10 minutos. Se não gostar, volta pro caderno — sem custo, sem burocracia.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handleFinalCtaClick}>
-              <Button size="lg" variant="secondary" className="gap-2 shadow-xl">
+              <Button size="lg" variant="cta" className="gap-2 shadow-xl">
                 {finalCtaBtn.isLoaded ? finalCtaBtn.content : 'Criar Conta Grátis'}
                 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/pricing" onClick={() => trackCTAClick('final_view_pricing', '/pricing')}>
-              <Button size="lg" variant="outline" className="gap-2 bg-transparent border-white text-white hover:bg-white hover:text-blue-700">
-                Ver Planos
               </Button>
             </Link>
           </div>
