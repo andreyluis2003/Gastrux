@@ -24,6 +24,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'demandForecast');
+    if (tierBlock) return tierBlock;
 
     // Fetch forecast data
     const forecasts = await prisma.stockForecast.findMany({

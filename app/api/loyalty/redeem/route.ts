@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'loyalty');
+    if (tierBlock) return tierBlock;
+
     const body = await request.json();
     const { accountId, rewardId } = body;
 

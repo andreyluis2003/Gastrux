@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,18 @@ export async function POST(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const table = await prisma.table.findUnique({ where: { id: params.id } });
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
+    }
+
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'qrMenu');
+    if (tierBlock) return tierBlock;
+
+    // Scoped by restaurantId - without this, any authenticated user could
+    // regenerate/hijack another restaurant's table QR token by guessing an id.
+    const table = await prisma.table.findFirst({ where: { id: params.id, restaurantId } });
     if (!table) {
       return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }

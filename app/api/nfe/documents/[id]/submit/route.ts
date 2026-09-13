@@ -28,6 +28,9 @@ export async function POST(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'nfe');
+    if (tierBlock) return tierBlock;
 
     const document = await prisma.nFeDocument.findFirst({
       where: { id: params.id, config: { restaurantId } },

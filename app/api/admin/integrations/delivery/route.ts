@@ -53,6 +53,14 @@ export const POST = safeHandler(async (req, context) => {
     },
   });
 
+  // Only a genuinely new platform connection counts against the plan's
+  // deliveryIntegrations limit - reconnecting/editing an existing one must not.
+  if (!existingIntegration) {
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(context.restaurantId, 'deliveryIntegrations');
+    if (tierBlock) return tierBlock;
+  }
+
   if (existingIntegration) {
     const updated = await prisma.deliveryIntegration.update({
       where: {

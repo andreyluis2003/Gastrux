@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'demandForecast');
+    if (tierBlock) return tierBlock;
+
     const { searchParams } = new URL(request.url);
     const startDate = new Date(searchParams.get('startDate') || '');
     const endDate = new Date(searchParams.get('endDate') || '');

@@ -42,6 +42,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Silent by design (see file comment) - a plan downgrade after NFeConfig
+    // was set up must not break the sale itself, so this checks the feature
+    // gate the same graceful way as "not configured" rather than a hard 403.
+    const { isTierFeatureEnabled } = await import('@/lib/tier-guard');
+    const { prisma: prismaForTier } = await import('@/lib/prisma');
+    const restaurantTier = await prismaForTier.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { subscriptionTier: true },
+    });
+    if (!isTierFeatureEnabled(restaurantTier?.subscriptionTier || 'starter', 'nfe')) {
+      return NextResponse.json({
+        success: true,
+        nfce: null,
+        message: 'NF-e não disponível no plano atual. Venda registrada sem nota fiscal.',
+      });
+    }
+
     // Check if NFC-e auto-emission is configured
     const nfeConfig = await prisma.nFeConfig.findFirst({
       where: { restaurantId, active: true },

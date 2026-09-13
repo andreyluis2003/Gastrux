@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'advancedReports');
+    if (tierBlock) return tierBlock;
+
     // Fetch all data in parallel
     const [stocks, suppliers, forecasts, plans, recipes, ingredients] = await Promise.all([
       prisma.stock.findMany({

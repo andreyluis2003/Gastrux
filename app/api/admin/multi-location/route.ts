@@ -109,11 +109,19 @@ export async function POST(req: NextRequest) {
 
     try {
       const { checkTierLimit } = await import('@/lib/tier-guard');
+      const { enforceFeature } = await import('@/lib/api/tier-middleware');
       const currentRestaurant = await prisma.user.findUnique({
         where: { id: userId },
         select: { currentRestaurantId: true },
       });
       if (currentRestaurant?.currentRestaurantId) {
+        // The numeric 'locations' limit alone doesn't block Starter/Pro - they
+        // have no `locations` entry in their tier limits, and checkTierLimit
+        // defaults a missing limit to unlimited. The multiLocation feature
+        // flag is what actually restricts this to Business/Enterprise.
+        const tierBlock = await enforceFeature(currentRestaurant.currentRestaurantId, 'multiLocation');
+        if (tierBlock) return tierBlock;
+
         const check = await checkTierLimit(currentRestaurant.currentRestaurantId, 'locations');
         if (!check.allowed) {
           return NextResponse.json(
