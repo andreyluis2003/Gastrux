@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.staffMember.groupBy({
         by: ['restaurantId'],
-        where: { restaurantId: { in: restaurantIds }, active: true },
+        where: { restaurantId: { in: restaurantIds }, status: 'ACTIVE' },
         _count: true,
       }),
     ]);
