@@ -14,6 +14,7 @@ import { TestimonialsCarousel } from '@/components/marketing/testimonials-carous
 import { FAQSection } from '@/components/marketing/faq-section';
 import { GatewayChoiceDialog } from '@/components/billing/gateway-choice-dialog';
 import { cn } from '@/lib/utils';
+import { ClarityScript } from '@/components/analytics/clarity-script';
 
 const FEATURES_COMPARISON = [
   { category: 'Transações', name: 'Transações Diárias' },
@@ -149,6 +150,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
+      <ClarityScript />
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
