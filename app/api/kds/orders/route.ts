@@ -32,7 +32,10 @@ export async function GET(req: NextRequest) {
     const skip = parseInt(searchParams.get('skip') || '0');
 
     const where: any = { restaurantId };
-    if (status) where.status = status;
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
+      where.status = statuses.length > 1 ? { in: statuses } : statuses[0];
+    }
     if (priority) where.priority = priority;
     if (station) {
       where.stationAssignments = {
