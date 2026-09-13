@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
+    if (tierBlock) return tierBlock;
 
     const body = await req.json();
     const {
