@@ -58,6 +58,7 @@ model User {
   emailWelcomeSentAt     DateTime?
   acceptedTermsAt        DateTime?
   businessStage          String?
+  businessType           String?
   locationCount          String?
   mainPainPoint          String?
   leadQuality            String?

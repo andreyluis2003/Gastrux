@@ -6,6 +6,15 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { ChefHat } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SEGMENTS } from '@/lib/marketing/segments';
+
+// Reuses the marketing segment taxonomy so answers stay consistent with
+// /para/[segmento], minus 'delivery'/'franquias' - those are a business
+// model/channel, not a cuisine/format, and don't belong in this list.
+const BUSINESS_TYPE_OPTIONS = SEGMENTS.filter((s) => !['delivery', 'franquias'].includes(s.slug)).map((s) => ({
+  value: s.slug,
+  label: `${s.emoji} ${s.shortName}`,
+}));
 
 const BUSINESS_STAGE_OPTIONS = [
   { value: 'operating', label: 'Já tenho um restaurante/negócio de alimentação em operação' },
@@ -66,9 +75,10 @@ export default function QualificationPage() {
   const [businessStage, setBusinessStage] = useState<string | null>(null);
   const [locationCount, setLocationCount] = useState<string | null>(null);
   const [mainPainPoint, setMainPainPoint] = useState<string | null>(null);
+  const [businessType, setBusinessType] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = businessStage && locationCount && mainPainPoint;
+  const canSubmit = businessStage && locationCount && mainPainPoint && businessType;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -77,7 +87,7 @@ export default function QualificationPage() {
       const res = await fetch('/api/onboarding/qualification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessStage, locationCount, mainPainPoint }),
+        body: JSON.stringify({ businessStage, businessType, locationCount, mainPainPoint }),
       });
       if (!res.ok) {
         toast.error('Não deu pra salvar suas respostas, mas você já pode continuar');
@@ -98,7 +108,7 @@ export default function QualificationPage() {
       <div className="w-full max-w-md space-y-6 rounded-lg bg-white p-8 shadow-lg">
         <div className="flex flex-col items-center space-y-2 text-center">
           <ChefHat className="h-10 w-10 text-red-600" />
-          <h1 className="text-xl font-bold text-slate-900">Só mais 3 perguntinhas</h1>
+          <h1 className="text-xl font-bold text-slate-900">Só mais 4 perguntinhas</h1>
           <p className="text-sm text-slate-600">
             Isso nos ajuda a preparar a melhor experiência pro seu tipo de negócio.
           </p>
@@ -123,6 +133,13 @@ export default function QualificationPage() {
           options={PAIN_POINT_OPTIONS}
           value={mainPainPoint}
           onSelect={setMainPainPoint}
+        />
+
+        <ChoiceStep
+          title="Qual o tipo do seu negócio?"
+          options={BUSINESS_TYPE_OPTIONS}
+          value={businessType}
+          onSelect={setBusinessType}
         />
 
         <div className="space-y-2 pt-2">
