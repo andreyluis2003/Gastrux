@@ -32,7 +32,7 @@ const FEATURES_COMPARISON = [
   { category: 'Integrações', name: 'Integração iFood/Rappi/Uber' },
   { category: 'Integrações', name: 'Multi-loja' },
   { category: 'Suporte', name: 'Suporte Email' },
-  { category: 'Suporte', name: 'Suporte Prioritário' },
+  { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
   { category: 'Premium', name: 'Nota Fiscal Eletrônica (NF-e)' },
   { category: 'Premium', name: 'API customizada' },
 ];
@@ -63,7 +63,7 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
         ? (tier.limits.locations === 999999 ? 'Ilimitado' : `${tier.limits.locations} lojas`)
         : false,
     'Suporte Email': true,
-    'Suporte Prioritário': ['business', 'enterprise'].includes(tierId),
+    'Suporte pelo WhatsApp': tierId === 'business',
     'Nota Fiscal Eletrônica (NF-e)': tierId === 'enterprise',
     'API customizada': tierId === 'enterprise',
   };
@@ -80,7 +80,8 @@ export default function PricingPage() {
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [gatewayDialogTier, setGatewayDialogTier] = useState<{ id: string; name: string } | null>(null);
 
-  const tiers = Object.values(STRIPE_PRICING_TIERS);
+  // Enterprise is consultation-only - not a self-serve card on this page.
+  const tiers = Object.values(STRIPE_PRICING_TIERS).filter((t: any) => t.id !== 'enterprise');
 
   useEffect(() => {
     fetch('/api/billing/gateways')
@@ -124,12 +125,6 @@ export default function PricingPage() {
     if (tierId === 'starter') {
       toast.success('Você já tem acesso ao plano Starter. Bem-vindo!');
       router.push('/dashboard');
-      return;
-    }
-
-    if (tierId === 'enterprise') {
-      toast.info('Um consultor vai falar com você para montar o plano Enterprise');
-      router.push('/suporte/novo?tipo=enterprise');
       return;
     }
 
@@ -216,7 +211,7 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <section className="py-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {tiers.map((tier) => {
               const isPopular = tier.id === 'business';
               const isCustom = tier.priceMonthly === null;
@@ -325,6 +320,14 @@ export default function PricingPage() {
               );
             })}
           </div>
+
+          {/* Enterprise: consultation-only, not a self-serve card */}
+          <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-8">
+            Precisa de mais que o Business — mais lojas, mais usuários, requisitos específicos?{' '}
+            <Link href="/suporte/novo?tipo=enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Fale com a gente sobre o plano Enterprise
+            </Link>
+          </p>
 
           {/* Trust badges */}
           <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-slate-600 dark:text-slate-400">

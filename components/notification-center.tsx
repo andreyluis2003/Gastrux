@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Bell, X, CheckCheck, Archive } from 'lucide-react';
 import { useNotifications } from '@/hooks/use-notifications';
@@ -33,6 +34,7 @@ const typeIcons: Record<string, string> = {
 
 export function NotificationCenter() {
   const { data: session, status } = useSession();
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, archiveNotification } =
@@ -41,6 +43,10 @@ export function NotificationCenter() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Public marketing pages don't need a notification bell
+  const isPublicMarketingPage = pathname === '/' || pathname === '/pricing' || !!pathname?.startsWith('/para/');
+  if (isPublicMarketingPage) return null;
 
   if (!mounted || status !== 'authenticated') {
     return (

@@ -23,14 +23,18 @@ export function FeedbackWidget() {
   const [submitted, setSubmitted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  // Hide widget on admin or auth routes
+  // Hide widget on admin/auth routes and on public marketing pages (no
+  // account/data to give feedback about there, and it clutters the CTA area)
   const isHidden =
     !pathname ||
     pathname.startsWith('/admin') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/signin') ||
     pathname.startsWith('/signup') ||
-    pathname.startsWith('/auth');
+    pathname.startsWith('/auth') ||
+    pathname === '/' ||
+    pathname === '/pricing' ||
+    pathname.startsWith('/para/');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
