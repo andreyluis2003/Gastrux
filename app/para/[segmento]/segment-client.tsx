@@ -141,7 +141,7 @@ export function SegmentPageClient({ segment }: { segment: Segment }) {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/auth/signup">
               <Button size="lg" className="w-full sm:w-auto bg-white text-slate-900 hover:bg-white/90 gap-2">
-                Testar Grátis por 7 dias <ArrowRight className="w-4 h-4" />
+                Testar Grátis por 30 dias <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
             <Link href="/pricing">
