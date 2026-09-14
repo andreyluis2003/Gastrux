@@ -1,21 +1,45 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/nfe/webhook
  * Receive webhook callbacks from NF-e provider (Focus NFe, Brasil NFe, etc)
- * This handles status updates from SEFAZ
+ * This handles status updates from SEFAZ. No browser session is present on
+ * these calls - the target document (and therefore its restaurant) is
+ * resolved from the payload's globally-unique accessKey below.
+ *
+ * accessKey is NOT a secret - it's printed on the fiscal document itself -
+ * so resolving the document by it is not an authentication check. The
+ * webhook URL must be registered with the provider including
+ * ?token=<NFE_WEBHOOK_SECRET>, or any caller who obtains an accessKey could
+ * forge a status change (e.g. mark an unauthorized document "authorized",
+ * or cancel a real one).
  */
+function verifyNFeWebhookToken(request: NextRequest): boolean {
+  const secret = process.env.NFE_WEBHOOK_SECRET;
+  if (!secret) return false;
+
+  const provided = request.nextUrl.searchParams.get('token') || request.headers.get('x-webhook-token') || '';
+  if (!provided) return false;
+
+  try {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    if (!verifyNFeWebhookToken(request)) {
+      console.warn('[NF-e Webhook] Rejected: missing or invalid token');
+      return NextResponse.json({ error: 'invalid token' }, { status: 401 });
     }
 
     const body = await request.json();

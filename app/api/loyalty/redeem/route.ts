@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'loyalty');
+    if (tierBlock) return tierBlock;
+
     const body = await request.json();
     const { accountId, rewardId } = body;
 
@@ -49,25 +53,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (account.currentPoints < reward.pointsCost) {
+    // Process the redemption atomically. Checking the balance/cap and then
+    // writing it separately (as this used to) lets two concurrent redeem
+    // requests both pass the check before either write lands - a customer
+    // could redeem a reward twice while only ever spending the points once.
+    // A single conditional update makes the check-and-deduct one atomic
+    // operation, so only one of two racing requests can ever succeed.
+    const pointsResult = await prisma.customerLoyaltyAccount.updateMany({
+      where: { id: accountId, currentPoints: { gte: reward.pointsCost } },
+      data: {
+        currentPoints: { decrement: reward.pointsCost },
+        totalPointsRedeemed: { increment: reward.pointsCost },
+        lastActivityAt: new Date(),
+      },
+    });
+    if (pointsResult.count === 0) {
       return NextResponse.json(
         { error: 'Pontos insuficientes para resgatar esta recompensa' },
         { status: 400 }
       );
     }
 
-    // Check max redemptions
-    if (reward.maxRedemptions && reward.currentRedemptions >= reward.maxRedemptions) {
+    const rewardResult = await prisma.loyaltyReward.updateMany({
+      where: reward.maxRedemptions
+        ? { id: rewardId, currentRedemptions: { lt: reward.maxRedemptions } }
+        : { id: rewardId },
+      data: { currentRedemptions: { increment: 1 } },
+    });
+    if (rewardResult.count === 0) {
+      // Reward hit its redemption cap between our check and the points
+      // deduction above - refund the points before rejecting.
+      await prisma.customerLoyaltyAccount.update({
+        where: { id: accountId },
+        data: {
+          currentPoints: { increment: reward.pointsCost },
+          totalPointsRedeemed: { decrement: reward.pointsCost },
+        },
+      });
       return NextResponse.json(
         { error: 'Esta recompensa atingiu o limite de resgates' },
         { status: 400 }
       );
     }
 
-    // Process the redemption
-    const newPoints = account.currentPoints - reward.pointsCost;
-
-    const [transaction, updatedAccount, updatedReward] = await prisma.$transaction([
+    const [updatedAccount, transaction] = await Promise.all([
+      prisma.customerLoyaltyAccount.findUniqueOrThrow({ where: { id: accountId } }),
       prisma.loyaltyTransaction.create({
         data: {
           customerId: account.customerId,
@@ -78,25 +108,7 @@ export async function POST(request: NextRequest) {
           reason: `Resgate: ${reward.name}`,
           rewardId,
           balanceBefore: account.currentPoints,
-          balanceAfter: newPoints,
-        },
-      }),
-      prisma.customerLoyaltyAccount.update({
-        where: { id: accountId },
-        data: {
-          currentPoints: newPoints,
-          totalPointsRedeemed: {
-            increment: reward.pointsCost,
-          },
-          lastActivityAt: new Date(),
-        },
-      }),
-      prisma.loyaltyReward.update({
-        where: { id: rewardId },
-        data: {
-          currentRedemptions: {
-            increment: 1,
-          },
+          balanceAfter: account.currentPoints - reward.pointsCost,
         },
       }),
     ]);

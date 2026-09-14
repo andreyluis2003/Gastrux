@@ -42,6 +42,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
     }
 
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
+    if (tierBlock) return tierBlock;
+
     // Resolve menu items and compute totals (scoped to this restaurant - a
     // client could otherwise mix in another restaurant's menuItemIds/prices)
     const menuItemIds = items.map((i: any) => i.menuItemId);
@@ -91,7 +95,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const total = subtotal + Number(deliveryFee);
+    // deliveryFee has no server-side source of truth to validate against
+    // (no delivery zone/fee config exists yet) - clamp it to non-negative
+    // so a client can't submit a negative value to reduce the order total.
+    const safeDeliveryFee = Math.max(0, Number(deliveryFee) || 0);
+    const total = subtotal + safeDeliveryFee;
     const orderNumber = generateOrderNumber();
 
     // Find or create customer, scoped to this restaurant. Customer.email is
@@ -129,7 +137,7 @@ export async function POST(req: NextRequest) {
         paymentStatus: 'PENDING',
         totalItems: orderItems.reduce((acc, i) => acc + i.quantity, 0),
         subtotal,
-        fees: Number(deliveryFee),
+        fees: safeDeliveryFee,
         total,
         specialInstructions: [
           specialInstructions,

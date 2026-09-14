@@ -117,81 +117,95 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+    }
 
-      // Check for conflicts
-      const conflicts = await prisma.reservation.findMany({
-        where: {
-          restaurantId,
-          tableId,
-          status: { in: ['CONFIRMED', 'PENDING'] },
-          reservedAt: {
-            lt: endTime,
-          },
-          NOT: {
-            reservedAt: {
-              gte: endTime,
+    // The conflict check and the reservation create must happen in one
+    // Serializable transaction - checking for conflicts and then creating
+    // as two separate steps left a window where two concurrent bookings for
+    // the same table/time could both pass the check and both get confirmed
+    // (double-booking). Serializable isolation makes Postgres abort one of
+    // two racing transactions instead.
+    let reservation;
+    try {
+      reservation = await prisma.$transaction(
+        async (tx) => {
+          if (tableId) {
+            const conflicts = await tx.reservation.findMany({
+              where: {
+                restaurantId,
+                tableId,
+                status: { in: ['CONFIRMED', 'PENDING'] },
+                reservedAt: { lt: endTime },
+                NOT: { reservedAt: { gte: endTime } },
+              },
+            });
+            if (conflicts.length > 0) {
+              throw new TableConflictError();
+            }
+          }
+
+          // Get or create guest profile, scoped to this restaurant (the
+          // same email can be a guest at multiple restaurants - see
+          // GuestProfile's @@unique([restaurantId, email])).
+          let guest = await tx.guestProfile.findUnique({
+            where: { restaurantId_email: { restaurantId, email: guestEmail } },
+          });
+
+          if (!guest) {
+            guest = await tx.guestProfile.create({
+              data: {
+                restaurantId,
+                name: guestName,
+                email: guestEmail,
+                phone: guestPhone,
+                firstReservationAt: new Date(),
+              },
+            });
+          }
+
+          const created = await tx.reservation.create({
+            data: {
+              restaurantId,
+              guestId: guest.id,
+              guestName,
+              guestEmail,
+              guestPhone,
+              partySize: parseInt(partySize),
+              tableId,
+              reservedAt: reserved_at,
+              duration,
+              notes,
+              status: 'CONFIRMED',
             },
-          },
-        },
-      });
+            include: {
+              guest: true,
+              table: {
+                include: { section: true },
+              },
+            },
+          });
 
-      if (conflicts.length > 0) {
+          await tx.guestProfile.update({
+            where: { id: guest.id },
+            data: {
+              totalReservations: { increment: 1 },
+              lastReservationAt: new Date(),
+            },
+          });
+
+          return created;
+        },
+        { isolationLevel: 'Serializable' }
+      );
+    } catch (error: any) {
+      if (error instanceof TableConflictError || error?.code === 'P2034') {
         return NextResponse.json(
           { error: 'Table is no longer available at this time' },
           { status: 409 }
         );
       }
+      throw error;
     }
-
-    // Get or create guest profile, scoped to this restaurant (the same email
-    // can be a guest at multiple restaurants - see GuestProfile's
-    // @@unique([restaurantId, email])).
-    let guest = await prisma.guestProfile.findUnique({
-      where: { restaurantId_email: { restaurantId, email: guestEmail } },
-    });
-
-    if (!guest) {
-      guest = await prisma.guestProfile.create({
-        data: {
-          restaurantId,
-          name: guestName,
-          email: guestEmail,
-          phone: guestPhone,
-          firstReservationAt: new Date(),
-        },
-      });
-    }
-
-    const reservation = await prisma.reservation.create({
-      data: {
-        restaurantId,
-        guestId: guest.id,
-        guestName,
-        guestEmail,
-        guestPhone,
-        partySize: parseInt(partySize),
-        tableId,
-        reservedAt: reserved_at,
-        duration,
-        notes,
-        status: 'CONFIRMED',
-      },
-      include: {
-        guest: true,
-        table: {
-          include: { section: true },
-        },
-      },
-    });
-
-    // Update guest stats
-    await prisma.guestProfile.update({
-      where: { id: guest.id },
-      data: {
-        totalReservations: { increment: 1 },
-        lastReservationAt: new Date(),
-      },
-    });
 
     return NextResponse.json(reservation, { status: 201 });
   } catch (error) {
@@ -202,3 +216,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+class TableConflictError extends Error {}

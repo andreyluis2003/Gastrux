@@ -44,6 +44,22 @@ export async function POST(req: NextRequest) {
     const balanceAfter = balanceBefore - points;
     const discountValue = points; // 1 ponto = R$1
 
+    // The check above and the deduct below must be one atomic operation -
+    // otherwise two concurrent redeem requests can both pass the balance
+    // check before either write lands, redeeming more than the customer
+    // actually had.
+    const redeemResult = await prisma.customerLoyaltyAccount.updateMany({
+      where: { id: account.id, currentPoints: { gte: points } },
+      data: {
+        currentPoints: { decrement: points },
+        totalPointsRedeemed: { increment: points },
+        lastActivityAt: new Date(),
+      },
+    });
+    if (redeemResult.count === 0) {
+      return NextResponse.json({ error: `Saldo insuficiente. Dispon\u00edvel: ${account.currentPoints} pontos` }, { status: 400 });
+    }
+
     await prisma.loyaltyTransaction.create({
       data: {
         customerId,
@@ -55,15 +71,6 @@ export async function POST(req: NextRequest) {
         orderId: orderId || null,
         balanceBefore,
         balanceAfter,
-      },
-    });
-
-    await prisma.customerLoyaltyAccount.update({
-      where: { id: account.id },
-      data: {
-        currentPoints: { decrement: points },
-        totalPointsRedeemed: { increment: points },
-        lastActivityAt: new Date(),
       },
     });
 
