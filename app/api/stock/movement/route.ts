@@ -61,12 +61,11 @@ export const POST = safeHandler(async (req, context) => {
   });
 
   if (stock && ingredient) {
-    const newQuantity =
-      body.movementType === 'ENTRY'
-        ? stock.currentQuantity + body.quantity
-        : stock.currentQuantity - body.quantity;
-
-    await prisma.stock.update({
+    // Atomic increment/decrement - computing newQuantity from a prior read
+    // and writing it back loses updates when two movements for the same
+    // ingredient happen concurrently (e.g. two orders auto-deducting stock
+    // at the same time).
+    const updatedStock = await prisma.stock.update({
       where: {
         restaurantId_ingredientId: {
           restaurantId: context.restaurantId,
@@ -74,10 +73,14 @@ export const POST = safeHandler(async (req, context) => {
         },
       },
       data: {
-        currentQuantity: newQuantity,
+        currentQuantity:
+          body.movementType === 'ENTRY'
+            ? { increment: body.quantity }
+            : { decrement: body.quantity },
         lastUpdated: new Date(),
       },
     });
+    const newQuantity = updatedStock.currentQuantity;
 
     // Trigger low stock notification if below minimum
     if (newQuantity < ingredient.minimumStock) {

@@ -15,12 +15,13 @@ export async function POST(req: NextRequest) {
 
   if (!restaurantId) return NextResponse.json({ error: 'restaurantId obrigat\u00f3rio' }, { status: 400 });
 
-  // Verify user has access
+  // Verify user has active access (a removed/deactivated member must not
+  // be able to switch back into a restaurant they were removed from)
   const access = await prisma.restaurantUser.findUnique({
     where: { restaurantId_userId: { restaurantId, userId } },
   });
 
-  if (!access) return NextResponse.json({ error: 'Sem acesso a esta unidade' }, { status: 403 });
+  if (!access || !access.isActive) return NextResponse.json({ error: 'Sem acesso a esta unidade' }, { status: 403 });
 
   await prisma.user.update({
     where: { id: userId },

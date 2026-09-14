@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { createUnifiedRefund } from '@/lib/payment-unified';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
@@ -33,6 +35,20 @@ export async function POST(request: NextRequest) {
         { error: 'Payment ID is required' },
         { status: 400 }
       );
+    }
+
+    // The payment must belong to the caller's own restaurant - otherwise
+    // any OWNER/ADMIN/MANAGER could refund another restaurant's payment.
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+    const owned = await prisma.payment.findFirst({
+      where: { id: paymentId, restaurantId },
+      select: { id: true },
+    });
+    if (!owned) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
     const result = await createUnifiedRefund(
