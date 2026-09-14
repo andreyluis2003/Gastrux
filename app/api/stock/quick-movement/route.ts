@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getCurrentRestaurantId } from "@/lib/whatsapp/get-restaurant";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: "Restaurant not found" }, { status: 400 });
+    }
+
     const body: QuickMovementBody = await request.json();
     const { ingredientId, quantity, movementType, reason } = body;
 
@@ -41,8 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ingredient = await prisma.ingredient.findUnique({
-      where: { id: ingredientId },
+    const ingredient = await prisma.ingredient.findFirst({
+      where: { id: ingredientId, restaurantId },
       include: { category: true },
     });
 
@@ -67,25 +73,32 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let newQuantity = stock.currentQuantity;
-    switch (movementType) {
-      case "ENTRY":
-        newQuantity += quantity;
-        break;
-      case "MANUAL_DEDUCTION":
-      case "ADJUSTMENT":
-        newQuantity = Math.max(0, newQuantity - quantity);
-        break;
-    }
+    const isDeduction = movementType === "MANUAL_DEDUCTION" || movementType === "ADJUSTMENT";
 
-    const updatedStock = await prisma.stock.update({
+    // Atomic increment/decrement - computing newQuantity from a prior read
+    // and writing it back loses updates when two movements for the same
+    // ingredient happen concurrently.
+    let updatedStock = await prisma.stock.update({
       where: { ingredientId },
       data: {
-        currentQuantity: newQuantity,
+        currentQuantity: isDeduction ? { decrement: quantity } : { increment: quantity },
         lastUpdated: new Date(),
       },
       include: { ingredient: true },
     });
+
+    // Deductions never go below zero - correct it if a decrement crossed
+    // zero (the clamp itself doesn't need to be atomic with the decrement
+    // above since it only ever pulls the value up to a floor).
+    if (updatedStock.currentQuantity < 0) {
+      updatedStock = await prisma.stock.update({
+        where: { ingredientId },
+        data: { currentQuantity: 0 },
+        include: { ingredient: true },
+      });
+    }
+
+    const newQuantity = updatedStock.currentQuantity;
 
     const movement = await prisma.stockMovement.create({
       data: {
@@ -127,6 +140,7 @@ export async function POST(request: NextRequest) {
       if (!existingAlert) {
         await prisma.alert.create({
           data: {
+            restaurantId,
             type: "LOW_STOCK",
             severity: "HIGH",
             title: `Estoque baixo: ${ingredient.name}`,

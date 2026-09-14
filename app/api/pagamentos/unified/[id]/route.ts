@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { syncPaymentStatus } from '@/lib/payment-unified';
 
 export const dynamic = 'force-dynamic';
@@ -24,8 +25,13 @@ export async function GET(
 
     const { id } = params;
 
-    const payment = await prisma.payment.findUnique({
-      where: { id },
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: { id, restaurantId },
       include: {
         mercadoPagoData: true,
         stripeData: true,
@@ -60,6 +66,16 @@ export async function PATCH(
     }
 
     const { id } = params;
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+    const owned = await prisma.payment.findFirst({ where: { id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+    }
+
     const newStatus = await syncPaymentStatus(id);
 
     return NextResponse.json({ paymentId: id, status: newStatus });

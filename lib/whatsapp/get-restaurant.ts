@@ -16,11 +16,34 @@ export async function getCurrentRestaurantId(): Promise<string | null> {
     select: {
       id: true,
       currentRestaurantId: true,
-      restaurants: { select: { restaurantId: true }, orderBy: { restaurantId: 'asc' }, take: 1 },
+      restaurants: {
+        where: { isActive: true },
+        select: { restaurantId: true },
+        orderBy: { restaurantId: 'asc' },
+        take: 1,
+      },
     },
   });
   if (!user) return null;
-  if (user.currentRestaurantId) return user.currentRestaurantId;
+
+  // currentRestaurantId is only trustworthy while the user still has an
+  // active membership (or ownership) there. Sessions are JWT-based and
+  // outlive membership changes, so without this check a staff member
+  // removed from a restaurant (RestaurantUser.isActive = false) would
+  // keep full access to it for the rest of their session.
+  if (user.currentRestaurantId) {
+    const [stillMember, ownsIt] = await Promise.all([
+      prisma.restaurantUser.findFirst({
+        where: { restaurantId: user.currentRestaurantId, userId: user.id, isActive: true },
+        select: { id: true },
+      }),
+      prisma.restaurant.findFirst({
+        where: { id: user.currentRestaurantId, ownerId: user.id },
+        select: { id: true },
+      }),
+    ]);
+    if (stillMember || ownsIt) return user.currentRestaurantId;
+  }
 
   // Tenta achar um restaurante onde o user é owner (determinístico)
   const owned = await prisma.restaurant.findFirst({

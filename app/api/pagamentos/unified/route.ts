@@ -125,8 +125,15 @@ export async function GET(request: NextRequest) {
 
     const restaurantId = user?.restaurants?.[0]?.restaurant?.id;
 
+    // listPayments only applies a restaurantId filter when one is given -
+    // without this guard, a user with no restaurant association would see
+    // every restaurant's payments on the platform.
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'No restaurant associated with user' }, { status: 400 });
+    }
+
     const { payments, total } = await listPayments({
-      restaurantId: restaurantId || undefined,
+      restaurantId,
       gateway: gateway || undefined,
       status,
       fromDate,
