@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+class TableConflictError extends Error {}
+
 // GET /api/reservations - Get available tables for a specific time, for one restaurant
 export async function GET(req: NextRequest) {
   try {
@@ -27,6 +29,8 @@ export async function GET(req: NextRequest) {
     const size = parseInt(partySize);
 
     // Find tables with capacity and no conflicts, scoped to this restaurant
+    // (without this filter, tables from every restaurant on the platform
+    // show up as "available" for any customer booking page).
     const availableTables = await prisma.table.findMany({
       where: {
         restaurantId,
@@ -98,7 +102,10 @@ export async function POST(req: NextRequest) {
     const duration = 90;
     const endTime = new Date(reserved_at.getTime() + duration * 60000);
 
-    // Validate table if provided (must belong to this restaurant)
+    // Validate table if provided (must belong to this restaurant - the
+    // original version looked it up by id alone, so a tableId from another
+    // restaurant would be accepted and the reservation created with no
+    // restaurantId at all).
     if (tableId) {
       const table = await prisma.table.findFirst({
         where: { id: tableId, restaurantId },
@@ -216,5 +223,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-class TableConflictError extends Error {}

@@ -14,14 +14,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // The reward and the loyalty account must both belong to the caller's
+    // own restaurant - the original version resolved them by id alone,
+    // which let any authenticated user redeem another restaurant's reward
+    // using another restaurant's customer's points.
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
     }
-
-    const { enforceFeature } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceFeature(restaurantId, 'loyalty');
-    if (tierBlock) return tierBlock;
 
     const body = await request.json();
     const { accountId, rewardId } = body;
@@ -41,7 +41,9 @@ export async function POST(request: NextRequest) {
 
     // Verify account exists, belongs to this restaurant, and is enrolled in
     // the same program as the reward (an account's points from one program
-    // can't be spent on another program's rewards).
+    // can't be spent on another program's rewards). customerId is derived
+    // from the account itself rather than trusted from the request body, so
+    // the redemption can't be logged against an arbitrary customer.
     const account = await prisma.customerLoyaltyAccount.findFirst({
       where: { id: accountId, programId: reward.programId, program: { restaurantId } },
     });
