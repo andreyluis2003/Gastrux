@@ -254,6 +254,7 @@ function HomePageContent() {
           </div>
           <div className="border-t border-slate-800 pt-6 text-center text-sm">
             <p>&copy; 2026 Gastrux. Todos os direitos reservados.</p>
+            <p className="mt-1 text-xs text-slate-500">Gastrux é um produto da Help Flow Ltda — CNPJ 61.639.918/0001-70</p>
           </div>
         </div>
       </footer>
