@@ -11,6 +11,7 @@ import {
   QrCode, Building2, CircleDollarSign, ChevronRight, Loader2,
   FileText, Bell, ScanLine
 } from 'lucide-react';
+import { MpConnectBanner } from '@/components/payments/mp-connect-banner';
 
 interface Payment {
   id: string;
@@ -114,6 +115,7 @@ export default function PagamentosDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        <MpConnectBanner />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
