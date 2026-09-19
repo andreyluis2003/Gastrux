@@ -8,6 +8,7 @@ jest.mock('../../../lib/mercadopago-connect/payments', () => ({
   getConnectPayment: jest.fn(),
 }));
 
+import { prisma as appPrisma } from '../../../lib/prisma';
 import { getConnectPayment } from '../../../lib/mercadopago-connect/payments';
 import { saveConnection, getConnection } from '../../../lib/mercadopago-connect/connection-service';
 import { syncRestaurantPayment } from '../../../lib/mercadopago-connect/payment-sync';
@@ -104,6 +105,27 @@ describe('mercadopago-connect/payment-sync', () => {
     expect(again).toMatchObject({ updated: false, reason: 'no-transition' });
     const second = (await reload()).payment;
     expect(second.processedAt.getTime()).toBe(first.processedAt.getTime());
+  });
+
+  it('repairs an order left unpaid when the order update failed after the payment was approved', async () => {
+    getConnectPayment.mockResolvedValue(mpPayment());
+    // The sync module uses the app's Prisma client, not this file's instance.
+    const spy = jest.spyOn(appPrisma.order, 'updateMany').mockRejectedValueOnce(new Error('boom'));
+    try {
+      await expect(syncRestaurantPayment(A.restaurantId, '555')).rejects.toThrow('boom');
+    } finally {
+      spy.mockRestore();
+    }
+    const broken = await reload();
+    expect(broken.payment.status).toBe('APPROVED');
+    expect(broken.order.paymentStatus).toBe('PENDING');
+
+    const retry = await syncRestaurantPayment(A.restaurantId, '555');
+
+    expect(retry).toMatchObject({ updated: false, reason: 'no-transition' });
+    const healed = await reload();
+    expect(healed.order.paymentStatus).toBe('APPROVED');
+    expect(healed.payment.processedAt.getTime()).toBe(broken.payment.processedAt.getTime());
   });
 
   it('refuses to approve when the paid amount differs from the payment amount', async () => {

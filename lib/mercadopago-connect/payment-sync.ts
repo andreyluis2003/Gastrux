@@ -20,6 +20,37 @@ function parseMetadata(raw: string | null): Record<string, unknown> {
 }
 
 /**
+ * Writes that follow the Payment update: marks the linked Order paid and
+ * mirrors the MP data on the preference-based MercadoPagoTransaction row.
+ * Both writes are idempotent and scoped, so they are safe to repeat; the
+ * self-healing branch in syncRestaurantPayment relies on that.
+ */
+async function applyLinkedRecords(
+  restaurantId: string,
+  payment: { id: string; orderId: string | null },
+  mp: any,
+  markOrderPaid: boolean
+): Promise<void> {
+  if (markOrderPaid && payment.orderId) {
+    await prisma.order.updateMany({
+      where: { id: payment.orderId, restaurantId, paymentStatus: { not: 'APPROVED' } },
+      data: { paymentStatus: 'APPROVED' },
+    });
+  }
+
+  // Preference-based checkouts also keep a MercadoPagoTransaction row.
+  await prisma.mercadoPagoTransaction.updateMany({
+    where: { paymentId: payment.id },
+    data: {
+      mpPaymentId: String(mp.id),
+      mpStatus: mp.status,
+      mpStatusDetail: mp.status_detail,
+      lastWebhookAt: new Date(),
+    },
+  });
+}
+
+/**
  * Applies a Mercado Pago payment to OUR Payment (and Order) records, using the
  * restaurant's own token to fetch it. Used by the webhook and by the PIX
  * status reconciliation. Safe to call repeatedly and concurrently.
@@ -55,9 +86,23 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
   }
 
   const mapped = mapMPStatusToPaymentStatus(mp.status) as PaymentStatus;
-  if (!canTransition(payment.status, mapped)) return { updated: false, reason: 'no-transition' };
+  const amountMatches = Number(mp.transaction_amount) === Number(payment.amount);
 
-  if (mapped === 'APPROVED' && Number(mp.transaction_amount) !== Number(payment.amount)) {
+  if (!canTransition(payment.status, mapped)) {
+    // Self-healing: the Payment write and the Order write are not one
+    // transaction. If a previous run committed the Payment as APPROVED and then
+    // failed before the Order write, no later notification would ever mark the
+    // Order paid, because APPROVED -> APPROVED is not a transition. So repeat
+    // the idempotent linked writes. Runs only for an APPROVED notification on
+    // an already APPROVED Payment whose MP id was checked above and whose
+    // amount matches; it never touches the Payment row.
+    if (mapped === 'APPROVED' && payment.status === 'APPROVED' && payment.orderId && amountMatches) {
+      await applyLinkedRecords(restaurantId, payment, mp, true);
+    }
+    return { updated: false, reason: 'no-transition' };
+  }
+
+  if (mapped === 'APPROVED' && !amountMatches) {
     console.warn(
       `[mp-connect] amount mismatch for payment ${payment.id}: expected ${payment.amount}, MP reported ${mp.transaction_amount}`
     );
@@ -89,23 +134,7 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
   });
   if (result.count === 0) return { updated: false, reason: 'concurrent' };
 
-  if (approved && payment.orderId) {
-    await prisma.order.updateMany({
-      where: { id: payment.orderId, restaurantId, paymentStatus: { not: 'APPROVED' } },
-      data: { paymentStatus: 'APPROVED' },
-    });
-  }
-
-  // Preference-based checkouts also keep a MercadoPagoTransaction row.
-  await prisma.mercadoPagoTransaction.updateMany({
-    where: { paymentId: payment.id },
-    data: {
-      mpPaymentId: String(mp.id),
-      mpStatus: mp.status,
-      mpStatusDetail: mp.status_detail,
-      lastWebhookAt: new Date(),
-    },
-  });
+  await applyLinkedRecords(restaurantId, payment, mp, approved);
 
   return { updated: true, status: mapped };
 }
