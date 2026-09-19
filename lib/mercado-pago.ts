@@ -106,9 +106,10 @@ export interface CreatePreferenceInput {
   statementDescriptor?: string;
 }
 
-export async function createCheckoutPreference(input: CreatePreferenceInput) {
-  const client = getMercadoPagoClient();
-
+export async function createCheckoutPreference(
+  input: CreatePreferenceInput,
+  client: MercadoPagoConfig = getMercadoPagoClient()
+) {
   const preference = new Preference(client);
 
   const body = {
@@ -153,8 +154,7 @@ export async function createCheckoutPreference(input: CreatePreferenceInput) {
 // PAYMENT LOOKUP
 // ============================================================
 
-export async function getPayment(paymentId: string) {
-  const client = getMercadoPagoClient();
+export async function getPayment(paymentId: string, client: MercadoPagoConfig = getMercadoPagoClient()) {
   const payment = new Payment(client);
   return payment.get({ id: paymentId });
 }
@@ -297,16 +297,22 @@ export function getMPAutoRecurringForBillingCycle(
 // PIX (via Preference + external_reference tracking)
 // ============================================================
 
-export async function createPixPreference(input: Omit<CreatePreferenceInput, 'items'> & { amount: number; description: string }) {
-  return createCheckoutPreference({
-    ...input,
-    items: [{
-      id: 'pix-payment',
-      title: input.description,
-      quantity: 1,
-      unitPrice: input.amount,
-    }],
-  });
+export async function createPixPreference(
+  input: Omit<CreatePreferenceInput, 'items'> & { amount: number; description: string },
+  client?: MercadoPagoConfig
+) {
+  return createCheckoutPreference(
+    {
+      ...input,
+      items: [{
+        id: 'pix-payment',
+        title: input.description,
+        quantity: 1,
+        unitPrice: input.amount,
+      }],
+    },
+    client
+  );
 }
 
 // ============================================================
