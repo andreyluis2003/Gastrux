@@ -7,8 +7,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { prisma } from '@/lib/prisma';
-import { createUnifiedPayment, listPayments, syncPaymentStatus, getPaymentAnalytics } from '@/lib/payment-unified';
+import {
+  createUnifiedPayment,
+  listPayments,
+  syncPaymentStatus,
+  getPaymentAnalytics,
+  OnlinePaymentUnavailableError,
+} from '@/lib/payment-unified';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -48,8 +55,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const restaurant = user.restaurants?.[0]?.restaurant;
-    const restaurantId = restaurant?.id;
+    const restaurantId = await getCurrentRestaurantId();
 
     if (!restaurantId) {
       return NextResponse.json(
@@ -95,6 +101,9 @@ export async function POST(request: NextRequest) {
     captureException(error instanceof Error ? error : new Error(String(error)), {
       endpoint: '/api/pagamentos/unified',
     });
+    if (error instanceof OnlinePaymentUnavailableError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     console.error('[Unified Payment] Error:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create payment' },

@@ -13,10 +13,27 @@
  */
 
 import { prisma } from './prisma';
-import { isMercadoPagoConfigured, createCheckoutPreference, getPayment as getMPPayment } from './mercado-pago';
+import type { MercadoPagoConfig } from 'mercadopago';
+import { createCheckoutPreference, getPayment as getMPPayment } from './mercado-pago';
+import { getMpClientForRestaurant } from './mercadopago-connect/connection-service';
+import { notificationUrlFor, refundConnectPayment } from './mercadopago-connect/payments';
 import { isStripeConnectConfigured, createPaymentIntent, retrievePaymentIntent, createRefund as createStripeRefund } from './stripe-connect';
 import { logPaymentEvent, PaymentEventType } from './payment-logger';
 import { captureException } from './sentry';
+
+/**
+ * Thrown when a restaurant has not connected its own Mercado Pago account
+ * (or the connection expired): online Mercado Pago payments are never created
+ * with the platform token, and there is no fallback.
+ */
+export class OnlinePaymentUnavailableError extends Error {
+  code = 'ONLINE_PAYMENT_UNAVAILABLE' as const;
+
+  constructor() {
+    super('Este restaurante não conectou o Mercado Pago. Conecte a conta para receber pagamentos online.');
+    this.name = 'OnlinePaymentUnavailableError';
+  }
+}
 
 export type UnifiedGateway = 'MERCADO_PAGO' | 'STRIPE_CONNECT' | 'MANUAL';
 
@@ -69,9 +86,12 @@ export interface PaymentResult {
 export async function createUnifiedPayment(input: CreatePaymentInput): Promise<PaymentResult> {
   const totalAmount = input.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 
-  // Validate gateway configuration
-  if (input.gateway === 'MERCADO_PAGO' && !isMercadoPagoConfigured()) {
-    throw new Error('Mercado Pago not configured');
+  // A restaurant's Mercado Pago payments go through THAT restaurant's own Mercado Pago account
+  // (OAuth connection). The platform token is never used for them, and there is no fallback.
+  let mpClient: MercadoPagoConfig | null = null;
+  if (input.gateway === 'MERCADO_PAGO') {
+    mpClient = await getMpClientForRestaurant(input.restaurantId);
+    if (!mpClient) throw new OnlinePaymentUnavailableError();
   }
   if (input.gateway === 'STRIPE_CONNECT' && !isStripeConnectConfigured()) {
     throw new Error('Stripe Connect not configured');
@@ -81,7 +101,7 @@ export async function createUnifiedPayment(input: CreatePaymentInput): Promise<P
   const payment = await prisma.payment.create({
     data: {
       restaurantId: input.restaurantId,
-      gateway: input.gateway,
+      gateway: input.gateway === 'MERCADO_PAGO' ? 'MERCADO_PAGO_CONNECT' : input.gateway,
       amount: totalAmount,
       currency: input.currency || 'BRL',
       method: input.gateway === 'STRIPE_CONNECT' ? 'STRIPE' : 'MERCADO_PAGO',
@@ -103,7 +123,7 @@ export async function createUnifiedPayment(input: CreatePaymentInput): Promise<P
 
     switch (input.gateway) {
       case 'MERCADO_PAGO':
-        result = await processMercadoPagoPayment(payment.id, input, totalAmount);
+        result = await processMercadoPagoPayment(payment.id, input, totalAmount, mpClient!);
         break;
       case 'STRIPE_CONNECT':
         result = await processStripeConnectPayment(payment.id, input, totalAmount);
@@ -151,7 +171,8 @@ export async function createUnifiedPayment(input: CreatePaymentInput): Promise<P
 async function processMercadoPagoPayment(
   paymentId: string,
   input: CreatePaymentInput,
-  totalAmount: number
+  totalAmount: number,
+  client: MercadoPagoConfig
 ): Promise<PaymentResult> {
   const preference = await createCheckoutPreference({
     orderId: paymentId,
@@ -162,11 +183,12 @@ async function processMercadoPagoPayment(
       failure: input.failureUrl,
       pending: input.pendingUrl,
     },
-    notificationUrl: input.webhookUrl,
+    // The client-supplied webhookUrl is ignored: notifications must carry ?rid=<restaurantId>.
+    notificationUrl: notificationUrlFor(input.restaurantId),
     externalReference: paymentId,
     autoReturn: 'approved',
     statementDescriptor: input.description?.substring(0, 21),
-  });
+  }, client);
 
   // Create MercadoPagoTransaction record
   await prisma.mercadoPagoTransaction.create({
@@ -286,6 +308,16 @@ export async function createUnifiedRefund(
       gatewayRefundId = String(result.id);
       break;
     }
+    case 'MERCADO_PAGO_CONNECT': {
+      if (!payment.restaurantId) throw new Error('Payment has no restaurant');
+      const mpPaymentId = payment.gatewayPaymentId;
+      if (!mpPaymentId) throw new Error('Mercado Pago payment ID not found');
+      const client = await getMpClientForRestaurant(payment.restaurantId);
+      if (!client) throw new OnlinePaymentUnavailableError();
+      const result = await refundConnectPayment(client, mpPaymentId, refundAmount);
+      gatewayRefundId = String(result.id);
+      break;
+    }
     case 'STRIPE_CONNECT': {
       const chargeId = payment.stripeData?.stripeChargeId;
       if (!chargeId) throw new Error('Stripe charge ID not found');
@@ -363,6 +395,10 @@ export async function syncPaymentStatus(paymentId: string): Promise<string> {
       }
       break;
     }
+    case 'MERCADO_PAGO_CONNECT':
+      // Restaurant payments are driven by the webhook (?rid=...), which fetches them with the
+      // restaurant's own token. Nothing to do here, and never with the platform token.
+      break;
     case 'STRIPE_CONNECT': {
       if (payment.stripeData?.stripePaymentIntentId) {
         const pi = await retrievePaymentIntent(payment.stripeData.stripePaymentIntentId);
