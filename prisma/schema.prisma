@@ -2745,6 +2745,7 @@ model Restaurant {
   accountingMethod      String                    @default("SIMPLIFIED")
   stripeAccountId       String?
   mercadoPagoAccountId  String?
+  mercadoPagoConnection MercadoPagoConnection?
   ifoodIntegrationId    String?
   rappiIntegrationId    String?
   uberIntegrationId     String?
@@ -3205,6 +3206,33 @@ model WhatsAppConfig {
   restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("whatsapp_configs")
+}
+
+enum MercadoPagoConnectionStatus {
+  ACTIVE
+  NEEDS_RECONNECT
+}
+
+model MercadoPagoConnection {
+  id               String                      @id @default(cuid())
+  restaurantId     String                      @unique
+  mpUserId         String
+  accessToken      String
+  refreshToken     String
+  publicKey        String?
+  liveMode         Boolean                     @default(true)
+  lifetimeSeconds  Int
+  expiresAt        DateTime
+  status           MercadoPagoConnectionStatus @default(ACTIVE)
+  connectedAt      DateTime                    @default(now())
+  lastRefreshAt    DateTime?
+  lastRefreshError String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  restaurant       Restaurant                  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+  @@map("mercado_pago_connections")
 }
 
 model WhatsAppConversation {
@@ -3874,6 +3902,7 @@ enum PaymentGateway {
   MERCADO_PAGO
   STRIPE
   STRIPE_CONNECT
+  MERCADO_PAGO_CONNECT
   MANUAL
 }
 
