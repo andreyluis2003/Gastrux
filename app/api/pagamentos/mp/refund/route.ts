@@ -11,6 +11,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { refundPayment } from '@/lib/mercado-pago';
+import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
+import { refundConnectPayment } from '@/lib/mercadopago-connect/payments';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +40,14 @@ export async function POST(request: NextRequest) {
         { error: 'Payment ID is required' },
         { status: 400 }
       );
+    }
+
+    // A provided amount must be a positive number: 0 or garbage must never fall through to a full refund.
+    if (amount !== undefined && amount !== null && amount !== '') {
+      const parsedAmount = Number(amount);
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        return NextResponse.json({ error: 'Valor de reembolso inválido' }, { status: 400 });
+      }
     }
 
     // The payment must belong to the caller's own restaurant - otherwise
@@ -80,8 +90,10 @@ export async function POST(request: NextRequest) {
     const refundAmount = amount ? Number(amount) : remainingAmount;
     const isFullRefund = refundAmount >= Number(payment.amount);
 
-    // Get MP payment ID
-    const mpPaymentId = payment.mercadoPagoData?.mpPaymentId;
+    // Get MP payment ID. Payments received by a restaurant through its own
+    // Mercado Pago account (MERCADO_PAGO_CONNECT) keep it in gatewayPaymentId.
+    const isConnect = payment.gateway === 'MERCADO_PAGO_CONNECT';
+    const mpPaymentId = isConnect ? payment.gatewayPaymentId : payment.mercadoPagoData?.mpPaymentId;
     if (!mpPaymentId) {
       return NextResponse.json(
         { error: 'Mercado Pago payment ID not found' },
@@ -89,11 +101,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process refund via MP API
-    const mpRefund = await refundPayment(
-      mpPaymentId,
-      amount ? Number(amount) : undefined
-    );
+    // Process refund via MP API - with the restaurant's own token for Connect payments.
+    let mpRefund;
+    if (isConnect) {
+      const client = await getMpClientForRestaurant(restaurantId);
+      if (!client) {
+        return NextResponse.json(
+          { error: 'Conexão com o Mercado Pago indisponível. Reconecte sua conta para reembolsar.' },
+          { status: 409 }
+        );
+      }
+      mpRefund = await refundConnectPayment(client, mpPaymentId, amount ? Number(amount) : undefined);
+    } else {
+      mpRefund = await refundPayment(mpPaymentId, amount ? Number(amount) : undefined);
+    }
 
     // Create refund record
     const refund = await prisma.paymentRefund.create({
@@ -102,7 +123,7 @@ export async function POST(request: NextRequest) {
         amount: refundAmount,
         currency: payment.currency,
         reason: reason || 'requested_by_customer',
-        gateway: 'MERCADO_PAGO',
+        gateway: payment.gateway,
         gatewayRefundId: String(mpRefund.id),
         status: 'completed',
         description: description || `Refund for payment ${payment.id}`,
