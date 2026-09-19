@@ -1,6 +1,7 @@
 // Public delivery menu endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hasActiveConnection } from '@/lib/mercadopago-connect/connection-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,9 +43,10 @@ export async function GET(
     });
 
     const filteredCategories = categories.filter((c) => c.items.length > 0);
+    const acceptsOnlinePayment = await hasActiveConnection(params.restaurantId);
 
     return NextResponse.json(
-      { restaurant, categories: filteredCategories },
+      { restaurant: { ...restaurant, acceptsOnlinePayment }, categories: filteredCategories },
       { headers: { 'Cache-Control': 'public, max-age=60' } }
     );
   } catch (error) {

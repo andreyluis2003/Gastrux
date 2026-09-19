@@ -59,7 +59,7 @@ interface CartItem {
 
 interface MenuData {
   table: { id: string; number: number; section: { name: string } };
-  restaurant: { id: string; name: string };
+  restaurant: { id: string; name: string; acceptsOnlinePayment?: boolean };
   categories: MenuCategory[];
   combos?: Combo[];
 }
@@ -174,19 +174,17 @@ export default function PublicMenuPage() {
   };
 
   // Generate Pix QR Code for table payment
-  const generatePixPayment = async (amount: number) => {
+  // The server computes the amount from the table's open tab: the browser only
+  // says which table it is (qrToken).
+  const generatePixPayment = async () => {
     setPixLoading(true);
     try {
-      const tableInfo = menu?.table;
       const res = await fetch('/api/pagamentos/mp/pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount,
-          description: `Mesa ${tableInfo?.number || '?'} - ${menu?.restaurant?.name || 'Restaurante'}`,
-          payerEmail: 'cliente@restaurante.com',
+          qrToken,
           payerName: customerName || 'Cliente',
-          externalReference: `mesa-${tableInfo?.id || 'unknown'}-${Date.now()}`,
         }),
       });
       const data = await res.json();
@@ -198,11 +196,11 @@ export default function PublicMenuPage() {
           ticketUrl: data.ticketUrl || '',
         });
         setShowPixPayment(true);
-        setOrderTotal(amount);
+        setOrderTotal(Number(data.amount) || 0);
         // Start polling for payment status
         startPixPolling(data.paymentId);
       } else {
-        toast.error('Erro ao gerar QR Code Pix');
+        toast.error(data.error || 'Erro ao gerar QR Code Pix');
       }
     } catch (err) {
       console.error(err);
@@ -210,6 +208,12 @@ export default function PublicMenuPage() {
     } finally {
       setPixLoading(false);
     }
+  };
+
+  const payCartWithPix = async () => {
+    if (cart.length === 0) return;
+    const submitted = await submitOrder();
+    if (submitted) await generatePixPayment();
   };
 
   const startPixPolling = (paymentId: string) => {
@@ -248,8 +252,8 @@ export default function PublicMenuPage() {
     }
   };
 
-  const submitOrder = async () => {
-    if (cart.length === 0) return;
+  const submitOrder = async (): Promise<boolean> => {
+    if (cart.length === 0) return false;
     try {
       setSubmitting(true);
       const res = await fetch(`/api/public/orders/${qrToken}`, {
@@ -268,7 +272,7 @@ export default function PublicMenuPage() {
       if (!res.ok) {
         const err = await res.json();
         toast.error(err.error || 'Erro ao enviar pedido');
-        return;
+        return false;
       }
 
       setOrderTotal(cartTotal);
@@ -276,9 +280,11 @@ export default function PublicMenuPage() {
       setCart([]);
       setCartOpen(false);
       toast.success('Pedido enviado para a cozinha!');
+      return true;
     } catch (err) {
       console.error(err);
       toast.error('Erro ao enviar pedido');
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -399,15 +405,17 @@ export default function PublicMenuPage() {
             mesa.
           </p>
           <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => generatePixPayment(cartTotal > 0 ? cartTotal : orderTotal)}
-              disabled={pixLoading}
-            >
-              {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-              Pagar com Pix
-            </Button>
+            {menu?.restaurant?.acceptsOnlinePayment && (
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => generatePixPayment()}
+                disabled={pixLoading}
+              >
+                {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                Pagar com Pix
+              </Button>
+            )}
             <Button onClick={() => setSuccess(false)} className="w-full">
               Fazer outro pedido
             </Button>
@@ -733,18 +741,22 @@ export default function PublicMenuPage() {
               >
                 {submitting ? 'Enviando...' : 'Enviar pedido para cozinha'}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => { setOrderTotal(cartTotal); generatePixPayment(cartTotal); }}
-                disabled={pixLoading || cart.length === 0}
-                className="w-full h-10 text-sm gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                Pagar com Pix agora
-              </Button>
-              <p className="text-xs text-gray-500 text-center">
-                Envie o pedido ou pague direto com Pix.
-              </p>
+              {menu?.restaurant?.acceptsOnlinePayment && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={payCartWithPix}
+                    disabled={pixLoading || submitting || cart.length === 0}
+                    className="w-full h-10 text-sm gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                  >
+                    {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                    Pagar com Pix agora
+                  </Button>
+                  <p className="text-xs text-gray-500 text-center">
+                    Envie o pedido ou pague direto com Pix.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -151,6 +151,7 @@ export default function ConciliacaoPage() {
 
   const gatewayColors: Record<string, string> = {
     MERCADO_PAGO: 'bg-blue-100 text-blue-700',
+    MERCADO_PAGO_CONNECT: 'bg-sky-100 text-sky-700',
     STRIPE: 'bg-purple-100 text-purple-700',
     STRIPE_CONNECT: 'bg-indigo-100 text-indigo-700',
     MANUAL: 'bg-gray-100 text-gray-700',
@@ -287,6 +288,7 @@ export default function ConciliacaoPage() {
                 >
                   <option value="all">Todos</option>
                   <option value="MERCADO_PAGO">Mercado Pago</option>
+                  <option value="MERCADO_PAGO_CONNECT">Mercado Pago (recebimentos)</option>
                   <option value="STRIPE">Stripe</option>
                   <option value="STRIPE_CONNECT">Stripe Connect</option>
                   <option value="MANUAL">Manual</option>

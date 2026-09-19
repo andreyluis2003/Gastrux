@@ -98,7 +98,8 @@ export default function PagamentosDashboardPage() {
 
   const getGatewayIcon = (gateway: string) => {
     switch (gateway) {
-      case 'MERCADO_PAGO': return <QrCode className="w-4 h-4" />;
+      case 'MERCADO_PAGO':
+      case 'MERCADO_PAGO_CONNECT': return <QrCode className="w-4 h-4" />;
       case 'STRIPE_CONNECT': return <CreditCard className="w-4 h-4" />;
       default: return <CircleDollarSign className="w-4 h-4" />;
     }
@@ -262,6 +263,7 @@ export default function PagamentosDashboardPage() {
           >
             <option value="all">Todos os Gateways</option>
             <option value="MERCADO_PAGO">Mercado Pago</option>
+            <option value="MERCADO_PAGO_CONNECT">Mercado Pago (recebimentos)</option>
             <option value="STRIPE_CONNECT">Stripe Connect</option>
             <option value="MANUAL">Manual</option>
           </select>

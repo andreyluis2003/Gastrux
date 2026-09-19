@@ -72,6 +72,9 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 const VALID_GATEWAYS = ['MERCADO_PAGO', 'STRIPE', 'STRIPE_CONNECT', 'MANUAL'] as const;
+// Read-only filter values: MERCADO_PAGO_CONNECT rows are created only by the
+// Mercado Pago connect flow, never by the manual-payment POST below.
+const FILTER_GATEWAYS = [...VALID_GATEWAYS, 'MERCADO_PAGO_CONNECT'] as const;
 const VALID_STATUSES = [
   'PENDING',
   'PROCESSING',
@@ -195,7 +198,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (gateway !== 'all' && VALID_GATEWAYS.includes(gateway as any)) {
+    if (gateway !== 'all' && (FILTER_GATEWAYS as readonly string[]).includes(gateway)) {
       where.gateway = gateway;
     }
     if (status !== 'all' && VALID_STATUSES.includes(status as any)) {
