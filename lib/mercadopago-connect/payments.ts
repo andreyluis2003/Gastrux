@@ -72,12 +72,20 @@ export function getConnectPayment(client: MercadoPagoConfig, mpPaymentId: string
 /**
  * Refunds an APPROVED payment. Payment.cancel (used by the platform helper in
  * lib/mercado-pago.ts) only works for payments that are not yet approved.
+ *
+ * Only an omitted amount means a full refund. A zero, negative or non-finite
+ * amount is rejected: it must never fall through to refunding the whole payment
+ * from the restaurant's account.
  */
-export function refundConnectPayment(client: MercadoPagoConfig, mpPaymentId: string, amount?: number) {
+export async function refundConnectPayment(client: MercadoPagoConfig, mpPaymentId: string, amount?: number) {
   const refunds = new PaymentRefund(client);
-  return amount
-    ? refunds.create({ payment_id: mpPaymentId, body: { amount } })
-    : refunds.total({ payment_id: mpPaymentId });
+  if (amount === undefined) {
+    return refunds.total({ payment_id: mpPaymentId });
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Valor de reembolso inválido');
+  }
+  return refunds.create({ payment_id: mpPaymentId, body: { amount } });
 }
 
 export function isUnauthorizedError(error: unknown): boolean {

@@ -101,6 +101,16 @@ describe('mercadopago-connect/payments', () => {
     expect(mocks.refundTotal).toHaveBeenCalledWith({ payment_id: '77' });
   });
 
+  it.each([
+    ['zero', 0],
+    ['negative', -5],
+    ['NaN', NaN],
+  ])('rejects a %s refund amount without calling Mercado Pago (never a silent full refund)', async (_label, amount) => {
+    await expect(refundConnectPayment(client, '77', amount)).rejects.toThrow('Valor de reembolso inválido');
+    expect(mocks.refundCreate).not.toHaveBeenCalled();
+    expect(mocks.refundTotal).not.toHaveBeenCalled();
+  });
+
   it('detects unauthorized errors from the SDK shapes', () => {
     expect(isUnauthorizedError({ status: 401 })).toBe(true);
     expect(isUnauthorizedError({ statusCode: 401 })).toBe(true);

@@ -31,17 +31,14 @@ const preferenceInput = {
 };
 
 describe('lib/mercado-pago optional client argument', () => {
-  // Order matters here: the platform client is a lazy singleton, so the test
-  // that builds it ("without a client") runs before any test that asserts it
-  // was NOT built, and jest.clearAllMocks() resets only the call history.
+  // Order matters here. The platform client is a lazy singleton: the first call
+  // that builds it caches it, and later calls never construct MercadoPagoConfig
+  // again. So the "never builds the platform client" assertions are only
+  // meaningful BEFORE the platform test runs. The three provided-client tests
+  // therefore come first, and the no-client (platform) test runs LAST.
+  // jest.clearAllMocks() resets only the call history, not the cached singleton.
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('getPayment without a client still uses the platform client (billing keeps working)', async () => {
-    await getPayment('1');
-    expect(mp.MercadoPagoConfig).toHaveBeenCalledTimes(1);
-    expect(mp.Payment.mock.calls[0][0].isPlatform).toBe(true);
   });
 
   it('getPayment uses the provided client and never builds the platform one', async () => {
@@ -61,5 +58,12 @@ describe('lib/mercado-pago optional client argument', () => {
     await createPixPreference({ ...rest, amount: 10, description: 'PIX' }, restaurantClient);
     expect(mp.Preference).toHaveBeenCalledWith(restaurantClient);
     expect(mp.MercadoPagoConfig).not.toHaveBeenCalled();
+  });
+
+  // Must stay last: it builds and caches the platform singleton.
+  it('getPayment without a client still uses the platform client (billing keeps working)', async () => {
+    await getPayment('1');
+    expect(mp.MercadoPagoConfig).toHaveBeenCalledTimes(1);
+    expect(mp.Payment.mock.calls[0][0].isPlatform).toBe(true);
   });
 });
