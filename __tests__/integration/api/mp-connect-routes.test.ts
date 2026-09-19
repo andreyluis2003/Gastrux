@@ -59,6 +59,7 @@ describe('Mercado Pago connect routes', () => {
 
   const callback = (query: string) =>
     callbackRoute(new Request(`https://gastrux.test/api/pagamentos/mp/connect/callback?${query}`) as any);
+  const start = () => new Request('https://gastrux.test/api/pagamentos/mp/connect/start') as any;
   const location = (res: Response) => res.headers.get('location') || '';
 
   describe('GET /connect (status)', () => {
@@ -85,14 +86,36 @@ describe('Mercado Pago connect routes', () => {
   });
 
   describe('GET /connect/start', () => {
-    it('denies non owner/admin roles', async () => {
+    it('redirects non owner/admin roles back with mp=unauthorized', async () => {
       session('MANAGER');
-      expect((await startRoute()).status).toBe(403);
+      const res = await startRoute(start());
+      expect([302, 307]).toContain(res.status);
+      expect(location(res)).toContain('mp=unauthorized');
+    });
+
+    it('redirects unauthenticated users back with mp=unauthorized', async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(null);
+      const res = await startRoute(start());
+      expect([302, 307]).toContain(res.status);
+      expect(location(res)).toContain('mp=unauthorized');
+    });
+
+    it('redirects back with mp=error when Mercado Pago is not configured', async () => {
+      session('OWNER');
+      const previous = process.env.MERCADO_PAGO_CLIENT_SECRET;
+      delete process.env.MERCADO_PAGO_CLIENT_SECRET;
+      try {
+        const res = await startRoute(start());
+        expect([302, 307]).toContain(res.status);
+        expect(location(res)).toContain('mp=error');
+      } finally {
+        process.env.MERCADO_PAGO_CLIENT_SECRET = previous;
+      }
     });
 
     it('redirects an owner to Mercado Pago with a valid signed state', async () => {
       session('OWNER');
-      const res = await startRoute();
+      const res = await startRoute(start());
       expect([302, 307]).toContain(res.status);
       const url = new URL(location(res));
       expect(url.origin).toBe('https://auth.mercadopago.com.br');
