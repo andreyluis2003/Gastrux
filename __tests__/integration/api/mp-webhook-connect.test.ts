@@ -14,10 +14,12 @@ jest.mock('../../../lib/mercado-pago', () => ({
   ...jest.requireActual('../../../lib/mercado-pago'),
   MP_WEBHOOK_SECRET: 'test-mp-secret',
   getPayment: jest.fn().mockResolvedValue(null),
+  getMerchantOrder: jest.fn(),
+  getPreApproval: jest.fn(),
 }));
 
 import { getConnectPayment } from '../../../lib/mercadopago-connect/payments';
-import { getPayment } from '../../../lib/mercado-pago';
+import { getPayment, getMerchantOrder, getPreApproval } from '../../../lib/mercado-pago';
 import { saveConnection } from '../../../lib/mercadopago-connect/connection-service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -78,6 +80,8 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     getPayment.mockResolvedValue(null);
+    getMerchantOrder.mockReset();
+    getPreApproval.mockReset();
     await cleanRows();
     await saveConnection(A.restaurantId, TOKENS);
     order = await prisma.order.create({
@@ -147,6 +151,16 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
     expect(res.status).toBe(200);
     expect(getConnectPayment).not.toHaveBeenCalled();
     expect(getPayment).not.toHaveBeenCalled();
+    expect(getMerchantOrder).not.toHaveBeenCalled();
+  });
+
+  it('ignores preapproval notifications that carry a rid (never reach the platform-billing handlers)', async () => {
+    const res = await POST(signed('555', `topic=preapproval&id=555&rid=${A.restaurantId}`) as any);
+    expect(res.status).toBe(200);
+    expect(getPreApproval).not.toHaveBeenCalled();
+    expect(getMerchantOrder).not.toHaveBeenCalled();
+    expect(getPayment).not.toHaveBeenCalled();
+    expect(getConnectPayment).not.toHaveBeenCalled();
   });
 
   it('keeps the platform-billing path for notifications WITHOUT rid', async () => {
