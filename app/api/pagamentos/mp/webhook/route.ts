@@ -16,6 +16,7 @@ import { upsertSubscriptionFromGatewayEvent } from '@/lib/billing/subscription-s
 import { logPaymentEvent, PaymentEventType } from '@/lib/payment-logger';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
+import { syncRestaurantPayment } from '@/lib/mercadopago-connect/payment-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,18 @@ export async function POST(request: NextRequest) {
       eventType: PaymentEventType.WEBHOOK_RECEIVED,
       metadata: { topic, mpId: id },
     });
+
+    // Payments received by a RESTAURANT through its own Mercado Pago account
+    // carry ?rid=<restaurantId> (set in notification_url when the payment was
+    // created). They are fetched with THAT restaurant's token and never touch
+    // the platform-billing handlers below, which stay unchanged.
+    const rid = url.searchParams.get('rid');
+    if (rid) {
+      if (validTopic === 'payment') {
+        await syncRestaurantPayment(rid, id);
+      }
+      return NextResponse.json({ received: true });
+    }
 
     switch (validTopic) {
       case 'payment':
