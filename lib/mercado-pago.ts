@@ -104,6 +104,8 @@ export interface CreatePreferenceInput {
   expirationDateFrom?: string;
   expirationDateTo?: string;
   statementDescriptor?: string;
+  /** Mercado Pago payment TYPE ids to hide at checkout, e.g. 'ticket' (boleto) and 'atm'. */
+  excludedPaymentTypes?: string[];
 }
 
 export async function createCheckoutPreference(
@@ -140,7 +142,7 @@ export async function createCheckoutPreference(
     statement_descriptor: input.statementDescriptor,
     payment_methods: {
       excluded_payment_methods: [],
-      excluded_payment_types: [],
+      excluded_payment_types: (input.excludedPaymentTypes ?? []).map((id) => ({ id })),
       installments: 12,
       default_payment_method_id: null,
       default_installments: 1,

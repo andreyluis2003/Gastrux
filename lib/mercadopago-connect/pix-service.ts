@@ -94,7 +94,7 @@ type PixClaim =
   | { kind: 'in-progress' }
   | { kind: 'created'; payment: any };
 
-function isDefiniteRejection(error: unknown): boolean {
+export function isDefiniteRejection(error: unknown): boolean {
   const e = error as any;
   const status = Number(e?.status ?? e?.statusCode);
   return Number.isInteger(status) && status >= 400 && status < 500;
