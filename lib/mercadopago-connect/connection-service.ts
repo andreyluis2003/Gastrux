@@ -112,17 +112,25 @@ export async function refreshConnection(restaurantId: string): Promise<RefreshOu
     return 'refreshed';
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (error instanceof MpOAuthError && error.revoked) {
-      await markNeedsReconnect(restaurantId, message);
-      return 'needs_reconnect';
-    }
-    await prisma.mercadoPagoConnection.update({
-      where: { restaurantId },
-      data: { lastRefreshError: message.slice(0, 500) },
-    });
-    if (isExpired(conn)) {
-      await markNeedsReconnect(restaurantId, message);
-      return 'needs_reconnect';
+    // The recovery writes must NEVER throw out of here: a row deleted while the
+    // sweep was running makes a `update` raise P2025, which used to abort the
+    // whole cron sweep and skip every remaining restaurant. updateMany is a
+    // no-op for a missing row, and the try/catch covers the rest.
+    try {
+      if (error instanceof MpOAuthError && error.revoked) {
+        await markNeedsReconnect(restaurantId, message);
+        return 'needs_reconnect';
+      }
+      await prisma.mercadoPagoConnection.updateMany({
+        where: { restaurantId },
+        data: { lastRefreshError: message.slice(0, 500) },
+      });
+      if (isExpired(conn)) {
+        await markNeedsReconnect(restaurantId, message);
+        return 'needs_reconnect';
+      }
+    } catch (recoveryError) {
+      console.error(`[mp-connect] could not record the refresh failure for ${restaurantId}:`, recoveryError);
     }
     return 'failed';
   }
@@ -163,10 +171,17 @@ export async function refreshExpiringConnections(now: number = Date.now()) {
   const summary = { checked: active.length, refreshed: 0, needsReconnect: 0, failed: 0 };
   for (const conn of active) {
     if (!shouldRefresh(conn, now)) continue;
-    const outcome = await refreshConnection(conn.restaurantId);
-    if (outcome === 'refreshed') summary.refreshed++;
-    else if (outcome === 'needs_reconnect') summary.needsReconnect++;
-    else if (outcome === 'failed') summary.failed++;
+    // One bad row must never abort the sweep: count it and move on, otherwise
+    // every remaining restaurant is silently skipped.
+    try {
+      const outcome = await refreshConnection(conn.restaurantId);
+      if (outcome === 'refreshed') summary.refreshed++;
+      else if (outcome === 'needs_reconnect') summary.needsReconnect++;
+      else if (outcome === 'failed') summary.failed++;
+    } catch (error) {
+      summary.failed++;
+      console.error(`[mp-connect] refresh sweep failed for restaurant ${conn.restaurantId}:`, error);
+    }
   }
   return summary;
 }

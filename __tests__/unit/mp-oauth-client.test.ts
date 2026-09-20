@@ -121,6 +121,64 @@ describe('mercadopago-connect/oauth-client', () => {
     expect(error.message).toBe('Refresh token invalid');
   });
 
+  it('does NOT flag a bare 401 as revoked (one wrong client secret must not revoke every connection)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'invalid client credentials' }),
+    });
+
+    const error = await refreshTokens('good-token').catch((e) => e);
+
+    expect(error).toBeInstanceOf(MpOAuthError);
+    expect(error.status).toBe(401);
+    expect(error.revoked).toBe(false);
+  });
+
+  it('does not flag a 401 whose body only says unauthorized as revoked', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'unauthorized' }),
+    });
+
+    const error = await refreshTokens('good-token').catch((e) => e);
+    expect(error.revoked).toBe(false);
+  });
+
+  it('sends an abort signal so a hung Mercado Pago call cannot stall the sweep', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => tokenResponse });
+    global.fetch = fetchMock;
+
+    await refreshTokens('old-refresh');
+
+    const signal = fetchMock.mock.calls[0][1].signal;
+    expect(signal).toBeDefined();
+    expect(typeof signal.aborted).toBe('boolean');
+  });
+
+  it('turns an aborted/timed-out request into a RETRYABLE failure, never revoked', async () => {
+    const abortError = new Error('The operation was aborted due to timeout');
+    abortError.name = 'TimeoutError';
+    global.fetch = jest.fn().mockRejectedValue(abortError);
+
+    const error = await refreshTokens('good-token').catch((e) => e);
+
+    expect(error).toBeInstanceOf(MpOAuthError);
+    expect(error.revoked).toBe(false);
+    expect(error.status).toBe(504);
+    expect(error.message).toContain('aborted');
+  });
+
+  it('turns a network failure into a retryable failure too', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('fetch failed'));
+
+    const error = await refreshTokens('good-token').catch((e) => e);
+
+    expect(error).toBeInstanceOf(MpOAuthError);
+    expect(error.revoked).toBe(false);
+  });
+
   it('does not flag a server error as revoked', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,

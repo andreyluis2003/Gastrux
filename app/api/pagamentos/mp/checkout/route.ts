@@ -15,8 +15,8 @@ import {
   createPixPreference,
 } from '@/lib/mercado-pago';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
-import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
-import { notificationUrlFor } from '@/lib/mercadopago-connect/payments';
+import { getMpClientForRestaurant, markNeedsReconnect } from '@/lib/mercadopago-connect/connection-service';
+import { isUnauthorizedError, notificationUrlFor } from '@/lib/mercadopago-connect/payments';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -126,16 +126,38 @@ export async function POST(request: NextRequest) {
       statementDescriptor: restaurant?.name?.substring(0, 21) || 'RestauranteApp',
     };
 
-    const preference = pixOnly
-      ? await createPixPreference(
+    let preference;
+    try {
+      preference = pixOnly
+        ? await createPixPreference(
+            {
+              ...preferenceInput,
+              amount: totalAmount,
+              description: items.map((i: any) => i.title).join(', '),
+            },
+            mpClient
+          )
+        : await createCheckoutPreference(preferenceInput, mpClient);
+    } catch (error) {
+      // A 401 means the restaurant's token is no longer usable. Without this
+      // the connection stayed ACTIVE, the UI kept showing "Conectado" and every
+      // card checkout failed with a generic 500 forever.
+      if (isUnauthorizedError(error)) {
+        await markNeedsReconnect(restaurantId, 'Mercado Pago rejeitou o token (401)');
+        await prisma.payment
+          .update({ where: { id: payment.id }, data: { status: 'DECLINED' } })
+          .catch(() => {});
+        trackApiCall('POST', '/api/pagamentos/mp/checkout', 409, Date.now() - startTime);
+        return NextResponse.json(
           {
-            ...preferenceInput,
-            amount: totalAmount,
-            description: items.map((i: any) => i.title).join(', '),
+            error: 'Conecte sua conta do Mercado Pago para receber pagamentos online.',
+            code: 'ONLINE_PAYMENT_UNAVAILABLE',
           },
-          mpClient
-        )
-      : await createCheckoutPreference(preferenceInput, mpClient);
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     // Create MercadoPagoTransaction record
     await prisma.mercadoPagoTransaction.create({

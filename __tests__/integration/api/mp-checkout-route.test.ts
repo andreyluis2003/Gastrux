@@ -12,7 +12,7 @@ jest.mock('../../../lib/mercado-pago', () => ({
 
 import { getServerSession } from 'next-auth';
 import { createCheckoutPreference, createPixPreference } from '../../../lib/mercado-pago';
-import { saveConnection } from '../../../lib/mercadopago-connect/connection-service';
+import { saveConnection, getConnection } from '../../../lib/mercadopago-connect/connection-service';
 import { POST } from '../../../app/api/pagamentos/mp/checkout/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -38,6 +38,8 @@ describe('POST /api/pagamentos/mp/checkout', () => {
     await prisma.mercadoPagoTransaction.deleteMany({ where: { payment: { restaurantId: { in: ids } } } });
     await prisma.payment.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId: { in: ids } } });
+    // markNeedsReconnect notifies the owner; keep the table clean between tests.
+    await prisma.notification.deleteMany({ where: { userId: { in: [A.ownerId, B.ownerId] } } });
   };
 
   afterAll(async () => {
@@ -103,6 +105,31 @@ describe('POST /api/pagamentos/mp/checkout', () => {
 
     const tx = await prisma.mercadoPagoTransaction.findFirst({ where: { paymentId: payment.id } });
     expect(tx.preferenceId).toBe('pref-1');
+  });
+
+  it('marks the connection NEEDS_RECONNECT and answers 409 when Mercado Pago rejects the token (I8)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    createCheckoutPreference.mockRejectedValue({ status: 401, message: 'unauthorized' });
+
+    const res = await checkout(BODY);
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe('ONLINE_PAYMENT_UNAVAILABLE');
+    expect((await getConnection(A.restaurantId)).status).toBe('NEEDS_RECONNECT');
+    // The orphaned PENDING row is rolled back and no transaction row is left.
+    const payment = await prisma.payment.findFirst({ where: { restaurantId: A.restaurantId } });
+    expect(payment.status).toBe('DECLINED');
+    expect(await prisma.mercadoPagoTransaction.count({ where: { paymentId: payment.id } })).toBe(0);
+  });
+
+  it('leaves the connection ACTIVE for a non-401 Mercado Pago failure', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    createCheckoutPreference.mockRejectedValue(new Error('MP down'));
+
+    const res = await checkout(BODY);
+
+    expect(res.status).toBe(500);
+    expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
   });
 
   it('uses the PIX preference with the restaurant client when pixOnly is set', async () => {

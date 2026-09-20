@@ -18,7 +18,7 @@ jest.mock('../../../lib/mercadopago-connect/payments', () => ({
 import { getServerSession } from 'next-auth';
 import { createCheckoutPreference, getPayment, refundPayment } from '../../../lib/mercado-pago';
 import { refundConnectPayment } from '../../../lib/mercadopago-connect/payments';
-import { saveConnection } from '../../../lib/mercadopago-connect/connection-service';
+import { saveConnection, getConnection } from '../../../lib/mercadopago-connect/connection-service';
 import {
   createUnifiedPayment,
   createUnifiedRefund,
@@ -51,6 +51,8 @@ describe('unified payments - Mercado Pago never uses the platform token', () => 
     await prisma.mercadoPagoTransaction.deleteMany({ where: { payment: { restaurantId: { in: ids } } } });
     await prisma.payment.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId: { in: ids } } });
+    // markNeedsReconnect notifies the owner; keep the table clean between tests.
+    await prisma.notification.deleteMany({ where: { userId: { in: [A.ownerId, B.ownerId] } } });
   };
 
   afterAll(async () => {
@@ -108,6 +110,41 @@ describe('unified payments - Mercado Pago never uses the platform token', () => 
     expect(prefInput.notificationUrl).toBe(`https://gastrux.test/api/pagamentos/mp/webhook?rid=${A.restaurantId}`);
     expect(prefInput.notificationUrl).not.toContain('evil.example');
     expect(result.checkoutUrl).toBe('https://mp/init');
+  });
+
+  it('marks the connection NEEDS_RECONNECT and surfaces 409 when Mercado Pago rejects the token (I8)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    createCheckoutPreference.mockRejectedValue({ status: 401, message: 'unauthorized' });
+
+    await expect(createUnifiedPayment(input(A.restaurantId))).rejects.toBeInstanceOf(OnlinePaymentUnavailableError);
+
+    expect((await getConnection(A.restaurantId)).status).toBe('NEEDS_RECONNECT');
+    const payment = await prisma.payment.findFirst({ where: { restaurantId: A.restaurantId } });
+    expect(payment.status).toBe('DECLINED');
+  });
+
+  it('answers 409 ONLINE_PAYMENT_UNAVAILABLE from the route for that same 401 (I8)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    createCheckoutPreference.mockRejectedValue({ status: 401, message: 'unauthorized' });
+
+    const res = await unifiedPost(
+      new Request('https://gastrux.test/api/pagamentos/unified', {
+        method: 'POST',
+        body: JSON.stringify({ gateway: 'MERCADO_PAGO', items: [{ id: 'i1', title: 'Pizza', quantity: 1, unitPrice: 30 }] }),
+      }) as any
+    );
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe('ONLINE_PAYMENT_UNAVAILABLE');
+  });
+
+  it('leaves the connection ACTIVE for a non-401 Mercado Pago failure', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    createCheckoutPreference.mockRejectedValue(new Error('MP down'));
+
+    await expect(createUnifiedPayment(input(A.restaurantId))).rejects.toThrow('MP down');
+
+    expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
   });
 
   it('syncPaymentStatus for a Connect payment answers from our database and never calls Mercado Pago', async () => {

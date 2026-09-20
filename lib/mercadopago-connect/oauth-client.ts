@@ -77,19 +77,37 @@ function parseTokens(data: any): MpOAuthTokens {
   };
 }
 
+/** A hung Mercado Pago call must not stall the serial refresh sweep. */
+const TOKEN_TIMEOUT_MS = 10_000;
+
 async function requestTokens(grant: Record<string, string>): Promise<MpOAuthTokens> {
   const { clientId, clientSecret } = credentials();
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, ...grant }),
-  });
+
+  let res: Response;
+  try {
+    res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, ...grant }),
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
+    });
+  } catch (error) {
+    // A timeout or a network failure says nothing about the refresh token, so
+    // it is a RETRYABLE failure and never `revoked`.
+    const message = error instanceof Error ? error.message : String(error);
+    throw new MpOAuthError(`Mercado Pago OAuth request failed: ${message}`, 504, false);
+  }
+
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
     const message =
       data?.message || data?.error_description || data?.error || `Mercado Pago OAuth error ${res.status}`;
-    const revoked = data?.error === 'invalid_grant' || res.status === 401;
+    // ONLY invalid_grant means the connection is really gone. A bare 401 is a
+    // retryable failure: a wrong MERCADO_PAGO_CLIENT_SECRET makes EVERY refresh
+    // answer 401, and treating that as revoked would mark every restaurant
+    // NEEDS_RECONNECT and notify every owner over one configuration mistake.
+    const revoked = data?.error === 'invalid_grant';
     throw new MpOAuthError(message, res.status, revoked);
   }
   return parseTokens(data);

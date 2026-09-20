@@ -1,7 +1,7 @@
 // @ts-nocheck
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
+import { createMultiRestaurantScenario, cleanupMultiTenantData, createUserWithRole } from '../helpers/multi-tenant';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
 
@@ -21,6 +21,9 @@ const ENV = ['CREDENTIALS_ENCRYPTION_KEY', 'MERCADO_PAGO_CLIENT_ID', 'MERCADO_PA
 describe('Mercado Pago connect routes', () => {
   let A: { restaurantId: string; ownerId: string };
   let B: { restaurantId: string; ownerId: string };
+  let managerA: { userId: string; email: string };
+  let adminA: { userId: string; email: string };
+  let cashierA: { userId: string; email: string };
   const saved: Record<string, string | undefined> = {};
   const originalFetch = global.fetch;
 
@@ -39,11 +42,22 @@ describe('Mercado Pago connect routes', () => {
     const scenario = await createMultiRestaurantScenario();
     A = scenario.restaurantA;
     B = scenario.restaurantB;
+
+    // Ruling R20 fixtures, all members of restaurant A but NOT its owner.
+    managerA = await createUserWithRole(A.restaurantId, 'MANAGER', 'r20-manager@integration.test');
+    adminA = await createUserWithRole(A.restaurantId, 'ADMIN', 'r20-admin@integration.test');
+    cashierA = await createUserWithRole(A.restaurantId, 'CASHIER', 'r20-cashier@integration.test');
+    // Globally OWNER (of some other restaurant), but only a CASHIER member here:
+    // the exact case the old global-role check let through.
+    await prisma.user.update({ where: { id: cashierA.userId }, data: { role: 'OWNER' } });
   });
 
   afterAll(async () => {
     await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
     await cleanupMultiTenantData([A.restaurantId, B.restaurantId]);
+    await prisma.user.deleteMany({
+      where: { id: { in: [managerA.userId, adminA.userId, cashierA.userId] } },
+    });
     ENV.forEach((k) => {
       if (saved[k] === undefined) delete process.env[k];
       else process.env[k] = saved[k];
@@ -86,8 +100,17 @@ describe('Mercado Pago connect routes', () => {
   });
 
   describe('GET /connect/start', () => {
-    it('redirects non owner/admin roles back with mp=unauthorized', async () => {
-      session('MANAGER');
+    it('redirects non owner/admin members back with mp=unauthorized', async () => {
+      // A MANAGER member of the CURRENT restaurant (ruling R20 authorizes by
+      // membership, so this user must not be the restaurant's owner).
+      session('MANAGER', managerA.userId, managerA.email);
+      const res = await startRoute(start());
+      expect([302, 307]).toContain(res.status);
+      expect(location(res)).toContain('mp=unauthorized');
+    });
+
+    it('redirects a globally OWNER user who is only a cashier HERE with mp=unauthorized (R20)', async () => {
+      session('OWNER', cashierA.userId, cashierA.email);
       const res = await startRoute(start());
       expect([302, 307]).toContain(res.status);
       expect(location(res)).toContain('mp=unauthorized');
@@ -188,9 +211,62 @@ describe('Mercado Pago connect routes', () => {
   });
 
   describe('DELETE /connect', () => {
-    it('denies non owner/admin roles', async () => {
-      session('MANAGER');
+    it('denies a non owner/admin member of the current restaurant', async () => {
+      session('MANAGER', managerA.userId, managerA.email);
       expect((await disconnectRoute()).status).toBe(403);
+    });
+
+    it('denies a globally OWNER user whose membership here is a cashier (R20)', async () => {
+      const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
+      await saveConnection(A.restaurantId, tokens);
+      session('OWNER', cashierA.userId, cashierA.email);
+
+      expect((await disconnectRoute()).status).toBe(403);
+      // The connection is untouched: this user cannot change where A's money lands.
+      expect(await getConnection(A.restaurantId)).not.toBeNull();
+    });
+
+    it("allows the restaurant's own owner (R20)", async () => {
+      const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
+      await saveConnection(A.restaurantId, tokens);
+      session('OWNER', A.ownerId, 'owner-a@integration.test');
+
+      expect((await disconnectRoute()).status).toBe(200);
+      expect(await getConnection(A.restaurantId)).toBeNull();
+    });
+
+    it('allows an ACTIVE ADMIN member who is not the owner (R20)', async () => {
+      const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
+      await saveConnection(A.restaurantId, tokens);
+      // Session role OWNER on purpose: it is NOT a platform-admin identity, so
+      // this exercises the RestaurantUser(role: ADMIN) branch and not the
+      // isPlatformAdminIdentity short-circuit.
+      session('OWNER', adminA.userId, adminA.email);
+
+      expect((await disconnectRoute()).status).toBe(200);
+      expect(await getConnection(A.restaurantId)).toBeNull();
+    });
+
+    it('denies that same ADMIN member once the membership is deactivated (R20)', async () => {
+      const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
+      await saveConnection(A.restaurantId, tokens);
+      await prisma.restaurantUser.updateMany({
+        where: { restaurantId: A.restaurantId, userId: adminA.userId },
+        data: { isActive: false },
+      });
+      session('OWNER', adminA.userId, adminA.email);
+
+      try {
+        // getCurrentRestaurantId no longer resolves a restaurant for this user,
+        // so the guard answers 404 (never 200).
+        expect([403, 404]).toContain((await disconnectRoute()).status);
+        expect(await getConnection(A.restaurantId)).not.toBeNull();
+      } finally {
+        await prisma.restaurantUser.updateMany({
+          where: { restaurantId: A.restaurantId, userId: adminA.userId },
+          data: { isActive: true },
+        });
+      }
     });
 
     it('removes only the caller restaurant connection', async () => {

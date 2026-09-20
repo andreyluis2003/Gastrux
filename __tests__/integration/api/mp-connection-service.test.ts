@@ -14,6 +14,9 @@ import {
   refreshExpiringConnections,
 } from '../../../lib/mercadopago-connect/connection-service';
 import { decryptSecret } from '../../../lib/security/credential-crypto';
+// The service writes through the app's own Prisma client, not this file's
+// instance: a spy on a local client would never be hit.
+import { prisma as appPrisma } from '../../../lib/prisma';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -226,5 +229,65 @@ describe('mercadopago-connect/connection-service', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
     const bRaw = await prisma.mercadoPagoConnection.findUnique({ where: { restaurantId: B.restaurantId } });
     expect(decryptSecret(bRaw.accessToken)).toBe('APP_USR-access-1');
+  });
+
+  it('one connection that throws does not abort the sweep: the others are still refreshed (I7)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    await saveConnection(B.restaurantId, TOKENS);
+    // Both are due for a refresh.
+    await prisma.mercadoPagoConnection.updateMany({
+      where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } },
+      data: { expiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000) },
+    });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => REFRESHED });
+
+    // A's row behaves like one deleted mid-sweep: the read throws P2025 out of
+    // refreshConnection. Before the fix this aborted the whole loop and every
+    // remaining restaurant was silently skipped.
+    const realFindUnique = appPrisma.mercadoPagoConnection.findUnique.bind(appPrisma.mercadoPagoConnection);
+    const spy = jest
+      .spyOn(appPrisma.mercadoPagoConnection, 'findUnique')
+      .mockImplementation((args: any) => {
+        if (args?.where?.restaurantId === A.restaurantId) {
+          return Promise.reject(Object.assign(new Error('An operation failed because it depends on one or more records that were required but not found.'), { code: 'P2025' }));
+        }
+        return realFindUnique(args);
+      });
+
+    let summary: any;
+    try {
+      summary = await refreshExpiringConnections();
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(summary.checked).toBe(2);
+    expect(summary.failed).toBe(1);
+    expect(summary.refreshed).toBe(1);
+    // B was refreshed despite A blowing up.
+    const bRaw = await prisma.mercadoPagoConnection.findUnique({ where: { restaurantId: B.restaurantId } });
+    expect(decryptSecret(bRaw.accessToken)).toBe('APP_USR-access-2');
+  });
+
+  it('keeps a failed refresh ACTIVE and does not throw when the row disappears mid-refresh (I7)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    // The RECOVERY write fails (the claim, which writes lastRefreshError:
+    // null, must still go through). It must be logged, not thrown out.
+    const realUpdateMany = appPrisma.mercadoPagoConnection.updateMany.bind(appPrisma.mercadoPagoConnection);
+    const spy = jest
+      .spyOn(appPrisma.mercadoPagoConnection, 'updateMany')
+      .mockImplementation((args: any) => {
+        if (typeof args?.data?.lastRefreshError === 'string') {
+          return Promise.reject(new Error('row vanished'));
+        }
+        return realUpdateMany(args);
+      });
+
+    try {
+      await expect(refreshConnection(A.restaurantId)).resolves.toBe('failed');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
