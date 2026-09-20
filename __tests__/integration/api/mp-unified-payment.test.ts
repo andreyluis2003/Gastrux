@@ -25,7 +25,8 @@ import {
   syncPaymentStatus,
   OnlinePaymentUnavailableError,
 } from '../../../lib/payment-unified';
-import { POST as unifiedPost } from '../../../app/api/pagamentos/unified/route';
+import { POST as unifiedPost, GET as unifiedGet } from '../../../app/api/pagamentos/unified/route';
+import { POST as unifiedRefundPost } from '../../../app/api/pagamentos/unified/refund/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const TOKENS = { accessToken: 'APP_USR-a', refreshToken: 'TG-r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
@@ -211,6 +212,28 @@ describe('unified payments - Mercado Pago never uses the platform token', () => 
       expect(createCheckoutPreference).not.toHaveBeenCalled();
     });
 
+    it('rejects a gateway a client may not ask for, without creating a row (I9)', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+
+      const res = await post({
+        gateway: 'MERCADO_PAGO_CONNECT',
+        items: [{ id: 'i1', title: 'Pizza', quantity: 1, unitPrice: 30 }],
+      });
+
+      // MERCADO_PAGO_CONNECT is created by the connect flows only: accepting it
+      // here would skip the connection check and leave a DECLINED row behind.
+      expect(res.status).toBe(400);
+      expect(createCheckoutPreference).not.toHaveBeenCalled();
+      expect(await prisma.payment.count({ where: { restaurantId: A.restaurantId } })).toBe(0);
+    });
+
+    it('rejects an unknown gateway with 400 instead of letting it reach Prisma (I9)', async () => {
+      const res = await post({ gateway: 'BITCOIN', items: [{ id: 'i1', title: 'Pizza', quantity: 1, unitPrice: 30 }] });
+
+      expect(res.status).toBe(400);
+      expect(await prisma.payment.count({ where: { restaurantId: A.restaurantId } })).toBe(0);
+    });
+
     it('creates the payment through the restaurant connection when there is one', async () => {
       await saveConnection(A.restaurantId, TOKENS);
 
@@ -219,6 +242,73 @@ describe('unified payments - Mercado Pago never uses the platform token', () => 
       expect(res.status).toBe(201);
       expect(createCheckoutPreference.mock.calls[0][1].accessToken).toBe('APP_USR-a');
       expect((await prisma.payment.findFirst({ where: { restaurantId: A.restaurantId } })).gateway).toBe('MERCADO_PAGO_CONNECT');
+    });
+  });
+
+  describe('GET /api/pagamentos/unified', () => {
+    const get = (query = '') =>
+      unifiedGet(new Request(`https://gastrux.test/api/pagamentos/unified${query}`) as any);
+
+    it('lists the CURRENT restaurant, not the first membership (I9)', async () => {
+      // The owner of A is also a member of B, and B sorts first by id often
+      // enough that restaurants[0] was a real bug. currentRestaurantId is A.
+      await prisma.restaurantUser.upsert({
+        where: { restaurantId_userId: { restaurantId: B.restaurantId, userId: A.ownerId } },
+        create: { restaurantId: B.restaurantId, userId: A.ownerId, role: 'OWNER' },
+        update: { isActive: true },
+      });
+      const mine = await prisma.payment.create({
+        data: { restaurantId: A.restaurantId, amount: 10, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING' },
+      });
+      const theirs = await prisma.payment.create({
+        data: { restaurantId: B.restaurantId, amount: 20, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING' },
+      });
+
+      const body = await (await get()).json();
+      const ids = body.payments.map((p: any) => p.id);
+
+      expect(ids).toContain(mine.id);
+      expect(ids).not.toContain(theirs.id);
+
+      await prisma.restaurantUser.deleteMany({ where: { restaurantId: B.restaurantId, userId: A.ownerId } });
+    });
+
+    it('can filter by MERCADO_PAGO_CONNECT (I9)', async () => {
+      const connect = await prisma.payment.create({
+        data: { restaurantId: A.restaurantId, amount: 10, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING' },
+      });
+      await prisma.payment.create({
+        data: { restaurantId: A.restaurantId, amount: 5, method: 'CASH', gateway: 'MANUAL', status: 'PENDING' },
+      });
+
+      const body = await (await get('?gateway=MERCADO_PAGO_CONNECT')).json();
+
+      expect(body.payments.map((p: any) => p.id)).toEqual([connect.id]);
+    });
+
+    it('answers 400 for an invalid gateway filter instead of a 500 from Prisma (I9)', async () => {
+      expect((await get('?gateway=BITCOIN')).status).toBe(400);
+    });
+  });
+
+  describe('POST /api/pagamentos/unified/refund', () => {
+    it('maps OnlinePaymentUnavailableError to 409, not 500 (I9)', async () => {
+      // A Connect payment whose restaurant has no usable connection.
+      const payment = await prisma.payment.create({
+        data: { restaurantId: A.restaurantId, amount: 100, method: 'MERCADO_PAGO', gateway: 'MERCADO_PAGO_CONNECT', status: 'APPROVED', gatewayPaymentId: '4242' },
+      });
+
+      const res = await unifiedRefundPost(
+        new Request('https://gastrux.test/api/pagamentos/unified/refund', {
+          method: 'POST',
+          body: JSON.stringify({ paymentId: payment.id }),
+        }) as any
+      );
+
+      expect(res.status).toBe(409);
+      expect((await res.json()).code).toBe('ONLINE_PAYMENT_UNAVAILABLE');
+      expect(refundConnectPayment).not.toHaveBeenCalled();
+      expect(await prisma.paymentRefund.count({ where: { paymentId: payment.id } })).toBe(0);
     });
   });
 });

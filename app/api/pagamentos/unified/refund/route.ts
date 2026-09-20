@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
-import { createUnifiedRefund } from '@/lib/payment-unified';
+import { createUnifiedRefund, OnlinePaymentUnavailableError } from '@/lib/payment-unified';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -64,6 +64,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     const duration = Date.now() - startTime;
+
+    // An expected 409 is NOT a server error: the restaurant has no usable
+    // Mercado Pago connection, so it cannot refund right now.
+    if (error instanceof OnlinePaymentUnavailableError) {
+      trackApiCall('POST', '/api/pagamentos/unified/refund', 409, duration);
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
+
     trackApiCall('POST', '/api/pagamentos/unified/refund', 500, duration);
     captureException(error instanceof Error ? error : new Error(String(error)), {
       endpoint: '/api/pagamentos/unified/refund',

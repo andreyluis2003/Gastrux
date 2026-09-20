@@ -163,6 +163,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // A fully refunded payment must not leave its order showing as paid in the
+    // KDS/POS. Idempotent and restaurantId-scoped, and only from APPROVED; a
+    // PARTIAL refund keeps the order APPROVED.
+    if (newStatus === 'REFUNDED' && payment.orderId) {
+      await prisma.order.updateMany({
+        where: { id: payment.orderId, restaurantId, paymentStatus: 'APPROVED' },
+        data: { paymentStatus: 'REFUNDED' },
+      });
+    }
+
     const duration = Date.now() - startTime;
     trackApiCall('POST', '/api/pagamentos/mp/refund', 200, duration);
 

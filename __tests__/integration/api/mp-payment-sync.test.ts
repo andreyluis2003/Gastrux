@@ -168,14 +168,42 @@ describe('mercadopago-connect/payment-sync', () => {
     expect(o.paymentStatus).toBe('PENDING');
   });
 
-  it('moves an approved payment to REFUNDED', async () => {
+  it('moves an approved payment to REFUNDED and takes the order off APPROVED (I10)', async () => {
     getConnectPayment.mockResolvedValueOnce(mpPayment());
     await syncRestaurantPayment(A.restaurantId, '555');
+    expect((await reload()).order.paymentStatus).toBe('APPROVED');
     getConnectPayment.mockResolvedValueOnce(mpPayment({ status: 'refunded' }));
 
     const result = await syncRestaurantPayment(A.restaurantId, '555');
 
     expect(result).toMatchObject({ updated: true, status: 'REFUNDED' });
+    const { payment: p, order: o } = await reload();
+    expect(p.status).toBe('REFUNDED');
+    // Before the fix the KDS/POS kept showing a refunded order as paid.
+    expect(o.paymentStatus).toBe('REFUNDED');
+  });
+
+  it('moves the order to CHARGEBACK for a charged_back notification (I10)', async () => {
+    getConnectPayment.mockResolvedValueOnce(mpPayment());
+    await syncRestaurantPayment(A.restaurantId, '555');
+    getConnectPayment.mockResolvedValueOnce(mpPayment({ status: 'charged_back' }));
+
+    const result = await syncRestaurantPayment(A.restaurantId, '555');
+
+    expect(result).toMatchObject({ updated: true, status: 'CHARGEBACK' });
+    const { payment: p, order: o } = await reload();
+    expect(p.status).toBe('CHARGEBACK');
+    expect(o.paymentStatus).toBe('CHARGEBACK');
+  });
+
+  it('does not touch an order that was never APPROVED when the payment is cancelled (I10)', async () => {
+    getConnectPayment.mockResolvedValueOnce(mpPayment({ status: 'cancelled' }));
+
+    await syncRestaurantPayment(A.restaurantId, '555');
+
+    const { payment: p, order: o } = await reload();
+    expect(p.status).toBe('CANCELLED');
+    expect(o.paymentStatus).toBe('PENDING');
   });
 
   it('reports no-active-connection without calling Mercado Pago', async () => {

@@ -39,6 +39,7 @@ describe('POST /api/pagamentos/mp/refund', () => {
     await prisma.paymentRefund.deleteMany({ where: { payment: { restaurantId: { in: ids } } } });
     await prisma.mercadoPagoTransaction.deleteMany({ where: { payment: { restaurantId: { in: ids } } } });
     await prisma.payment.deleteMany({ where: { restaurantId: { in: ids } } });
+    await prisma.order.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId: { in: ids } } });
   };
 
@@ -169,6 +170,29 @@ describe('POST /api/pagamentos/mp/refund', () => {
 
     expect(res.status).toBe(400);
     expect(refundPayment).not.toHaveBeenCalled();
+  });
+
+  it('takes the linked order off APPROVED on a FULL refund, but not on a partial one (I10)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    const order = await prisma.order.create({
+      data: { restaurantId: A.restaurantId, orderNumber: `T-${crypto.randomBytes(4).toString('hex')}`, total: 100, paymentStatus: 'APPROVED' },
+    });
+    const payment = await prisma.payment.create({
+      data: { restaurantId: A.restaurantId, orderId: order.id, amount: 100, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'APPROVED', gatewayPaymentId: '4242' },
+    });
+
+    await refund({ paymentId: payment.id, amount: 30 });
+    // A PARTIAL refund keeps the order APPROVED.
+    expect((await prisma.order.findUnique({ where: { id: order.id } })).paymentStatus).toBe('APPROVED');
+
+    // Settle it so the route's pre-existing status guard lets the rest
+    // through, then refund the remaining 70.
+    await prisma.payment.update({ where: { id: payment.id }, data: { status: 'SETTLED' } });
+    const res = await refund({ paymentId: payment.id });
+
+    expect(res.status).toBe(200);
+    expect((await prisma.payment.findUnique({ where: { id: payment.id } })).status).toBe('REFUNDED');
+    expect((await prisma.order.findUnique({ where: { id: order.id } })).paymentStatus).toBe('REFUNDED');
   });
 
   it('sends an idempotency key derived from the payment and the amounts (I5)', async () => {

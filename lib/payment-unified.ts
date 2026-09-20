@@ -35,7 +35,22 @@ export class OnlinePaymentUnavailableError extends Error {
   }
 }
 
+/** Gateways a caller may ASK for when creating a payment. */
 export type UnifiedGateway = 'MERCADO_PAGO' | 'STRIPE_CONNECT' | 'MANUAL';
+
+export const UNIFIED_GATEWAYS: readonly UnifiedGateway[] = ['MERCADO_PAGO', 'STRIPE_CONNECT', 'MANUAL'];
+
+/**
+ * Gateways that may appear on a STORED row, so they can be filtered for.
+ * MERCADO_PAGO_CONNECT is created by the connect flows, never asked for by a
+ * client: allowing it as a create gateway would skip the connection check.
+ */
+export type UnifiedFilterGateway = UnifiedGateway | 'MERCADO_PAGO_CONNECT';
+
+export const UNIFIED_FILTER_GATEWAYS: readonly UnifiedFilterGateway[] = [
+  ...UNIFIED_GATEWAYS,
+  'MERCADO_PAGO_CONNECT',
+];
 
 export interface CreatePaymentInput {
   restaurantId: string;
@@ -378,6 +393,16 @@ export async function createUnifiedRefund(
     },
   });
 
+  // A fully refunded payment must not leave its order showing as paid in the
+  // KDS/POS. Idempotent and restaurantId-scoped, and only from APPROVED; a
+  // PARTIAL refund keeps the order APPROVED.
+  if (newStatus === 'REFUNDED' && payment.orderId && payment.restaurantId) {
+    await prisma.order.updateMany({
+      where: { id: payment.orderId, restaurantId: payment.restaurantId, paymentStatus: 'APPROVED' },
+      data: { paymentStatus: 'REFUNDED' },
+    });
+  }
+
   return {
     refundId: refund.id,
     status: newStatus,
@@ -444,7 +469,7 @@ export async function syncPaymentStatus(paymentId: string): Promise<string> {
 
 export interface ListPaymentsFilters {
   restaurantId?: string;
-  gateway?: UnifiedGateway;
+  gateway?: UnifiedFilterGateway;
   status?: string;
   fromDate?: Date;
   toDate?: Date;

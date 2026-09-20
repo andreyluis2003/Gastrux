@@ -29,12 +29,19 @@ async function applyLinkedRecords(
   restaurantId: string,
   payment: { id: string; orderId: string | null },
   mp: any,
-  markOrderPaid: boolean
+  orderStatus: 'APPROVED' | 'REFUNDED' | 'CHARGEBACK' | null
 ): Promise<void> {
-  if (markOrderPaid && payment.orderId) {
+  if (orderStatus && payment.orderId) {
     await prisma.order.updateMany({
-      where: { id: payment.orderId, restaurantId, paymentStatus: { not: 'APPROVED' } },
-      data: { paymentStatus: 'APPROVED' },
+      where: {
+        id: payment.orderId,
+        restaurantId,
+        // Paying moves the order off anything but APPROVED; a refund or a
+        // chargeback moves it ONLY off APPROVED, so the KDS/POS stops showing
+        // a refunded order as paid and neither move can happen twice.
+        paymentStatus: orderStatus === 'APPROVED' ? { not: 'APPROVED' } : 'APPROVED',
+      },
+      data: { paymentStatus: orderStatus },
     });
   }
 
@@ -97,7 +104,7 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
     // an already APPROVED Payment whose MP id was checked above and whose
     // amount matches; it never touches the Payment row.
     if (mapped === 'APPROVED' && payment.status === 'APPROVED' && payment.orderId && amountMatches) {
-      await applyLinkedRecords(restaurantId, payment, mp, true);
+      await applyLinkedRecords(restaurantId, payment, mp, 'APPROVED');
     }
     return { updated: false, reason: 'no-transition' };
   }
@@ -134,7 +141,15 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
   });
   if (result.count === 0) return { updated: false, reason: 'concurrent' };
 
-  await applyLinkedRecords(restaurantId, payment, mp, approved);
+  // A REFUNDED or CHARGEBACK notification must also move the Order off
+  // APPROVED, otherwise the KDS/POS keeps showing a refunded order as paid.
+  const orderStatus: 'APPROVED' | 'REFUNDED' | 'CHARGEBACK' | null = approved
+    ? 'APPROVED'
+    : mapped === 'REFUNDED' || mapped === 'CHARGEBACK'
+    ? mapped
+    : null;
+
+  await applyLinkedRecords(restaurantId, payment, mp, orderStatus);
 
   return { updated: true, status: mapped };
 }
