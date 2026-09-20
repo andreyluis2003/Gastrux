@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentRestaurantId, requireAdminSession } from '@/lib/whatsapp/get-restaurant';
+import { requireRestaurantManager } from '@/lib/mercadopago-connect/guard';
 import { hasActiveConnection } from '@/lib/mercadopago-connect/connection-service';
-import { parseSettingsInput } from '@/lib/delivery-payments/choice';
+import { parseSettingsInput, type DeliveryPaymentSettingsData } from '@/lib/delivery-payments/choice';
 import {
   getDeliveryPaymentSettings,
   saveDeliveryPaymentSettings,
@@ -9,38 +9,36 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-async function resolveRestaurant() {
-  const auth = await requireAdminSession();
-  if (!auth.ok) return { error: NextResponse.json({ error: auth.error }, { status: auth.status }) };
-  const restaurantId = await getCurrentRestaurantId();
-  if (!restaurantId) {
-    return { error: NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 }) };
-  }
-  return { restaurantId };
+/**
+ * Authorized by membership in the CURRENT restaurant, not by the global JWT
+ * role (ruling R20): the owner, or an active OWNER/ADMIN/MANAGER member.
+ */
+function authorize() {
+  return requireRestaurantManager(
+    ['OWNER', 'ADMIN', 'MANAGER'],
+    'Apenas o dono, administrador ou gerente pode alterar as formas de pagamento'
+  );
 }
 
-async function payload(restaurantId: string) {
-  const [settings, connected] = await Promise.all([
-    getDeliveryPaymentSettings(restaurantId),
-    hasActiveConnection(restaurantId),
-  ]);
-  return { settings, online: { connected } };
+async function respond(restaurantId: string, settings: DeliveryPaymentSettingsData) {
+  const connected = await hasActiveConnection(restaurantId);
+  return NextResponse.json({ settings, online: { connected } });
 }
 
 export async function GET() {
-  const ctx = await resolveRestaurant();
-  if ('error' in ctx) return ctx.error;
-  return NextResponse.json(await payload(ctx.restaurantId));
+  const auth = await authorize();
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  return respond(auth.restaurantId, await getDeliveryPaymentSettings(auth.restaurantId));
 }
 
 /** The restaurant always comes from the session: a restaurantId in the body is ignored. */
 export async function PUT(request: NextRequest) {
-  const ctx = await resolveRestaurant();
-  if ('error' in ctx) return ctx.error;
+  const auth = await authorize();
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const parsed = parseSettingsInput(await request.json().catch(() => null));
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  await saveDeliveryPaymentSettings(ctx.restaurantId, parsed.data);
-  return NextResponse.json(await payload(ctx.restaurantId));
+  const saved = await saveDeliveryPaymentSettings(auth.restaurantId, parsed.data);
+  return respond(auth.restaurantId, saved);
 }

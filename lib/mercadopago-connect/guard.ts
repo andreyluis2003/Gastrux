@@ -4,30 +4,42 @@ import { isPlatformStaffEmail } from '@/lib/admin/guard';
 import { getCurrentRestaurantId, requireAdminSession } from '@/lib/whatsapp/get-restaurant';
 
 /**
- * Managing the Mercado Pago connection (start, callback, disconnect) decides
- * WHERE a restaurant's money lands, so it is authorized against the CURRENT
- * restaurant and not against the user's global JWT role (ruling R20).
+ * Restaurant-scoped management authorization (ruling R20). Anything that
+ * changes how a restaurant gets paid (the Mercado Pago connection, which
+ * payment methods it accepts) is authorized against the CURRENT restaurant and
+ * not against the user's global JWT role.
  *
  * `session.user.role` is global: a user who is OWNER of restaurant X and merely
- * a cashier member of the current restaurant Y used to pass this check and
- * could redirect Y's money. Allowed now:
+ * a cashier member of the current restaurant Y used to pass a role check and
+ * could change Y's payments. Allowed:
  *   - the current restaurant's `ownerId`, or
- *   - an ACTIVE `RestaurantUser` row for it whose role is OWNER or ADMIN, or
+ *   - an ACTIVE `RestaurantUser` row for it whose role is in the `roles` the
+ *     caller passes, or
  *   - a platform admin (Gastrux staff), per the PLATFORM_ADMIN_EMAILS allowlist (isPlatformStaffEmail).
- * Everything else is denied, including a session with no role
- * (requireAdminSession lets it through, the membership check does not).
+ * Everything else is denied. A session with no role passes requireAdminSession
+ * but is then decided by the membership check alone, so a non-member is denied.
  *
- * The return contract is unchanged: { ok: true, session, restaurantId, userId }
- * or { ok: false, status, error } with 401 / 403 / 404 as before.
+ * The return contract: { ok: true, session, restaurantId, userId }
+ * or { ok: false, status, error } with 401 / 403 / 404.
  */
 
-/** RestaurantUser.role is the UserRole enum; these are its management values. */
-const MANAGEMENT_ROLES: UserRole[] = ['OWNER', 'ADMIN'] as UserRole[];
-
-export async function requireConnectManager(): Promise<
+export type RestaurantManagerResult =
   | { ok: true; session: any; restaurantId: string; userId: string }
-  | { ok: false; status: number; error: string }
-> {
+  | { ok: false; status: number; error: string };
+
+const DEFAULT_DENIED_MESSAGE = 'Apenas o dono ou administrador pode gerenciar pagamentos';
+
+/** RestaurantUser.role is the UserRole enum; these are the roles that may manage the connection. */
+const CONNECT_ROLES: UserRole[] = ['OWNER', 'ADMIN'] as UserRole[];
+
+/**
+ * @param roles Membership roles (besides the owner) allowed to pass.
+ * @param deniedMessage Text of the 403 for a member outside `roles`.
+ */
+export async function requireRestaurantManager(
+  roles: UserRole[],
+  deniedMessage: string = DEFAULT_DENIED_MESSAGE
+): Promise<RestaurantManagerResult> {
   const auth = await requireAdminSession();
   if (!auth.ok) return { ok: false, status: auth.status, error: auth.error };
 
@@ -39,7 +51,7 @@ export async function requireConnectManager(): Promise<
 
   const granted = { ok: true as const, session: auth.session, restaurantId, userId: user.id as string };
 
-  // Gastrux staff may manage any restaurant's connection.
+  // Gastrux staff may manage any restaurant.
   if (isPlatformStaffEmail(user.email)) return granted;
 
   const [ownsIt, membership] = await Promise.all([
@@ -48,14 +60,19 @@ export async function requireConnectManager(): Promise<
       select: { id: true },
     }),
     prisma.restaurantUser.findFirst({
-      where: { restaurantId, userId: user.id as string, isActive: true, role: { in: MANAGEMENT_ROLES } },
+      where: { restaurantId, userId: user.id as string, isActive: true, role: { in: roles } },
       select: { id: true },
     }),
   ]);
 
   if (!ownsIt && !membership) {
-    return { ok: false, status: 403, error: 'Apenas o dono ou administrador pode gerenciar pagamentos' };
+    return { ok: false, status: 403, error: deniedMessage };
   }
 
   return granted;
+}
+
+/** Managing the Mercado Pago connection decides WHERE the money lands: owner or admin only. */
+export function requireConnectManager(): Promise<RestaurantManagerResult> {
+  return requireRestaurantManager(CONNECT_ROLES);
 }
