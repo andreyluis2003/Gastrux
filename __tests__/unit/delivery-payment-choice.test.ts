@@ -88,7 +88,7 @@ describe('delivery-payments/choice', () => {
       expect(validatePaymentChoice(options, { paymentMethod: 'CASH', changeFor: 50 }, 57.9)).toEqual({
         ok: false, error: 'O valor para troco deve ser maior ou igual ao total do pedido',
       });
-      for (const bad of [0, -5, 'abc', NaN, Infinity]) {
+      for (const bad of [0, -5, 'abc', NaN, Infinity, true, [100], {}, 1e21, 100001]) {
         expect(validatePaymentChoice(options, { paymentMethod: 'CASH', changeFor: bad }, 57.9)).toEqual({
           ok: false, error: 'Valor do troco inválido',
         });

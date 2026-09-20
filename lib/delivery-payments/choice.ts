@@ -81,6 +81,9 @@ export interface ValidatedChoice {
 
 export type ValidationResult = { ok: true; choice: ValidatedChoice } | { ok: false; error: string };
 
+/** Largest "troco para" accepted, in R$. Far above any real note, far below the column limit. */
+const MAX_CHANGE_FOR = 100_000;
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -123,8 +126,11 @@ export function validatePaymentChoice(
       if (!options.onDelivery.cash) return { ok: false, error: UNAVAILABLE };
       const change = input.changeFor;
       if (change === undefined || change === null || change === '') return accept(method);
+      // Only a number or a numeric string: Number(true) === 1 and Number([100]) === 100 must not pass.
+      if (typeof change !== 'number' && typeof change !== 'string') return { ok: false, error: 'Valor do troco inválido' };
       const value = round2(Number(change));
-      if (!Number.isFinite(value) || value <= 0) return { ok: false, error: 'Valor do troco inválido' };
+      // The cap keeps a hostile value out of the Decimal(12,2) column (a 500 instead of a 400) and the note readable.
+      if (!Number.isFinite(value) || value <= 0 || value > MAX_CHANGE_FOR) return { ok: false, error: 'Valor do troco inválido' };
       if (value < round2(total)) {
         return { ok: false, error: 'O valor para troco deve ser maior ou igual ao total do pedido' };
       }
