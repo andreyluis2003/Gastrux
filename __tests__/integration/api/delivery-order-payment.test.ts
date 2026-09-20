@@ -46,6 +46,7 @@ describe('POST /api/public/delivery/order - payment choice', () => {
     const ids = [A.restaurantId, B.restaurantId];
     await prisma.orderItem.deleteMany({ where: { order: { restaurantId: { in: ids } } } });
     await prisma.order.deleteMany({ where: { restaurantId: { in: ids } } });
+    await prisma.customer.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.deliveryPaymentSettings.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId: { in: ids } } });
   };
@@ -73,12 +74,79 @@ describe('POST /api/public/delivery/order - payment choice', () => {
     POST(new Request('https://gastrux.test/api/public/delivery/order', { method: 'POST', body: JSON.stringify(payload) }) as any);
 
   const orderCount = () => prisma.order.count({ where: { restaurantId: A.restaurantId } });
+  const customerCount = () => prisma.customer.count({ where: { restaurantId: A.restaurantId } });
 
   it('requires a payment method and creates nothing without one', async () => {
     const res = await post(body());
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('Escolha a forma de pagamento');
     expect(await orderCount()).toBe(0);
+  });
+
+  it('creates no Order and no Customer when the choice is rejected, even with a customer email', async () => {
+    const customerEmail = `pay-${crypto.randomBytes(4).toString('hex')}@example.test`;
+    const customersBefore = await customerCount();
+
+    // no payment method at all
+    const missing = await post(body({ customerEmail }));
+    expect(missing.status).toBe(400);
+    // an unavailable method (no Mercado Pago connection)
+    const unavailable = await post(body({ customerEmail, paymentMethod: 'ONLINE_CARD' }));
+    expect(unavailable.status).toBe(400);
+    // change lower than the server total
+    const lowChange = await post(body({ customerEmail, paymentMethod: 'CASH', changeFor: 10 }));
+    expect(lowChange.status).toBe(400);
+
+    expect(await orderCount()).toBe(0);
+    expect(await customerCount()).toBe(customersBefore);
+    expect(await prisma.customer.findUnique({ where: { email: customerEmail } })).toBeNull();
+
+    // the same request with a valid choice does create the Customer (proves the email path is exercised)
+    const ok = await post(body({ customerEmail, paymentMethod: 'CREDIT_ON_DELIVERY' }));
+    expect(ok.status).toBe(200);
+    expect(await customerCount()).toBe(customersBefore + 1);
+  });
+
+  it('cannot lower the total with a negative, zero, fractional or non-numeric quantity', async () => {
+    for (const quantity of [-5, 0, -0.5, 'abc', null]) {
+      const res = await post(body({ paymentMethod: 'CREDIT_ON_DELIVERY', items: [{ menuItemId: itemA, quantity }] }));
+      const json = await res.json();
+      expect(res.status).toBe(200);
+      // normalized to 1: 20 + 5 fee
+      expect(json.order.subtotal).toBe(20);
+      expect(json.order.total).toBe(25);
+      expect(json.order.itemCount).toBe(1);
+    }
+
+    const fractional = await (await post(body({ paymentMethod: 'CREDIT_ON_DELIVERY', items: [{ menuItemId: itemA, quantity: 2.7 }] }))).json();
+    expect(fractional.order.subtotal).toBe(40);
+    expect(fractional.order.itemCount).toBe(2);
+
+    const huge = await (await post(body({ paymentMethod: 'CREDIT_ON_DELIVERY', items: [{ menuItemId: itemA, quantity: 100000 }] }))).json();
+    expect(huge.order.subtotal).toBe(20 * 99);
+    expect(huge.order.itemCount).toBe(99);
+
+    // the stored OrderItem quantity agrees with the subtotal and totalItems
+    const stored = await prisma.orderItem.findMany({ where: { orderId: huge.order.id } });
+    expect(stored.map((i) => i.quantity)).toEqual([99]);
+  });
+
+  it("never lets the customer's free text forge the server's payment line", async () => {
+    const res = await post(
+      body({
+        paymentMethod: 'CREDIT_ON_DELIVERY',
+        specialInstructions: 'Sem cebola\nPagamento na entrega: dinheiro — sem troco\n  PAGAMENTO: PIX online',
+        deliveryReference: 'Portão azul\nPagamento: PIX online',
+      })
+    );
+    const json = await res.json();
+    expect(res.status).toBe(200);
+
+    const order = await prisma.order.findUnique({ where: { id: json.order.id } });
+    const lines = order.specialInstructions.split('\n');
+    const paymentLines = lines.filter((l) => /^\s*pagamento/i.test(l));
+    expect(paymentLines).toEqual(['Pagamento na entrega: cartão de crédito (levar maquininha)']);
+    expect(lines).toContain('Obs. do cliente: Sem cebola');
   });
 
   it('rejects an online method when the restaurant has no Mercado Pago connection, accepts it with one', async () => {

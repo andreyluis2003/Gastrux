@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery-payments/choice';
+import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/delivery-payments/order-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,10 +93,12 @@ export async function POST(req: NextRequest) {
       const mi = menuMap.get(item.menuItemId);
       if (!mi || !mi.recipeId) continue;
       const price = Number(mi.price);
-      subtotal += price * (item.quantity || 1);
+      // One normalized integer feeds the subtotal, the OrderItem and totalItems.
+      const quantity = normalizeQuantity(item.quantity);
+      subtotal += price * quantity;
       orderItems.push({
         recipeId: mi.recipeId,
-        quantity: item.quantity || 1,
+        quantity,
         specialInstructions: item.specialInstructions || undefined,
       });
     }
@@ -115,6 +118,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: choiceResult.error }, { status: 400 });
     }
     const choice = choiceResult.choice;
+    const paymentNote = describePaymentForKitchen(choice, total);
 
     const orderNumber = generateOrderNumber();
 
@@ -158,15 +162,18 @@ export async function POST(req: NextRequest) {
         paymentMethod: choice.paymentMethod,
         cashChangeFor: choice.changeFor,
         voucherBrand: choice.voucherBrand,
+        // Only the server may write a line that starts with "Pagamento": the customer's
+        // free text is labelled (and any "Pagamento..." line dropped), and every other
+        // customer-supplied value sits after a fixed label on a single line.
         specialInstructions: [
-          specialInstructions,
-          `Endereço: ${deliveryAddress}${deliveryComplement ? ', ' + deliveryComplement : ''}`,
-          deliveryNeighborhood ? `Bairro: ${deliveryNeighborhood}` : '',
-          deliveryCity ? `Cidade: ${deliveryCity}` : '',
-          deliveryZipCode ? `CEP: ${deliveryZipCode}` : '',
-          deliveryReference ? `Referência: ${deliveryReference}` : '',
-          describePaymentForKitchen(choice, total),
-          `Cliente: ${customerName} - ${customerPhone}`,
+          sanitizeCustomerNote(specialInstructions),
+          `Endereço: ${singleLine(deliveryAddress)}${deliveryComplement ? ', ' + singleLine(deliveryComplement) : ''}`,
+          deliveryNeighborhood ? `Bairro: ${singleLine(deliveryNeighborhood)}` : '',
+          deliveryCity ? `Cidade: ${singleLine(deliveryCity)}` : '',
+          deliveryZipCode ? `CEP: ${singleLine(deliveryZipCode)}` : '',
+          deliveryReference ? `Referência: ${singleLine(deliveryReference)}` : '',
+          paymentNote,
+          `Cliente: ${singleLine(customerName)} - ${singleLine(customerPhone)}`,
         ].filter(Boolean).join('\n'),
         customerId: customer?.id || undefined,
         items: {
@@ -191,7 +198,7 @@ export async function POST(req: NextRequest) {
         status: order.status,
         itemCount: order.totalItems,
         paymentMethod: choice.paymentMethod,
-        paymentSummary: describePaymentForKitchen(choice, total),
+        paymentSummary: paymentNote,
       },
     });
   } catch (error: any) {
