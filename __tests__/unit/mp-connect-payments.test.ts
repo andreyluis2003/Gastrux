@@ -101,6 +101,50 @@ describe('mercadopago-connect/payments', () => {
     expect(mocks.refundTotal).toHaveBeenCalledWith({ payment_id: '77' });
   });
 
+  it('passes the idempotency key to the SDK for a partial refund', async () => {
+    mocks.refundCreate.mockResolvedValue({ id: 1 });
+
+    await refundConnectPayment(client, '77', 10.5, 'refund:pay_1:0:10.5');
+
+    expect(mocks.refundCreate).toHaveBeenCalledWith({
+      payment_id: '77',
+      body: { amount: 10.5 },
+      requestOptions: { idempotencyKey: 'refund:pay_1:0:10.5' },
+    });
+    expect(mocks.refundTotal).not.toHaveBeenCalled();
+  });
+
+  it('passes the idempotency key to the SDK for a full refund', async () => {
+    mocks.refundTotal.mockResolvedValue({ id: 2 });
+
+    await refundConnectPayment(client, '77', undefined, 'refund:pay_1:0:100');
+
+    expect(mocks.refundTotal).toHaveBeenCalledWith({
+      payment_id: '77',
+      requestOptions: { idempotencyKey: 'refund:pay_1:0:100' },
+    });
+    expect(mocks.refundCreate).not.toHaveBeenCalled();
+  });
+
+  it('omitting the idempotency key is still allowed and sends no requestOptions', async () => {
+    mocks.refundCreate.mockResolvedValue({ id: 1 });
+    mocks.refundTotal.mockResolvedValue({ id: 2 });
+
+    await refundConnectPayment(client, '77', 5);
+    await refundConnectPayment(client, '77');
+
+    expect(mocks.refundCreate.mock.calls[0][0]).not.toHaveProperty('requestOptions');
+    expect(mocks.refundTotal.mock.calls[0][0]).not.toHaveProperty('requestOptions');
+  });
+
+  it('rejects an invalid amount even when an idempotency key is given', async () => {
+    await expect(refundConnectPayment(client, '77', 0, 'refund:pay_1:0:0')).rejects.toThrow(
+      'Valor de reembolso inválido'
+    );
+    expect(mocks.refundCreate).not.toHaveBeenCalled();
+    expect(mocks.refundTotal).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['zero', 0],
     ['negative', -5],

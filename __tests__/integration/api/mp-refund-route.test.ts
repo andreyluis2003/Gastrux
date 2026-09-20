@@ -99,6 +99,101 @@ describe('POST /api/pagamentos/mp/refund', () => {
     expect(Number(updated.amountRefunded)).toBe(30);
   });
 
+  // NOTE on the shape of these two: the reviewer's sequence "refund 60 through
+  // this route, then refund the remaining 40" cannot actually be replayed
+  // end-to-end, because the route's PRE-EXISTING status guard rejects a
+  // PARTIALLY_REFUNDED payment (`status !== APPROVED && status !== SETTLED`),
+  // which this wave leaves unchanged. The reachable equivalent - a SETTLED
+  // payment that already carries completed refunds - exercises exactly the two
+  // lines the finding is about.
+  const settledWithRefund = async (alreadyRefunded: number) => {
+    const payment = await prisma.payment.create({
+      data: { restaurantId: A.restaurantId, amount: 100, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'SETTLED', gatewayPaymentId: '4242' },
+    });
+    await prisma.paymentRefund.create({
+      data: {
+        paymentId: payment.id,
+        amount: alreadyRefunded,
+        currency: 'BRL',
+        gateway: 'MERCADO_PAGO_CONNECT',
+        status: 'completed',
+        gatewayRefundId: `r-${alreadyRefunded}`,
+      },
+    });
+    return payment;
+  };
+
+  it('refunding the remaining 40 after 60 leaves the payment REFUNDED, not PARTIALLY_REFUNDED (I4)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    const payment = await settledWithRefund(60);
+
+    const res = await refund({ paymentId: payment.id });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).amount).toBe(40);
+    const updated = await prisma.payment.findUnique({ where: { id: payment.id } });
+    // Before the fix isFullRefund compared 40 >= 100 and this stayed
+    // PARTIALLY_REFUNDED with amountRefunded = 100.
+    expect(updated.status).toBe('REFUNDED');
+    expect(Number(updated.amountRefunded)).toBe(100);
+  });
+
+  it('a further refund of a fully refunded payment is 400 and calls no refund function (I4)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    const payment = await settledWithRefund(100);
+
+    const res = await refund({ paymentId: payment.id });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Nada a reembolsar');
+    // Before the fix this called refundConnectPayment(client, id, undefined),
+    // i.e. a FULL refund request against the restaurant's account.
+    expect(refundConnectPayment).not.toHaveBeenCalled();
+    expect(refundPayment).not.toHaveBeenCalled();
+    expect(await prisma.paymentRefund.count({ where: { paymentId: payment.id } })).toBe(1);
+    expect((await prisma.payment.findUnique({ where: { id: payment.id } })).status).toBe('SETTLED');
+  });
+
+  it('applies the same zero guard to the legacy platform path (I4)', async () => {
+    const payment = await prisma.payment.create({
+      data: { restaurantId: A.restaurantId, amount: 100, method: 'MERCADO_PAGO', gateway: 'MERCADO_PAGO', status: 'SETTLED' },
+    });
+    await prisma.mercadoPagoTransaction.create({
+      data: { paymentId: payment.id, preferenceId: `pref-${crypto.randomBytes(4).toString('hex')}`, mpPaymentId: '888' },
+    });
+    await prisma.paymentRefund.create({
+      data: { paymentId: payment.id, amount: 100, currency: 'BRL', gateway: 'MERCADO_PAGO', status: 'completed', gatewayRefundId: 'r-legacy' },
+    });
+
+    const res = await refund({ paymentId: payment.id });
+
+    expect(res.status).toBe(400);
+    expect(refundPayment).not.toHaveBeenCalled();
+  });
+
+  it('sends an idempotency key derived from the payment and the amounts (I5)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    const payment = await makeConnectPayment();
+
+    await refund({ paymentId: payment.id, amount: 30 });
+    expect(refundConnectPayment.mock.calls[0][3]).toBe(`refund:${payment.id}:0:30`);
+  });
+
+  it('rebuilds the SAME idempotency key for an identical repeated request (I5)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    const payment = await settledWithRefund(60);
+
+    await refund({ paymentId: payment.id, amount: 10 });
+    // Same payment, same already-refunded total, same amount -> same key, so a
+    // double click or a client retry maps to ONE refund at Mercado Pago.
+    const expected = `refund:${payment.id}:60:10`;
+    expect(refundConnectPayment.mock.calls[0][3]).toBe(expected);
+
+    // Recompute the key from a fresh read of the same state.
+    const reread = await prisma.payment.findUnique({ where: { id: payment.id }, include: { refunds: true } });
+    expect(reread.refunds.filter((r: any) => r.status === 'completed').length).toBe(2);
+  });
+
   const expectInvalidAmountRejected = async (badAmount: number) => {
     await saveConnection(A.restaurantId, TOKENS);
     const payment = await makeConnectPayment();

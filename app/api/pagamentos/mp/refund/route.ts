@@ -88,7 +88,22 @@ export async function POST(request: NextRequest) {
     }
 
     const refundAmount = amount ? Number(amount) : remainingAmount;
-    const isFullRefund = refundAmount >= Number(payment.amount);
+
+    // Nothing left to refund. Without this guard a third call after a full
+    // refund computed refundAmount = 0 and reached refundConnectPayment /
+    // refundPayment with an undefined amount, which is a FULL refund request
+    // against the restaurant's account. Mirrors lib/payment-unified.ts.
+    if (!(refundAmount > 0)) {
+      return NextResponse.json({ error: 'Nada a reembolsar' }, { status: 400 });
+    }
+
+    // Counted against what was ALREADY refunded: refunding 60 of 100 and then
+    // the remaining 40 must end as REFUNDED, not PARTIALLY_REFUNDED.
+    const isFullRefund = totalRefunded + refundAmount >= Number(payment.amount);
+
+    // An identical repeated request (double click, client retry after a
+    // timeout) maps to the SAME key, so Mercado Pago refunds only once.
+    const idempotencyKey = `refund:${payment.id}:${totalRefunded}:${refundAmount}`;
 
     // Get MP payment ID. Payments received by a restaurant through its own
     // Mercado Pago account (MERCADO_PAGO_CONNECT) keep it in gatewayPaymentId.
@@ -111,7 +126,12 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      mpRefund = await refundConnectPayment(client, mpPaymentId, amount ? Number(amount) : undefined);
+      mpRefund = await refundConnectPayment(
+        client,
+        mpPaymentId,
+        amount ? Number(amount) : undefined,
+        idempotencyKey
+      );
     } else {
       mpRefund = await refundPayment(mpPaymentId, amount ? Number(amount) : undefined);
     }

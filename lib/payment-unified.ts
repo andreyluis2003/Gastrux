@@ -314,7 +314,14 @@ export async function createUnifiedRefund(
       if (!mpPaymentId) throw new Error('Mercado Pago payment ID not found');
       const client = await getMpClientForRestaurant(payment.restaurantId);
       if (!client) throw new OnlinePaymentUnavailableError();
-      const result = await refundConnectPayment(client, mpPaymentId, refundAmount);
+      // Same key for an identical repeated request: a double submit or a
+      // client retry after a timeout must not refund twice.
+      const result = await refundConnectPayment(
+        client,
+        mpPaymentId,
+        refundAmount,
+        `refund:${payment.id}:${totalRefunded}:${refundAmount}`
+      );
       gatewayRefundId = String(result.id);
       break;
     }

@@ -76,16 +76,28 @@ export function getConnectPayment(client: MercadoPagoConfig, mpPaymentId: string
  * Only an omitted amount means a full refund. A zero, negative or non-finite
  * amount is rejected: it must never fall through to refunding the whole payment
  * from the restaurant's account.
+ *
+ * `idempotencyKey` is optional (so existing callers keep working) but every
+ * caller should pass one, derived from the payment and the amounts involved:
+ * without it two clicks - or a client retry after a timeout - issue TWO refunds
+ * from the restaurant's account.
  */
-export async function refundConnectPayment(client: MercadoPagoConfig, mpPaymentId: string, amount?: number) {
+export async function refundConnectPayment(
+  client: MercadoPagoConfig,
+  mpPaymentId: string,
+  amount?: number,
+  idempotencyKey?: string
+) {
   const refunds = new PaymentRefund(client);
+  const options = idempotencyKey ? { requestOptions: { idempotencyKey } } : {};
+
   if (amount === undefined) {
-    return refunds.total({ payment_id: mpPaymentId });
+    return refunds.total({ payment_id: mpPaymentId, ...options });
   }
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error('Valor de reembolso inválido');
   }
-  return refunds.create({ payment_id: mpPaymentId, body: { amount } });
+  return refunds.create({ payment_id: mpPaymentId, body: { amount }, ...options });
 }
 
 export function isUnauthorizedError(error: unknown): boolean {
