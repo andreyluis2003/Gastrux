@@ -1,6 +1,8 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
+import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery-payments/choice';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,9 @@ export async function POST(req: NextRequest) {
       items,
       specialInstructions,
       deliveryFee = 0,
+      paymentMethod,
+      changeFor,
+      voucherBrand,
     } = body;
 
     if (!restaurantId || !customerName || !customerPhone || !deliveryAddress || !items?.length) {
@@ -100,6 +105,17 @@ export async function POST(req: NextRequest) {
     // so a client can't submit a negative value to reduce the order total.
     const safeDeliveryFee = Math.max(0, Number(deliveryFee) || 0);
     const total = subtotal + safeDeliveryFee;
+
+    // The payment choice is validated on the server against what this restaurant
+    // offers (its settings and its Mercado Pago connection) and against the
+    // server-computed total; nothing the browser says about availability is trusted.
+    const paymentOptions = await getDeliveryPaymentOptions(restaurantId);
+    const choiceResult = validatePaymentChoice(paymentOptions, { paymentMethod, changeFor, voucherBrand }, total);
+    if (!choiceResult.ok) {
+      return NextResponse.json({ error: choiceResult.error }, { status: 400 });
+    }
+    const choice = choiceResult.choice;
+
     const orderNumber = generateOrderNumber();
 
     // Find or create customer, scoped to this restaurant. Customer.email is
@@ -139,6 +155,9 @@ export async function POST(req: NextRequest) {
         subtotal,
         fees: safeDeliveryFee,
         total,
+        paymentMethod: choice.paymentMethod,
+        cashChangeFor: choice.changeFor,
+        voucherBrand: choice.voucherBrand,
         specialInstructions: [
           specialInstructions,
           `Endereço: ${deliveryAddress}${deliveryComplement ? ', ' + deliveryComplement : ''}`,
@@ -146,6 +165,7 @@ export async function POST(req: NextRequest) {
           deliveryCity ? `Cidade: ${deliveryCity}` : '',
           deliveryZipCode ? `CEP: ${deliveryZipCode}` : '',
           deliveryReference ? `Referência: ${deliveryReference}` : '',
+          describePaymentForKitchen(choice, total),
           `Cliente: ${customerName} - ${customerPhone}`,
         ].filter(Boolean).join('\n'),
         customerId: customer?.id || undefined,
@@ -170,6 +190,8 @@ export async function POST(req: NextRequest) {
         deliveryFee: Number(order.fees),
         status: order.status,
         itemCount: order.totalItems,
+        paymentMethod: choice.paymentMethod,
+        paymentSummary: describePaymentForKitchen(choice, total),
       },
     });
   } catch (error: any) {
