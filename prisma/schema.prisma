@@ -1645,6 +1645,9 @@ model Order {
   discount            Decimal?                 @db.Decimal(12, 2)
   total               Decimal?                 @db.Decimal(12, 2)
   paymentStatus       PaymentStatus            @default(PENDING)
+  paymentMethod       DeliveryPaymentMethod?
+  cashChangeFor       Decimal?                 @db.Decimal(12, 2)
+  voucherBrand        String?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
   loyaltyTransactions LoyaltyTransaction[]
@@ -2746,6 +2749,7 @@ model Restaurant {
   stripeAccountId       String?
   mercadoPagoAccountId  String?
   mercadoPagoConnection MercadoPagoConnection?
+  deliveryPaymentSettings DeliveryPaymentSettings?
   ifoodIntegrationId    String?
   rappiIntegrationId    String?
   uberIntegrationId     String?
@@ -3233,6 +3237,30 @@ model MercadoPagoConnection {
 
   @@index([status, expiresAt])
   @@map("mercado_pago_connections")
+}
+
+enum DeliveryPaymentMethod {
+  ONLINE_PIX
+  ONLINE_CARD
+  CASH
+  CREDIT_ON_DELIVERY
+  DEBIT_ON_DELIVERY
+  VOUCHER_ON_DELIVERY
+}
+
+model DeliveryPaymentSettings {
+  id                      String     @id @default(cuid())
+  restaurantId            String     @unique
+  acceptCash              Boolean    @default(true)
+  acceptCreditOnDelivery  Boolean    @default(true)
+  acceptDebitOnDelivery   Boolean    @default(true)
+  acceptVoucherOnDelivery Boolean    @default(false)
+  voucherBrands           String[]   @default([])
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+  restaurant              Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("delivery_payment_settings")
 }
 
 model WhatsAppConversation {
