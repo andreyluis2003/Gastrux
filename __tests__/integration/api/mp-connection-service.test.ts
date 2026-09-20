@@ -214,7 +214,25 @@ describe('mercadopago-connect/connection-service', () => {
     expect((await getConnection(A.restaurantId)).status).toBe('NEEDS_RECONNECT');
   });
 
+  /**
+   * refreshExpiringConnections scans EVERY ACTIVE connection in the database.
+   * On a database that is not dedicated to tests, with `fetch` mocked, it would
+   * overwrite real restaurants' tokens with the fixture response, flip expired
+   * ones to NEEDS_RECONNECT and notify their owners. Refuse BEFORE any mutation.
+   */
+  const requireDedicatedTestDb = async () => {
+    const foreign = await prisma.mercadoPagoConnection.count({
+      where: { restaurantId: { notIn: [A.restaurantId, B.restaurantId] } },
+    });
+    if (foreign > 0) {
+      throw new Error(
+        `refreshExpiringConnections scans ALL connections and this database has ${foreign} foreign MercadoPagoConnection row(s): this test requires a dedicated empty test DB.`
+      );
+    }
+  };
+
   it('refreshExpiringConnections only refreshes connections under 25% of their lifetime', async () => {
+    await requireDedicatedTestDb();
     await saveConnection(A.restaurantId, TOKENS);
     await saveConnection(B.restaurantId, TOKENS);
     await prisma.mercadoPagoConnection.update({
@@ -227,11 +245,17 @@ describe('mercadopago-connect/connection-service', () => {
 
     expect(summary.refreshed).toBe(1);
     expect(global.fetch).toHaveBeenCalledTimes(1);
+    // A's tokens were actually replaced...
+    const aRaw = await prisma.mercadoPagoConnection.findUnique({ where: { restaurantId: A.restaurantId } });
+    expect(decryptSecret(aRaw.accessToken)).toBe('APP_USR-access-2');
+    expect(decryptSecret(aRaw.refreshToken)).toBe('TG-refresh-2');
+    // ...and B's were left alone.
     const bRaw = await prisma.mercadoPagoConnection.findUnique({ where: { restaurantId: B.restaurantId } });
     expect(decryptSecret(bRaw.accessToken)).toBe('APP_USR-access-1');
   });
 
   it('one connection that throws does not abort the sweep: the others are still refreshed (I7)', async () => {
+    await requireDedicatedTestDb();
     await saveConnection(A.restaurantId, TOKENS);
     await saveConnection(B.restaurantId, TOKENS);
     // Both are due for a refresh.

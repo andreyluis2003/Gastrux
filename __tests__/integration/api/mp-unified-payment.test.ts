@@ -30,7 +30,13 @@ import { POST as unifiedRefundPost } from '../../../app/api/pagamentos/unified/r
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const TOKENS = { accessToken: 'APP_USR-a', refreshToken: 'TG-r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
-const PREFERENCE = { id: 'pref-unified-1', init_point: 'https://mp/init', sandbox_init_point: 'https://mp/sandbox' };
+// MercadoPagoTransaction.preferenceId is @unique: a fixed id would make the
+// SECOND run of this suite fail. Fresh per call.
+const preference = () => ({
+  id: `pref-unified-${crypto.randomBytes(8).toString('hex')}`,
+  init_point: 'https://mp/init',
+  sandbox_init_point: 'https://mp/sandbox',
+});
 
 describe('unified payments - Mercado Pago never uses the platform token', () => {
   let A: { restaurantId: string; ownerId: string };
@@ -65,7 +71,7 @@ describe('unified payments - Mercado Pago never uses the platform token', () => 
   beforeEach(async () => {
     jest.clearAllMocks();
     await cleanRows();
-    createCheckoutPreference.mockResolvedValue(PREFERENCE);
+    createCheckoutPreference.mockImplementation(async () => preference());
     refundConnectPayment.mockResolvedValue({ id: 9001 });
     (getServerSession as jest.Mock).mockResolvedValue({
       user: { id: A.ownerId, email: 'owner-a@integration.test', role: 'OWNER' },

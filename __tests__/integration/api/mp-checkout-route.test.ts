@@ -17,7 +17,14 @@ import { POST } from '../../../app/api/pagamentos/mp/checkout/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const TOKENS = { accessToken: 'APP_USR-a', refreshToken: 'TG-r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
-const PREFERENCE = { id: 'pref-1', init_point: 'https://mp/init', sandbox_init_point: 'https://mp/sandbox' };
+// MercadoPagoTransaction.preferenceId is @unique, so a fixed id would make the
+// SECOND run of this suite fail (and a crashed run would poison every later
+// one). A fresh id per CALL also keeps two preferences in one test distinct.
+const preference = () => ({
+  id: `pref-${crypto.randomBytes(8).toString('hex')}`,
+  init_point: 'https://mp/init',
+  sandbox_init_point: 'https://mp/sandbox',
+});
 
 describe('POST /api/pagamentos/mp/checkout', () => {
   let A: { restaurantId: string; ownerId: string };
@@ -54,8 +61,8 @@ describe('POST /api/pagamentos/mp/checkout', () => {
     (getServerSession as jest.Mock).mockResolvedValue({
       user: { id: A.ownerId, email: 'owner-a@integration.test', role: 'OWNER' },
     });
-    createCheckoutPreference.mockResolvedValue(PREFERENCE);
-    createPixPreference.mockResolvedValue(PREFERENCE);
+    createCheckoutPreference.mockImplementation(async () => preference());
+    createPixPreference.mockImplementation(async () => preference());
   });
 
   const checkout = (body: any) =>
@@ -104,7 +111,8 @@ describe('POST /api/pagamentos/mp/checkout', () => {
     expect(input.notificationUrl).toBe(`https://gastrux.test/api/pagamentos/mp/webhook?rid=${A.restaurantId}`);
 
     const tx = await prisma.mercadoPagoTransaction.findFirst({ where: { paymentId: payment.id } });
-    expect(tx.preferenceId).toBe('pref-1');
+    expect(tx.preferenceId).toBe(body.preferenceId);
+    expect(tx.preferenceId).toMatch(/^pref-[0-9a-f]{16}$/);
   });
 
   it('marks the connection NEEDS_RECONNECT and answers 409 when Mercado Pago rejects the token (I8)', async () => {

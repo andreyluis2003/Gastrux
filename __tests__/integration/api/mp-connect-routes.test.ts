@@ -290,6 +290,18 @@ describe('Mercado Pago connect routes', () => {
     });
 
     it('runs with the bearer secret', async () => {
+      // The cron sweeps EVERY ACTIVE connection in the database: on a database
+      // that is not dedicated to tests it would touch real restaurants' tokens
+      // and notify their owners. Refuse BEFORE any mutation.
+      const foreign = await prisma.mercadoPagoConnection.count({
+        where: { restaurantId: { notIn: [A.restaurantId, B.restaurantId] } },
+      });
+      if (foreign > 0) {
+        throw new Error(
+          `POST /connect/refresh sweeps ALL connections and this database has ${foreign} foreign MercadoPagoConnection row(s): this test requires a dedicated empty test DB.`
+        );
+      }
+
       const res = await refreshRoute(
         new Request('https://gastrux.test/x', { method: 'POST', headers: { authorization: 'Bearer cron-secret' } }) as any
       );
