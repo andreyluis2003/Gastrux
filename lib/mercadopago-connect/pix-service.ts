@@ -11,7 +11,7 @@ const REUSE_WINDOW_MS = 25 * 60 * 1000;
  * creating the QR right now. After this long we assume that request died
  * (process restart, timeout) and let a new one be created.
  */
-const IN_PROGRESS_TIMEOUT_MS = 2 * 60 * 1000;
+export const IN_PROGRESS_TIMEOUT_MS = 2 * 60 * 1000;
 
 export const ONLINE_PAYMENT_UNAVAILABLE = 'Este restaurante não aceita pagamento online no momento.';
 export const PIX_IN_PROGRESS = 'PIX em geração. Tente novamente em instantes.';

@@ -2,25 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createCheckoutPreference } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant, markNeedsReconnect } from '@/lib/mercadopago-connect/connection-service';
-import { isUnauthorizedError, notificationUrlFor } from '@/lib/mercadopago-connect/payments';
+import { isUnauthorizedError, notificationUrlFor, toMpDate } from '@/lib/mercadopago-connect/payments';
+import { CARD_LINK_VALIDITY_MS, CHECKOUT_IN_PROGRESS, claimCardPayment } from '@/lib/mercadopago-connect/card-claim';
 import { resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
 import { isDefiniteRejection, normalizePayer, ONLINE_PAYMENT_UNAVAILABLE } from '@/lib/mercadopago-connect/pix-service';
 
 export const dynamic = 'force-dynamic';
 
-/** Reuse a pending checkout only while its link is surely still valid. */
-const REUSE_WINDOW_MS = 25 * 60 * 1000;
-
 /** Boleto and ATM/bank-slip payments take days to clear: unsuitable for a delivery order. */
 const EXCLUDED_PAYMENT_TYPES = ['ticket', 'atm'];
-
-function parseMetadata(raw: string | null): Record<string, any> {
-  try {
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
 
 /**
  * POST /api/pagamentos/mp/delivery-checkout
@@ -53,39 +43,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ONLINE_PAYMENT_UNAVAILABLE, code: 'ONLINE_PAYMENT_UNAVAILABLE' }, { status: 409 });
     }
 
-    const reusable = await prisma.payment.findFirst({
-      where: {
-        restaurantId: target.restaurantId,
-        orderId: target.orderId,
-        gateway: 'MERCADO_PAGO_CONNECT',
-        method: 'MERCADO_PAGO',
-        status: 'PENDING',
-        amount: target.amount,
-        createdAt: { gte: new Date(Date.now() - REUSE_WINDOW_MS) },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    const storedInitPoint = reusable ? parseMetadata(reusable.metadata).initPoint : null;
-    if (reusable && storedInitPoint) {
-      return NextResponse.json({ success: true, paymentId: reusable.id, initPoint: storedInitPoint });
-    }
-
     const payer = normalizePayer({ payerEmail: body.payerEmail, payerName: body.payerName });
-    const payment = await prisma.payment.create({
-      data: {
-        restaurantId: target.restaurantId,
-        orderId: target.orderId,
-        amount: target.amount,
-        currency: 'BRL',
-        method: 'MERCADO_PAGO',
-        gateway: 'MERCADO_PAGO_CONNECT',
-        status: 'PENDING',
-        description: target.description,
-        customerEmail: payer.email,
-        customerName: payer.name,
-        metadata: JSON.stringify({ ...target.metadata, source: 'delivery-card' }),
-      },
-    });
+
+    // One live checkout per order: find-or-create under a per-order lock, so a
+    // double tap cannot create two payable links (see card-claim.ts).
+    const claim = await claimCardPayment(target, payer);
+    if (claim.kind === 'in-progress') {
+      return NextResponse.json({ error: CHECKOUT_IN_PROGRESS, code: 'CHECKOUT_IN_PROGRESS' }, { status: 409 });
+    }
+    if (claim.kind === 'reuse') {
+      return NextResponse.json({ success: true, paymentId: claim.payment.id, initPoint: claim.initPoint });
+    }
+    const payment = claim.payment;
 
     const base = (process.env.NEXTAUTH_URL || '').replace(/\/+$/, '');
     const back = (result: string) =>
@@ -103,6 +72,12 @@ export async function POST(request: NextRequest) {
           externalReference: payment.id,
           autoReturn: 'approved',
           excludedPaymentTypes: EXCLUDED_PAYMENT_TYPES,
+          // The link stops working after CARD_LINK_VALIDITY_MS, which is what makes
+          // the reuse window in card-claim.ts safe: an older checkout is dead, so
+          // creating a new one cannot leave two payable links for long.
+          expires: true,
+          expirationDateFrom: toMpDate(new Date()),
+          expirationDateTo: toMpDate(new Date(Date.now() + CARD_LINK_VALIDITY_MS)),
         },
         client
       );
@@ -141,14 +116,6 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       console.error(`[delivery-checkout] preference created but its transaction row was not stored (payment ${payment.id}):`, error);
-    }
-    try {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { metadata: JSON.stringify({ ...target.metadata, source: 'delivery-card', initPoint: preference.init_point }) },
-      });
-    } catch (error) {
-      console.error(`[delivery-checkout] preference created but its link was not stored (payment ${payment.id}):`, error);
     }
 
     return NextResponse.json({ success: true, paymentId: payment.id, initPoint: preference.init_point });
