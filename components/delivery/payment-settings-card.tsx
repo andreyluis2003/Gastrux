@@ -109,6 +109,7 @@ export function PaymentSettingsCard() {
       <input
         type="checkbox"
         checked={settings[key]}
+        disabled={saving}
         onChange={(e) => setSettings({ ...settings, [key]: e.target.checked })}
       />
       {label}
@@ -152,7 +153,12 @@ export function PaymentSettingsCard() {
             <div className="flex flex-wrap gap-3">
               {VOUCHER_BRAND_IDS.map((id) => (
                 <label key={id} className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={settings.voucherBrands.includes(id)} onChange={() => toggleBrand(id)} />
+                  <input
+                    type="checkbox"
+                    checked={settings.voucherBrands.includes(id)}
+                    disabled={saving}
+                    onChange={() => toggleBrand(id)}
+                  />
                   {VOUCHER_BRANDS[id]}
                 </label>
               ))}

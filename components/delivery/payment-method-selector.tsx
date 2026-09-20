@@ -11,23 +11,16 @@ import {
   type DeliveryPaymentMethod,
   type DeliveryPaymentOptions,
 } from '@/lib/delivery-payments/choice';
+import {
+  EMPTY_PAYMENT_CHOICE,
+  parseChangeInput,
+  toPaymentPayload,
+  type PaymentChoice,
+} from '@/lib/delivery-payments/payment-payload';
 
-export interface PaymentChoice {
-  method: DeliveryPaymentMethod | null;
-  /** Text typed by the customer, "100" or "100,50"; converted with parseChangeInput before sending. */
-  changeFor: string;
-  voucherBrand: string;
-}
-
-export const EMPTY_PAYMENT_CHOICE: PaymentChoice = { method: null, changeFor: '', voucherBrand: '' };
-
-/** Empty is valid (no change needed); a positive number is valid; anything else is not. */
-export function parseChangeInput(text: string): { valid: boolean; value?: number } {
-  const trimmed = text.trim();
-  if (!trimmed) return { valid: true };
-  const value = Number(trimmed.replace(',', '.'));
-  return Number.isFinite(value) && value > 0 ? { valid: true, value } : { valid: false };
-}
+// The pure logic lives in lib/ (unit-testable without React); re-exported for the delivery page.
+export { EMPTY_PAYMENT_CHOICE, parseChangeInput, toPaymentPayload };
+export type { PaymentChoice };
 
 interface Row {
   method: DeliveryPaymentMethod;
@@ -112,7 +105,7 @@ export function PaymentMethodSelector({ options, total, value, onChange }: Props
   }
 
   const select = (method: DeliveryPaymentMethod) => onChange({ ...value, method });
-  const changeIsInvalid = !parseChangeInput(value.changeFor).valid;
+  const change = parseChangeInput(value.changeFor, total);
 
   return (
     <Card className="p-4 space-y-4">
@@ -148,11 +141,11 @@ export function PaymentMethodSelector({ options, total, value, onChange }: Props
             inputMode="decimal"
             placeholder="Ex.: 100,00"
             value={value.changeFor}
-            aria-invalid={changeIsInvalid}
+            aria-invalid={!change.valid}
             onChange={(e) => onChange({ ...value, changeFor: e.target.value })}
           />
-          {changeIsInvalid ? (
-            <p className="mt-1 text-xs text-red-600">Digite um valor válido, por exemplo 100,00.</p>
+          {!change.valid ? (
+            <p className="mt-1 text-xs text-red-600">{change.error}</p>
           ) : (
             <p className="mt-1 text-xs text-gray-500">
               Total do pedido: {formatBRL(total)}. Deixe em branco se não precisar de troco.

@@ -5,16 +5,21 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Clock, Loader2, XCircle } from 'lucide-react';
 
-type ReturnState = 'checking' | 'approved' | 'failed' | 'notFound' | 'timeout';
+type ReturnState = 'checking' | 'approved' | 'failed' | 'refunded' | 'notFound' | 'timeout';
 
-/** The webhook is what confirms the payment: poll gently, and stop after a bounded time. */
+/** The webhook is what confirms the payment: poll gently (backing off), and stop after a bounded time. */
 const POLL_FAST_MS = 3000;
 const POLL_SLOW_MS = 8000;
+const POLL_SLOWEST_MS = 15000;
 const FAST_WINDOW_MS = 60 * 1000;
+const SLOW_WINDOW_MS = 3 * 60 * 1000;
 const GIVE_UP_AFTER_MS = 10 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 10 * 1000;
 
 /** Statuses (lowercased by the status route) that will not turn into an approval. */
 const FAILED_STATUSES = ['declined', 'cancelled', 'chargeback'];
+/** Money already went back to the customer: not pending, not confirmed. */
+const REFUNDED_STATUSES = ['refunded', 'partially_refunded'];
 
 interface Props {
   restaurantId: string;
@@ -38,19 +43,27 @@ export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const startedAt = Date.now();
 
+    let inflight: AbortController | undefined;
+
     const schedule = () => {
       const elapsed = Date.now() - startedAt;
       if (elapsed >= GIVE_UP_AFTER_MS) {
         if (!cancelled) setState('timeout');
         return;
       }
-      timer = setTimeout(check, elapsed < FAST_WINDOW_MS ? POLL_FAST_MS : POLL_SLOW_MS);
+      const delay = elapsed < FAST_WINDOW_MS ? POLL_FAST_MS : elapsed < SLOW_WINDOW_MS ? POLL_SLOW_MS : POLL_SLOWEST_MS;
+      timer = setTimeout(check, delay);
     };
 
     const check = async () => {
+      // A request that hangs counts as a network error: abort it and keep polling.
+      const controller = new AbortController();
+      inflight = controller;
+      const abortTimer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
         const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${encodeURIComponent(paymentId)}`, {
           cache: 'no-store',
+          signal: controller.signal,
         });
         if (cancelled) return;
         if (res.status === 404 || res.status === 400) {
@@ -63,12 +76,18 @@ export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
           setState('approved');
           return;
         }
+        if (REFUNDED_STATUSES.includes(data.status)) {
+          setState('refunded');
+          return;
+        }
         if (FAILED_STATUSES.includes(data.status)) {
           setState('failed');
           return;
         }
       } catch {
-        /* network hiccup or non-JSON answer: keep polling until the deadline */
+        /* network hiccup, timeout or non-JSON answer: keep polling until the deadline */
+      } finally {
+        clearTimeout(abortTimer);
       }
       if (!cancelled) schedule();
     };
@@ -78,6 +97,7 @@ export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      inflight?.abort();
     };
   }, [paymentId, round]);
 
@@ -114,6 +134,16 @@ export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
             <p className="text-sm text-gray-600">
               O pagamento do pedido #{orderNumber} não foi aprovado e o pedido não foi confirmado. Volte ao cardápio para
               fazer um novo pedido ou fale com o restaurante.
+            </p>
+          </>
+        )}
+        {state === 'refunded' && (
+          <>
+            <XCircle className="h-14 w-14 mx-auto text-gray-500" />
+            <h2 className="text-xl font-bold">Pagamento estornado</h2>
+            <p className="text-sm text-gray-600">
+              Este pagamento foi estornado. O pedido #{orderNumber} não foi confirmado. Se tiver dúvidas, fale com o
+              restaurante.
             </p>
           </>
         )}
