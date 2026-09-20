@@ -18,6 +18,15 @@ jest.mock('../../../lib/mercado-pago', () => ({
   getPreApproval: jest.fn(),
 }));
 
+// The route reports a rejected signature to Sentry (I13); mock it so the test
+// can assert the context instead of relying on the real (no-op) client.
+jest.mock('../../../lib/sentry', () => ({
+  ...jest.requireActual('../../../lib/sentry'),
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
+import { captureException } from '../../../lib/sentry';
 import { getConnectPayment } from '../../../lib/mercadopago-connect/payments';
 import { getPayment, getMerchantOrder, getPreApproval } from '../../../lib/mercado-pago';
 import { saveConnection } from '../../../lib/mercadopago-connect/connection-service';
@@ -105,6 +114,29 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
     expect(res.status).toBe(401);
     expect(getConnectPayment).not.toHaveBeenCalled();
     expect((await state()).payment.status).toBe('PENDING');
+  });
+
+  it('reports a rejected signature to Sentry with rid, mpId and topic, and no secrets (I13)', async () => {
+    await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`, 'wrong-secret') as any);
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    const [error, context] = (captureException as jest.Mock).mock.calls[0];
+    expect(error.message).toContain('MP webhook signature rejected');
+    expect(context).toMatchObject({
+      endpoint: '/api/pagamentos/mp/webhook',
+      rid: A.restaurantId,
+      mpId: '555',
+      topic: 'payment',
+    });
+    // Plain ids only: no secret and no header value.
+    expect(JSON.stringify(context)).not.toContain(SECRET);
+    expect(JSON.stringify(context)).not.toMatch(/x-signature|v1=/);
+  });
+
+  it('does not report anything to Sentry for a valid signature', async () => {
+    const res = await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`) as any);
+    expect(res.status).toBe(200);
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('applies the payment with the restaurant token: approves it and marks the order paid', async () => {

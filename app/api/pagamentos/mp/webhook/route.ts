@@ -82,6 +82,16 @@ export async function POST(request: NextRequest) {
     const sig = verifyMercadoPagoSignature(request, id, MP_WEBHOOK_SECRET);
     if (!sig.ok) {
       console.warn(`[MP Webhook] Invalid signature: ${sig.reason}`);
+      // Reported so a SYSTEMATIC rejection is visible - above all for the
+      // per-restaurant notifications (?rid=), whose signing secret is an
+      // unverified premise. rid, mpId and topic are plain ids: never secrets
+      // and never headers.
+      captureException(new Error(`MP webhook signature rejected: ${sig.reason}`), {
+        endpoint: '/api/pagamentos/mp/webhook',
+        rid: url.searchParams.get('rid'),
+        mpId: id,
+        topic,
+      });
       return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
     }
 
@@ -124,8 +134,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
+    const failedUrl = new URL(request.url);
     captureException(error instanceof Error ? error : new Error(String(error)), {
       endpoint: '/api/pagamentos/mp/webhook',
+      rid: failedUrl.searchParams.get('rid'),
+      mpId: failedUrl.searchParams.get('id') || failedUrl.searchParams.get('data.id'),
+      topic: failedUrl.searchParams.get('topic') || failedUrl.searchParams.get('type'),
     });
     console.error('[MP Webhook] Error:', error);
     return NextResponse.json(
