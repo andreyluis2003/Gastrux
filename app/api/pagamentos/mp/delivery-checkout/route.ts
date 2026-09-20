@@ -13,6 +13,22 @@ export const dynamic = 'force-dynamic';
 const EXCLUDED_PAYMENT_TYPES = ['ticket', 'atm'];
 
 /**
+ * The customer comes back to this origin from Mercado Pago, so it must be an
+ * absolute http(s) URL. Checked BEFORE anything is written: a missing or
+ * malformed NEXTAUTH_URL would otherwise leave a Payment row and a failed
+ * preference behind for a problem the customer cannot fix.
+ */
+function resolveBaseUrl(): string | null {
+  const base = (process.env.NEXTAUTH_URL || '').trim().replace(/\/+$/, '');
+  try {
+    const { protocol } = new URL(base);
+    return protocol === 'http:' || protocol === 'https:' ? base : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /api/pagamentos/mp/delivery-checkout
  * Public (the customer has no login). Creates a Checkout Pro preference, with
  * the RESTAURANT's own token, for a delivery order the customer chose to pay
@@ -43,6 +59,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: ONLINE_PAYMENT_UNAVAILABLE, code: 'ONLINE_PAYMENT_UNAVAILABLE' }, { status: 409 });
     }
 
+    const base = resolveBaseUrl();
+    if (!base) {
+      console.error('[delivery-checkout] NEXTAUTH_URL is missing or not an absolute http(s) URL; no checkout was created.');
+      return NextResponse.json({ error: 'Pagamento com cartão indisponível no momento. Tente novamente mais tarde.' }, { status: 500 });
+    }
+
     const payer = normalizePayer({ payerEmail: body.payerEmail, payerName: body.payerName });
 
     // One live checkout per order: find-or-create under a per-order lock, so a
@@ -56,8 +78,7 @@ export async function POST(request: NextRequest) {
     }
     const payment = claim.payment;
 
-    const base = (process.env.NEXTAUTH_URL || '').replace(/\/+$/, '');
-    const back = (result: string) =>
+    const back =(result: string) =>
       `${base}/delivery/${target.restaurantId}?payment=${payment.id}&n=${encodeURIComponent(order.orderNumber)}&result=${result}`;
 
     let preference: any;

@@ -82,6 +82,15 @@ describe('createPixForTarget', () => {
     expect(opts.timeout).toBeGreaterThanOrEqual(10_000);
   });
 
+  it('only reuses a pending PIX: a pending CARD payment for the order must not answer PIX_IN_PROGRESS', async () => {
+    (createConnectPix as jest.Mock).mockResolvedValue(MP_OK);
+
+    await createPixForTarget(orderTarget, payer);
+
+    const { where } = tx.payment.findFirst.mock.calls[0][0];
+    expect(where).toMatchObject({ method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING', orderId: 'order-1' });
+  });
+
   it('takes no lock and no transaction for a manual staff PIX', async () => {
     (createConnectPix as jest.Mock).mockResolvedValue(MP_OK);
 

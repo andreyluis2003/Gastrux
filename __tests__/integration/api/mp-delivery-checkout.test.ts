@@ -157,22 +157,106 @@ describe('POST /api/pagamentos/mp/delivery-checkout', () => {
     expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('CANCELLED');
   });
 
-  it('returns 502 but keeps the payment PENDING when the outcome is ambiguous (timeout or 5xx)', async () => {
+  it.each([
+    ['a timeout or socket error (no status)', new Error('MP down')],
+    ['a 5xx', { status: 503, message: 'unavailable' }],
+  ])('returns 502 but keeps the payment PENDING when the outcome is ambiguous: %s', async (_label, failure) => {
     await saveConnection(A.restaurantId, TOKENS);
     const order = await makeOrder();
+    createCheckoutPreference.mockRejectedValue(failure);
 
-    // A timeout or socket error carries no HTTP status; a 5xx carries one >= 500.
-    for (const failure of [new Error('MP down'), { status: 503, message: 'unavailable' }]) {
-      createCheckoutPreference.mockRejectedValueOnce(failure);
-      const res = await post({ orderId: order.id });
-      expect(res.status).toBe(502);
-    }
+    const res = await post({ orderId: order.id });
 
-    // The preference may exist at Mercado Pago: no row may be CANCELLED, or a
-    // real payment could never be recorded by the webhook.
+    expect(res.status).toBe(502);
+    expect(createCheckoutPreference).toHaveBeenCalledTimes(1);
+    // The preference may exist at Mercado Pago: the row must not be CANCELLED,
+    // or a real payment could never be recorded by the webhook.
     const rows = await prisma.payment.findMany({ where: { orderId: order.id } });
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.every((row) => row.status === 'PENDING')).toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('PENDING');
     expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
+
+    // An immediate retry must not create a second, possibly live, checkout.
+    const retry = await post({ orderId: order.id });
+    expect(retry.status).toBe(409);
+    expect((await retry.json()).code).toBe('CHECKOUT_IN_PROGRESS');
+    expect(createCheckoutPreference).toHaveBeenCalledTimes(1);
+    expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(1);
+  });
+
+  describe('one live checkout per order', () => {
+    const pendingRow = (order, createdAt = new Date()) =>
+      prisma.payment.create({
+        data: {
+          restaurantId: A.restaurantId,
+          orderId: order.id,
+          amount: 57.9,
+          currency: 'BRL',
+          method: 'MERCADO_PAGO',
+          gateway: 'MERCADO_PAGO_CONNECT',
+          status: 'PENDING',
+          createdAt,
+        },
+      });
+
+    it('a double tap creates ONE payment and ONE preference', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder();
+
+      const responses = await Promise.all([post({ orderId: order.id }), post({ orderId: order.id })]);
+      const bodies = await Promise.all(responses.map((res) => res.json()));
+
+      // The loser either waited for the lock and got the same link, or was told to retry.
+      responses.forEach((res, i) => {
+        if (res.status === 200) expect(bodies[i].initPoint).toBe('https://mp/init');
+        else expect(bodies[i].code).toBe('CHECKOUT_IN_PROGRESS');
+      });
+      expect(responses.map((res) => res.status)).toContain(200);
+      expect(createCheckoutPreference).toHaveBeenCalledTimes(1);
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(1);
+    });
+
+    it('reuses a pending checkout whose link is on the transaction row, whatever its metadata says', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder();
+      const row = await pendingRow(order);
+      await prisma.mercadoPagoTransaction.create({
+        data: { paymentId: row.id, preferenceId: 'pref-existing', externalReference: row.id, initPoint: 'https://mp/existing' },
+      });
+
+      const res = await post({ orderId: order.id });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true, paymentId: row.id, initPoint: 'https://mp/existing' });
+      expect(createCheckoutPreference).not.toHaveBeenCalled();
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(1);
+    });
+
+    it('answers 409 CHECKOUT_IN_PROGRESS for a pending row with no link yet, inside the in-progress window', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder();
+      await pendingRow(order);
+
+      const res = await post({ orderId: order.id });
+
+      expect(res.status).toBe(409);
+      expect((await res.json()).code).toBe('CHECKOUT_IN_PROGRESS');
+      expect(createCheckoutPreference).not.toHaveBeenCalled();
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(1);
+    });
+
+    it('treats a pending row with no link older than the in-progress window as abandoned and creates a new one', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder();
+      const abandoned = await pendingRow(order, new Date(Date.now() - 3 * 60 * 1000));
+
+      const res = await post({ orderId: order.id });
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.paymentId).not.toBe(abandoned.id);
+      expect(createCheckoutPreference).toHaveBeenCalledTimes(1);
+      expect(await prisma.payment.count({ where: { orderId: order.id } })).toBe(2);
+    });
   });
 });

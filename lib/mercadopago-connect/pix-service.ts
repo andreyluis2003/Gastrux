@@ -131,6 +131,9 @@ async function claimPixPayment(
       where: {
         restaurantId: target.restaurantId,
         gateway: 'MERCADO_PAGO_CONNECT',
+        // A pending CARD payment for the same order must not look like an
+        // in-progress PIX.
+        method: 'PIX',
         status: 'PENDING',
         amount: target.amount,
         createdAt: { gte: new Date(Date.now() - REUSE_WINDOW_MS) },
