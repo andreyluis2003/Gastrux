@@ -1,6 +1,6 @@
 import type { UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { isPlatformAdminIdentity } from '@/lib/admin/guard';
+import { isPlatformStaffEmail } from '@/lib/admin/guard';
 import { getCurrentRestaurantId, requireAdminSession } from '@/lib/whatsapp/get-restaurant';
 
 /**
@@ -13,7 +13,7 @@ import { getCurrentRestaurantId, requireAdminSession } from '@/lib/whatsapp/get-
  * could redirect Y's money. Allowed now:
  *   - the current restaurant's `ownerId`, or
  *   - an ACTIVE `RestaurantUser` row for it whose role is OWNER or ADMIN, or
- *   - a platform admin (Gastrux staff), per isPlatformAdminIdentity.
+ *   - a platform admin (Gastrux staff), per the PLATFORM_ADMIN_EMAILS allowlist (isPlatformStaffEmail).
  * Everything else is denied, including a session with no role
  * (requireAdminSession lets it through, the membership check does not).
  *
@@ -40,7 +40,7 @@ export async function requireConnectManager(): Promise<
   const granted = { ok: true as const, session: auth.session, restaurantId, userId: user.id as string };
 
   // Gastrux staff may manage any restaurant's connection.
-  if (isPlatformAdminIdentity(user.role, user.email)) return granted;
+  if (isPlatformStaffEmail(user.email)) return granted;
 
   const [ownsIt, membership] = await Promise.all([
     prisma.restaurant.findFirst({

@@ -70,7 +70,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { isPlatformAdminIdentity } from '@/lib/admin/guard';
+import { isPlatformStaffEmail } from '@/lib/admin/guard';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -160,10 +160,7 @@ export async function GET(req: NextRequest) {
     // amounts, so a normal caller only ever sees its OWN current restaurant and
     // the `restaurantId` query parameter is ignored. Only a platform admin
     // (Gastrux staff) may list across restaurants.
-    const isPlatformAdmin = isPlatformAdminIdentity(
-      (session.user as any)?.role,
-      (session.user as any)?.email
-    );
+    const isPlatformAdmin = isPlatformStaffEmail((session.user as any)?.email);
     let scopedRestaurantId: string | null = null;
     if (!isPlatformAdmin) {
       scopedRestaurantId = await getCurrentRestaurantId();
@@ -383,10 +380,7 @@ export async function POST(req: NextRequest) {
 
     // Same tenant rule as GET: a manual payment row is attributed to the
     // caller's own current restaurant, never to a restaurant named in the body.
-    const isPlatformAdmin = isPlatformAdminIdentity(
-      (session.user as any)?.role,
-      (session.user as any)?.email
-    );
+    const isPlatformAdmin = isPlatformStaffEmail((session.user as any)?.email);
     let scopedRestaurantId: string | null = null;
     if (!isPlatformAdmin) {
       scopedRestaurantId = await getCurrentRestaurantId();

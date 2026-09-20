@@ -4,7 +4,7 @@
  *
  * A normal authenticated caller only ever sees its OWN current restaurant's
  * payments; the `restaurantId` query parameter is ignored for it. Only a
- * platform-admin identity (isPlatformAdminIdentity) keeps the cross-restaurant
+ * platform-staff identity (PLATFORM_ADMIN_EMAILS allowlist) keeps the cross-restaurant
  * filter. The same rule applies to the aggregated summary and to POST.
  *
  * Written, NOT run (ruling R2: no DATABASE_URL in this worktree).
@@ -31,10 +31,21 @@ describe('GET /api/pagamentos tenant scoping', () => {
       user: { id: A.ownerId, email: 'owner-a@integration.test', role: 'OWNER' },
     });
 
-  const asPlatformAdmin = () =>
+  // Platform staff = the PLATFORM_ADMIN_EMAILS allowlist. A global role of
+  // ADMIN alone is NOT enough: a restaurant can mint that role for its own staff.
+  const asPlatformAdmin = () => {
+    process.env.PLATFORM_ADMIN_EMAILS = 'owner-a@integration.test';
+    (getServerSession as jest.Mock).mockResolvedValue({
+      user: { id: A.ownerId, email: 'owner-a@integration.test', role: 'OWNER' },
+    });
+  };
+
+  const asGlobalAdminRoleOnly = () => {
+    delete process.env.PLATFORM_ADMIN_EMAILS;
     (getServerSession as jest.Mock).mockResolvedValue({
       user: { id: A.ownerId, email: 'owner-a@integration.test', role: 'ADMIN' },
     });
+  };
 
   const list = (query = '') =>
     GET(new Request(`https://gastrux.test/api/pagamentos${query}`) as any);
@@ -128,6 +139,15 @@ describe('GET /api/pagamentos tenant scoping', () => {
     const ids = body.payments.map((p: any) => p.id);
     expect(ids).toContain(paymentB.id);
     expect(ids).not.toContain(paymentA.id);
+  });
+
+  it('does not treat a global ADMIN role without the allowlist as platform staff', async () => {
+    asGlobalAdminRoleOnly();
+    const res = await list(`?restaurantId=${B.restaurantId}`);
+    expect(res.status).toBe(200);
+    const ids = (await res.json()).payments.map((p: any) => p.id);
+    expect(ids).toContain(paymentA.id);
+    expect(ids).not.toContain(paymentB.id);
   });
 
   it('attributes a POSTed payment to the caller restaurant, ignoring the body', async () => {

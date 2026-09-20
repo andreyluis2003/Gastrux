@@ -226,6 +226,21 @@ describe('Mercado Pago connect routes', () => {
       expect(await getConnection(A.restaurantId)).not.toBeNull();
     });
 
+    it('denies a cashier whose GLOBAL role is ADMIN when not on the platform allowlist', async () => {
+      const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
+      await saveConnection(A.restaurantId, tokens);
+      const prev = process.env.PLATFORM_ADMIN_EMAILS;
+      delete process.env.PLATFORM_ADMIN_EMAILS;
+      session('ADMIN', cashierA.userId, cashierA.email);
+      try {
+        expect((await disconnectRoute()).status).toBe(403);
+        expect(await getConnection(A.restaurantId)).not.toBeNull();
+      } finally {
+        if (prev === undefined) delete process.env.PLATFORM_ADMIN_EMAILS;
+        else process.env.PLATFORM_ADMIN_EMAILS = prev;
+      }
+    });
+
     it("allows the restaurant's own owner (R20)", async () => {
       const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
       await saveConnection(A.restaurantId, tokens);
@@ -238,9 +253,9 @@ describe('Mercado Pago connect routes', () => {
     it('allows an ACTIVE ADMIN member who is not the owner (R20)', async () => {
       const tokens = { accessToken: 'a', refreshToken: 'r', mpUserId: '1', publicKey: null, liveMode: true, lifetimeSeconds: 15552000 };
       await saveConnection(A.restaurantId, tokens);
-      // Session role OWNER on purpose: it is NOT a platform-admin identity, so
+      // Session role OWNER on purpose: it is NOT a platform-staff identity, so
       // this exercises the RestaurantUser(role: ADMIN) branch and not the
-      // isPlatformAdminIdentity short-circuit.
+      // platform-staff short-circuit.
       session('OWNER', adminA.userId, adminA.email);
 
       expect((await disconnectRoute()).status).toBe(200);

@@ -94,6 +94,12 @@ type PixClaim =
   | { kind: 'in-progress' }
   | { kind: 'created'; payment: any };
 
+function isDefiniteRejection(error: unknown): boolean {
+  const e = error as any;
+  const status = Number(e?.status ?? e?.statusCode);
+  return Number.isInteger(status) && status >= 400 && status < 500;
+}
+
 /**
  * Find-or-create the PENDING Payment row for this target, serialized per
  * target with a Postgres advisory lock (ruling R19).
@@ -115,7 +121,9 @@ async function claimPixPayment(
   }
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+    // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void, which
+    // Prisma cannot deserialize as a query result.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
 
     // Matches rows WITH OR WITHOUT gatewayPaymentId: a row that is still being
     // created must block a second charge, not be invisible to it.
@@ -143,6 +151,11 @@ async function claimPixPayment(
     }
 
     return { kind: 'created' as const, payment: await tx.payment.create({ data: newPaymentData(target, payer) }) };
+  }, {
+    // Waiters queue on the advisory lock; Prisma's default 5 s interactive
+    // timeout would turn a busy table into a 500 instead of a retryable 409.
+    maxWait: 10_000,
+    timeout: 10_000,
   });
 }
 
@@ -199,9 +212,15 @@ export async function createPixForTarget(
       payer,
     });
   } catch (error) {
-    // The Mercado Pago call ITSELF failed, so no live charge exists for this
-    // Payment id and the row can safely be cancelled.
-    await prisma.payment.update({ where: { id: payment.id }, data: { status: 'CANCELLED' } }).catch(() => {});
+    // Cancel only when Mercado Pago DEFINITELY rejected the request (a 4xx):
+    // then no charge exists. A timeout, a socket error or a 5xx is ambiguous -
+    // the charge may have been created server-side - and a CANCELLED row can no
+    // longer transition to APPROVED, so a real payment would go unrecorded. In
+    // that case the row stays PENDING and the webhook reconciles it (the sync
+    // accepts a Payment whose gatewayPaymentId is still null).
+    if (isDefiniteRejection(error)) {
+      await prisma.payment.update({ where: { id: payment.id }, data: { status: 'CANCELLED' } }).catch(() => {});
+    }
 
     if (isUnauthorizedError(error)) {
       await markNeedsReconnect(target.restaurantId, 'Mercado Pago rejeitou o token (401)');
