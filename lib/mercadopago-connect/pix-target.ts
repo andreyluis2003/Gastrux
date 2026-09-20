@@ -26,6 +26,15 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Money is summed in INTEGER CENTS: every Decimal is rounded to cents once and
+ * the integers are added, instead of accumulating floats and rounding only at
+ * the end.
+ */
+function toCents(value: unknown): number {
+  return Math.round(Number(value ?? 0) * 100);
+}
+
 async function resolveOrder(orderId: string): Promise<ResolveResult> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -61,11 +70,35 @@ async function resolveTable(qrToken: string): Promise<ResolveResult> {
   const session = await prisma.orderSession.findFirst({
     where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: OPEN_SESSION_STATUSES } },
     orderBy: { openedAt: 'desc' },
-    select: { id: true, items: { select: { price: true, quantity: true } } },
+    select: {
+      id: true,
+      items: {
+        select: {
+          price: true,
+          quantity: true,
+          // Paid modifiers are NOT included in OrderSessionItem.price (that is
+          // the base menu price); their surcharge lives here.
+          modifiers: { select: { priceAdjustment: true } },
+        },
+      },
+    },
   });
   if (!session) return { ok: false, status: 409, error: 'Nenhuma comanda aberta nesta mesa' };
 
-  const amount = round2(session.items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0));
+  // A comanda line costs `price * quantity` plus the adjustments of the
+  // modifiers attached to that line. OrderSessionItemModifier has ONE row per
+  // (sessionItem, modifier) whatever the quantity - @@unique([sessionItemId,
+  // modifierId]) - and the comanda screen prices a line the same way
+  // (app/comanda/[sessionId]/page.tsx: `price * quantity + getModifierPrice()`),
+  // so the adjustment is added once per line and NOT multiplied by quantity.
+  const totalCents = session.items.reduce(
+    (sum, item) =>
+      sum +
+      toCents(item.price) * item.quantity +
+      item.modifiers.reduce((mods, mod) => mods + toCents(mod.priceAdjustment), 0),
+    0
+  );
+  const amount = totalCents / 100;
   if (!(amount > 0)) return { ok: false, status: 409, error: 'A comanda está vazia' };
 
   return {

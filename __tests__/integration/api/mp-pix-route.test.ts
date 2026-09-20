@@ -11,6 +11,9 @@ jest.mock('../../../lib/mercadopago-connect/payments', () => ({
 }));
 
 import { getServerSession } from 'next-auth';
+// The service under test writes through the app's own Prisma client, not this
+// file's instance: spying on a local client would never be hit.
+import { prisma as appPrisma } from '../../../lib/prisma';
 import { createConnectPix, getConnectPayment } from '../../../lib/mercadopago-connect/payments';
 import { saveConnection, getConnection } from '../../../lib/mercadopago-connect/connection-service';
 import { POST as createPix } from '../../../app/api/pagamentos/mp/pix/route';
@@ -45,7 +48,10 @@ describe('public PIX routes', () => {
   const cleanRows = async () => {
     const ids = [A.restaurantId, B.restaurantId];
     await prisma.payment.deleteMany({ where: { restaurantId: { in: ids } } });
+    // OrderSessionItem (and OrderSessionItemModifier) cascade from the session;
+    // the ItemModifier rows they point at must be deleted after them.
     await prisma.orderSession.deleteMany({ where: { restaurantId: { in: ids } } });
+    await prisma.itemModifier.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.order.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.notification.deleteMany({ where: { userId: { in: [A.ownerId, B.ownerId] } } });
@@ -171,10 +177,67 @@ describe('public PIX routes', () => {
       expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
       expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('CANCELLED');
     });
+
+    it('keeps the payment PENDING and retries when the local write fails after Mercado Pago succeeded (I3)', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder(A.restaurantId);
+      const realUpdate = appPrisma.payment.update.bind(appPrisma.payment);
+      const spy = jest
+        .spyOn(appPrisma.payment, 'update')
+        .mockImplementationOnce(() => Promise.reject(new Error('db write failed')))
+        .mockImplementation((args: any) => realUpdate(args));
+
+      try {
+        const res = await post({ orderId: order.id });
+        const body = await res.json();
+
+        // The QR is valid and must reach the customer.
+        expect(res.status).toBe(200);
+        expect(body.qrCode).toBe('QR-CODE');
+
+        const payment = await prisma.payment.findFirst({ where: { orderId: order.id } });
+        // NEVER CANCELLED: a live Mercado Pago charge exists with this id as
+        // external_reference and CANCELLED -> APPROVED is not a transition.
+        expect(payment.status).toBe('PENDING');
+        // The retry stored the Mercado Pago id and the QR.
+        expect(payment.gatewayPaymentId).toBe('4242');
+        expect(JSON.parse(payment.metadata).pix.qrCode).toBe('QR-CODE');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('still returns the PIX and leaves the payment PENDING when both local writes fail', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder(A.restaurantId);
+      const spy = jest
+        .spyOn(appPrisma.payment, 'update')
+        .mockRejectedValue(new Error('db write failed'));
+
+      try {
+        const res = await post({ orderId: order.id });
+
+        expect(res.status).toBe(200);
+        expect((await res.json()).qrCode).toBe('QR-CODE');
+      } finally {
+        spy.mockRestore();
+      }
+
+      const payment = await prisma.payment.findFirst({ where: { orderId: order.id } });
+      // The webhook (and the status reconciliation, which accepts a PIX with a
+      // null gatewayPaymentId) can still approve it.
+      expect(payment.status).toBe('PENDING');
+      expect(payment.gatewayPaymentId).toBeNull();
+    });
   });
 
   describe('POST /pix (table tab via qrToken)', () => {
-    const makeTable = async (restaurantId: string, ownerId: string, items: Array<[number, number]>) => {
+    // items: [quantity, unitPrice, modifierAdjustments?]
+    const makeTable = async (
+      restaurantId: string,
+      ownerId: string,
+      items: Array<[number, number] | [number, number, number[]]>
+    ) => {
       // Sections are unique per (restaurantId, name) and this helper runs in more
       // than one test without deleting sections, so the name gets a random suffix.
       const section = await prisma.tableSection.create({
@@ -186,8 +249,20 @@ describe('public PIX routes', () => {
         data: { code: `R-${crypto.randomBytes(3).toString('hex')}`, name: 'Prato', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', restaurantId },
       });
       const session = await prisma.orderSession.create({ data: { restaurantId, userId: ownerId, tableId: table.id, tableNumber: 7, status: 'OPEN' } });
-      for (const [quantity, price] of items) {
-        await prisma.orderSessionItem.create({ data: { sessionId: session.id, recipeId: recipe.id, quantity, price } });
+      for (const [quantity, price, adjustments] of items) {
+        const item = await prisma.orderSessionItem.create({
+          data: { sessionId: session.id, recipeId: recipe.id, quantity, price },
+        });
+        for (const priceAdjustment of adjustments || []) {
+          // The comanda stores the surcharge on the link row, copied from the
+          // ItemModifier, exactly like the modifiers route does.
+          const modifier = await prisma.itemModifier.create({
+            data: { restaurantId, name: `Extra ${crypto.randomBytes(3).toString('hex')}`, priceAdjustment },
+          });
+          await prisma.orderSessionItemModifier.create({
+            data: { sessionItemId: item.id, modifierId: modifier.id, priceAdjustment },
+          });
+        }
       }
       return { qrToken, table, session };
     };
@@ -208,6 +283,40 @@ describe('public PIX routes', () => {
       expect(createConnectPix.mock.calls[0][1].description).toBe('Mesa 7');
     });
 
+    it("adds the paid modifiers of each line to the tab's amount (I1)", async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      // Line 1: 2 x 10.50 + (2.00 + 0.50) = 23.50  (the adjustments are added
+      // once per line, not per unit - one OrderSessionItemModifier row exists
+      // per (sessionItem, modifier) whatever the quantity).
+      // Line 2: 1 x 20.00 + 1.25 = 21.25
+      // Total: 44.75  (without modifiers it would have been 41.00)
+      const { qrToken } = await makeTable(A.restaurantId, A.ownerId, [
+        [2, 10.5, [2, 0.5]],
+        [1, 20, [1.25]],
+      ]);
+
+      const res = await post({ qrToken });
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.amount).toBe(44.75);
+      expect(createConnectPix.mock.calls[0][1].amount).toBe(44.75);
+      expect(Number((await prisma.payment.findUnique({ where: { id: body.paymentId } })).amount)).toBe(44.75);
+    });
+
+    it('sums in integer cents, so repeated cent prices do not drift', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const { qrToken } = await makeTable(A.restaurantId, A.ownerId, [
+        [1, 0.1],
+        [1, 0.2],
+        [1, 0.1, [0.1]],
+      ]);
+
+      const body = await (await post({ qrToken })).json();
+
+      expect(body.amount).toBe(0.5);
+    });
+
     it('reuses the pending PIX for the same tab and amount', async () => {
       await saveConnection(A.restaurantId, TOKENS);
       const { qrToken } = await makeTable(A.restaurantId, A.ownerId, [[1, 30]]);
@@ -216,7 +325,57 @@ describe('public PIX routes', () => {
       const second = await (await post({ qrToken })).json();
 
       expect(second.paymentId).toBe(first.paymentId);
+      expect(second.qrCode).toBe('QR-CODE');
       expect(createConnectPix).toHaveBeenCalledTimes(1);
+      expect(await prisma.payment.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
+    });
+
+    it('answers 409 PIX_IN_PROGRESS while another request is still creating the QR (I2/R19)', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const { qrToken, session } = await makeTable(A.restaurantId, A.ownerId, [[1, 30]]);
+      // A PENDING row for the same tab and amount that has NO stored PIX data
+      // yet: exactly what a concurrent request leaves behind between the row
+      // creation and the Mercado Pago answer.
+      await prisma.payment.create({
+        data: {
+          restaurantId: A.restaurantId,
+          amount: 30,
+          method: 'PIX',
+          gateway: 'MERCADO_PAGO_CONNECT',
+          status: 'PENDING',
+          metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+        },
+      });
+
+      const res = await post({ qrToken });
+
+      expect(res.status).toBe(409);
+      expect((await res.json()).code).toBe('PIX_IN_PROGRESS');
+      // No SECOND live charge was created for the same tab.
+      expect(createConnectPix).not.toHaveBeenCalled();
+      expect(await prisma.payment.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
+    });
+
+    it('treats a data-less PENDING row older than 2 minutes as abandoned and creates a new PIX', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const { qrToken, session } = await makeTable(A.restaurantId, A.ownerId, [[1, 30]]);
+      await prisma.payment.create({
+        data: {
+          restaurantId: A.restaurantId,
+          amount: 30,
+          method: 'PIX',
+          gateway: 'MERCADO_PAGO_CONNECT',
+          status: 'PENDING',
+          metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+          createdAt: new Date(Date.now() - 3 * 60 * 1000),
+        },
+      });
+
+      const res = await post({ qrToken });
+
+      expect(res.status).toBe(200);
+      expect(createConnectPix).toHaveBeenCalledTimes(1);
+      expect(await prisma.payment.count({ where: { restaurantId: A.restaurantId } })).toBe(2);
     });
 
     it('404s for an unknown table and 409s when there is no open tab', async () => {

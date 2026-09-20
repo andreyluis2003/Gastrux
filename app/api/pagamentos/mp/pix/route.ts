@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
 
     const result = await createPixForTarget(resolved.target, normalizePayer({ payerEmail, payerName }));
     if (!result.ok) {
+      // `code` is forwarded as-is: ONLINE_PAYMENT_UNAVAILABLE (409, final) or
+      // PIX_IN_PROGRESS (409, RETRYABLE - another request is still generating
+      // the QR for this same order/tab, so no second live charge is created).
       return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
     }
     return NextResponse.json({ success: true, ...result.pix });
