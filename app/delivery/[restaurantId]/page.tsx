@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -102,7 +102,8 @@ async function postPaymentStart(url: string, body: Record<string, unknown>, fall
     try {
       res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     } catch {
-      throw Object.assign(new Error('Erro de conexão. Tente novamente.'), { retryable: true }) as PaymentStartError;
+      // Not "in progress": reported as an error; the customer can simply try again.
+      throw Object.assign(new Error('Erro de conexão. Tente novamente.'), { code: 'NETWORK_ERROR' }) as PaymentStartError;
     }
     const data: any = await res.json().catch(() => ({}));
     return { res, data };
@@ -168,6 +169,28 @@ export default function DeliveryPage() {
     const orderNumber = query.get('n');
     if (paymentId && orderNumber) setReturned({ paymentId, orderNumber });
   }, []);
+
+  // PIX polling lives in refs so it can always be cancelled: a new order, "Fazer outro pedido" and unmount
+  // stop it, and a late answer for an old payment can never touch the screen of a newer order.
+  const pixIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pixTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pixDataRef = useRef<typeof pixData>(null);
+  // Signature of the order request that created the current order (see handleSubmitOrder)
+  const orderSignatureRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    pixDataRef.current = pixData;
+  }, [pixData]);
+
+  const stopPixPolling = useCallback(() => {
+    if (pixIntervalRef.current) clearInterval(pixIntervalRef.current);
+    if (pixTimeoutRef.current) clearTimeout(pixTimeoutRef.current);
+    pixIntervalRef.current = null;
+    pixTimeoutRef.current = null;
+    setPixPolling(false);
+  }, []);
+
+  useEffect(() => () => stopPixPolling(), [stopPixPolling]);
 
   useEffect(() => {
     const load = async () => {
@@ -272,29 +295,43 @@ export default function DeliveryPage() {
       toast.error(payment.error);
       return;
     }
+    const orderBody = {
+      restaurantId,
+      customerName,
+      customerPhone,
+      customerEmail: customerEmail || undefined,
+      deliveryAddress,
+      deliveryNeighborhood,
+      deliveryCity,
+      deliveryZipCode,
+      deliveryComplement,
+      deliveryReference,
+      items: cart.map((c) => ({ menuItemId: c.menuItemId, quantity: c.quantity })),
+      specialInstructions: scheduledDelivery && scheduledDate && scheduledTime
+        ? `[AGENDADO: ${scheduledDate} às ${scheduledTime}] ${specialInstructions}`.trim()
+        : specialInstructions,
+      deliveryFee: DELIVERY_FEE,
+      ...payment.payload,
+    };
+    // The signature is the whole request (cart, customer, address, notes, payment choice). If an online order
+    // already exists for exactly this request (the customer used the back arrow and pressed send again),
+    // do not create a second order: go back to the payment step, whose routes reuse the payment.
+    const signature = JSON.stringify(orderBody);
+    const existingMethod = orderData?.paymentMethod;
+    if (
+      orderData &&
+      (existingMethod === 'ONLINE_PIX' || existingMethod === 'ONLINE_CARD') &&
+      orderSignatureRef.current === signature
+    ) {
+      setStep('payment');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/public/delivery/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          restaurantId,
-          customerName,
-          customerPhone,
-          customerEmail: customerEmail || undefined,
-          deliveryAddress,
-          deliveryNeighborhood,
-          deliveryCity,
-          deliveryZipCode,
-          deliveryComplement,
-          deliveryReference,
-          items: cart.map((c) => ({ menuItemId: c.menuItemId, quantity: c.quantity })),
-          specialInstructions: scheduledDelivery && scheduledDate && scheduledTime
-            ? `[AGENDADO: ${scheduledDate} às ${scheduledTime}] ${specialInstructions}`.trim()
-            : specialInstructions,
-          deliveryFee: DELIVERY_FEE,
-          ...payment.payload,
-        }),
+        body: JSON.stringify(orderBody),
       });
       const data = await res.json().catch(() => ({} as any));
       if (!res.ok) {
@@ -305,9 +342,11 @@ export default function DeliveryPage() {
       }
       const method: string = data.order?.paymentMethod ?? payment.payload.paymentMethod;
       setOrderData({ ...data.order, paymentMethod: method });
-      // A new order never inherits the PIX code or the notice of an earlier one (back arrow, then resend).
+      // A new order never inherits the PIX code, the polling or the notice of an earlier one (back arrow, then resend).
+      stopPixPolling();
       setPixData(null);
       setPaymentProblem(null);
+      orderSignatureRef.current = signature;
       if (method === 'ONLINE_PIX' || method === 'ONLINE_CARD') {
         // Online: the order is only confirmed to the customer once the payment is approved.
         setStep('payment');
@@ -371,6 +410,11 @@ export default function DeliveryPage() {
         { orderId: orderData.id, payerEmail: customerEmail || undefined, payerName: customerName },
         'Erro ao iniciar pagamento com cartão'
       );
+      if (typeof data?.initPoint !== 'string' || !data.initPoint) {
+        throw Object.assign(new Error('Não foi possível abrir o pagamento com cartão agora.'), {
+          code: 'ONLINE_PAYMENT_UNAVAILABLE',
+        }) as PaymentStartError;
+      }
       // Leaves the page: the customer pays at Mercado Pago and returns to /delivery/<id>?payment=...&n=...
       window.location.href = data.initPoint;
     } catch (err) {
@@ -380,22 +424,25 @@ export default function DeliveryPage() {
   }
 
   function startPixPolling(paymentId: string) {
+    stopPixPolling();
     setPixPolling(true);
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${paymentId}`);
         const data = await res.json();
+        // Ignore an answer that no longer belongs to the payment on screen (polling stopped, or a newer order).
+        if (pixIntervalRef.current !== interval || pixDataRef.current?.paymentId !== paymentId) return;
         if (data.status === 'approved') {
-          clearInterval(interval);
+          stopPixPolling();
           setPixPaid(true);
-          setPixPolling(false);
           setStep('success');
           toast.success('Pagamento confirmado!');
         }
       } catch { /* continue polling */ }
     }, 5000);
+    pixIntervalRef.current = interval;
     // Stop after 10 min
-    setTimeout(() => { clearInterval(interval); setPixPolling(false); }, 600000);
+    pixTimeoutRef.current = setTimeout(stopPixPolling, 600000);
   }
 
   function copyPixCode() {
@@ -448,7 +495,7 @@ export default function DeliveryPage() {
           </div>
           <p className="text-sm text-gray-500">Acompanhe seu pedido pelo telefone do restaurante.</p>
           {restaurant.phone && <p className="text-sm font-medium"><Phone className="inline h-4 w-4 mr-1" />{restaurant.phone}</p>}
-          <Button className="w-full mt-4" onClick={() => { setStep('menu'); setCart([]); setOrderData(null); setPixData(null); setPixPaid(false); }}>
+          <Button className="w-full mt-4" onClick={() => { stopPixPolling(); orderSignatureRef.current = null; setStep('menu'); setCart([]); setOrderData(null); setPixData(null); setPixPaid(false); setPaymentProblem(null); }}>
             Fazer outro pedido
           </Button>
         </Card>
