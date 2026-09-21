@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { broadcastOrderCreated } from '@/lib/socket';
 import { notifyNewOrder } from '@/lib/notification-utils';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,8 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    const where: any = {};
+    // An online (PIX/card) order reaches the kitchen only once its payment is APPROVED.
+    const where: any = { AND: [KITCHEN_VISIBLE_ORDER_WHERE] };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (station) {

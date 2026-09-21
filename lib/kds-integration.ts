@@ -2,6 +2,7 @@
 // KDS Integration with Delivery and Reservation Systems
 import { prisma } from './prisma';
 import { broadcastOrderCreated, broadcastOrderUpdate } from './socket';
+import { KITCHEN_VISIBLE_ORDER_WHERE } from './kds-visibility';
 
 /**
  * Create a KDS order from an external delivery order
@@ -247,6 +248,8 @@ export async function getStationOrders(stationId: string) {
         items: {
           some: { stationId },
         },
+        // Unpaid online orders never reach the kitchen.
+        AND: [KITCHEN_VISIBLE_ORDER_WHERE],
       },
       include: {
         items: {

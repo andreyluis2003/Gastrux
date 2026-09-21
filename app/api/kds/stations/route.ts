@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +29,15 @@ export async function GET(req: NextRequest) {
           where: {
             order: {
               status: { in: ['PENDING', 'PREPARING'] },
+              // Unpaid online orders are not kitchen workload yet.
+              AND: [KITCHEN_VISIBLE_ORDER_WHERE],
             },
           },
         },
         assignments: {
           where: {
             status: { in: ['PENDING', 'IN_PROGRESS'] },
+            order: { AND: [KITCHEN_VISIBLE_ORDER_WHERE] },
           },
         },
       },
