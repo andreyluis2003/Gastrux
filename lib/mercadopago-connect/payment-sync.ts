@@ -4,6 +4,8 @@ import { mapMPStatusToPaymentStatus } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
 import { getConnectPayment, isUnauthorizedError } from './payments';
 import { canTransition } from './payment-status';
+import { captureException } from '@/lib/sentry';
+import { createPaymentAlert } from '@/lib/payment-alert-service';
 
 export interface SyncResult {
   updated: boolean;
@@ -20,6 +22,53 @@ function parseMetadata(raw: string | null): Record<string, unknown> {
 }
 
 /**
+ * The order was already paid (its update matched no row) and this Payment just
+ * became APPROVED too. If ANOTHER Payment of the same order is APPROVED, the
+ * customer was charged twice: the money is real, so it is reported (Sentry plus
+ * an operator alert) instead of being silently absorbed. Idempotent: the alert
+ * is keyed on the pair of payment ids, so a webhook retry (the self-healing
+ * branch re-runs this) raises nothing new. Never throws: the approval itself
+ * stays recorded whatever happens here. No PII: only ids.
+ */
+async function reportDoublePayment(
+  restaurantId: string,
+  payment: { id: string; orderId: string | null; amount?: unknown }
+): Promise<void> {
+  try {
+    if (!payment.orderId) return;
+    const other = await prisma.payment.findFirst({
+      where: { orderId: payment.orderId, restaurantId, status: 'APPROVED', id: { not: payment.id } },
+      select: { id: true },
+    });
+    if (!other) return;
+
+    const pair = [payment.id, other.id].sort();
+    const alert = await createPaymentAlert({
+      alertType: 'failure',
+      severity: 'critical',
+      title: 'Pedido pago duas vezes',
+      message:
+        'Um pedido que já estava pago recebeu um segundo pagamento aprovado. Confira o pedido e faça o reembolso de um dos pagamentos.',
+      paymentId: payment.id,
+      gateway: 'MERCADO_PAGO_CONNECT',
+      amount: Number(payment.amount ?? 0),
+      restaurantId,
+      dedupeKey: `double-payment:${pair[0]}:${pair[1]}`,
+    });
+    // Report to Sentry once per pair; a null result means the alert could not be stored.
+    if (alert?.duplicate) return;
+    captureException(new Error('Order paid twice: second approved payment for an already paid order'), {
+      endpoint: 'mp-connect/payment-sync',
+      restaurantId,
+      orderId: payment.orderId,
+      paymentIds: pair,
+    });
+  } catch (error) {
+    console.error('[mp-connect] could not report a double payment:', error);
+  }
+}
+
+/**
  * Writes that follow the Payment update: marks the linked Order paid and
  * mirrors the MP data on the preference-based MercadoPagoTransaction row.
  * Both writes are idempotent and scoped, so they are safe to repeat; the
@@ -27,12 +76,12 @@ function parseMetadata(raw: string | null): Record<string, unknown> {
  */
 async function applyLinkedRecords(
   restaurantId: string,
-  payment: { id: string; orderId: string | null },
+  payment: { id: string; orderId: string | null; amount?: unknown },
   mp: any,
   orderStatus: 'APPROVED' | 'REFUNDED' | 'CHARGEBACK' | null
 ): Promise<void> {
   if (orderStatus && payment.orderId) {
-    await prisma.order.updateMany({
+    const orderUpdate = await prisma.order.updateMany({
       where: {
         id: payment.orderId,
         restaurantId,
@@ -43,6 +92,8 @@ async function applyLinkedRecords(
       },
       data: { paymentStatus: orderStatus },
     });
+    // Nothing to move because the order is already paid: is it paid by ANOTHER payment?
+    if (orderStatus === 'APPROVED' && orderUpdate.count === 0) await reportDoublePayment(restaurantId, payment);
   }
 
   // Preference-based checkouts also keep a MercadoPagoTransaction row.
