@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
     const payment = claim.payment;
 
-    const back =(result: string) =>
+    const back = (result: string) =>
       `${base}/delivery/${target.restaurantId}?payment=${payment.id}&n=${encodeURIComponent(order.orderNumber)}&result=${result}`;
 
     let preference: any;
@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
           // the reuse window in card-claim.ts safe: an older checkout is dead, so
           // creating a new one cannot leave two payable links for long.
           expires: true,
-          expirationDateFrom: toMpDate(new Date()),
+          // Backdated a minute: a clock a few seconds ahead of ours must not make the link "not active yet".
+          expirationDateFrom: toMpDate(new Date(Date.now() - 60_000)),
           expirationDateTo: toMpDate(new Date(Date.now() + CARD_LINK_VALIDITY_MS)),
         },
         client
