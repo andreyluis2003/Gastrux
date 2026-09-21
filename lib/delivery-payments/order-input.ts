@@ -15,35 +15,49 @@ export function normalizeQuantity(value: unknown): number {
   return Math.min(MAX_QUANTITY, Math.max(1, Math.trunc(Number(value) || 1)));
 }
 
-const LINE_BREAKS = /\r\n|[\r\n\u2028\u2029]/;
-// Whitespace plus zero-width / bidi format characters a customer could hide in front of a word.
-const INVISIBLE_LEAD = '\\s\\u00AD\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\uFEFF';
-const STARTS_WITH_PAYMENT = new RegExp(`^[${INVISIBLE_LEAD}]*pagamento`, 'i');
+/**
+ * Every character class that can end a line: CR, LF, VT, FF, NEL, LS and PS.
+ * The one place that defines it; a run of them is a single break. Written as a
+ * string so the source holds only escapes, no raw invisible characters.
+ */
+const LINE_BREAKS = new RegExp('[\\r\\n\\v\\f\\u0085\\u2028\\u2029]+');
+
+const SEPARATOR = ' / ';
+
+/** Longest customer note kept (in characters) so it cannot flood the kitchen note. */
+const MAX_NOTE_LENGTH = 500;
+
+/** Every line-break run becomes one separator; empty segments are dropped. */
+function collapseLines(value: string): string {
+  return value
+    .split(LINE_BREAKS)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(SEPARATOR);
+}
 
 /**
- * The customer's free-text note as one clearly labelled line block for the
- * order notes. The server-generated "Pagamento..." line lives in the same note,
- * so any customer line that starts with "Pagamento" is dropped and the rest is
- * prefixed: only the server can produce a line that starts with "Pagamento".
- * Returns '' when nothing is left.
+ * The customer's free-text note as ONE line for the order notes. The
+ * server-generated "Pagamento..." line lives in the same note, so the rule is
+ * structural rather than a list of forbidden words: no customer text can ever
+ * start a line, because it is collapsed into a single line that begins with the
+ * fixed label. Returns '' when nothing is left (or the input is not a string).
  */
 export function sanitizeCustomerNote(text: unknown): string {
   if (typeof text !== 'string') return '';
-  const lines = text
-    .split(LINE_BREAKS)
-    .filter((line) => !STARTS_WITH_PAYMENT.test(line))
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length === 0) return '';
-  return `Obs. do cliente: ${lines.join('\n')}`;
+  const collapsed = collapseLines(text);
+  if (!collapsed) return '';
+  const chars = Array.from(collapsed); // by code point: never cuts a character in half
+  // When cut, do not leave a dangling separator at the end.
+  const capped = chars.length > MAX_NOTE_LENGTH ? chars.slice(0, MAX_NOTE_LENGTH).join('').replace(/[\s/]+$/, '') : collapsed;
+  return `Obs. do cliente: ${capped}`;
 }
 
 /**
  * A customer-supplied value that goes after a fixed label ("Endereço: ...") in
- * the order notes: line breaks are collapsed so it cannot start a line of its own.
+ * the order notes: line breaks of any kind are collapsed so it cannot start a
+ * line of its own. '' when nothing is left.
  */
 export function singleLine(value: unknown): string {
-  return String(value ?? '')
-    .replace(/[\r\n\u2028\u2029]+/g, ' ')
-    .trim();
+  return collapseLines(String(value ?? ''));
 }
