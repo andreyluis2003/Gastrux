@@ -6,10 +6,8 @@
  * Refunds a Mercado Pago payment (full or partial)
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { requireRestaurantManager } from '@/lib/mercadopago-connect/guard';
 import { refundPayment } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
 import { refundConnectPayment } from '@/lib/mercadopago-connect/payments';
@@ -20,18 +18,17 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Authorized by membership in the CURRENT restaurant (its owner, or an active
+    // OWNER/ADMIN/MANAGER member), never by the global JWT role: a user who is
+    // OWNER of restaurant X and only a cashier of this one must not refund here.
+    const auth = await requireRestaurantManager(
+      ['OWNER', 'ADMIN', 'MANAGER'],
+      'Apenas o dono, administrador ou gerente pode reembolsar pagamentos'
+    );
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    // Only OWNER, ADMIN, MANAGER can process refunds
-    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(session.user.role || '')) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to process refunds' },
-        { status: 403 }
-      );
-    }
+    const { session, restaurantId } = auth;
 
     const { paymentId, amount, reason, description } = await request.json();
 
@@ -50,12 +47,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // The payment must belong to the caller's own restaurant - otherwise
-    // any OWNER/ADMIN/MANAGER could refund another restaurant's payment.
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
-    }
+    // The payment must belong to the current restaurant (the one the caller was
+    // just authorized for) - otherwise a manager could refund another restaurant's payment.
 
     // Find the payment
     const payment = await prisma.payment.findFirst({
