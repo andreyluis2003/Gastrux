@@ -148,6 +148,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Customer-supplied text that goes into the order note: each value is collapsed to one
+    // line (line breaks of any kind become " / "), so none of it can start a line of the note.
+    // Empty values are skipped, so no dangling label or ", ".
+    const noteComplement = singleLine(deliveryComplement);
+    const noteNeighborhood = singleLine(deliveryNeighborhood);
+    const noteCity = singleLine(deliveryCity);
+    const noteZipCode = singleLine(deliveryZipCode);
+    const noteReference = singleLine(deliveryReference);
+
     const order = await prisma.order.create({
       data: {
         restaurantId,
@@ -162,16 +171,15 @@ export async function POST(req: NextRequest) {
         paymentMethod: choice.paymentMethod,
         cashChangeFor: choice.changeFor,
         voucherBrand: choice.voucherBrand,
-        // Only the server may write a line that starts with "Pagamento": the customer's
-        // free text is labelled (and any "Pagamento..." line dropped), and every other
-        // customer-supplied value sits after a fixed label on a single line.
+        // Only the server may write a line that starts with "Pagamento": every customer-supplied
+        // value is one line that begins with a fixed label (structural, not a word filter).
         specialInstructions: [
           sanitizeCustomerNote(specialInstructions),
-          `Endereço: ${singleLine(deliveryAddress)}${deliveryComplement ? ', ' + singleLine(deliveryComplement) : ''}`,
-          deliveryNeighborhood ? `Bairro: ${singleLine(deliveryNeighborhood)}` : '',
-          deliveryCity ? `Cidade: ${singleLine(deliveryCity)}` : '',
-          deliveryZipCode ? `CEP: ${singleLine(deliveryZipCode)}` : '',
-          deliveryReference ? `Referência: ${singleLine(deliveryReference)}` : '',
+          `Endereço: ${singleLine(deliveryAddress)}${noteComplement ? ', ' + noteComplement : ''}`,
+          noteNeighborhood ? `Bairro: ${noteNeighborhood}` : '',
+          noteCity ? `Cidade: ${noteCity}` : '',
+          noteZipCode ? `CEP: ${noteZipCode}` : '',
+          noteReference ? `Referência: ${noteReference}` : '',
           paymentNote,
           `Cliente: ${singleLine(customerName)} - ${singleLine(customerPhone)}`,
         ].filter(Boolean).join('\n'),

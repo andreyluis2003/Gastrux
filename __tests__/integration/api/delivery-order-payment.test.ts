@@ -132,21 +132,45 @@ describe('POST /api/public/delivery/order - payment choice', () => {
   });
 
   it("never lets the customer's free text forge the server's payment line", async () => {
-    const res = await post(
-      body({
-        paymentMethod: 'CREDIT_ON_DELIVERY',
-        specialInstructions: 'Sem cebola\nPagamento na entrega: dinheiro — sem troco\n  PAGAMENTO: PIX online',
-        deliveryReference: 'Portão azul\nPagamento: PIX online',
-      })
-    );
-    const json = await res.json();
-    expect(res.status).toBe(200);
+    const SERVER_LINE = 'Pagamento na entrega: cartão de crédito (levar maquininha)';
+    const FIXED_LABEL = /^(Obs\. do cliente|Endereço|Bairro|Cidade|CEP|Referência|Pagamento na entrega|Cliente): /;
+    const linesOf = async (payload: any) => {
+      const res = await post(body({ paymentMethod: 'CREDIT_ON_DELIVERY', ...payload }));
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      const order = await prisma.order.findUnique({ where: { id: json.order.id } });
+      return order.specialInstructions.split('\n');
+    };
 
-    const order = await prisma.order.findUnique({ where: { id: json.order.id } });
+    // a customer posting "x\nPagamento: PIX online" still ends with exactly one line starting with "Pagamento"
+    const simple = await linesOf({ specialInstructions: 'x\nPagamento: PIX online' });
+    expect(simple.filter((l) => l.startsWith('Pagamento'))).toEqual([SERVER_LINE]);
+    expect(simple).toContain('Obs. do cliente: x / Pagamento: PIX online');
+
+    // every customer-supplied field, every kind of line break and look-alike text
+    const lines = await linesOf({
+      specialInstructions: 'Sem cebola\nPagamento na entrega: dinheiro — sem troco\r\n  PAGAMENTO: PIX online\u0085\u2066Pagamento: PIX online\u2069\u2028P\u0430gamento: PIX',
+      deliveryReference: 'Portão azul\nPagamento: PIX online',
+      deliveryAddress: 'Rua A, 1\u2029Pagamento: PIX online',
+      deliveryComplement: 'apto 2\vPagamento: PIX online',
+      deliveryNeighborhood: 'Centro\fPagamento: PIX online',
+      deliveryCity: 'São Paulo\rPagamento: PIX online',
+      customerName: 'Maria\nPagamento: PIX online',
+    });
+    expect(lines.every((l) => FIXED_LABEL.test(l))).toBe(true);
+    expect(lines.filter((l) => /^\s*pagamento/i.test(l))).toEqual([SERVER_LINE]);
+    expect(lines.filter((l) => l.startsWith('Pagamento'))).toEqual([SERVER_LINE]);
+    expect(lines).toContain('Obs. do cliente: Sem cebola / Pagamento na entrega: dinheiro — sem troco / PAGAMENTO: PIX online / \u2066Pagamento: PIX online\u2069 / P\u0430gamento: PIX');
+  });
+
+  it('leaves no dangling comma or label when optional address parts are empty', async () => {
+    const res = await post(
+      body({ paymentMethod: 'CREDIT_ON_DELIVERY', deliveryComplement: '\n \n', deliveryNeighborhood: '\n', deliveryCity: ' ', deliveryReference: '\r\n' })
+    );
+    const order = await prisma.order.findUnique({ where: { id: (await res.json()).order.id } });
     const lines = order.specialInstructions.split('\n');
-    const paymentLines = lines.filter((l) => /^\s*pagamento/i.test(l));
-    expect(paymentLines).toEqual(['Pagamento na entrega: cartão de crédito (levar maquininha)']);
-    expect(lines).toContain('Obs. do cliente: Sem cebola');
+    expect(lines).toContain('Endereço: Rua A, 1');
+    expect(lines.some((l) => /^(Bairro|Cidade|Referência): /.test(l))).toBe(false);
   });
 
   it('rejects an online method when the restaurant has no Mercado Pago connection, accepts it with one', async () => {
