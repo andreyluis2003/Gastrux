@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { syncRestaurantPayment } from '@/lib/mercadopago-connect/payment-sync';
+import { parseMpPaymentId, reconcileTarget } from '@/lib/mercadopago-connect/status-reconcile';
 
 export const dynamic = 'force-dynamic';
-
-/** Only ask Mercado Pago directly once the webhook has had time to arrive. */
-const RECONCILE_AFTER_MS = 30 * 1000;
 
 const SELECT = { id: true, status: true, restaurantId: true, gatewayPaymentId: true, createdAt: true } as const;
 
 /**
- * GET /api/pagamentos/mp/pix/status?paymentId=<our Payment.id>
+ * GET /api/pagamentos/mp/pix/status?paymentId=<our Payment.id>[&mpPaymentId=<digits>]
  * Reads OUR database (updated by the webhook). Returns only the status:
- * no payer data, and no Mercado Pago lookup by a caller-supplied id.
+ * no payer data, and nothing from the query is ever echoed back.
+ *
+ * mpPaymentId is the payment id Mercado Pago puts on the card checkout's return
+ * URL. It only matters for a card payment whose webhook never arrived (our row
+ * has no Mercado Pago id yet): the sync fetches that id with the RESTAURANT's
+ * token and applies it only if its external_reference is this very payment, so
+ * the id is a hint, never proof.
  */
 export async function GET(request: NextRequest) {
   const paymentId = new URL(request.url).searchParams.get('paymentId');
@@ -24,15 +28,12 @@ export async function GET(request: NextRequest) {
   });
   if (!payment) return NextResponse.json({ error: 'Pagamento não encontrado' }, { status: 404 });
 
-  const webhookIsLate =
-    payment.status === 'PENDING' &&
-    payment.restaurantId &&
-    payment.gatewayPaymentId &&
-    Date.now() - payment.createdAt.getTime() > RECONCILE_AFTER_MS;
+  const mpPaymentId = reconcileTarget(payment, parseMpPaymentId(new URL(request.url).searchParams.get('mpPaymentId')));
 
-  if (webhookIsLate) {
+  if (mpPaymentId) {
     try {
-      await syncRestaurantPayment(payment.restaurantId!, payment.gatewayPaymentId!);
+      // The restaurant comes from OUR row, never from the query.
+      await syncRestaurantPayment(payment.restaurantId!, mpPaymentId);
       payment = (await prisma.payment.findUnique({ where: { id: payment.id }, select: SELECT })) ?? payment;
     } catch (error) {
       console.error('[mp-connect] status reconcile failed:', error);

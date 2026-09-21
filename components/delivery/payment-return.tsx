@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Clock, Loader2, XCircle } from 'lucide-react';
+import { statusPollUrl } from '@/lib/delivery-payments/return-params';
 
 type ReturnState = 'checking' | 'approved' | 'failed' | 'refunded' | 'notFound' | 'timeout';
 
@@ -25,6 +26,8 @@ interface Props {
   restaurantId: string;
   paymentId: string;
   orderNumber: string;
+  /** Mercado Pago's payment id from the return URL (digits): only a hint for the status route, never proof. */
+  mpPaymentId?: string | null;
 }
 
 /**
@@ -33,7 +36,7 @@ interface Props {
  * payment status; the webhook is what actually marks the payment as paid, and
  * the order is only confirmed once the payment is approved.
  */
-export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
+export function PaymentReturn({ restaurantId, paymentId, orderNumber, mpPaymentId }: Props) {
   const [state, setState] = useState<ReturnState>('checking');
   // Bumped by "Verificar novamente" to restart the polling after a timeout.
   const [round, setRound] = useState(0);
@@ -61,7 +64,7 @@ export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
       inflight = controller;
       const abortTimer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
-        const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${encodeURIComponent(paymentId)}`, {
+        const res = await fetch(statusPollUrl(paymentId, mpPaymentId), {
           cache: 'no-store',
           signal: controller.signal,
         });
@@ -99,7 +102,7 @@ export function PaymentReturn({ restaurantId, paymentId, orderNumber }: Props) {
       if (timer) clearTimeout(timer);
       inflight?.abort();
     };
-  }, [paymentId, round]);
+  }, [paymentId, mpPaymentId, round]);
 
   const backToMenu = () => {
     window.location.href = `/delivery/${restaurantId}`;

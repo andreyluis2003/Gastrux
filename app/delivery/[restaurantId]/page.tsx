@@ -19,6 +19,7 @@ import {
 } from '@/components/delivery/payment-method-selector';
 import { PaymentReturn } from '@/components/delivery/payment-return';
 import type { DeliveryPaymentOptions } from '@/lib/delivery-payments/choice';
+import { readPaymentReturnParams, type PaymentReturnParams } from '@/lib/delivery-payments/return-params';
 
 interface MenuItem {
   id: string;
@@ -159,15 +160,13 @@ export default function DeliveryPage() {
 
   // Payment method chosen at checkout, and the state of a return from Mercado Pago's card checkout
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>(EMPTY_PAYMENT_CHOICE);
-  const [returned, setReturned] = useState<{ paymentId: string; orderNumber: string } | null>(null);
+  const [returned, setReturned] = useState<PaymentReturnParams | null>(null);
   // Set when the order exists but online payment cannot be started (shown on the payment step)
   const [paymentProblem, setPaymentProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    const paymentId = query.get('payment');
-    const orderNumber = query.get('n');
-    if (paymentId && orderNumber) setReturned({ paymentId, orderNumber });
+    const params = readPaymentReturnParams(window.location.search);
+    if (params) setReturned(params);
   }, []);
 
   // PIX polling lives in refs so it can always be cancelled: a new order, "Fazer outro pedido" and unmount
@@ -459,7 +458,14 @@ export default function DeliveryPage() {
 
   // Back from Mercado Pago's card checkout: confirm the payment instead of showing the menu.
   if (returned) {
-    return <PaymentReturn restaurantId={restaurantId} paymentId={returned.paymentId} orderNumber={returned.orderNumber} />;
+    return (
+      <PaymentReturn
+        restaurantId={restaurantId}
+        paymentId={returned.paymentId}
+        orderNumber={returned.orderNumber}
+        mpPaymentId={returned.mpPaymentId}
+      />
+    );
   }
 
   if (loading) {
