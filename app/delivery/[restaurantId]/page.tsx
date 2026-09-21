@@ -11,6 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import {
+  PaymentMethodSelector,
+  EMPTY_PAYMENT_CHOICE,
+  toPaymentPayload,
+  type PaymentChoice,
+} from '@/components/delivery/payment-method-selector';
+import { PaymentReturn } from '@/components/delivery/payment-return';
+import type { DeliveryPaymentOptions } from '@/lib/delivery-payments/choice';
 
 interface MenuItem {
   id: string;
@@ -37,6 +45,8 @@ interface RestaurantInfo {
   state?: string | null;
   phone?: string | null;
   businessHours?: any;
+  acceptsOnlinePayment?: boolean;
+  paymentOptions?: DeliveryPaymentOptions;
 }
 
 interface CartItem {
@@ -52,6 +62,62 @@ const DELIVERY_FEE = 5.0;
 
 function formatBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Whether the restaurant still offers the method the customer had picked (used after a menu reload). */
+function isMethodOffered(options: DeliveryPaymentOptions | undefined, method: PaymentChoice['method']): boolean {
+  if (!options || !method) return false;
+  switch (method) {
+    case 'ONLINE_PIX':
+      return options.online.pix;
+    case 'ONLINE_CARD':
+      return options.online.card;
+    case 'CASH':
+      return options.onDelivery.cash;
+    case 'CREDIT_ON_DELIVERY':
+      return options.onDelivery.credit;
+    case 'DEBIT_ON_DELIVERY':
+      return options.onDelivery.debit;
+    case 'VOUCHER_ON_DELIVERY':
+      return options.onDelivery.voucher.enabled;
+    default:
+      return false;
+  }
+}
+
+/** The server answers 409 with one of these codes when another request is already creating the same payment (double tap). */
+const IN_PROGRESS_CODES = ['CHECKOUT_IN_PROGRESS', 'PIX_IN_PROGRESS'];
+const IN_PROGRESS_RETRY_MS = 3000;
+
+type PaymentStartError = Error & { code?: string; retryable?: boolean };
+
+/**
+ * POSTs the request that starts an online payment (PIX or card link) and returns the parsed body.
+ * An "in progress" 409 is retried once after ~3 s; if it is still in progress the error is marked
+ * retryable (the caller keeps the button enabled). Every failure carries a message fit for the customer.
+ */
+async function postPaymentStart(url: string, body: Record<string, unknown>, fallback: string): Promise<any> {
+  const send = async () => {
+    let res: Response;
+    try {
+      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch {
+      throw Object.assign(new Error('Erro de conexão. Tente novamente.'), { retryable: true }) as PaymentStartError;
+    }
+    const data: any = await res.json().catch(() => ({}));
+    return { res, data };
+  };
+  const inProgress = (r: { res: Response; data: any }) => r.res.status === 409 && IN_PROGRESS_CODES.includes(r.data?.code);
+
+  let result = await send();
+  if (inProgress(result)) {
+    toast.info(typeof result.data?.error === 'string' && result.data.error ? result.data.error : 'Estamos gerando o pagamento, aguarde um instante');
+    await new Promise((resolve) => setTimeout(resolve, IN_PROGRESS_RETRY_MS));
+    result = await send();
+  }
+  if (result.res.ok) return result.data;
+  const message = typeof result.data?.error === 'string' && result.data.error ? result.data.error : fallback;
+  throw Object.assign(new Error(message), { code: result.data?.code, retryable: inProgress(result) }) as PaymentStartError;
 }
 
 export default function DeliveryPage() {
@@ -89,6 +155,19 @@ export default function DeliveryPage() {
   const [pixPaid, setPixPaid] = useState(false);
   const [pixPolling, setPixPolling] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
+
+  // Payment method chosen at checkout, and the state of a return from Mercado Pago's card checkout
+  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>(EMPTY_PAYMENT_CHOICE);
+  const [returned, setReturned] = useState<{ paymentId: string; orderNumber: string } | null>(null);
+  // Set when the order exists but online payment cannot be started (shown on the payment step)
+  const [paymentProblem, setPaymentProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const paymentId = query.get('payment');
+    const orderNumber = query.get('n');
+    if (paymentId && orderNumber) setReturned({ paymentId, orderNumber });
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -158,9 +237,39 @@ export default function DeliveryPage() {
     setCart((prev) => prev.map((c) => c.menuItemId === menuItemId ? { ...c, quantity: Math.max(0, c.quantity + delta) } : c).filter((c) => c.quantity > 0));
   }
 
+  // The menu response is cached for a minute: after the server refuses an order, load it again
+  // (bypassing the browser cache) so the selector shows what the restaurant offers right now.
+  async function refreshMenu() {
+    try {
+      const res = await fetch(`/api/public/delivery/menu/${restaurantId}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      setRestaurant(data.restaurant);
+      setCategories(data.categories);
+      const options: DeliveryPaymentOptions | undefined = data.restaurant?.paymentOptions;
+      setPaymentChoice((current) => {
+        // Drop a choice the restaurant no longer offers (or a voucher brand it no longer accepts).
+        if (!isMethodOffered(options, current.method)) return EMPTY_PAYMENT_CHOICE;
+        if (current.method === 'VOUCHER_ON_DELIVERY' && current.voucherBrand) {
+          const brands = options?.onDelivery.voucher.brands ?? [];
+          if (!brands.includes(current.voucherBrand.trim().toUpperCase())) return { ...current, voucherBrand: '' };
+        }
+        return current;
+      });
+    } catch {
+      /* keep what is on screen */
+    }
+  }
+
   async function handleSubmitOrder() {
     if (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim()) {
       toast.error('Preencha nome, telefone e endereço');
+      return;
+    }
+    // Validated against the total shown to the customer; the server re-validates against its own.
+    const payment = toPaymentPayload(paymentChoice, grandTotal);
+    if (!payment.ok) {
+      toast.error(payment.error);
       return;
     }
     setSubmitting(true);
@@ -184,13 +293,27 @@ export default function DeliveryPage() {
             ? `[AGENDADO: ${scheduledDate} às ${scheduledTime}] ${specialInstructions}`.trim()
             : specialInstructions,
           deliveryFee: DELIVERY_FEE,
+          ...payment.payload,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao enviar pedido');
-      setOrderData(data.order);
-      setStep('payment');
-      toast.success('Pedido criado! Realize o pagamento.');
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        // Any refusal (for example the restaurant just changed its payment settings): show the
+        // server's message, keep the cart and reload what the restaurant offers.
+        void refreshMenu();
+        throw new Error(typeof data?.error === 'string' && data.error ? data.error : 'Erro ao enviar pedido');
+      }
+      const method: string = data.order?.paymentMethod ?? payment.payload.paymentMethod;
+      setOrderData({ ...data.order, paymentMethod: method });
+      if (method === 'ONLINE_PIX' || method === 'ONLINE_CARD') {
+        // Online: the order is only confirmed to the customer once the payment is approved.
+        setStep('payment');
+        toast.success('Pedido criado! Realize o pagamento.');
+      } else {
+        // Pay on delivery: nothing else to do online.
+        setStep('success');
+        toast.success('Pedido enviado! O pagamento será feito na entrega.');
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao criar pedido');
     } finally {
@@ -198,28 +321,57 @@ export default function DeliveryPage() {
     }
   }
 
+  // A payment could not be started. Still "in progress" after the automatic retry: a neutral notice,
+  // the button stays enabled. Online payment unavailable: a lasting explanation, the order exists unpaid.
+  function reportPaymentStartError(err: unknown, fallback: string) {
+    const e = err as PaymentStartError;
+    if (e?.retryable) {
+      toast.info(e.message || 'Estamos gerando o pagamento, aguarde um instante e tente de novo');
+      return;
+    }
+    if (e?.code === 'ONLINE_PAYMENT_UNAVAILABLE') {
+      const phone = restaurant?.phone ? ` (${restaurant.phone})` : '';
+      setPaymentProblem(
+        `${e.message} Seu pedido #${orderData?.orderNumber} foi criado, mas ainda não foi pago. Fale com o restaurante${phone} para combinar o pagamento, por exemplo na entrega.`
+      );
+      return;
+    }
+    toast.error(e?.message || fallback);
+  }
+
   async function handlePixPayment() {
     if (!orderData) return;
     setPixLoading(true);
+    setPaymentProblem(null);
     try {
-      const res = await fetch('/api/pagamentos/mp/pix', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: orderData.total,
-          description: `Delivery ${orderData.orderNumber}`,
-          payerEmail: customerEmail || 'cliente@delivery.com',
-          payerName: customerName,
-          externalReference: orderData.id,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao gerar PIX');
+      const data = await postPaymentStart(
+        '/api/pagamentos/mp/pix',
+        { orderId: orderData.id, payerEmail: customerEmail || undefined, payerName: customerName },
+        'Erro ao gerar PIX'
+      );
       setPixData(data);
       startPixPolling(data.paymentId);
-    } catch (err: any) {
-      toast.error(err.message || 'Erro ao gerar pagamento PIX');
+    } catch (err) {
+      reportPaymentStartError(err, 'Erro ao gerar pagamento PIX');
     } finally {
+      setPixLoading(false);
+    }
+  }
+
+  async function startCardCheckout() {
+    if (!orderData) return;
+    setPixLoading(true);
+    setPaymentProblem(null);
+    try {
+      const data = await postPaymentStart(
+        '/api/pagamentos/mp/delivery-checkout',
+        { orderId: orderData.id, payerEmail: customerEmail || undefined, payerName: customerName },
+        'Erro ao iniciar pagamento com cartão'
+      );
+      // Leaves the page: the customer pays at Mercado Pago and returns to /delivery/<id>?payment=...&n=...
+      window.location.href = data.initPoint;
+    } catch (err) {
+      reportPaymentStartError(err, 'Erro ao iniciar pagamento com cartão');
       setPixLoading(false);
     }
   }
@@ -248,6 +400,11 @@ export default function DeliveryPage() {
       navigator.clipboard.writeText(pixData.qrCode);
       toast.success('Código PIX copiado!');
     }
+  }
+
+  // Back from Mercado Pago's card checkout: confirm the payment instead of showing the menu.
+  if (returned) {
+    return <PaymentReturn restaurantId={restaurantId} paymentId={returned.paymentId} orderNumber={returned.orderNumber} />;
   }
 
   if (loading) {
@@ -279,12 +436,12 @@ export default function DeliveryPage() {
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
         <Card className="p-8 text-center max-w-md w-full space-y-4">
           <CheckCircle className="h-16 w-16 mx-auto text-green-600" />
-          <h2 className="text-2xl font-bold text-green-800">Pedido Confirmado!</h2>
+          <h2 className="text-2xl font-bold text-green-800">{pixPaid ? 'Pedido Confirmado!' : 'Pedido Enviado!'}</h2>
           <p className="text-gray-600">Seu pedido <span className="font-bold">#{orderData?.orderNumber}</span> foi recebido.</p>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-1">
             <p className="text-sm"><span className="font-medium">Total:</span> {formatBRL(orderData?.total || 0)}</p>
             <p className="text-sm"><span className="font-medium">Entrega em:</span> {deliveryAddress}</p>
-            <p className="text-sm"><span className="font-medium">Status:</span> Pagamento confirmado ✔</p>
+            <p className="text-sm">{pixPaid ? <><span className="font-medium">Status:</span> Pagamento confirmado ✔</> : orderData?.paymentSummary || 'Pagamento na entrega'}</p>
           </div>
           <p className="text-sm text-gray-500">Acompanhe seu pedido pelo telefone do restaurante.</p>
           {restaurant.phone && <p className="text-sm font-medium"><Phone className="inline h-4 w-4 mr-1" />{restaurant.phone}</p>}
@@ -303,7 +460,7 @@ export default function DeliveryPage() {
         <header className="bg-white border-b sticky top-0 z-10 px-4 py-3">
           <div className="max-w-lg mx-auto flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setStep('checkout')}><ArrowLeft className="h-5 w-5" /></Button>
-            <h1 className="text-lg font-bold">Pagamento PIX</h1>
+            <h1 className="text-lg font-bold">Pagamento</h1>
           </div>
         </header>
         <div className="max-w-lg mx-auto p-4 space-y-6">
@@ -312,7 +469,22 @@ export default function DeliveryPage() {
               <p className="text-sm text-gray-500 mb-1">Pedido #{orderData?.orderNumber}</p>
               <p className="text-3xl font-bold text-orange-600">{formatBRL(orderData?.total || 0)}</p>
             </div>
-            {!pixData ? (
+            {paymentProblem && (
+              <p className="text-sm text-red-600 text-center" role="alert">{paymentProblem}</p>
+            )}
+            {orderData?.paymentMethod === 'ONLINE_CARD' ? (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600 text-center">
+                  Você será levado ao Mercado Pago para pagar com cartão de crédito, débito ou saldo Mercado Pago, e depois volta para cá.
+                </p>
+                <p className="text-xs text-gray-500 text-center">
+                  Seu pedido só é confirmado depois que o pagamento for aprovado.
+                </p>
+                <Button className="w-full bg-orange-600 hover:bg-orange-700" onClick={startCardCheckout} disabled={pixLoading}>
+                  {pixLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Abrindo o Mercado Pago...</> : <><CreditCard className="h-4 w-4 mr-2" /> Pagar com cartão</>}
+                </Button>
+              </div>
+            ) : !pixData ? (
               <Button className="w-full bg-orange-600 hover:bg-orange-700" onClick={handlePixPayment} disabled={pixLoading}>
                 {pixLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Gerando PIX...</> : <><CreditCard className="h-4 w-4 mr-2" /> Gerar QR Code PIX</>}
               </Button>
@@ -332,10 +504,21 @@ export default function DeliveryPage() {
                     <Button variant="outline" size="icon" onClick={copyPixCode}><Copy className="h-4 w-4" /></Button>
                   </div>
                 </div>
-                <div className="flex items-center justify-center gap-2 text-sm text-orange-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Aguardando pagamento...</span>
-                </div>
+                {pixPolling ? (
+                  <div className="space-y-1 text-center">
+                    <div className="flex items-center justify-center gap-2 text-sm text-orange-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Aguardando a confirmação do pagamento...</span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Seu pedido só é confirmado depois que o pagamento for aprovado. Não feche esta página.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-center text-orange-700">
+                    Ainda não recebemos a confirmação do pagamento. Se você já pagou, aguarde alguns minutos e fale com o restaurante informando o pedido #{orderData?.orderNumber}. O pedido só é confirmado depois que o pagamento for aprovado.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="text-center space-y-2">
@@ -465,6 +648,14 @@ export default function DeliveryPage() {
             )}
           </Card>
 
+          {/* Payment method */}
+          <PaymentMethodSelector
+            options={restaurant?.paymentOptions}
+            total={grandTotal}
+            value={paymentChoice}
+            onChange={setPaymentChoice}
+          />
+
           {/* Notes */}
           <Card className="p-4">
             <h3 className="font-bold text-sm mb-2">Observações</h3>
@@ -479,7 +670,7 @@ export default function DeliveryPage() {
           <Button
             className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-bold text-base"
             onClick={handleSubmitOrder}
-            disabled={submitting || cart.length === 0}
+            disabled={submitting || cart.length === 0 || !paymentChoice.method}
           >
             {submitting ? <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Enviando...</> : <>Enviar Pedido • {formatBRL(grandTotal)}</>}
           </Button>
