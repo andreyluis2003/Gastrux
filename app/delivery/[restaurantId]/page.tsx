@@ -305,6 +305,9 @@ export default function DeliveryPage() {
       }
       const method: string = data.order?.paymentMethod ?? payment.payload.paymentMethod;
       setOrderData({ ...data.order, paymentMethod: method });
+      // A new order never inherits the PIX code or the notice of an earlier one (back arrow, then resend).
+      setPixData(null);
+      setPaymentProblem(null);
       if (method === 'ONLINE_PIX' || method === 'ONLINE_CARD') {
         // Online: the order is only confirmed to the customer once the payment is approved.
         setStep('payment');
