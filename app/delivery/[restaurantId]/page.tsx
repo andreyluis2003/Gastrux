@@ -323,6 +323,9 @@ export default function DeliveryPage() {
       (existingMethod === 'ONLINE_PIX' || existingMethod === 'ONLINE_CARD') &&
       orderSignatureRef.current === signature
     ) {
+      // Polling already stopped (timeout) and not paid: drop the stale QR so the payment step can
+      // ask the (idempotent) PIX route again instead of stranding the customer on an expired code.
+      if (!pixIntervalRef.current && !pixPaid) setPixData(null);
       setStep('payment');
       return;
     }
@@ -345,6 +348,8 @@ export default function DeliveryPage() {
       // A new order never inherits the PIX code, the polling or the notice of an earlier one (back arrow, then resend).
       stopPixPolling();
       setPixData(null);
+      // An approval of the PREVIOUS order that landed during this request must not label this new order as paid.
+      setPixPaid(false);
       setPaymentProblem(null);
       orderSignatureRef.current = signature;
       if (method === 'ONLINE_PIX' || method === 'ONLINE_CARD') {
