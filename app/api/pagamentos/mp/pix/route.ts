@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
+import { orderAcceptsPix, PIX_NOT_FOR_THIS_ORDER, resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
 import { createPixForTarget, normalizePayer } from '@/lib/mercadopago-connect/pix-service';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic';
  * to pay - `orderId` (delivery) or `qrToken` (table tab). The restaurant and
  * the amount are resolved on the server, and the PIX is created with the
  * restaurant's own Mercado Pago token, so the money lands in its account.
+ * An order created with another payment method (cash, card, on delivery) is
+ * refused: it is not settled online.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +20,11 @@ export async function POST(request: NextRequest) {
 
     const resolved = await resolvePixTarget({ orderId, qrToken });
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+
+    // Table (qrToken) targets have no orderId and are unaffected; only an ORDER carries a method.
+    if (resolved.target.orderId && !orderAcceptsPix(resolved.target.orderPaymentMethod)) {
+      return NextResponse.json({ error: PIX_NOT_FOR_THIS_ORDER, code: 'PAYMENT_METHOD_MISMATCH' }, { status: 409 });
+    }
 
     const result = await createPixForTarget(resolved.target, normalizePayer({ payerEmail, payerName }));
     if (!result.ok) {

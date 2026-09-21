@@ -14,6 +14,12 @@ export interface ResolvedPixTarget {
   orderId: string | null;
   sessionId: string | null;
   metadata: Record<string, unknown>;
+  /**
+   * Set only for a target that is an ORDER: how the customer chose to pay it
+   * (null for legacy and table orders). Lets a route refuse an order that was
+   * not created for the payment method it is being paid with.
+   */
+  orderPaymentMethod?: string | null;
 }
 
 export type ResolveResult =
@@ -35,10 +41,31 @@ function toCents(value: unknown): number {
   return Math.round(Number(value ?? 0) * 100);
 }
 
+/** Shown when someone asks for a PIX for an order created with another payment method. */
+export const PIX_NOT_FOR_THIS_ORDER = 'Este pedido não foi feito com pagamento por PIX online.';
+
+/**
+ * An order can be paid by PIX only if it was created for it (ONLINE_PIX) or has
+ * no recorded method (legacy and table/QR orders). A CASH, card or
+ * pay-on-delivery order must not be settled online: its kitchen note still
+ * tells the driver to collect the payment at the door.
+ */
+export function orderAcceptsPix(paymentMethod: string | null | undefined): boolean {
+  return paymentMethod == null || paymentMethod === 'ONLINE_PIX';
+}
+
 async function resolveOrder(orderId: string): Promise<ResolveResult> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, restaurantId: true, orderNumber: true, total: true, status: true, paymentStatus: true },
+    select: {
+      id: true,
+      restaurantId: true,
+      orderNumber: true,
+      total: true,
+      status: true,
+      paymentStatus: true,
+      paymentMethod: true,
+    },
   });
   if (!order) return { ok: false, status: 404, error: 'Pedido não encontrado' };
   if (order.paymentStatus === 'APPROVED') return { ok: false, status: 409, error: 'Pedido já pago' };
@@ -56,6 +83,7 @@ async function resolveOrder(orderId: string): Promise<ResolveResult> {
       orderId: order.id,
       sessionId: null,
       metadata: { source: 'delivery', orderNumber: order.orderNumber },
+      orderPaymentMethod: order.paymentMethod ?? null,
     },
   };
 }
