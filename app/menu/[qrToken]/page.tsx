@@ -1,7 +1,7 @@
 // FASE 50: Public customer-facing menu page - accessed via QR code scan
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { ShoppingBag, Plus, Minus, X, Check, Search, ChefHat, QrCode, Loader2, CreditCard, Copy, CheckCircle } from 'lucide-react';
@@ -84,6 +84,24 @@ export default function PublicMenuPage() {
   const [pixPaid, setPixPaid] = useState(false);
   const [pixPolling, setPixPolling] = useState(false);
   const [orderTotal, setOrderTotal] = useState(0);
+
+  // PIX polling lives in refs so it can always be cancelled (a new QR, leaving the screen, unmount), and a
+  // late answer for an OLD QR can never flip the screen of the current one: the tab may have grown and its
+  // QR been regenerated for a higher amount, and paying the old one must not read as "paid".
+  const pixIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pixTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Id of the payment whose QR is the CURRENT one (set synchronously, before its polling starts)
+  const currentPixPaymentIdRef = useRef<string | null>(null);
+
+  const stopPixPolling = useCallback(() => {
+    if (pixIntervalRef.current) clearInterval(pixIntervalRef.current);
+    if (pixTimeoutRef.current) clearTimeout(pixTimeoutRef.current);
+    pixIntervalRef.current = null;
+    pixTimeoutRef.current = null;
+    setPixPolling(false);
+  }, []);
+
+  useEffect(() => () => stopPixPolling(), [stopPixPolling]);
 
   useEffect(() => {
     const load = async () => {
@@ -189,6 +207,7 @@ export default function PublicMenuPage() {
       });
       const data = await res.json();
       if (data.success && data.qrCode) {
+        currentPixPaymentIdRef.current = data.paymentId;
         setPixData({
           paymentId: data.paymentId,
           qrCode: data.qrCode,
@@ -217,29 +236,26 @@ export default function PublicMenuPage() {
   };
 
   const startPixPolling = (paymentId: string) => {
+    // One poller at a time: a new QR replaces the previous one's polling.
+    stopPixPolling();
+    currentPixPaymentIdRef.current = paymentId;
     setPixPolling(true);
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes (every 5s)
     const interval = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts) {
-        clearInterval(interval);
-        setPixPolling(false);
-        return;
-      }
       try {
-        const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${paymentId}`);
+        const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${encodeURIComponent(paymentId)}`);
         const data = await res.json();
+        // Ignore an answer that no longer belongs to the QR on screen (polling stopped, or a newer QR).
+        if (pixIntervalRef.current !== interval || currentPixPaymentIdRef.current !== paymentId) return;
         if (data.approved) {
-          clearInterval(interval);
+          stopPixPolling();
           setPixPaid(true);
-          setPixPolling(false);
           toast.success('Pagamento confirmado! ✅');
         }
       } catch { /* ignore polling errors */ }
     }, 5000);
-    // Cleanup on unmount
-    return () => clearInterval(interval);
+    pixIntervalRef.current = interval;
+    // Stop after 5 minutes
+    pixTimeoutRef.current = setTimeout(stopPixPolling, 5 * 60 * 1000);
   };
 
   const copyPixCode = () => {
@@ -329,7 +345,7 @@ export default function PublicMenuPage() {
               <p className="text-gray-600 text-sm mb-4">
                 R$ {orderTotal.toFixed(2)} pago via Pix com sucesso.
               </p>
-              <Button onClick={() => { setShowPixPayment(false); setPixData(null); setPixPaid(false); setSuccess(false); }} className="w-full">
+              <Button onClick={() => { stopPixPolling(); currentPixPaymentIdRef.current = null; setShowPixPayment(false); setPixData(null); setPixPaid(false); setSuccess(false); }} className="w-full">
                 Fazer outro pedido
               </Button>
             </>
@@ -381,7 +397,7 @@ export default function PublicMenuPage() {
               </div>
 
               <div className="space-y-2">
-                <Button variant="outline" className="w-full" onClick={() => { setShowPixPayment(false); setPixData(null); }}>
+                <Button variant="outline" className="w-full" onClick={() => { stopPixPolling(); currentPixPaymentIdRef.current = null; setShowPixPayment(false); setPixData(null); }}>
                   Voltar
                 </Button>
               </div>
