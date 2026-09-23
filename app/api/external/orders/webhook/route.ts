@@ -8,6 +8,13 @@ import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
+function hasValidSignature(body: string, signature: string | null, secret: string | null | undefined): boolean {
+  if (!secret || !signature) return false;
+  const expected = Buffer.from(crypto.createHmac('sha256', secret).update(body).digest('hex'));
+  const received = Buffer.from(signature.trim().toLowerCase());
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const signature = req.headers.get('x-webhook-signature');
@@ -40,19 +47,11 @@ export async function POST(req: NextRequest) {
     }
     const restaurantId = integration.restaurantId;
 
-    // Verify signature
-    if (integration.webhookSecret && signature) {
-      const hash = crypto
-        .createHmac('sha256', integration.webhookSecret)
-        .update(body)
-        .digest('hex');
-
-      if (hash !== signature) {
-        return NextResponse.json(
-          { error: 'Invalid signature' },
-          { status: 401 }
-        );
-      }
+    // Verify signature. This is the ONLY thing that authenticates the caller, so it is mandatory:
+    // a missing header, a missing secret or a wrong signature all fail closed. (It used to run only
+    // when the header was present, so leaving the header out skipped the check.)
+    if (!hasValidSignature(body, signature, integration.webhookSecret)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     const data = preParsed;

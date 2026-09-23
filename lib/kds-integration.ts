@@ -29,23 +29,13 @@ export async function createOrderFromExternalOrder(
       return null;
     }
 
-    // Generate order number
-    const lastOrder = await prisma.order.findFirst({
-      orderBy: { createdAt: 'desc' },
-      select: { orderNumber: true },
-    });
-
-    let orderNumber = 'KDS-0001';
-    if (lastOrder?.orderNumber) {
-      const num = parseInt(lastOrder.orderNumber.split('-')[1]) + 1;
-      orderNumber = `KDS-${String(num).padStart(4, '0')}`;
-    }
-
-    // Find matching recipes
+    // Find matching recipes (ONLY this restaurant's own: a recipe of another restaurant must
+    // never end up on this kitchen's order)
     const orderItems = [];
     for (const item of items) {
       const recipe = await prisma.recipe.findFirst({
         where: {
+          restaurantId: externalOrder.restaurantId,
           OR: [
             {
               menuMappings: {
@@ -88,26 +78,18 @@ export async function createOrderFromExternalOrder(
       priority = 'HIGH';
     }
 
-    // Create KDS order
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        orderType: 'DELIVERY',
-        externalOrderId: externalOrderId,
-        priority,
-        estimatedPrepTime: 30,
-        specialInstructions: externalOrder.specialInstructions || undefined,
-        totalItems: orderItems.length,
-        items: {
-          create: orderItems,
-        },
-      },
-      include: {
-        items: {
-          include: { recipe: true },
-        },
-      },
-    });
+    // Create KDS order. Order.orderNumber is unique across ALL restaurants, so the next KDS number
+    // comes from the last KDS-#### order globally, and a concurrent writer that took the same number
+    // is retried with a fresh one.
+    let order: any = null;
+    for (let attempt = 0; attempt < 5 && !order; attempt++) {
+      try {
+        order = await createKdsOrder(externalOrder, externalOrderId, orderItems, priority);
+      } catch (error: any) {
+        const numberTaken = error?.code === 'P2002' && String(error?.meta?.target ?? '').includes('orderNumber');
+        if (!numberTaken || attempt === 4) throw error;
+      }
+    }
 
     await prisma.externalOrder.update({
       where: { id: externalOrderId },
@@ -120,6 +102,41 @@ export async function createOrderFromExternalOrder(
     console.error('Error creating order from external order:', error);
     return null;
   }
+}
+
+/** Next free "KDS-####" number: ignores orders numbered in any other format. */
+async function nextKdsOrderNumber(): Promise<string> {
+  const last = await prisma.order.findFirst({
+    where: { orderNumber: { startsWith: 'KDS-' } },
+    orderBy: { createdAt: 'desc' },
+    select: { orderNumber: true },
+  });
+  const current = last ? parseInt(last.orderNumber.slice(4), 10) : 0;
+  return `KDS-${String((Number.isFinite(current) ? current : 0) + 1).padStart(4, '0')}`;
+}
+
+async function createKdsOrder(externalOrder: any, externalOrderId: string, orderItems: any[], priority: any) {
+  const orderNumber = await nextKdsOrderNumber();
+  return prisma.order.create({
+    data: {
+      restaurantId: externalOrder.restaurantId,
+      orderNumber,
+      orderType: 'DELIVERY',
+      externalOrderId: externalOrderId,
+      priority,
+      estimatedPrepTime: 30,
+      specialInstructions: externalOrder.specialInstructions || undefined,
+      totalItems: orderItems.length,
+      items: {
+        create: orderItems,
+      },
+    },
+    include: {
+      items: {
+        include: { recipe: true },
+      },
+    },
+  });
 }
 
 /**
