@@ -69,6 +69,44 @@ async function reportDoublePayment(
 }
 
 /**
+ * A payment we had already CANCELLED just became APPROVED: Mercado Pago really
+ * received the money after we gave up on it (expired PIX paid late, a charge
+ * whose creation call timed out, ...). The approval is recorded (the row is the
+ * evidence and the refund route needs it APPROVED) and the operator is told to
+ * honor it or refund it. Nothing is refunded automatically: that is a decision
+ * about a live order. Idempotent through the alert's dedupeKey, never throws,
+ * no PII (ids only).
+ */
+async function reportLatePayment(
+  restaurantId: string,
+  payment: { id: string; orderId: string | null; amount?: unknown }
+): Promise<void> {
+  try {
+    const alert = await createPaymentAlert({
+      alertType: 'failure',
+      severity: 'critical',
+      title: 'Pagamento recebido após cancelamento',
+      message:
+        'Um pagamento que já estava cancelado foi aprovado pelo Mercado Pago: o cliente foi cobrado. Confira o pedido e honre a venda ou faça o reembolso do pagamento.',
+      paymentId: payment.id,
+      gateway: 'MERCADO_PAGO_CONNECT',
+      amount: Number(payment.amount ?? 0),
+      restaurantId,
+      dedupeKey: `late-payment:${payment.id}`,
+    });
+    if (alert?.duplicate) return;
+    captureException(new Error('Payment approved after it was cancelled'), {
+      endpoint: 'mp-connect/payment-sync',
+      restaurantId,
+      orderId: payment.orderId,
+      paymentId: payment.id,
+    });
+  } catch (error) {
+    console.error('[mp-connect] could not report a late payment:', error);
+  }
+}
+
+/**
  * Writes that follow the Payment update: marks the linked Order paid and
  * mirrors the MP data on the preference-based MercadoPagoTransaction row.
  * Both writes are idempotent and scoped, so they are safe to repeat; the
@@ -201,6 +239,7 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
     : null;
 
   await applyLinkedRecords(restaurantId, payment, mp, orderStatus);
+  if (approved && payment.status === 'CANCELLED') await reportLatePayment(restaurantId, payment);
 
   return { updated: true, status: mapped };
 }
