@@ -97,9 +97,9 @@ describe('bad day 3: delivery order webhook replayed', () => {
       expect(order.items.map((i) => [i.recipeId, i.quantity])).toEqual([[dishA.id, 2]]);
     });
 
-    // R2: a replay hits the (restaurantId, externalOrderId) unique key and the route answers 500, so the
-    // platform keeps retrying. R1 masks the "one kitchen order" half until R1 is fixed.
-    it.failing.each([2, 5])('replayed %i times in a row: every answer is 2xx and there is still ONE kitchen order (R2)', async (times) => {
+    // R2 (fixed 2026-09-23): a replay hit the (restaurantId, externalOrderId) unique key and the route
+    // answered 500, so the platform kept retrying.
+    it.each([2, 5])('replayed %i times in a row: every answer is 2xx and there is still ONE kitchen order (R2)', async (times) => {
       const data = payload();
       const statuses = [];
       for (let i = 0; i < times; i++) statuses.push((await send(data)).status);
@@ -108,12 +108,41 @@ describe('bad day 3: delivery order webhook replayed', () => {
       expect(await counts(data.orderId)).toEqual({ external: 1, orders: 1 });
     });
 
-    it.failing('five deliveries at the same instant produce ONE kitchen order and no 500 (R2)', async () => {
+    it('five deliveries at the same instant produce ONE kitchen order and no 500 (R2)', async () => {
       const data = payload();
       const statuses = (await Promise.all(Array.from({ length: 5 }, () => send(data)))).map((r) => r.status);
 
       expect(statuses.filter((s) => s >= 500)).toEqual([]);
       expect(await counts(data.orderId)).toEqual({ external: 1, orders: 1 });
+    });
+
+    it('a replay answers 200 with duplicate:true and points at the SAME kitchen order', async () => {
+      const data = payload();
+      const first = await send(data);
+      const again = await send(data);
+
+      expect(first.status).toBe(201);
+      expect(again.status).toBe(200);
+      const a = await first.json();
+      const b = await again.json();
+      expect(b).toMatchObject({ success: true, duplicate: true, externalOrderId: a.externalOrderId, kdsOrderId: a.kdsOrderId });
+      expect(a.kdsOrderId).toBeTruthy();
+    });
+
+    it('simultaneous deliveries: exactly one answers 201 and all point at the same kitchen order', async () => {
+      const data = payload();
+      const responses = await Promise.all(Array.from({ length: 5 }, () => send(data)));
+      const bodies = await Promise.all(responses.map((r) => r.json()));
+
+      expect(responses.filter((r) => r.status === 201)).toHaveLength(1);
+      expect(responses.filter((r) => r.status === 200)).toHaveLength(4);
+      expect(new Set(bodies.map((b) => b.kdsOrderId)).size).toBe(1);
+      expect(bodies[0].kdsOrderId).toBeTruthy();
+    });
+
+    it('an order without an id is rejected with 400, not a 500', async () => {
+      const res = await send(payload({ orderId: undefined, id: undefined }));
+      expect(res.status).toBe(400);
     });
 
     it('the same external id from ANOTHER restaurant is a different order (R1)', async () => {
@@ -152,9 +181,9 @@ describe('bad day 3: delivery order webhook replayed', () => {
   });
 
   describe('a delivery half-failed earlier, then the platform retries', () => {
-    // R8: an external order saved without its kitchen order (first attempt failed) can never be healed:
-    // every retry is a 500 on the unique key.
-    it.failing('a retry creates the missing kitchen order for an external order that has none (R8)', async () => {
+    // R8 (fixed 2026-09-23): an external order saved without its kitchen order (first attempt failed)
+    // could never be healed: every retry was a 500 on the unique key.
+    it('a retry creates the missing kitchen order for an external order that has none (R8)', async () => {
       const data = payload();
       const integration = await prisma.deliveryIntegration.findFirst({ where: { restaurantId: A.restaurantId, storeId: STORE } });
       await prisma.externalOrder.create({
@@ -168,6 +197,26 @@ describe('bad day 3: delivery order webhook replayed', () => {
 
       expect(ok(res.status)).toBe(true);
       expect(await counts(data.orderId)).toEqual({ external: 1, orders: 1 });
+    });
+  });
+
+  describe('several retries hit a half-saved order at once', () => {
+    it('heals it once: one kitchen order, linked back to the external order', async () => {
+      const data = payload();
+      const integration = await prisma.deliveryIntegration.findFirst({ where: { restaurantId: A.restaurantId, storeId: STORE } });
+      const ext = await prisma.externalOrder.create({
+        data: {
+          restaurantId: A.restaurantId, integrationId: integration.id, externalOrderId: data.orderId, status: 'PENDING',
+          totalAmount: 60, customerName: 'Ana', customerPhone: '1', deliveryAddress: 'Rua 1', items: JSON.stringify(data.items),
+        },
+      });
+
+      const responses = await Promise.all(Array.from({ length: 5 }, () => send(data)));
+
+      expect(responses.filter((r) => r.status >= 500)).toHaveLength(0);
+      expect(await counts(data.orderId)).toEqual({ external: 1, orders: 1 });
+      const order = await prisma.order.findFirst({ where: { externalOrderId: ext.id } });
+      expect((await prisma.externalOrder.findUnique({ where: { id: ext.id } })).internalOrderId).toBe(order.id);
     });
   });
 
