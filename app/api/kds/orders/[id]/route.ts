@@ -11,6 +11,7 @@ import { getOrCreateLoyaltyProgram } from '@/lib/loyalty/get-program';
 import { broadcastOrderUpdate, broadcastOrderCompleted } from '@/lib/socket';
 import { notifyOrderReady } from '@/lib/notification-utils';
 import { cancelOrder } from '@/lib/kds-cancel-order';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: params.id },
+    // An order of another restaurant is "not found" (404), never readable or changeable.
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: params.id, restaurantId },
       include: {
         items: {
           include: {
@@ -66,6 +73,15 @@ export async function PUT(
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+    const owned = await prisma.order.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     const body = await req.json();
@@ -185,6 +201,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     // Optional reason in the body (a DELETE may come without one).
     let reason: string | undefined;
     try {
@@ -192,7 +213,7 @@ export async function DELETE(
       if (typeof body?.reason === 'string' && body.reason.trim()) reason = body.reason.trim().slice(0, 200);
     } catch {}
 
-    const outcome = await cancelOrder(params.id, { userId: (session.user as any).id, reason });
+    const outcome = await cancelOrder(params.id, { restaurantId, userId: (session.user as any).id, reason });
 
     if (outcome.kind === 'not-found') {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });

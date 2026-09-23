@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
     const skip = parseInt(searchParams.get('skip') || '0');
 
     // An online (PIX/card) order reaches the kitchen only once its payment is APPROVED.
-    const where: any = { AND: [KITCHEN_VISIBLE_ORDER_WHERE] };
+    // Only THIS restaurant's orders: the list used to be unscoped and showed every restaurant's kitchen.
+    const where: any = { restaurantId, AND: [KITCHEN_VISIBLE_ORDER_WHERE] };
     if (status) where.status = status;
     if (priority) where.priority = priority;
     if (station) {

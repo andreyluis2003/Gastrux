@@ -24,10 +24,14 @@ export type CancelOutcome =
  * transaction, so a second or simultaneous cancel changes nothing and records no second loss, and
  * the status, the items and the loss either all happen or none does.
  */
-export async function cancelOrder(orderId: string, opts: { userId?: string; reason?: string } = {}): Promise<CancelOutcome> {
+export async function cancelOrder(
+  orderId: string,
+  opts: { restaurantId: string; userId?: string; reason?: string }
+): Promise<CancelOutcome> {
   const result = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
+    // Scoped to the caller's restaurant: another restaurant's order is "not found", never cancelled.
+    const order = await tx.order.findFirst({
+      where: { id: orderId, restaurantId: opts.restaurantId },
       include: { items: { include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } } } },
     });
     if (!order) return { kind: 'not-found' } as CancelOutcome;
@@ -35,7 +39,7 @@ export async function cancelOrder(orderId: string, opts: { userId?: string; reas
     if (!CANCELLABLE.includes(order.status)) return { kind: 'completed', order } as CancelOutcome;
 
     const moved = await tx.order.updateMany({
-      where: { id: orderId, status: { in: CANCELLABLE } },
+      where: { id: orderId, restaurantId: opts.restaurantId, status: { in: CANCELLABLE } },
       data: { status: 'CANCELLED' },
     });
     // A simultaneous cancel won between the read and the update: nothing more to do.

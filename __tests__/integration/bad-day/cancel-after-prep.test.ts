@@ -7,9 +7,10 @@
  * corrupt stock, and can neither repeat side effects nor be undone by a stray status update.
  * A case that documents a known gap is written with `it.failing` (the suite stays green and a case
  * flips to a failure the day its gap is fixed). Gaps, by priority:
- *   P0 security  C1 C2 C3   the kitchen order routes never check the restaurant (any signed-in user of ANY
- *                           restaurant can read, change or cancel any order; the kitchen list shows every
- *                           restaurant's orders)
+ *   (C1 C2 C3 fixed 2026-09-23: the kitchen order routes never checked the restaurant, so any signed-in
+ *   user of ANY restaurant could read, change or cancel any order and the list showed every restaurant's
+ *   orders; now scoped to getCurrentRestaurantId() and another restaurant's order is a 404)
+ *   C4 C5 C6 C7 fixed with the loss recording (audit, items closed, idempotent, COMPLETED refused)
  *   P0 money     C8 C9      cancelling a paid online order keeps the money with no refund and no alert; a
  *                           pending payment of a cancelled order stays live
  *   P1 stock     C10 C11    completing twice deducts stock (and cashback) twice; a cancelled order can be completed
@@ -25,7 +26,7 @@ jest.mock('../../../lib/whatsapp/get-restaurant', () => ({ getCurrentRestaurantI
 
 import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
-import { PUT as updateOrder, DELETE as cancelOrder } from '../../../app/api/kds/orders/[id]/route';
+import { GET as readOrder, PUT as updateOrder, DELETE as cancelOrder } from '../../../app/api/kds/orders/[id]/route';
 import { GET as listKds } from '../../../app/api/kds/orders/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -117,7 +118,7 @@ describe('bad day 4: cancellation after the kitchen started', () => {
   const statusOf = async (id: string) => (await prisma.order.findUnique({ where: { id } })).status;
 
   describe('who may cancel', () => {
-    it.failing('the owner of ANOTHER restaurant cannot cancel this restaurant\'s order (C1)', async () => {
+    it('the owner of ANOTHER restaurant cannot cancel this restaurant\'s order (C1)', async () => {
       const order = await makeOrder();
       asOwnerB();
 
@@ -127,7 +128,7 @@ describe('bad day 4: cancellation after the kitchen started', () => {
       expect(await statusOf(order.id)).toBe('PREPARING');
     });
 
-    it.failing('a user of ANOTHER restaurant cannot change the status of this restaurant\'s order (C2)', async () => {
+    it('a user of ANOTHER restaurant cannot change the status of this restaurant\'s order (C2)', async () => {
       const order = await makeOrder();
       asUser(B.ownerId, B.restaurantId, 'CASHIER');
 
@@ -137,7 +138,7 @@ describe('bad day 4: cancellation after the kitchen started', () => {
       expect(await statusOf(order.id)).toBe('PREPARING');
     });
 
-    it.failing('the kitchen list of one restaurant never shows another restaurant\'s orders (C3)', async () => {
+    it('the kitchen list of one restaurant never shows another restaurant\'s orders (C3)', async () => {
       const orderA = await makeOrder();
       const orderB = await prisma.order.create({
         data: { restaurantId: B.restaurantId, orderNumber: `C4B-${crypto.randomBytes(4).toString('hex')}`, orderType: 'DELIVERY', status: 'PREPARING', total: 10 },
@@ -149,6 +150,43 @@ describe('bad day 4: cancellation after the kitchen started', () => {
 
       expect(orders.map((o) => o.id)).toContain(orderA.id);
       expect(orders.map((o) => o.id)).not.toContain(orderB.id);
+    });
+  });
+
+  describe('who may read the order (C1-C3 follow-ups)', () => {
+    const get = (id: string) => readOrder(new Request(`http://localhost/api/kds/orders/${id}`) as any, { params: { id } });
+
+    it('the restaurant reads its own order; another restaurant gets 404 (existence is not leaked)', async () => {
+      const order = await makeOrder();
+
+      asOwnerA();
+      expect((await get(order.id)).status).toBe(200);
+      asOwnerB();
+      expect((await get(order.id)).status).toBe(404);
+    });
+
+    it('nothing is read, changed or cancelled when no restaurant can be resolved for the session (400)', async () => {
+      const order = await makeOrder();
+      (getCurrentRestaurantId as jest.Mock).mockResolvedValue(null);
+
+      expect((await get(order.id)).status).toBe(400);
+      expect((await put(order.id, { status: 'READY' })).status).toBe(400);
+      expect((await del(order.id)).status).toBe(400);
+      expect(await statusOf(order.id)).toBe('PREPARING');
+    });
+
+    it('the kitchen list total also counts only this restaurant', async () => {
+      await makeOrder();
+      await makeOrder();
+      await prisma.order.create({
+        data: { restaurantId: B.restaurantId, orderNumber: `C4B-${crypto.randomBytes(4).toString('hex')}`, orderType: 'DELIVERY', status: 'PREPARING', total: 10 },
+      });
+      asOwnerA();
+
+      const body = await (await listKds(new Request('http://localhost/api/kds/orders') as any)).json();
+
+      expect(body.total).toBe(2);
+      expect(body.orders).toHaveLength(2);
     });
   });
 
