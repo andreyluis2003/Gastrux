@@ -56,7 +56,7 @@ if ($confChanged) {
 if (Test-PgRunning) {
     if ($confChanged) {
         Write-Host 'Configuration changed: restarting PostgreSQL...'
-        [void](Invoke-Native -Echo -Exe $pgCtl -Arguments @('restart', '-D', $DataDir, '-l', $LogFile, '-w'))
+        Invoke-PgCtlDetached -Arguments @('restart', '-D', $DataDir, '-l', $LogFile, '-w')
     } else {
         Write-Host 'PostgreSQL already running.'
     }

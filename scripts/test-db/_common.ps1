@@ -187,5 +187,16 @@ function Start-TestPg {
     }
     $pgCtl = Get-PgTool 'pg_ctl'
     Write-Host ("Starting PostgreSQL on {0}:{1} (log: {2})" -f $PgHost, $PgPort, $LogFile)
-    [void](Invoke-Native -Echo -Exe $pgCtl -Arguments @('start', '-D', $DataDir, '-l', $LogFile, '-w'))
+    Invoke-PgCtlDetached -Arguments @('start', '-D', $DataDir, '-l', $LogFile, '-w')
+    if (-not (Test-PgRunning)) { throw "PostgreSQL did not start. See $LogFile" }
+}
+
+# pg_ctl start/restart leave the server process holding the caller's stdout: capturing that output
+# (`$x = & pg_ctl ...`) never returns. Run it with no redirection in a hidden window instead.
+function Invoke-PgCtlDetached {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    $pgCtl = Get-PgTool 'pg_ctl'
+    $quoted = ($Arguments | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+    $p = Start-Process -FilePath $pgCtl -ArgumentList $quoted -WindowStyle Hidden -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw ("pg_ctl {0} failed with exit code {1}. See {2}" -f $Arguments[0], $p.ExitCode, $LogFile) }
 }
