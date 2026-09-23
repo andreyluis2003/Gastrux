@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { getOrCreateLoyaltyProgram } from '@/lib/loyalty/get-program';
 import { broadcastOrderUpdate, broadcastOrderCompleted } from '@/lib/socket';
 import { notifyOrderReady } from '@/lib/notification-utils';
+import { cancelOrder } from '@/lib/kds-cancel-order';
 
 export const dynamic = 'force-dynamic';
 
@@ -184,14 +185,31 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const order = await prisma.order.update({
-      where: { id: params.id },
-      data: { status: 'CANCELLED' },
-    });
+    // Optional reason in the body (a DELETE may come without one).
+    let reason: string | undefined;
+    try {
+      const body = await req.json();
+      if (typeof body?.reason === 'string' && body.reason.trim()) reason = body.reason.trim().slice(0, 200);
+    } catch {}
+
+    const outcome = await cancelOrder(params.id, { userId: (session.user as any).id, reason });
+
+    if (outcome.kind === 'not-found') {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    if (outcome.kind === 'completed') {
+      return NextResponse.json(
+        { error: 'Um pedido concluído não pode ser cancelado', code: 'ORDER_ALREADY_COMPLETED' },
+        { status: 409 }
+      );
+    }
+    if (outcome.kind === 'already-cancelled') {
+      return NextResponse.json({ message: 'Order already cancelled', order: outcome.order });
+    }
 
     broadcastOrderUpdate(params.id, 'CANCELLED', { reason: 'Order cancelled' });
 
-    return NextResponse.json({ message: 'Order cancelled', order });
+    return NextResponse.json({ message: 'Order cancelled', order: outcome.order, loss: outcome.loss });
   } catch (error) {
     console.error('Error cancelling order:', error);
     return NextResponse.json(
