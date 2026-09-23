@@ -221,17 +221,67 @@ describe('bad day 3: delivery order webhook replayed', () => {
   });
 
   describe('items the kitchen cannot match', () => {
-    // R6: no matching recipe -> createOrderFromExternalOrder returns null; the webhook answers 201 and
-    // nobody is told that a paid delivery never reached the kitchen.
-    it.failing('an order with NO matching recipe is not lost silently (kitchen order or an operator alert) (R6)', async () => {
+    // R6 (fixed 2026-09-23): an order with no matching recipe used to vanish (201, no kitchen order,
+    // nobody told). Now the operator gets a CRITICAL alert, once per order even if the platform replays.
+    it('an order with NO matching recipe raises ONE critical alert, also when replayed (R6)', async () => {
       const data = payload({ items: [{ externalItemId: 'zz', name: `Prato inexistente ${tag}`, quantity: 1 }] });
 
       const res = await send(data);
+      await send(data);
 
-      const c = await counts(data.orderId);
-      const alerts = await prisma.notification.count({ where: { restaurantId: A.restaurantId } });
       expect(ok(res.status)).toBe(true);
-      expect(c.orders === 1 || alerts > 0).toBe(true);
+      expect(await counts(data.orderId)).toEqual({ external: 1, orders: 0 });
+      const alerts = await prisma.notification.findMany({ where: { restaurantId: A.restaurantId } });
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].severity).toBe('CRITICAL');
+      expect(alerts[0].message).toContain(data.orderId);
+      expect(alerts[0].message).toContain('Prato inexistente');
+    });
+
+    it('a partly matched order goes to the kitchen WITH the missing items written on the ticket, and alerts once', async () => {
+      const data = payload({
+        items: [
+          { externalItemId: 'x1', name: dishA.name, quantity: 2 },
+          { externalItemId: 'zz', name: `Sobremesa sem cadastro ${tag}`, quantity: 3 },
+        ],
+      });
+
+      await send(data);
+      await send(data);
+
+      const order = await prisma.order.findFirst({ where: { externalOrder: { externalOrderId: data.orderId } }, include: { items: true } });
+      expect(order.items.map((i) => [i.recipeId, i.quantity])).toEqual([[dishA.id, 2]]);
+      expect(order.specialInstructions).toContain('NÃO MAPEADOS');
+      expect(order.specialInstructions).toContain('3x Sobremesa sem cadastro');
+      const alerts = await prisma.notification.findMany({ where: { restaurantId: A.restaurantId } });
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].severity).toBe('HIGH');
+    });
+
+    it('an item with no name and no id matches NOTHING (it must not become an empty filter that matches any recipe)', async () => {
+      const data = payload({ items: [{ quantity: 1 }] });
+
+      await send(data);
+
+      expect(await counts(data.orderId)).toEqual({ external: 1, orders: 0 });
+      expect(await prisma.orderItem.count({ where: { order: { restaurantId: A.restaurantId } } })).toBe(0);
+    });
+
+    it('items that cannot be read raise a critical alert instead of vanishing', async () => {
+      const data = payload();
+      const integration = await prisma.deliveryIntegration.findFirst({ where: { restaurantId: A.restaurantId, storeId: STORE } });
+      await prisma.externalOrder.create({
+        data: {
+          restaurantId: A.restaurantId, integrationId: integration.id, externalOrderId: data.orderId, status: 'PENDING',
+          totalAmount: 60, customerName: 'Ana', customerPhone: '1', deliveryAddress: 'Rua 1', items: '{not json',
+        },
+      });
+
+      await send(data);
+
+      const alerts = await prisma.notification.findMany({ where: { restaurantId: A.restaurantId } });
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].severity).toBe('CRITICAL');
     });
 
     // R7 (fixed with R1, 2026-09-23): the recipe lookup had no restaurantId filter and matched by name
@@ -279,23 +329,69 @@ describe('bad day 3: delivery order webhook replayed', () => {
   describe('status updates out of order', () => {
     const statusEvent = (orderId: string, status: string) => ({ type: 'order.status_changed', orderId, storeId: STORE, status });
 
-    // R4: any status is written as received; there is no state machine like the payments one.
-    it.failing('a finished order (DELIVERED) is not moved back by a late older status (R4)', async () => {
+    const statusOf = async (orderId: string) =>
+      (await prisma.externalOrder.findFirst({ where: { restaurantId: A.restaurantId, externalOrderId: orderId } })).status;
+
+    // R4 (fixed 2026-09-23): any status used to be written as received (no state machine).
+    it('a finished order (DELIVERED) is not moved back by a late older status, and the platform gets a 2xx (R4)', async () => {
       const data = payload();
       await send(data);
       await send(statusEvent(data.orderId, 'DELIVERED'));
 
-      await send(statusEvent(data.orderId, 'PREPARING'));
+      const late = await send(statusEvent(data.orderId, 'PREPARING'));
 
-      const ext = await prisma.externalOrder.findFirst({ where: { restaurantId: A.restaurantId, externalOrderId: data.orderId } });
-      expect(ext.status).toBe('DELIVERED');
+      expect(late.status).toBe(200);
+      expect(await late.json()).toMatchObject({ ignored: true, status: 'DELIVERED' });
+      expect(await statusOf(data.orderId)).toBe('DELIVERED');
     });
 
-    // R5: findFirst returns null and the route still answers 200 {success:true}: the update is lost.
-    it.failing('a status for an order we have not received yet is not dropped silently (it is answered so the platform retries) (R5)', async () => {
-      const res = await send(statusEvent('NOT-YET-1', 'CONFIRMED'));
+    it('statuses move forward (skipping steps is fine) and a repeat changes nothing', async () => {
+      const data = payload();
+      await send(data);
 
-      expect(res.status === 404 || res.status === 202 || res.status === 409).toBe(true);
+      await send(statusEvent(data.orderId, 'CONFIRMED'));
+      expect(await statusOf(data.orderId)).toBe('CONFIRMED');
+      await send(statusEvent(data.orderId, 'READY'));
+      expect(await statusOf(data.orderId)).toBe('READY');
+      await send(statusEvent(data.orderId, 'CONFIRMED'));
+      expect(await statusOf(data.orderId)).toBe('READY');
+      const repeat = await send(statusEvent(data.orderId, 'READY'));
+      expect(repeat.status).toBe(200);
+      expect(await statusOf(data.orderId)).toBe('READY');
+    });
+
+    it('a cancellation is final: a later PREPARING or DELIVERED does not resurrect the order', async () => {
+      const data = payload();
+      await send(data);
+      await send(statusEvent(data.orderId, 'CANCELLED'));
+
+      await send(statusEvent(data.orderId, 'PREPARING'));
+      await send(statusEvent(data.orderId, 'DELIVERED'));
+
+      expect(await statusOf(data.orderId)).toBe('CANCELLED');
+    });
+
+    it('an unknown status name is rejected with 400 (not a 500)', async () => {
+      const data = payload();
+      await send(data);
+      const res = await send(statusEvent(data.orderId, 'TELEPORTED'));
+      expect(res.status).toBe(400);
+      expect(await statusOf(data.orderId)).toBe('PENDING');
+    });
+
+    // R5 (fixed 2026-09-23): a status for an order not received yet answered 200 and was lost.
+    it('a status that overtakes its order gets a retryable 503, and the retry is applied once the order arrives (R5)', async () => {
+      const data = payload();
+
+      const early = await send(statusEvent(data.orderId, 'CONFIRMED'));
+      expect(early.status).toBe(503);
+      expect(early.headers.get('retry-after')).toBe('30');
+
+      await send(data);
+      const retry = await send(statusEvent(data.orderId, 'CONFIRMED'));
+
+      expect(retry.status).toBe(200);
+      expect(await statusOf(data.orderId)).toBe('CONFIRMED');
     });
   });
 });

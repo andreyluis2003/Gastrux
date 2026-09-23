@@ -26,34 +26,34 @@ export async function createOrderFromExternalOrder(
       items = JSON.parse(externalOrder.items);
     } catch (e) {
       console.error('Failed to parse items:', e);
+      await alertDeliveryProblem(externalOrder, {
+        kind: 'unreadable',
+        severity: 'CRITICAL',
+        title: 'Pedido de plataforma ilegível',
+        message: `O pedido ${externalOrder.externalOrderId} chegou com os itens ilegíveis e NÃO foi para a cozinha. Confira o pedido na plataforma.`,
+      });
       return null;
     }
 
     // Find matching recipes (ONLY this restaurant's own: a recipe of another restaurant must
     // never end up on this kitchen's order)
     const orderItems = [];
+    const unmapped: Array<{ name: string; quantity: number }> = [];
     for (const item of items) {
-      const recipe = await prisma.recipe.findFirst({
-        where: {
-          restaurantId: externalOrder.restaurantId,
-          OR: [
-            {
-              menuMappings: {
-                some: {
-                  integrationId: externalOrder.integrationId,
-                  externalItemId: item.externalItemId,
-                },
-              },
-            },
-            {
-              name: {
-                contains: item.name,
-                mode: 'insensitive',
-              },
-            },
-          ],
-        },
-      });
+      // A missing name or id must not become an empty filter (Prisma treats `contains: undefined`
+      // as "no condition", which would match ANY recipe of the restaurant).
+      const matchers: any[] = [];
+      if (item.externalItemId) {
+        matchers.push({
+          menuMappings: { some: { integrationId: externalOrder.integrationId, externalItemId: item.externalItemId } },
+        });
+      }
+      if (typeof item.name === 'string' && item.name.trim()) {
+        matchers.push({ name: { contains: item.name.trim(), mode: 'insensitive' } });
+      }
+      const recipe = matchers.length
+        ? await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, OR: matchers } })
+        : null;
 
       if (recipe) {
         orderItems.push({
@@ -61,11 +61,22 @@ export async function createOrderFromExternalOrder(
           quantity: item.quantity || 1,
           specialInstructions: item.specialInstructions,
         });
+      } else {
+        unmapped.push({ name: String(item.name || item.externalItemId || 'item sem nome'), quantity: item.quantity || 1 });
       }
     }
 
+    const unmappedList = unmapped.map((u) => `${u.quantity}x ${u.name}`).join('; ');
+
     if (orderItems.length === 0) {
       console.warn('No matching recipes found');
+      await alertDeliveryProblem(externalOrder, {
+        kind: 'no-items-matched',
+        severity: 'CRITICAL',
+        title: 'Pedido de plataforma NÃO foi para a cozinha',
+        message: `O pedido ${externalOrder.externalOrderId} não teve nenhum item reconhecido (${unmappedList || 'sem itens'}). Cadastre o mapeamento dos itens ou prepare-o manualmente.`,
+        items: unmapped,
+      });
       return null;
     }
 
@@ -84,7 +95,7 @@ export async function createOrderFromExternalOrder(
     let order: any = null;
     for (let attempt = 0; attempt < 5 && !order; attempt++) {
       try {
-        order = await createKdsOrder(externalOrder, externalOrderId, orderItems, priority);
+        order = await createKdsOrder(externalOrder, externalOrderId, orderItems, priority, unmappedList);
       } catch (error: any) {
         const numberTaken = error?.code === 'P2002' && String(error?.meta?.target ?? '').includes('orderNumber');
         if (!numberTaken || attempt === 4) throw error;
@@ -95,6 +106,16 @@ export async function createOrderFromExternalOrder(
       where: { id: externalOrderId },
       data: { internalOrderId: order.id },
     });
+
+    if (unmapped.length) {
+      await alertDeliveryProblem(externalOrder, {
+        kind: 'partial',
+        severity: 'HIGH',
+        title: 'Pedido de plataforma com itens não reconhecidos',
+        message: `O pedido ${externalOrder.externalOrderId} foi para a cozinha SEM: ${unmappedList}. Prepare esses itens manualmente ou cadastre o mapeamento.`,
+        items: unmapped,
+      });
+    }
 
     broadcastOrderCreated(order);
     return order;
@@ -115,7 +136,45 @@ async function nextKdsOrderNumber(): Promise<string> {
   return `KDS-${String((Number.isFinite(current) ? current : 0) + 1).padStart(4, '0')}`;
 }
 
-async function createKdsOrder(externalOrder: any, externalOrderId: string, orderItems: any[], priority: any) {
+/**
+ * Tells the restaurant that a delivery-platform order did not reach the kitchen complete: a
+ * notification, once per external order and kind (a platform replay must not raise it again).
+ * Never throws: the order handling must not fail because the alert could not be stored.
+ */
+async function alertDeliveryProblem(
+  externalOrder: { id: string; restaurantId: string; externalOrderId: string },
+  alert: { kind: string; severity?: 'HIGH' | 'CRITICAL'; title: string; message: string; items?: Array<{ name: string; quantity: number }> }
+) {
+  try {
+    const dedupeKey = `delivery-${alert.kind}:${externalOrder.id}`;
+    const existing = await prisma.notification.findFirst({
+      where: { restaurantId: externalOrder.restaurantId, data: { path: ['dedupeKey'], equals: dedupeKey } },
+      select: { id: true },
+    });
+    if (existing) return;
+    await prisma.notification.create({
+      data: {
+        restaurantId: externalOrder.restaurantId,
+        type: 'SYSTEM_ERROR',
+        severity: alert.severity ?? 'HIGH',
+        title: alert.title,
+        message: alert.message,
+        data: {
+          kind: 'delivery_order_problem',
+          problem: alert.kind,
+          dedupeKey,
+          externalOrderId: externalOrder.id,
+          platformOrderId: externalOrder.externalOrderId,
+          items: alert.items ?? [],
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Could not store the delivery order alert:', error);
+  }
+}
+
+async function createKdsOrder(externalOrder: any, externalOrderId: string, orderItems: any[], priority: any, unmappedList = '') {
   const orderNumber = await nextKdsOrderNumber();
   return prisma.order.create({
     data: {
@@ -125,7 +184,12 @@ async function createKdsOrder(externalOrder: any, externalOrderId: string, order
       externalOrderId: externalOrderId,
       priority,
       estimatedPrepTime: 30,
-      specialInstructions: externalOrder.specialInstructions || undefined,
+      // Items that could not be matched are written on the ticket so the kitchen does not
+      // silently prepare an incomplete order.
+      specialInstructions:
+        [externalOrder.specialInstructions, unmappedList && `ATENÇÃO - ITENS NÃO MAPEADOS (não estão neste pedido): ${unmappedList}`]
+          .filter(Boolean)
+          .join(' | ') || undefined,
       totalItems: orderItems.length,
       items: {
         create: orderItems,

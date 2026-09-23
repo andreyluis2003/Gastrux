@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createOrderFromExternalOrder } from '@/lib/kds-integration';
+import { canMoveExternalOrderStatus, isExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -143,11 +144,28 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      if (externalOrder && data.status) {
-        await prisma.externalOrder.update({
-          where: { id: externalOrder.id },
-          data: { status: data.status },
-        });
+      if (!externalOrder) {
+        // The status can overtake the order itself. Answer with a retryable error instead of 200,
+        // otherwise the platform believes it was applied and never sends it again.
+        return NextResponse.json(
+          { error: 'Pedido ainda não recebido', code: 'ORDER_NOT_RECEIVED_YET' },
+          { status: 503, headers: { 'Retry-After': '30' } }
+        );
+      }
+
+      if (data.status) {
+        if (!isExternalOrderStatus(data.status)) {
+          return NextResponse.json({ error: 'status inválido' }, { status: 400 });
+        }
+        // A status only moves the order forward: a repeated or late older one is acknowledged and ignored.
+        if (canMoveExternalOrderStatus(externalOrder.status, data.status)) {
+          await prisma.externalOrder.updateMany({
+            where: { id: externalOrder.id, status: externalOrder.status },
+            data: { status: data.status },
+          });
+        } else {
+          return NextResponse.json({ success: true, ignored: true, status: externalOrder.status });
+        }
       }
     }
 
