@@ -70,6 +70,18 @@ export function getConnectPayment(client: MercadoPagoConfig, mpPaymentId: string
 }
 
 /**
+ * Every Mercado Pago payment attempt that carries our Payment.id as its
+ * external_reference (a card checkout can hold a rejected attempt and a later
+ * approved one). Used by the sweep for payments whose id we never recorded.
+ */
+export async function searchConnectPaymentsByReference(client: MercadoPagoConfig, paymentId: string) {
+  const res = await new Payment(client).search({
+    options: { external_reference: paymentId, sort: 'date_created', criteria: 'asc', limit: 20 },
+  });
+  return (res?.results ?? []) as any[];
+}
+
+/**
  * Refunds an APPROVED payment. Payment.cancel (used by the platform helper in
  * lib/mercado-pago.ts) only works for payments that are not yet approved.
  *

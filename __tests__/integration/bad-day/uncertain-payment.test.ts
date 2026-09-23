@@ -14,11 +14,13 @@ import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helper
 jest.mock('../../../lib/mercadopago-connect/payments', () => ({
   ...jest.requireActual('../../../lib/mercadopago-connect/payments'),
   getConnectPayment: jest.fn(),
+  searchConnectPaymentsByReference: jest.fn(),
 }));
 
-import { getConnectPayment } from '../../../lib/mercadopago-connect/payments';
+import { getConnectPayment, searchConnectPaymentsByReference } from '../../../lib/mercadopago-connect/payments';
 import { saveConnection } from '../../../lib/mercadopago-connect/connection-service';
 import { syncRestaurantPayment } from '../../../lib/mercadopago-connect/payment-sync';
+import { sweepPendingPayments } from '../../../lib/mercadopago-connect/payment-sweep';
 import { GET as pixStatus } from '../../../app/api/pagamentos/mp/pix/status/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -82,8 +84,9 @@ describe('bad day 6: payment with an uncertain status', () => {
     payment: await prisma.payment.findUnique({ where: { id: payment.id } }),
     order: await prisma.order.findUnique({ where: { id: order.id } }),
   });
+  // Makes the payment look `ms` old and never checked since (the sweep reads updatedAt as "last checked").
   const age = (ms: number) =>
-    prisma.payment.update({ where: { id: payment.id }, data: { createdAt: new Date(Date.now() - ms) } });
+    prisma.payment.update({ where: { id: payment.id }, data: { createdAt: new Date(Date.now() - ms), updatedAt: new Date(Date.now() - ms) } });
   const poll = () => pixStatus(new Request(`http://localhost/api/pagamentos/mp/pix/status?paymentId=${payment.id}`) as any);
   const alerts = () => prisma.notification.findMany({ where: { restaurantId: A.restaurantId } });
 
@@ -109,14 +112,16 @@ describe('bad day 6: payment with an uncertain status', () => {
       expect(getConnectPayment).not.toHaveBeenCalled();
     });
 
-    // GAP: only the customer's open page reconciles. A customer who paid and closed the
-    // page, on a payment whose webhook was lost, stays PENDING until someone polls.
-    it.failing('recovers with NO page open (server-side sweep of old PENDING payments)', async () => {
+    // G1 (fixed 2026-09-23): only the customer's open page used to reconcile, so a customer who
+    // paid and closed the page, on a payment whose webhook was lost, stayed PENDING until someone
+    // polled. POST /api/pagamentos/mp/reconcile (cron) now sweeps old PENDING/PROCESSING payments.
+    it('recovers with NO page open (server-side sweep of old PENDING payments) (G1)', async () => {
       await age(10 * 60_000);
       getConnectPayment.mockResolvedValue(mp());
 
-      // No poll: nothing but a background sweep may move it. There is no sweep to call, so this
-      // asserts the outcome after "time passes" and fails today.
+      const summary = await sweepPendingPayments();
+
+      expect(summary).toMatchObject({ examined: 1, resolved: 1 });
       const { payment: p, order: o } = await reload();
       expect(p.status).toBe('APPROVED');
       expect(o.paymentStatus).toBe('APPROVED');
@@ -255,6 +260,21 @@ describe('bad day 6: payment with an uncertain status', () => {
   });
 
   describe('Mercado Pago times out after creating the charge', () => {
-    it.todo('covered by mp-pix-route.test.ts "keeps the payment PENDING when the outcome is unknown (R23)"; add the sweep case once the sweep exists');
+    // mp-pix-route.test.ts covers the request side (the row stays PENDING, R23). This is the
+    // recovery side: the charge exists at Mercado Pago but we never stored its id.
+    it('the sweep finds the orphan charge by our reference and records the payment', async () => {
+      await prisma.payment.update({ where: { id: payment.id }, data: { gatewayPaymentId: null } });
+      await age(10 * 60_000);
+      searchConnectPaymentsByReference.mockResolvedValue([mp()]);
+      getConnectPayment.mockResolvedValue(mp());
+
+      const summary = await sweepPendingPayments();
+
+      expect(summary).toMatchObject({ examined: 1, resolved: 1 });
+      const { payment: p, order: o } = await reload();
+      expect(p.status).toBe('APPROVED');
+      expect(p.gatewayPaymentId).toBe('777');
+      expect(o.paymentStatus).toBe('APPROVED');
+    });
   });
 });
