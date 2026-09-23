@@ -166,7 +166,19 @@ describe('public PIX routes', () => {
       expect(payment.status).toBe('CANCELLED');
     });
 
-    it('returns 502 and cancels the payment on other Mercado Pago errors', async () => {
+    it('returns 502 and cancels the payment when Mercado Pago definitely rejects the call (4xx)', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const order = await makeOrder(A.restaurantId);
+      createConnectPix.mockRejectedValue({ status: 400, message: 'bad request' });
+
+      const res = await post({ orderId: order.id });
+
+      expect(res.status).toBe(502);
+      expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
+      expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('CANCELLED');
+    });
+
+    it('returns 502 but keeps the payment PENDING when the outcome is unknown (timeout, no status) (R23)', async () => {
       await saveConnection(A.restaurantId, TOKENS);
       const order = await makeOrder(A.restaurantId);
       createConnectPix.mockRejectedValue(new Error('MP down'));
@@ -175,7 +187,7 @@ describe('public PIX routes', () => {
 
       expect(res.status).toBe(502);
       expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
-      expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('CANCELLED');
+      expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('PENDING');
     });
 
     it('keeps the payment PENDING and retries when the local write fails after Mercado Pago succeeded (I3)', async () => {

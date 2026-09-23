@@ -333,7 +333,7 @@ export async function cleanupMultiTenantData(restaurantIds: string[]): Promise<v
     });
     await prisma.stockMovement.deleteMany({ where: { restaurantId } });
     await prisma.stock.deleteMany({ where: { restaurantId } });
-    await prisma.recipeIngredient.deleteMany({ where: { restaurantId } });
+    await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId } } });
     await prisma.recipe.deleteMany({ where: { restaurantId } });
     await prisma.ingredient.deleteMany({ where: { restaurantId } });
     await prisma.ingredientCategory.deleteMany({ where: { restaurantId } });

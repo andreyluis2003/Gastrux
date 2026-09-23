@@ -172,10 +172,19 @@ describe('Mercado Pago connect routes', () => {
     });
 
     it('rejects a valid state when the session belongs to a different user', async () => {
-      session('OWNER', 'someone-else');
+      // An authorized ADMIN member of the same restaurant (requireConnectManager passes, R20) who
+      // is not the user that started the flow: only the state's userId check can reject this.
+      session('ADMIN', adminA.userId, adminA.email);
       const state = createOAuthState({ restaurantId: A.restaurantId, userId: A.ownerId });
       const res = await callback(`code=abc&state=${state}`);
       expect(location(res)).toContain('mp=invalid_state');
+    });
+
+    it('rejects a valid state when the session user is not a member of the restaurant', async () => {
+      session('OWNER', 'someone-else');
+      const state = createOAuthState({ restaurantId: A.restaurantId, userId: A.ownerId });
+      const res = await callback(`code=abc&state=${state}`);
+      expect(location(res)).toContain('mp=unauthorized');
     });
 
     it('exchanges the code and stores an encrypted connection on the happy path', async () => {
