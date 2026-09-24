@@ -8,6 +8,23 @@ import { KDSOrderCard } from './kds-order-card';
 import { KDSStationView } from './kds-station-view';
 import { KDSMetrics } from './kds-metrics';
 import { toast } from 'sonner';
+import { printInHiddenFrame } from '@/lib/print/print-frame';
+
+// Per device (the kitchen computer): print new orders by itself, and which orders were printed
+const AUTOPRINT_KEY = 'gastrux:kds-autoprint';
+const PRINTED_KEY = 'gastrux:kds-printed';
+const readPrinted = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(PRINTED_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+const savePrinted = (ids: string[]) => {
+  try {
+    localStorage.setItem(PRINTED_KEY, JSON.stringify(ids.slice(-300)));
+  } catch {}
+};
 
 interface KDSDisplayProps {
   stationId?: string;
@@ -19,6 +36,32 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [autoPrint, setAutoPrint] = useState(false);
+
+  useEffect(() => {
+    try {
+      setAutoPrint(localStorage.getItem(AUTOPRINT_KEY) === '1');
+    } catch {}
+  }, []);
+
+  // Printing phase 1: every NEW order (not printed on this device yet) gets its kitchen ticket
+  useEffect(() => {
+    if (!autoPrint) return;
+    const printed = readPrinted();
+    const fresh = orders.filter((o) => o.status === 'PENDING' && !printed.includes(o.id));
+    if (fresh.length === 0) return;
+    savePrinted([...printed, ...fresh.map((o) => o.id)]);
+    fresh.forEach((o, i) => setTimeout(() => printInHiddenFrame(`/imprimir/cozinha/${o.id}`), i * 1500));
+  }, [orders, autoPrint]);
+
+  const toggleAutoPrint = (on: boolean) => {
+    // turning it on does not print the orders already on the screen, only the next ones
+    if (on) savePrinted([...readPrinted(), ...orders.map((o) => o.id)]);
+    try {
+      localStorage.setItem(AUTOPRINT_KEY, on ? '1' : '0');
+    } catch {}
+    setAutoPrint(on);
+  };
   const [viewMode, setViewMode] = useState<'all' | 'station'>(
     stationId ? 'station' : 'all'
   );
@@ -114,6 +157,10 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
       {/* Connection Status */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Kitchen Display System</h1>
+        <label className="flex items-center gap-2 text-sm" title="Para imprimir sem a janela de confirmação, abra o Chrome da cozinha com --kiosk-printing">
+          <input type="checkbox" checked={autoPrint} onChange={(e) => toggleAutoPrint(e.target.checked)} />
+          Imprimir pedidos novos automaticamente
+        </label>
         <div className="flex items-center gap-2">
           <div
             className={`w-3 h-3 rounded-full ${

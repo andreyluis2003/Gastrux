@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useOutbox } from '@/components/offline/outbox-provider';
+import { printInHiddenFrame } from '@/lib/print/print-frame';
 
 interface MenuEntry {
   id: string;
@@ -81,7 +82,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           toast.error(data.error || 'Erro ao registrar a venda');
           return;
         }
-        toast.success('Venda registrada');
+        toast.success('Venda registrada', {
+          action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${clientId}`) },
+          duration: 15000,
+        });
         if (data.nfce?.message) {
           (data.nfce.nfce?.status === 'authorized' ? toast.success : toast.warning)(data.nfce.message);
         }

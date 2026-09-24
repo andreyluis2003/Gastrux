@@ -61,6 +61,8 @@ export async function GET(req: NextRequest) {
           include: {
             recipe: true,
             station: true,
+            // the kitchen must see "sem cebola" / "ponto da carne" on the screen too
+            modifiers: { include: { modifier: { select: { name: true } } } },
           },
         },
         stationAssignments: {

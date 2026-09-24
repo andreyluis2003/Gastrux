@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { OfflineUnavailableError } from '@/lib/offline/outbox';
-import { ArrowLeft, Trash2, Plus, Send, Receipt, FileText, CheckCircle2 } from 'lucide-react';
+import { printInHiddenFrame } from '@/lib/print/print-frame';
+import { ArrowLeft, Trash2, Plus, Send, Receipt, FileText, CheckCircle2, Printer } from 'lucide-react';
 
 interface MenuItemEntry {
   id: string;
@@ -186,7 +187,10 @@ export default function ComandaDetailPage() {
         toast.error(data.error || 'Erro ao fechar a conta');
         return;
       }
-      toast.success('Conta fechada');
+      toast.success('Conta fechada', {
+        action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${sessionId}`) },
+        duration: 15000,
+      });
       const nfce = data.nfce;
       if (nfce?.nfce?.status === 'authorized') {
         toast.success(nfce.message);
@@ -616,6 +620,18 @@ export default function ComandaDetailPage() {
                 <CheckCircle2 className="w-5 h-5" />
                 {session?.status === 'CLOSED' ? 'Conta fechada' : 'Fechar conta'}
               </Button>
+
+              {session?.status === 'CLOSED' && (
+                <Button
+                  onClick={() => printInHiddenFrame(`/imprimir/cupom/${sessionId}`)}
+                  variant="outline"
+                  className="w-full mt-2 gap-2"
+                  size="lg"
+                >
+                  <Printer className="w-5 h-5" />
+                  Imprimir cupom
+                </Button>
+              )}
 
               {emittedDoc && (
                 <a

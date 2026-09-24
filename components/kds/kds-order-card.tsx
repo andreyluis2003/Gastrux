@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Printer, Zap } from 'lucide-react';
+import { printInHiddenFrame } from '@/lib/print/print-frame';
 import { cn } from '@/lib/utils';
 
 interface OrderItem {
@@ -18,6 +19,7 @@ interface OrderItem {
   station?: {
     name: string;
   };
+  modifiers?: { modifier?: { name: string } | null }[];
 }
 
 interface OrderCardProps {
@@ -181,6 +183,13 @@ export function KDSOrderCard({
                 <p className="font-medium">
                   {item.quantity}x {item.recipe.name}
                 </p>
+                {(item.modifiers ?? []).map((m, idx) =>
+                  m.modifier?.name ? (
+                    <p key={idx} className="text-xs font-semibold text-red-700">
+                      * {m.modifier.name}
+                    </p>
+                  ) : null
+                )}
                 {item.station && (
                   <p className="text-xs text-gray-500">{item.station.name}</p>
                 )}
@@ -206,6 +215,15 @@ export function KDSOrderCard({
 
       {/* Actions */}
       <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          aria-label={`Imprimir pedido ${order.orderNumber}`}
+          title="Imprimir ticket da cozinha"
+          onClick={() => printInHiddenFrame(`/imprimir/cozinha/${order.id}`)}
+        >
+          <Printer className="w-4 h-4" />
+        </Button>
         {order.status === 'PENDING' && (
           <Button
             size="sm"

@@ -1,0 +1,28 @@
+/* 80 mm thermal paper: only the ticket is printed (the app menus and banners are hidden) */
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+.print-ticket {
+  width: 72mm;
+  margin: 0 auto;
+  padding: 2mm 0;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.25;
+  color: #000;
+  background: #fff;
+}
+.print-ticket h1 { font-size: 16px; font-weight: 700; text-align: center; margin: 0 0 2mm; }
+.print-ticket .big { font-size: 20px; font-weight: 700; }
+.print-ticket .center { text-align: center; }
+.print-ticket .row { display: flex; justify-content: space-between; gap: 2mm; }
+.print-ticket hr { border: 0; border-top: 1px dashed #000; margin: 2mm 0; }
+.print-ticket .muted { font-size: 11px; }
+.print-ticket .break { word-break: break-all; }
+@media print {
+  body * { visibility: hidden; }
+  .print-ticket, .print-ticket * { visibility: visible; }
+  .print-ticket { position: absolute; left: 0; top: 0; }
+  .no-print { display: none !important; }
+}
