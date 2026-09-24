@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { lineTotal } from '@/lib/comanda/line-total';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ interface SessionItem {
   quantity: number;
   price: string | number;
   recipe: { name: string };
+  modifiers?: { priceAdjustment: string | number; modifier?: { name: string } }[];
 }
 
 interface Modifier {
@@ -220,21 +222,23 @@ export default function ComandaDetailPage() {
     );
   };
 
-  const getModifierPrice = () => {
-    return selectedModifiers.reduce((sum, modId) => {
-      const mod = modifiers.find((m) => m.id === modId);
-      return sum + (mod?.priceAdjustment || 0);
-    }, 0);
-  };
+  // The subtotal of the line being added: each modifier's surcharge applies to EACH unit.
+  const getLineSubtotal = (unitPrice: number) =>
+    lineTotal(
+      unitPrice,
+      quantity,
+      selectedModifiers.map((modId) => modifiers.find((m) => m.id === modId)?.priceAdjustment || 0)
+    );
 
   const filteredRecipes = recipes.filter((r) =>
     r.name?.toLowerCase().includes(searchTerm.toLowerCase()) && r.available !== false
   );
 
+  // Same rule as the PIX charged for this tab (lib/comanda/line-total.ts), modifiers included.
   const totalPrice =
     session?.items?.reduce(
       (sum: number, item: SessionItem) =>
-        sum + Number(item.price) * item.quantity,
+        sum + lineTotal(item.price, item.quantity, (item.modifiers ?? []).map((m) => m.priceAdjustment)),
       0
     ) || 0;
 
@@ -332,7 +336,7 @@ export default function ComandaDetailPage() {
                         Subtotal
                       </label>
                       <div className="text-2xl font-bold text-green-600">
-                        R$ {(Number(selectedRecipe.price || selectedRecipe.sellingPrice || 0) * quantity + getModifierPrice()).toFixed(2)}
+                        R$ {getLineSubtotal(Number(selectedRecipe.price || selectedRecipe.sellingPrice || 0)).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -397,6 +401,12 @@ export default function ComandaDetailPage() {
                       <div className="text-xs text-gray-500">
                         {item.quantity}x R$ {Number(item.price).toFixed(2)}
                       </div>
+                      {(item.modifiers ?? []).map((m, idx) => (
+                        <div key={idx} className="text-xs text-gray-500">
+                          + {m.modifier?.name ?? 'Adicional'}
+                          {Number(m.priceAdjustment) !== 0 && ` (R$ ${Number(m.priceAdjustment).toFixed(2)} cada)`}
+                        </div>
+                      ))}
                     </div>
                     <Button
                       onClick={() => handleRemoveItem(item.id)}

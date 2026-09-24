@@ -23,7 +23,12 @@ export async function GET(
       include: {
         user: { select: { name: true } },
         table: { include: { section: { select: { name: true } } } },
-        items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
+        items: {
+          include: {
+            recipe: { select: { name: true, sellingPrice: true } },
+            modifiers: { include: { modifier: { select: { name: true } } } },
+          },
+        },
         order: { select: { orderNumber: true, status: true } },
       },
     });

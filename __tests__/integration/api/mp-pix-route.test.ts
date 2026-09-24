@@ -295,13 +295,12 @@ describe('public PIX routes', () => {
       expect(createConnectPix.mock.calls[0][1].description).toBe('Mesa 7');
     });
 
-    it("adds the paid modifiers of each line to the tab's amount (I1)", async () => {
+    it("adds the paid modifiers of each line to the tab's amount, applied to EACH unit (I1)", async () => {
       await saveConnection(A.restaurantId, TOKENS);
-      // Line 1: 2 x 10.50 + (2.00 + 0.50) = 23.50  (the adjustments are added
-      // once per line, not per unit - one OrderSessionItemModifier row exists
-      // per (sessionItem, modifier) whatever the quantity).
-      // Line 2: 1 x 20.00 + 1.25 = 21.25
-      // Total: 44.75  (without modifiers it would have been 41.00)
+      // A modifier's surcharge applies to every unit of the line (owner's rule, 2026-09-24):
+      // Line 1: 2 x (10.50 + 2.00 + 0.50) = 26.00
+      // Line 2: 1 x (20.00 + 1.25) = 21.25
+      // Total: 47.25  (without modifiers it would have been 41.00)
       const { qrToken } = await makeTable(A.restaurantId, A.ownerId, [
         [2, 10.5, [2, 0.5]],
         [1, 20, [1.25]],
@@ -311,9 +310,9 @@ describe('public PIX routes', () => {
       const body = await res.json();
 
       expect(res.status).toBe(200);
-      expect(body.amount).toBe(44.75);
-      expect(createConnectPix.mock.calls[0][1].amount).toBe(44.75);
-      expect(Number((await prisma.payment.findUnique({ where: { id: body.paymentId } })).amount)).toBe(44.75);
+      expect(body.amount).toBe(47.25);
+      expect(createConnectPix.mock.calls[0][1].amount).toBe(47.25);
+      expect(Number((await prisma.payment.findUnique({ where: { id: body.paymentId } })).amount)).toBe(47.25);
     });
 
     it('sums in integer cents, so repeated cent prices do not drift', async () => {

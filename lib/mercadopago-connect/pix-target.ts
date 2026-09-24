@@ -1,5 +1,6 @@
 import type { OrderSessionStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { lineTotalCents } from '@/lib/comanda/line-total';
 
 /**
  * Turns "what is the customer paying for" into a restaurant plus an amount
@@ -30,15 +31,6 @@ const OPEN_SESSION_STATUSES: OrderSessionStatus[] = ['OPEN', 'SENT_TO_KITCHEN', 
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-/**
- * Money is summed in INTEGER CENTS: every Decimal is rounded to cents once and
- * the integers are added, instead of accumulating floats and rounding only at
- * the end.
- */
-function toCents(value: unknown): number {
-  return Math.round(Number(value ?? 0) * 100);
 }
 
 /** Shown when someone asks for a PIX for an order created with another payment method. */
@@ -113,17 +105,11 @@ async function resolveTable(qrToken: string): Promise<ResolveResult> {
   });
   if (!session) return { ok: false, status: 409, error: 'Nenhuma comanda aberta nesta mesa' };
 
-  // A comanda line costs `price * quantity` plus the adjustments of the
-  // modifiers attached to that line. OrderSessionItemModifier has ONE row per
-  // (sessionItem, modifier) whatever the quantity - @@unique([sessionItemId,
-  // modifierId]) - and the comanda screen prices a line the same way
-  // (app/comanda/[sessionId]/page.tsx: `price * quantity + getModifierPrice()`),
-  // so the adjustment is added once per line and NOT multiplied by quantity.
+  // A comanda line costs (price + the adjustments of its modifiers) * quantity: a
+  // modifier's surcharge applies to EACH unit (owner's rule, 2026-09-24). The same
+  // function prices the comanda screen and the revenue reports.
   const totalCents = session.items.reduce(
-    (sum, item) =>
-      sum +
-      toCents(item.price) * item.quantity +
-      item.modifiers.reduce((mods, mod) => mods + toCents(mod.priceAdjustment), 0),
+    (sum, item) => sum + lineTotalCents(item.price, item.quantity, item.modifiers.map((m) => m.priceAdjustment)),
     0
   );
   const amount = totalCents / 100;
