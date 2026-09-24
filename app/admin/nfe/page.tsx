@@ -149,6 +149,24 @@ export default function NFePage() {
         </Card>
       </div>
 
+      {/* Unused numbers: SEFAZ requires them to be voided (inutilização), usually by the 10th of next month */}
+      {stats?.numbersToVoid && stats.numbersToVoid.length > 0 && (
+        <Card className="p-4 border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+          <h3 className="font-semibold mb-1">Números a inutilizar na SEFAZ ({stats.numbersToVoid.length})</h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            Números que não viraram nota válida. Reenvie a nota rejeitada (o mesmo número é reaproveitado) ou
+            peça ao contador a inutilização, normalmente até o dia 10 do mês seguinte.
+          </p>
+          <div className="flex flex-wrap gap-2 text-sm">
+            {stats.numbersToVoid.map((n: any) => (
+              <span key={`${n.documentType}-${n.series}-${n.number}`} className="px-2 py-1 rounded border bg-background">
+                {n.documentType} série {n.series} nº {n.number} · {n.reason === 'gap' ? 'pulado' : 'rejeitado'}
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Top rejected reasons */}
       {stats?.topRejectedReasons && stats.topRejectedReasons.length > 0 && (
         <Card className="p-4">

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { autoEmitNFCe } from '@/lib/nfe/emit-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,11 +58,17 @@ export async function PUT(
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
     const ownedSession = await prisma.orderSession.findFirst({
       where: { id: params.id, restaurantId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!ownedSession) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
 
-    const { notes, customerName, status } = await request.json();
+    const { notes, customerName, status, customerCPF, paymentMethod } = await request.json();
+
+    // A cancelled comanda stays cancelled; a closed one is only closed once (the note is issued once)
+    if (status !== undefined && ownedSession.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'Comanda cancelada não pode mudar de status' }, { status: 409 });
+    }
+    const closing = status === 'CLOSED' && ownedSession.status !== 'CLOSED';
 
     const updated = await prisma.orderSession.update({
       where: { id: params.id },
@@ -74,6 +81,20 @@ export async function PUT(
         items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
       },
     });
+
+    if (closing) {
+      // Closing the bill issues the NFC-e when the restaurant enabled it (NFeConfig.autoIssueOnSale).
+      // Never fails the close: a problem comes back as a message and leaves an alert for the manager.
+      const nfce = await autoEmitNFCe({
+        restaurantId,
+        orderSessionId: params.id,
+        customerCPF,
+        customerName: customerName || updated.customerName,
+        paymentMethod,
+        onlyIfEnabled: true,
+      });
+      return NextResponse.json({ ...updated, nfce });
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

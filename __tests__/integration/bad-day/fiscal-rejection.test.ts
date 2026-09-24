@@ -16,13 +16,14 @@
  *   60; /api/nfe/emit now uses lib/comanda/line-total.ts)
  *   (F3 fixed 2026-09-24: a network error / timeout / 408 / 429 / 5xx was recorded as "rejected" although
  *   the note may have been authorised; now "processing", which blocks a second emission)
- *   P1 numbering F2   no unique (config, type, series, number): two notes can share a number
- *   P1 numbering F4   emitting again after a rejection creates a NEW document with the NEXT number,
- *                     leaving the rejected number as a gap SEFAZ requires to be voided (inutilização)
- *   P1 feature   F6   /api/nfe/auto-emit always fails (invalid NFeItem fields, wrong provider payload)
- *                     and nothing calls it: the "emitir automaticamente" setting has no effect
- *   P2           F7   re-sending a rejected note always declares payment "dinheiro"
- *   P2           F8   a rejection only shows a toast: no alert stays for the manager
+ *   (F2 F4 fixed 2026-09-24, lib/nfe/numbering.ts: unique (config, type, series, number); the number
+ *   is reserved in the insert transaction; emitting again after a rejection re-sends the same note
+ *   under its number instead of burning the next one; unused numbers are listed for inutilização)
+ *   (F6 fixed 2026-09-24, lib/nfe/emit-session.ts: auto-emit always failed and nothing called it; now
+ *   it shares the manual rules, and closing a comanda (PUT status CLOSED) issues the note when
+ *   NFeConfig.autoIssueOnSale is on, the default for new configs)
+ *   (F7 F8 fixed 2026-09-24: a re-send keeps the payment method first declared; a rejection, denial
+ *   or unknown outcome leaves a notification for the restaurant)
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
@@ -48,6 +49,8 @@ import { POST as submit } from '../../../app/api/nfe/documents/[id]/submit/route
 import { POST as cancelDoc } from '../../../app/api/nfe/documents/[id]/cancel/route';
 import { GET as readDoc } from '../../../app/api/nfe/documents/[id]/route';
 import { FocusNFeClient } from '../../../lib/nfe/focus-nfe-client';
+import { PUT as updateComanda } from '../../../app/api/comanda/sessions/[id]/route';
+import { listNumbersToVoid } from '../../../lib/nfe/numbering';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -101,7 +104,7 @@ describe('bad day 7: fiscal rejection', () => {
     await prisma.nFeLog.deleteMany({ where: { document: { configId: configA.id } } });
     await prisma.nFeDocument.deleteMany({ where: { configId: configA.id } });
     await prisma.notification.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
-    await prisma.nFeConfig.update({ where: { id: configA.id }, data: { nextNumberNFCe: 1 } });
+    await prisma.nFeConfig.update({ where: { id: configA.id }, data: { nextNumberNFCe: 1, autoIssueOnSale: true } });
   };
 
   beforeAll(async () => {
@@ -281,13 +284,13 @@ describe('bad day 7: fiscal rejection', () => {
   });
 
   describe('F2 / F4: numbering', () => {
-    it.failing('two notes of the same type and series can never share a number', async () => {
+    it('two notes of the same type and series can never share a number', async () => {
       const base = { configId: configA.id, documentType: 'NFCe', documentSeries: 1, documentNumber: 900, status: 'pending' };
       await prisma.nFeDocument.create({ data: base });
       await expect(prisma.nFeDocument.create({ data: base })).rejects.toThrow();
     });
 
-    it.failing('emitting again after a rejection re-sends the same note instead of burning a number', async () => {
+    it('emitting again after a rejection re-sends the same note instead of burning a number', async () => {
       fakeProvider.emitNFCe.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(authorized());
       const s = await comanda();
       await emitFor(s.id);
@@ -302,7 +305,7 @@ describe('bad day 7: fiscal rejection', () => {
   });
 
   describe('F6: automatic emission', () => {
-    it.failing('auto-emit issues the note of a closed comanda', async () => {
+    it('auto-emit issues the note of a closed comanda', async () => {
       fakeProvider.emitNFCe.mockResolvedValueOnce(authorized());
       const s = await comanda();
 
@@ -314,7 +317,7 @@ describe('bad day 7: fiscal rejection', () => {
   });
 
   describe('F7 / F8: correction and follow-up', () => {
-    it.failing('re-sending a rejected note keeps the payment method first declared', async () => {
+    it('re-sending a rejected note keeps the payment method first declared', async () => {
       fakeProvider.emitNFCe.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(authorized());
       const s = await comanda();
       await emitFor(s.id, { paymentMethod: 'pix' });
@@ -325,13 +328,155 @@ describe('bad day 7: fiscal rejection', () => {
       expect(fakeProvider.emitNFCe.mock.calls[1][0].paymentMethod).toBe('pix');
     });
 
-    it.failing('a rejection leaves an alert for the restaurant, not only a toast', async () => {
+    it('a rejection leaves an alert for the restaurant, not only a toast', async () => {
       fakeProvider.emitNFCe.mockResolvedValueOnce(rejected());
       const s = await comanda();
 
       await emitFor(s.id);
 
       expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBeGreaterThan(0);
+    });
+  });
+
+  describe('numbering under pressure', () => {
+    it('five comandas emitted at once get five different consecutive numbers', async () => {
+      fakeProvider.emitNFCe.mockImplementation(async () => authorized());
+      const all = await Promise.all([1, 2, 3, 4, 5].map(() => comanda()));
+
+      const answers = await Promise.all(all.map((s) => emitFor(s.id)));
+
+      expect(answers.every((r) => r.status === 200)).toBe(true);
+      const numbers = (await prisma.nFeDocument.findMany({ where: { configId: configA.id } }))
+        .map((d) => d.documentNumber)
+        .sort((a, b) => a - b);
+      expect(numbers).toEqual([1, 2, 3, 4, 5]);
+      expect((await prisma.nFeConfig.findUnique({ where: { id: configA.id } })).nextNumberNFCe).toBe(6);
+    });
+
+    it('two clicks at once on the same comanda issue one note (the other gets 409)', async () => {
+      fakeProvider.emitNFCe.mockImplementation(async () => authorized());
+      const s = await comanda();
+
+      const answers = await Promise.all([emitFor(s.id), emitFor(s.id)]);
+
+      expect(answers.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(await docsOf(s.id)).toHaveLength(1);
+      expect(fakeProvider.emitNFCe).toHaveBeenCalledTimes(1);
+    });
+
+    it('a counter behind a number already used skips it instead of duplicating', async () => {
+      await prisma.nFeDocument.create({
+        data: { configId: configA.id, documentType: 'NFCe', documentSeries: 1, documentNumber: 1, status: 'authorized' },
+      });
+      fakeProvider.emitNFCe.mockResolvedValueOnce(authorized());
+      const s = await comanda();
+
+      const res = await emitFor(s.id);
+
+      expect(res.status).toBe(200);
+      expect((await docsOf(s.id))[0].documentNumber).toBe(2);
+    });
+
+    it('a denied note keeps its number: emitting again uses the next one', async () => {
+      fakeProvider.emitNFCe
+        .mockResolvedValueOnce({ ok: false, status: 'denied', rejectionReason: 'Uso denegado: irregularidade fiscal do emitente' })
+        .mockResolvedValueOnce(authorized());
+      const s = await comanda();
+      await emitFor(s.id);
+
+      await emitFor(s.id);
+
+      const docs = await docsOf(s.id);
+      expect(docs.map((d) => [d.documentNumber, d.status])).toEqual([[1, 'denied'], [2, 'authorized']]);
+    });
+
+    it('lists the numbers to void: holes and rejected notes nobody re-sent', async () => {
+      const base = { configId: configA.id, documentType: 'NFCe', documentSeries: 1 };
+      await prisma.nFeDocument.create({ data: { ...base, documentNumber: 1, status: 'authorized' } });
+      const rej = await prisma.nFeDocument.create({ data: { ...base, documentNumber: 2, status: 'rejected' } });
+      await prisma.nFeDocument.create({ data: { ...base, documentNumber: 4, status: 'authorized' } });
+      await prisma.nFeDocument.create({ data: { ...base, documentNumber: 5, status: 'processing' } });
+      await prisma.nFeConfig.update({ where: { id: configA.id }, data: { nextNumberNFCe: 7 } });
+
+      const toVoid = await listNumbersToVoid(configA.id);
+
+      expect(toVoid).toEqual([
+        { documentType: 'NFCe', series: 1, number: 2, reason: 'rejected', documentId: rej.id },
+        { documentType: 'NFCe', series: 1, number: 3, reason: 'gap' },
+        { documentType: 'NFCe', series: 1, number: 6, reason: 'gap' },
+      ]);
+    });
+  });
+
+  describe('closing the comanda issues the note (owner decision 2026-09-24)', () => {
+    const close = (id: string, body: any = {}) =>
+      updateComanda(
+        new Request(`http://localhost/api/comanda/sessions/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'CLOSED', ...body }) }) as any,
+        { params: { id } }
+      );
+    const openComanda = async () => {
+      const s = await comanda();
+      await prisma.orderSession.update({ where: { id: s.id }, data: { status: 'OPEN' } });
+      return s;
+    };
+
+    it('closes and issues the note with the CPF and payment method asked at the close', async () => {
+      fakeProvider.emitNFCe.mockResolvedValueOnce(authorized());
+      const s = await openComanda();
+
+      const res = await close(s.id, { customerCPF: '123.456.789-09', paymentMethod: 'pix' });
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.status).toBe('CLOSED');
+      expect(body.nfce.nfce.status).toBe('authorized');
+      const sent = fakeProvider.emitNFCe.mock.calls[0][0];
+      expect(sent.customerCPF).toBe('12345678909');
+      expect(sent.paymentMethod).toBe('pix');
+    });
+
+    it('closing twice issues one note', async () => {
+      fakeProvider.emitNFCe.mockImplementation(async () => authorized());
+      const s = await openComanda();
+
+      await close(s.id);
+      await close(s.id);
+
+      expect(await docsOf(s.id)).toHaveLength(1);
+    });
+
+    it('a rejection does not block the close and leaves an alert', async () => {
+      fakeProvider.emitNFCe.mockResolvedValueOnce(rejected());
+      const s = await openComanda();
+
+      const res = await close(s.id);
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('CLOSED');
+      expect(body.nfce.message).toMatch(/rejeitada/);
+      expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
+    });
+
+    it('with automatic emission turned off, closing issues no note', async () => {
+      await prisma.nFeConfig.update({ where: { id: configA.id }, data: { autoIssueOnSale: false } });
+      const s = await openComanda();
+
+      const body = await (await close(s.id)).json();
+
+      expect(body.status).toBe('CLOSED');
+      expect(fakeProvider.emitNFCe).not.toHaveBeenCalled();
+      expect(await docsOf(s.id)).toHaveLength(0);
+    });
+
+    it('a cancelled comanda cannot be closed', async () => {
+      const s = await openComanda();
+      await prisma.orderSession.update({ where: { id: s.id }, data: { status: 'CANCELLED' } });
+
+      const res = await close(s.id);
+
+      expect(res.status).toBe(409);
+      expect(fakeProvider.emitNFCe).not.toHaveBeenCalled();
     });
   });
 

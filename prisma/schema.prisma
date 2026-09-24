@@ -2169,7 +2169,7 @@ model NFeConfig {
   environment           String        @default("sandbox")
   issueNFCeForCPF       Boolean       @default(true)
   issueNFeForCNPJ       Boolean       @default(true)
-  autoIssueOnSale       Boolean       @default(false)
+  autoIssueOnSale       Boolean       @default(true) // market practice: the note is issued when the sale closes
   active                Boolean       @default(true)
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
@@ -2229,6 +2229,8 @@ model NFeDocument {
   @@index([issueDate])
   @@index([orderId])
   @@index([orderSessionId])
+  // A number is used once per emitter, model and series (a rejected note is re-sent under its own number)
+  @@unique([configId, documentType, documentSeries, documentNumber], map: "nfe_documents_number_key")
   @@map("nfe_documents")
 }
 

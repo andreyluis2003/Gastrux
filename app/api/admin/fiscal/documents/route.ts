@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createDocumentWithNextNumber } from '@/lib/nfe/numbering';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,23 +93,15 @@ export async function POST(req: NextRequest) {
   const documentType = body.documentType || 'NFCe';
   const isNFCe = documentType === 'NFCe';
 
-  // Increment document number
-  const numberField = isNFCe ? 'nextNumberNFCe' : 'nextNumberNFe';
-  const seriesField = isNFCe ? 'seriesNFCe' : 'seriesNFe';
-  const docNumber = config[numberField];
-  const docSeries = config[seriesField];
-
   // Calculate totals
   const items = body.items || [];
   const totalAmount = items.reduce((sum: number, i: any) => sum + (Number(i.totalPrice) || 0), 0);
 
-  // Create document
-  const document = await prisma.nFeDocument.create({
+  // Number reserved atomically with the insert (lib/nfe/numbering.ts): never shared, never skipped
+  const document = await createDocumentWithNextNumber({
+    configId: config.id,
+    documentType: isNFCe ? 'NFCe' : 'NFe',
     data: {
-      configId: config.id,
-      documentType,
-      documentNumber: docNumber,
-      documentSeries: docSeries,
       customerName: body.customerName || null,
       customerCPF: body.customerCPF || null,
       customerCNPJ: body.customerCNPJ || null,
@@ -136,11 +129,8 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   });
 
-  // Increment next number
-  await prisma.nFeConfig.update({
-    where: { id: config.id },
-    data: isNFCe ? { nextNumberNFCe: { increment: 1 } } : { nextNumberNFe: { increment: 1 } },
-  });
+  const docNumber = document.documentNumber;
+  const docSeries = document.documentSeries;
 
   // Log submission
   await prisma.nFeLog.create({

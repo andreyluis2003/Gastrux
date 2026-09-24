@@ -7,7 +7,7 @@ import { lineTotal } from '@/lib/comanda/line-total';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { ArrowLeft, Trash2, Plus, Send, Receipt, FileText } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Send, Receipt, FileText, CheckCircle2 } from 'lucide-react';
 
 interface MenuItemEntry {
   id: string;
@@ -42,6 +42,7 @@ interface Session {
     section: { name: string };
   };
   customerName?: string;
+  status?: string;
 }
 
 export default function ComandaDetailPage() {
@@ -62,6 +63,11 @@ export default function ComandaDetailPage() {
   const [nfceName, setNfceName] = useState('');
   const [emittingNfce, setEmittingNfce] = useState(false);
   const [emittedDoc, setEmittedDoc] = useState<any>(null);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeCpf, setCloseCpf] = useState('');
+  const [closePayment, setClosePayment] = useState('dinheiro');
+  const [closingBill, setClosingBill] = useState(false);
+  const isClosed = session?.status === 'CLOSED' || session?.status === 'CANCELLED';
 
   useEffect(() => {
     Promise.all([fetchSession(), fetchRecipes(), fetchModifiers()]);
@@ -94,6 +100,44 @@ export default function ComandaDetailPage() {
       toast.error(e?.message || 'Erro');
     } finally {
       setEmittingNfce(false);
+    }
+  };
+
+  // Closing the bill issues the NFC-e automatically when the restaurant enabled it (market practice:
+  // "CPF na nota?" is asked here, before closing). A fiscal problem never blocks the close.
+  const handleCloseBill = async () => {
+    try {
+      setClosingBill(true);
+      const res = await fetch(`/api/comanda/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CLOSED',
+          customerCPF: closeCpf.replace(/D/g, '') || undefined,
+          paymentMethod: closePayment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Erro ao fechar a conta');
+        return;
+      }
+      toast.success('Conta fechada');
+      const nfce = data.nfce;
+      if (nfce?.nfce?.status === 'authorized') {
+        toast.success(nfce.message);
+        setEmittedDoc({ id: nfce.nfce.id, documentNumber: nfce.nfce.number });
+      } else if (nfce?.nfce) {
+        toast.warning(nfce.message, { duration: 10000 });
+      } else if (nfce?.message) {
+        toast.info(nfce.message);
+      }
+      setShowCloseModal(false);
+      await fetchSession();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao fechar a conta');
+    } finally {
+      setClosingBill(false);
     }
   };
 
@@ -450,6 +494,16 @@ export default function ComandaDetailPage() {
                 {emittedDoc ? 'NFC-e emitida' : 'Emitir NFC-e'}
               </Button>
 
+              <Button
+                onClick={() => setShowCloseModal(true)}
+                disabled={!session?.items?.length || isClosed}
+                className="w-full mt-2 gap-2 bg-green-600"
+                size="lg"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                {session?.status === 'CLOSED' ? 'Conta fechada' : 'Fechar conta'}
+              </Button>
+
               {emittedDoc && (
                 <a
                   href={`/admin/nfe/documents/${emittedDoc.id}`}
@@ -463,6 +517,53 @@ export default function ComandaDetailPage() {
             </Card>
           </div>
         </div>
+
+        {/* Close bill modal */}
+        {showCloseModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="max-w-md w-full p-6">
+              <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5" /> Fechar conta
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Total: <strong>R$ {totalPrice.toFixed(2)}</strong>. A NFC-e é emitida ao fechar, se a emissão automática estiver ligada.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-semibold block mb-1">CPF na nota?</label>
+                  <Input
+                    placeholder="Opcional. Ex: 123.456.789-09"
+                    value={closeCpf}
+                    onChange={(e) => setCloseCpf(e.target.value)}
+                    disabled={closingBill}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Forma de pagamento</label>
+                  <select
+                    className="w-full border rounded-md h-10 px-3 bg-background"
+                    value={closePayment}
+                    onChange={(e) => setClosePayment(e.target.value)}
+                    disabled={closingBill}
+                  >
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="cartao de credito">Cartão de crédito</option>
+                    <option value="cartao de debito">Cartão de débito</option>
+                    <option value="pix">PIX</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4 justify-end">
+                <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={closingBill}>
+                  Voltar
+                </Button>
+                <Button onClick={handleCloseBill} disabled={closingBill} className="bg-green-600">
+                  {closingBill ? 'Fechando...' : 'Fechar conta'}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* NFC-e Modal */}
         {showNfceModal && (

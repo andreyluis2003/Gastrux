@@ -34,7 +34,7 @@ export interface NFeEmitPayload {
 
 export interface NFeEmitResult {
   ok: boolean;
-  status: 'pending' | 'submitted' | 'authorized' | 'rejected' | 'cancelled' | 'processing';
+  status: 'pending' | 'submitted' | 'authorized' | 'rejected' | 'denied' | 'cancelled' | 'processing';
   accessKey?: string;
   protocolNumber?: string;
   qrCodeData?: string;

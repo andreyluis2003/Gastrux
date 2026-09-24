@@ -213,7 +213,8 @@ export class FocusNFeClient implements NFeProvider {
     if (rawStatus === 'autorizado') status = 'authorized';
     else if (rawStatus === 'processando_autorizacao') status = 'processing';
     else if (rawStatus === 'cancelado') status = 'cancelled';
-    else if (rawStatus === 'denegado' || rawStatus === 'erro_autorizacao' || rawStatus === 'rejeitado') status = 'rejected';
+    else if (rawStatus === 'denegado') status = 'denied'; // the number was used: never re-sent
+    else if (rawStatus === 'erro_autorizacao' || rawStatus === 'rejeitado') status = 'rejected';
     else if (rawStatus) status = 'submitted';
 
     return {
@@ -225,7 +226,7 @@ export class FocusNFeClient implements NFeProvider {
       qrCodeUrl: json?.qrcode_url, // pode ser mesma string
       danfeUrl: json?.caminho_danfe ? `${this.baseUrl}${json.caminho_danfe}` : json?.url_danfe,
       xmlUrl: json?.caminho_xml_nota_fiscal ? `${this.baseUrl}${json.caminho_xml_nota_fiscal}` : json?.url_xml,
-      rejectionReason: status === 'rejected' ? (json?.mensagem_sefaz || json?.mensagem || 'Rejeitado pela SEFAZ') : undefined,
+      rejectionReason: status === 'rejected' || status === 'denied' ? (json?.mensagem_sefaz || json?.mensagem || 'Rejeitado pela SEFAZ') : undefined,
       statusDescription: json?.mensagem_sefaz || json?.status,
       raw: json,
     };
