@@ -12,6 +12,7 @@ import { broadcastOrderUpdate, broadcastOrderCompleted } from '@/lib/socket';
 import { notifyOrderReady } from '@/lib/notification-utils';
 import { cancelOrder } from '@/lib/kds-cancel-order';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -196,15 +197,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'OWNER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
+    // A manager of THIS restaurant (the owner or a manager membership); it used to be OWNER only,
+    // read from the global role in the session
+    const auth = await requireRestaurantRole(MANAGER_ROLES, 'Cancelar um pedido da cozinha exige um gerente');
+    if (!auth.ok) return auth.response;
+    const { restaurantId, userId } = auth.member;
 
     // Optional reason in the body (a DELETE may come without one).
     let reason: string | undefined;
@@ -213,7 +210,7 @@ export async function DELETE(
       if (typeof body?.reason === 'string' && body.reason.trim()) reason = body.reason.trim().slice(0, 200);
     } catch {}
 
-    const outcome = await cancelOrder(params.id, { restaurantId, userId: (session.user as any).id, reason });
+    const outcome = await cancelOrder(params.id, { restaurantId, userId, reason });
 
     if (outcome.kind === 'not-found') {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });

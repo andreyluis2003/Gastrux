@@ -7,25 +7,25 @@
  * prices, refunds and staff roles need a manager of THIS restaurant, with a reason, and leave a trace;
  * a person's role is the role they have in the restaurant they are working in).
  * Real getCurrentRestaurantId / getRestaurantContext are used (only the session is simulated).
- * A case that documents a known gap is written with `it.failing` (the suite stays green and a case
- * flips to a failure the day its gap is fixed). Gaps, by priority:
- *   P0 security  W9   /api/caixa/movimentos finds the register by id only: anyone signed in can
- *                     post a withdrawal to ANOTHER restaurant's cash register
- *   P0 security  W8   a manager can create an OWNER or a platform ADMIN; every new staff user gets
- *                     the fixed password "temp123"
- *   P0 security  W7   role checks use the GLOBAL User.role from the session: the owner of another
- *                     restaurant who is only a CASHIER here acts as an owner here (refunds...)
- *   P1 security  W10  getRestaurantContext (safeHandler routes, stock count) never checks the
- *                     membership: a removed staff member keeps access until the session ends
- *   P1 records   W1   any role cancels a whole comanda, with no reason and no trace
- *   P1 records   W3   any role deletes (hard delete) or reduces an item the kitchen already has
- *   P1 records   W2   removing an item leaves no trace
- *   P1           W5   any role cancels an authorised NFC-e at SEFAZ
- *   P1           W6   any role changes a dish price (no audit, negative accepted)
- *   P2           W4   a MANAGER cannot cancel a kitchen order (only OWNER)
+ * All gaps below were fixed 2026-09-24 (lib/auth/restaurant-role.ts, lib/auth/effective-role.ts):
+ *   W9   /api/caixa/movimentos (and /reconciliacao) found the register by id only: anyone signed in
+ *        could post a withdrawal to ANOTHER restaurant's cash register
+ *   W8   a manager could create an OWNER or a platform ADMIN (or demote another manager); every new
+ *        staff user got the fixed password "temp123" (now random, shown once)
+ *   W7   role checks used the GLOBAL User.role frozen in the JWT: the owner of another restaurant
+ *        who is only a CASHIER here acted as an owner here; the session role is now the role in the
+ *        current restaurant (resolveEffectiveRole) and money routes check it explicitly
+ *   W10  getRestaurantContext (safeHandler routes, stock count) never checked the membership
+ *   W1   any role cancelled a whole comanda (also through PUT status CANCELLED), no reason, no trace
+ *   W3   any role deleted or reduced an item the kitchen already had
+ *   W2   removing an item left no trace
+ *   W5   any role cancelled an authorised NFC-e at SEFAZ
+ *   W6   any role changed a dish price (no audit, negative accepted)
+ *   W4   a MANAGER could not cancel a kitchen order (only OWNER)
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { NextRequest } from 'next/server';
 import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
@@ -43,6 +43,9 @@ import { POST as createStaff } from '../../../app/api/admin/staff/route';
 import { POST as cashMovement } from '../../../app/api/caixa/movimentos/route';
 import { POST as saveCount } from '../../../app/api/stock-count/route';
 import { POST as saveFiscalConfig } from '../../../app/api/admin/fiscal/config/route';
+import { PUT as updateComanda } from '../../../app/api/comanda/sessions/[id]/route';
+import { GET as reconciliation } from '../../../app/api/caixa/reconciliacao/route';
+import { resolveEffectiveRole } from '../../../lib/auth/effective-role';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -133,7 +136,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
   });
 
   describe('W1-W3: the comanda', () => {
-    it.failing('a cashier cannot cancel a whole comanda (needs a manager)', async () => {
+    it('a cashier cannot cancel a whole comanda (needs a manager)', async () => {
       const { s } = await mkComanda();
       as(cashier);
       const res = await cancelComanda(req(`http://localhost/api/comanda/sessions/${s.id}`, 'DELETE', { reason: 'cliente desistiu' }), { params: { id: s.id } });
@@ -141,7 +144,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('OPEN');
     });
 
-    it.failing('a manager cancels a comanda with a reason, and it leaves a trace', async () => {
+    it('a manager cancels a comanda with a reason, and it leaves a trace', async () => {
       const { s } = await mkComanda();
       as(manager);
       const res = await cancelComanda(req(`http://localhost/api/comanda/sessions/${s.id}`, 'DELETE', { reason: 'cliente desistiu' }), { params: { id: s.id } });
@@ -150,7 +153,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect(logs.some((l) => l.entityId === s.id && l.changes.includes('cliente desistiu'))).toBe(true);
     });
 
-    it.failing('a cashier removes an item the kitchen does not have yet, and it leaves a trace', async () => {
+    it('a cashier removes an item the kitchen does not have yet, and it leaves a trace', async () => {
       const { s, item } = await mkComanda(false);
       as(cashier);
       const res = await removeItem(req(`http://localhost/api/comanda/sessions/${s.id}/items/${item.id}`, 'DELETE'), { params: { id: s.id, itemId: item.id } });
@@ -158,7 +161,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect((await auditFor(cashier.id)).some((l) => l.entityId === item.id || l.changes.includes(item.id))).toBe(true);
     });
 
-    it.failing('a cashier cannot remove an item the kitchen already has', async () => {
+    it('a cashier cannot remove an item the kitchen already has', async () => {
       const { s, item } = await mkComanda(true);
       as(cashier);
       const res = await removeItem(req(`http://localhost/api/comanda/sessions/${s.id}/items/${item.id}`, 'DELETE'), { params: { id: s.id, itemId: item.id } });
@@ -166,12 +169,40 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect(await prisma.orderSessionItem.findUnique({ where: { id: item.id } })).not.toBeNull();
     });
 
-    it.failing('a cashier cannot reduce the quantity of an item the kitchen already has', async () => {
+    it('a cashier cannot reduce the quantity of an item the kitchen already has', async () => {
       const { s, item } = await mkComanda(true);
       as(cashier);
       const res = await updateItem(req(`http://localhost/api/comanda/sessions/${s.id}/items/${item.id}`, 'PUT', { quantity: 1 }), { params: { id: s.id, itemId: item.id } });
       expect(res.status).toBe(403);
       expect((await prisma.orderSessionItem.findUnique({ where: { id: item.id } })).quantity).toBe(2);
+    });
+
+    it('a manager cancels an item the kitchen has only with a reason, and it leaves a trace', async () => {
+      const { s, item } = await mkComanda(true);
+      as(manager);
+      const del = (body?: any) => removeItem(req(`http://localhost/api/comanda/sessions/${s.id}/items/${item.id}`, 'DELETE', body), { params: { id: s.id, itemId: item.id } });
+
+      expect((await del()).status).toBe(400);
+      expect((await del({ reason: 'cliente trocou o prato' })).status).toBe(200);
+      const logs = await auditFor(manager.id);
+      expect(logs.some((l) => l.entityId === item.id && l.changes.includes('cliente trocou o prato'))).toBe(true);
+    });
+
+    it('a comanda cannot be cancelled through a status update', async () => {
+      const { s } = await mkComanda();
+      as(manager);
+      const res = await updateComanda(req(`http://localhost/api/comanda/sessions/${s.id}`, 'PUT', { status: 'CANCELLED' }), { params: { id: s.id } });
+      expect(res.status).toBe(400);
+      expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('OPEN');
+    });
+
+    it('a cashier cannot reopen a closed bill', async () => {
+      const { s } = await mkComanda();
+      await prisma.orderSession.update({ where: { id: s.id }, data: { status: 'CLOSED' } });
+      as(cashier);
+      const res = await updateComanda(req(`http://localhost/api/comanda/sessions/${s.id}`, 'PUT', { status: 'OPEN' }), { params: { id: s.id } });
+      expect(res.status).toBe(403);
+      expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('CLOSED');
     });
 
     it('a cashier can raise the quantity of a line (a new order for the kitchen, not a cancellation)', async () => {
@@ -190,17 +221,17 @@ describe('bad day 9: a new operator makes a mistake', () => {
       const order = await mkOrder();
       as(cashier);
       const res = await cancelKitchenOrder(req(`http://localhost/api/kds/orders/${order.id}`, 'DELETE'), { params: { id: order.id } });
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
     });
 
-    it.failing('a manager can cancel a kitchen order', async () => {
+    it('a manager can cancel a kitchen order', async () => {
       const order = await mkOrder();
       as(manager);
       const res = await cancelKitchenOrder(req(`http://localhost/api/kds/orders/${order.id}`, 'DELETE'), { params: { id: order.id } });
       expect(res.status).toBe(200);
     });
 
-    it.failing('a cashier cannot cancel an authorised NFC-e', async () => {
+    it('a cashier cannot cancel an authorised NFC-e', async () => {
       const doc = await prisma.nFeDocument.create({
         data: { configId: configA.id, documentType: 'NFCe', documentSeries: 1, documentNumber: Number(`9${Date.now() % 100000}`), status: 'authorized', providerRef: `ref-${tag}`, authorizedAt: new Date() },
       });
@@ -216,14 +247,14 @@ describe('bad day 9: a new operator makes a mistake', () => {
     const setPrice = (price: any) =>
       setSellingPrice(req(`http://localhost/api/recipes/${recipe.id}/selling-price`, 'PUT', { sellingPrice: price }), { params: { id: recipe.id } });
 
-    it.failing('a cashier cannot change a dish price', async () => {
+    it('a cashier cannot change a dish price', async () => {
       as(cashier);
       const res = await setPrice(1);
       expect(res.status).toBe(403);
       expect((await prisma.recipe.findUnique({ where: { id: recipe.id } })).sellingPrice).toBe(30);
     });
 
-    it.failing('a manager changes a price and it leaves a trace with the old and new price', async () => {
+    it('a manager changes a price and it leaves a trace with the old and new price', async () => {
       as(manager);
       const res = await setPrice(32);
       expect(res.status).toBe(200);
@@ -232,7 +263,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
       await prisma.recipe.update({ where: { id: recipe.id }, data: { sellingPrice: 30 } });
     });
 
-    it.failing('a negative price is refused', async () => {
+    it('a negative price is refused', async () => {
       as(manager);
       const res = await setPrice(-5);
       expect(res.status).toBe(400);
@@ -241,10 +272,19 @@ describe('bad day 9: a new operator makes a mistake', () => {
   });
 
   describe('W7 / W10: the role that counts is the role in THIS restaurant', () => {
-    it.failing('the owner of another restaurant who is only a cashier here cannot refund', async () => {
+    it('the owner of another restaurant who is only a cashier here cannot refund', async () => {
       as(ownerElsewhere);
       const res = await refund(req('http://localhost/api/pagamentos/unified/refund', 'POST', { paymentId: 'any', reason: 'engano' }));
       expect(res.status).toBe(403);
+    });
+
+    it('the session role is the role in the current restaurant, read fresh', async () => {
+      expect(await resolveEffectiveRole(ownerElsewhere.id, 'OWNER')).toBe('CASHIER');
+      expect(await resolveEffectiveRole(manager.id, 'MANAGER')).toBe('MANAGER');
+      const demoted = await mkUser('MANAGER', 'MANAGER', A.restaurantId);
+      await prisma.restaurantUser.updateMany({ where: { userId: demoted.id }, data: { role: 'COOK' } });
+      expect(await resolveEffectiveRole(demoted.id, 'MANAGER')).toBe('COOK');
+      expect(await resolveEffectiveRole('platform-admin', 'ADMIN')).toBe('ADMIN');
     });
 
     it('a cashier cannot change the fiscal settings', async () => {
@@ -253,7 +293,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect([401, 403]).toContain(res.status);
     });
 
-    it.failing('a removed staff member cannot save a stock count', async () => {
+    it('a removed staff member cannot save a stock count', async () => {
       const removed = await mkUser('CASHIER', 'CASHIER', A.restaurantId);
       await prisma.restaurantUser.updateMany({ where: { userId: removed.id }, data: { isActive: false } });
       as(removed);
@@ -279,13 +319,29 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect((await newStaff('COOK')).status).toBe(403);
     });
 
-    it.failing('a manager cannot create an owner or a platform admin', async () => {
+    it('a manager cannot create an owner or a platform admin', async () => {
       as(manager);
       expect((await newStaff('OWNER')).status).toBe(403);
       expect((await newStaff('ADMIN')).status).toBe(403);
     });
 
-    it.failing('a new staff user does not get the fixed password "temp123"', async () => {
+    it('a manager cannot re-assign another manager', async () => {
+      const otherManager = await mkUser('MANAGER', 'MANAGER', A.restaurantId);
+      as(manager);
+      const res = await createStaff(req('http://localhost/api/admin/staff', 'POST', { name: 'Outro', email: otherManager.email, staffRole: 'COOK' }));
+      expect(res.status).toBe(403);
+      expect((await prisma.restaurantUser.findFirst({ where: { userId: otherManager.id } })).role).toBe('MANAGER');
+    });
+
+    it('the owner can hire a manager, and the hire leaves a trace', async () => {
+      const owner = await prisma.user.findUnique({ where: { id: A.ownerId } });
+      as(owner);
+      const res = await newStaff('MANAGER');
+      expect(res.status).toBe(201);
+      expect((await auditFor(A.ownerId)).some((l) => l.entityType === 'StaffMember')).toBe(true);
+    });
+
+    it('a new staff user does not get the fixed password "temp123"', async () => {
       as(manager);
       const res = await newStaff('CASHIER');
       const { member } = await res.json();
@@ -306,7 +362,20 @@ describe('bad day 9: a new operator makes a mistake', () => {
       expect((await res.json()).createdBy).toBe(cashier.id);
     });
 
-    it.failing("a user of another restaurant cannot post to this restaurant's register", async () => {
+    it('a zero or negative amount is refused', async () => {
+      as(cashier);
+      const res = await cashMovement(req('http://localhost/api/caixa/movimentos', 'POST', { cashRegisterId: registerA.id, type: 'WITHDRAWAL', amount: -50 }));
+      expect(res.status).toBe(400);
+    });
+
+    it("a user of another restaurant cannot read this restaurant's register reconciliation", async () => {
+      const outsider = await mkUser('OWNER', 'OWNER', B.restaurantId);
+      as(outsider);
+      const res = await reconciliation(new NextRequest(`http://localhost/api/caixa/reconciliacao?cashRegisterId=${registerA.id}`));
+      expect(res.status).toBe(404);
+    });
+
+    it("a user of another restaurant cannot post to this restaurant's register", async () => {
       const before = (await prisma.cashRegister.findUnique({ where: { id: registerA.id } })).expectedBalance;
       const outsider = await mkUser('OWNER', 'OWNER', B.restaurantId);
       as(outsider);

@@ -213,16 +213,27 @@ export default function ComandaDetailPage() {
     }
   };
 
-  const handleRemoveItem = async (itemId: string) => {
+  // An item the kitchen already has is a cancellation: a manager, with a reason (asked when needed)
+  const handleRemoveItem = async (itemId: string, reason?: string) => {
     try {
       const res = await fetch(
         `/api/comanda/sessions/${sessionId}/items/${itemId}`,
-        { method: 'DELETE' }
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reason ? { reason } : {}),
+        }
       );
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         toast.success('Item removido');
         fetchSession();
+      } else if (res.status === 400 && !reason) {
+        const asked = window.prompt('A cozinha já recebeu este item. Motivo do cancelamento:');
+        if (asked && asked.trim()) await handleRemoveItem(itemId, asked.trim());
+      } else {
+        toast.error(data.error || 'Erro ao remover item');
       }
     } catch (error) {
       console.error('Error:', error);

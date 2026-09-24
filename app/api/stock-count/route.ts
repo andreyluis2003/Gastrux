@@ -8,6 +8,16 @@ import { applyStockCount, StockCountError } from '@/lib/stock/stock-count';
 
 export const dynamic = 'force-dynamic';
 
+/** getRestaurantContext refuses a caller without an active membership in the selected restaurant. */
+function accessError(error: unknown) {
+  const message = (error as any)?.message || '';
+  if (message.startsWith('FORBIDDEN')) return NextResponse.json({ error: 'Acesso negado a este restaurante' }, { status: 403 });
+  if (message.startsWith('UNAUTHORIZED') || message.startsWith('NO_RESTAURANT')) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -38,6 +48,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(items);
   } catch (error) {
+    const denied = accessError(error);
+    if (denied) return denied;
     console.error('Stock count error:', error);
     return NextResponse.json({ error: 'Erro ao carregar itens' }, { status: 500 });
   }
@@ -69,6 +81,8 @@ export async function POST(req: NextRequest) {
       totalCounted: results.length,
     });
   } catch (error) {
+    const denied = accessError(error);
+    if (denied) return denied;
     if (error instanceof StockCountError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

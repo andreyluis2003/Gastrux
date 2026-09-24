@@ -180,7 +180,8 @@ describe('bad day 4: cancellation after the kitchen started', () => {
 
       expect((await get(order.id)).status).toBe(400);
       expect((await put(order.id, { status: 'READY' })).status).toBe(400);
-      expect((await del(order.id)).status).toBe(400);
+      // DELETE resolves the caller's membership first (lib/auth/restaurant-role.ts): no restaurant = 401
+      expect((await del(order.id)).status).toBe(401);
       expect(await statusOf(order.id)).toBe('PREPARING');
     });
 
