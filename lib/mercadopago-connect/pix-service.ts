@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
-import { createConnectPix, extractPixData, isUnauthorizedError, type PixData } from './payments';
+import { cancelConnectPayment, createConnectPix, extractPixData, isUnauthorizedError, type PixData } from './payments';
 import type { ResolvedPixTarget } from './pix-target';
 
 /** PIX expires in 30 minutes; reuse a pending one only while it is surely valid. */
@@ -172,6 +172,46 @@ function storePixData(paymentId: string, target: ResolvedPixTarget, mpPaymentId:
   });
 }
 
+/**
+ * A new PIX was generated for this order or tab (its total changed): the OLDER pending PIX of the same
+ * target no longer matches and must not stay payable. Runs only AFTER the new PIX exists, so the
+ * customer always has a valid QR. Mercado Pago is asked first: if it cannot cancel the old charge (it may
+ * just have been paid) the row stays PENDING, so a payment is never hidden behind a local CANCELLED and the
+ * approval is reconciled against the tab. A row still being created by a simultaneous request is left alone.
+ * Never throws.
+ */
+async function supersedeOlderPix(target: ResolvedPixTarget, keepPaymentId: string, client: any): Promise<void> {
+  if (!lockKeyFor(target)) return;
+  try {
+    const older = await prisma.payment.findMany({
+      where: {
+        restaurantId: target.restaurantId,
+        gateway: 'MERCADO_PAGO_CONNECT',
+        method: 'PIX',
+        status: 'PENDING',
+        id: { not: keepPaymentId },
+        ...scopeFor(target),
+      },
+      select: { id: true, gatewayPaymentId: true, createdAt: true },
+    });
+    for (const old of older) {
+      if (old.gatewayPaymentId) {
+        try {
+          await cancelConnectPayment(client, old.gatewayPaymentId);
+        } catch (error) {
+          console.error(`[mp-connect] could not cancel the superseded PIX ${old.id} at Mercado Pago; it stays PENDING:`, error);
+          continue;
+        }
+      } else if (Date.now() - new Date(old.createdAt).getTime() < IN_PROGRESS_TIMEOUT_MS) {
+        continue;
+      }
+      await prisma.payment.updateMany({ where: { id: old.id, status: 'PENDING' }, data: { status: 'CANCELLED' } });
+    }
+  } catch (error) {
+    console.error('[mp-connect] could not supersede the older PIX of this target:', error);
+  }
+}
+
 export async function createPixForTarget(
   target: ResolvedPixTarget,
   payer: { email: string; name?: string }
@@ -253,6 +293,8 @@ export async function createPixForTarget(
       );
     }
   }
+
+  await supersedeOlderPix(target, payment.id, client);
 
   return {
     ok: true,

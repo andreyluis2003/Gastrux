@@ -5,8 +5,7 @@
  * generated or paid, and the bill is to be split. Each case states the DESIRED behaviour: the amount
  * charged is what the tab really costs, a QR that no longer matches the tab cannot be paid by mistake,
  * money received for a tab that changed does not go unnoticed, and split parts always add up to the
- * total to the cent. A case that documents a known gap is `it.failing`; a feature that does not exist
- * yet is `it.todo`.
+ * total to the cent. A feature that does not exist yet is `it.todo`. (S5-1 and S5-2 fixed 2026-09-24.)
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
@@ -162,36 +161,144 @@ describe('bad day 5: the table tab changes around its PIX', () => {
   });
 
   describe('a QR code that no longer matches the tab', () => {
-    // GAP S5-1: a new PIX for a different total is created, but the OLD one stays PENDING and payable at
-    // Mercado Pago until it expires: the customer can still pay the stale (wrong) amount.
-    it.failing('the old PIX is cancelled (here and at Mercado Pago) when a new one is generated for a different total (S5-1)', async () => {
+    const approve = (payment: any, amount: number) =>
+      getConnectPayment.mockResolvedValue({
+        id: Number(payment.gatewayPaymentId), status: 'approved', status_detail: 'accredited',
+        external_reference: payment.id, transaction_amount: amount, fee_details: [],
+      });
+    const settle = async (paymentId: string, amount: number) => {
+      const p = await prisma.payment.findUnique({ where: { id: paymentId } });
+      approve(p, amount);
+      return syncRestaurantPayment(A.restaurantId, p.gatewayPaymentId);
+    };
+    const tabAlerts = async () => (await alerts()).filter((n) => n.data?.dedupeKey?.startsWith('tab-mismatch:'));
+
+    // S5-1 (fixed 2026-09-24): a new PIX for a different total used to leave the OLD one PENDING and payable
+    // at Mercado Pago until it expired, so the customer could still pay the stale (wrong) amount.
+    it('the old PIX is cancelled (here and at Mercado Pago) when a new one is generated for a different total (S5-1)', async () => {
       const line = await addLine(burger, 30);
       const first = await askPix();
       const firstPayment = await prisma.payment.findUnique({ where: { id: first.body.paymentId } });
       await prisma.orderSessionItemModifier.create({ data: { sessionItemId: line.id, modifierId: cheese.id, priceAdjustment: 3 } });
 
-      await askPix();
+      const second = await askPix();
 
       expect((await prisma.payment.findUnique({ where: { id: firstPayment.id } })).status).toBe('CANCELLED');
+      expect(cancelConnectPayment).toHaveBeenCalledTimes(1);
       expect(cancelConnectPayment).toHaveBeenCalledWith({ fake: 'client' }, firstPayment.gatewayPaymentId);
+      expect((await prisma.payment.findUnique({ where: { id: second.body.paymentId } })).status).toBe('PENDING');
     });
 
-    // GAP S5-2: the stale PIX is paid: the payment is APPROVED for the OLD amount, the tab is now higher and
-    // nothing links the payment to the tab, so nobody is told that part of the tab is still open.
-    it.failing('a PIX paid for an OLD total raises an alert saying the tab is not fully covered (S5-2)', async () => {
+    it('the old PIX is cancelled only AFTER the new one exists (a failed new PIX leaves the old one untouched)', async () => {
       const line = await addLine(burger, 30);
       const first = await askPix();
-      const stale = await prisma.payment.findUnique({ where: { id: first.body.paymentId } });
       await prisma.orderSessionItemModifier.create({ data: { sessionItemId: line.id, modifierId: cheese.id, priceAdjustment: 3 } });
-      getConnectPayment.mockResolvedValue({
-        id: Number(stale.gatewayPaymentId), status: 'approved', status_detail: 'accredited',
-        external_reference: stale.id, transaction_amount: 30, fee_details: [],
+      createConnectPix.mockRejectedValueOnce({ status: 500, message: 'MP down' });
+
+      const second = await askPix();
+
+      expect(second.status).toBe(502);
+      expect(cancelConnectPayment).not.toHaveBeenCalled();
+      expect((await prisma.payment.findUnique({ where: { id: first.body.paymentId } })).status).toBe('PENDING');
+    });
+
+    it('when Mercado Pago cannot cancel the old PIX (it may have just been paid) the row stays PENDING, never hidden as CANCELLED', async () => {
+      const line = await addLine(burger, 30);
+      const first = await askPix();
+      await prisma.orderSessionItemModifier.create({ data: { sessionItemId: line.id, modifierId: cheese.id, priceAdjustment: 3 } });
+      cancelConnectPayment.mockRejectedValueOnce({ status: 400, message: 'payment already approved' });
+
+      const second = await askPix();
+
+      expect(second.status).toBe(200);
+      expect((await prisma.payment.findUnique({ where: { id: first.body.paymentId } })).status).toBe('PENDING');
+    });
+
+    it('a PIX of ANOTHER tab is never cancelled', async () => {
+      await addLine(burger, 30);
+      const other = await prisma.orderSession.create({
+        data: { restaurantId: A.restaurantId, userId: A.ownerId, tableId: null, status: 'OPEN', tableNumber: 8 },
+      });
+      const otherPayment = await prisma.payment.create({
+        data: {
+          restaurantId: A.restaurantId, amount: 12, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING',
+          gatewayPaymentId: '7777', metadata: JSON.stringify({ source: 'table', sessionId: other.id }),
+        },
       });
 
-      await syncRestaurantPayment(A.restaurantId, stale.gatewayPaymentId);
+      await askPix();
 
-      expect((await prisma.payment.findUnique({ where: { id: stale.id } })).status).toBe('APPROVED');
-      expect((await alerts()).length).toBeGreaterThan(0);
+      expect((await prisma.payment.findUnique({ where: { id: otherPayment.id } })).status).toBe('PENDING');
+      expect(cancelConnectPayment).not.toHaveBeenCalled();
+      await prisma.payment.delete({ where: { id: otherPayment.id } });
+      await prisma.orderSession.delete({ where: { id: other.id } });
+    });
+
+    // S5-2 (fixed 2026-09-24): a PIX paid for an OLD total became APPROVED and nobody was told that the tab was
+    // no longer covered (a table payment is not linked to its comanda).
+    it('a PIX paid for an OLD total raises ONE alert saying how much of the tab is still open (S5-2)', async () => {
+      const line = await addLine(burger, 30);
+      const first = await askPix();
+      await prisma.orderSessionItemModifier.create({ data: { sessionItemId: line.id, modifierId: cheese.id, priceAdjustment: 3 } });
+      // The old QR could not be cancelled at Mercado Pago (it was paid meanwhile).
+      cancelConnectPayment.mockRejectedValueOnce({ status: 400, message: 'payment already approved' });
+      await askPix();
+
+      await settle(first.body.paymentId, 30);
+      await settle(first.body.paymentId, 30); // a repeated notification raises nothing new
+
+      expect((await prisma.payment.findUnique({ where: { id: first.body.paymentId } })).status).toBe('APPROVED');
+      const raised = await tabAlerts();
+      expect(raised).toHaveLength(1);
+      expect(raised[0].title).toBe('PIX da mesa aprovado não cobre a comanda');
+      expect(raised[0].message).toContain('Mesa 7');
+      expect(raised[0].message).toContain('faltam R$ 3.00');
+    });
+
+    it('a PIX that covers the tab exactly raises no alert', async () => {
+      await addLine(burger, 30, 1, [cheese]);
+      const pix = await askPix();
+
+      await settle(pix.body.paymentId, 33);
+
+      expect((await prisma.payment.findUnique({ where: { id: pix.body.paymentId } })).status).toBe('APPROVED');
+      expect(await tabAlerts()).toHaveLength(0);
+    });
+
+    it('a PIX bigger than the tab (an item was removed after it was generated) says how much is left over', async () => {
+      const burgerLine = await addLine(burger, 30);
+      await addLine(drink, 8);
+      const pix = await askPix();
+      await prisma.orderSessionItem.delete({ where: { id: burgerLine.id } });
+      cancelConnectPayment.mockRejectedValueOnce({ status: 400, message: 'payment already approved' });
+      await askPix();
+
+      await settle(pix.body.paymentId, 38);
+
+      const raised = await tabAlerts();
+      expect(raised).toHaveLength(1);
+      expect(raised[0].title).toBe('PIX da mesa maior que a comanda');
+      expect(raised[0].message).toContain('sobram R$ 30.00');
+    });
+
+    it('two approved PIX that together cover the tab raise no alert', async () => {
+      await addLine(burger, 30);
+      await prisma.payment.create({
+        data: {
+          restaurantId: A.restaurantId, amount: 10, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'APPROVED',
+          gatewayPaymentId: '8001', metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+        },
+      });
+      const rest = await prisma.payment.create({
+        data: {
+          restaurantId: A.restaurantId, amount: 20, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING',
+          gatewayPaymentId: '8002', metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+        },
+      });
+
+      await settle(rest.id, 20);
+
+      expect(await tabAlerts()).toHaveLength(0);
     });
 
     it('a stale PIX is not reused after the tab total changed (only the same amount is reused)', async () => {
@@ -203,7 +310,7 @@ describe('bad day 5: the table tab changes around its PIX', () => {
 
       expect(second.body.paymentId).not.toBe(first.body.paymentId);
       expect(second.body.amount).toBe(38);
-      expect((await paymentsOfTab()).map((p) => Number(p.amount))).toEqual([30, 38]);
+      expect((await paymentsOfTab()).map((p) => [Number(p.amount), p.status])).toEqual([[30, 'CANCELLED'], [38, 'PENDING']]);
     });
   });
 

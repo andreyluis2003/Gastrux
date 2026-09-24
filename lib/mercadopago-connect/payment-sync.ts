@@ -6,6 +6,7 @@ import { getConnectPayment, isUnauthorizedError } from './payments';
 import { canTransition } from './payment-status';
 import { captureException } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
+import { reconcileTabPayment } from './tab-reconcile';
 
 export interface SyncResult {
   updated: boolean;
@@ -240,6 +241,8 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
 
   await applyLinkedRecords(restaurantId, payment, mp, orderStatus);
   if (approved && payment.status === 'CANCELLED') await reportLatePayment(restaurantId, payment);
+  // A table PIX is not linked to its comanda: check that the approved ones still add up to the tab.
+  if (approved && !payment.orderId) await reconcileTabPayment(restaurantId, payment);
 
   return { updated: true, status: mapped };
 }
