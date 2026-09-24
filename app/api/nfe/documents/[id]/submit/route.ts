@@ -29,8 +29,9 @@ export async function POST(
     }
 
 
-    const document = await prisma.nFeDocument.findUnique({
-      where: { id: params.id },
+    // Scoped through the config: another restaurant's note is a 404
+    const document = await prisma.nFeDocument.findFirst({
+      where: { id: params.id, config: { restaurantId } },
       include: { items: true, config: true },
     });
 
@@ -119,6 +120,11 @@ export async function POST(
       if (result.status === 'authorized') {
         updateData.authorizedAt = new Date();
       }
+    } else if (result.status === 'processing') {
+      // Unknown outcome (timeout, 5xx): the note may be authorised. Keep it in processing so this
+      // sale cannot be emitted again before its status is checked on the same ref
+      updateData.status = 'processing';
+      updateData.statusDescription = result.rejectionReason || result.statusDescription || null;
     } else {
       updateData.status = 'rejected';
       updateData.rejectionReason = result.rejectionReason || 'Erro';

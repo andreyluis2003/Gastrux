@@ -40,8 +40,9 @@ export async function POST(
       );
     }
 
-    const document = await prisma.nFeDocument.findUnique({
-      where: { id: params.id },
+    // Scoped through the config: another restaurant's note is a 404
+    const document = await prisma.nFeDocument.findFirst({
+      where: { id: params.id, config: { restaurantId } },
       include: { config: true },
     });
 

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     const orderSession = await prisma.orderSession.findFirst({
       where: { id: orderSessionId, restaurantId },
       include: {
-        items: { include: { recipe: true } },
+        items: { include: { recipe: true, modifiers: { select: { priceAdjustment: true } } } },
       },
     });
 
@@ -78,10 +79,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'NFeConfig não configurada. Configure em /admin/nfe/config' }, { status: 400 });
     }
 
-    // Calcular totais
-    const totalAmount = orderSession.items.reduce((sum, item) => {
-      return sum + Number(item.price) * item.quantity;
-    }, 0);
+    // Each line as charged: (price + modifiers) x quantity, the same rule as the comanda screen
+    // and the table PIX (lib/comanda/line-total.ts), so the note declares what the customer paid
+    const lines = orderSession.items.map((item) => {
+      const adjustments = item.modifiers.map((m) => m.priceAdjustment);
+      const unitCents = toCents(item.price) + adjustments.reduce((sum, adj) => sum + toCents(adj), 0);
+      return { item, unitPrice: unitCents / 100, totalCents: lineTotalCents(item.price, item.quantity, adjustments) };
+    });
+    const totalAmount = lines.reduce((sum, line) => sum + line.totalCents, 0) / 100;
 
     // Sequencial
     const documentNumber = config.nextNumberNFCe;
@@ -104,12 +109,12 @@ export async function POST(request: NextRequest) {
         totalAmount,
         status: 'pending',
         items: {
-          create: orderSession.items.map((item, idx) => ({
+          create: lines.map(({ item, unitPrice, totalCents }, idx) => ({
             description: item.recipe?.name || 'Produto',
             quantity: item.quantity,
             unit: 'UN',
-            unitPrice: Number(item.price),
-            totalPrice: Number(item.price) * item.quantity,
+            unitPrice,
+            totalPrice: totalCents / 100,
             ncm: '21069090',
             cfop: '5102',
             recipeId: item.recipeId,
@@ -185,6 +190,11 @@ export async function POST(request: NextRequest) {
       if (result.status === 'authorized') {
         updateData.authorizedAt = new Date();
       }
+    } else if (result.status === 'processing') {
+      // Unknown outcome (timeout, 5xx): the note may be authorised. Keep it in processing so this
+      // sale cannot be emitted again before its status is checked on the same ref
+      updateData.status = 'processing';
+      updateData.statusDescription = result.rejectionReason || result.statusDescription || null;
     } else {
       updateData.status = 'rejected';
       updateData.rejectionReason = result.rejectionReason || 'Erro na emissão';

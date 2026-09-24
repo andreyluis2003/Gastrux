@@ -8,12 +8,14 @@
  * restaurant can never read, re-send or cancel another restaurant's notes.
  * A case that documents a known gap is written with `it.failing` (the suite stays green and a case
  * flips to a failure the day its gap is fixed). Gaps, by priority:
- *   P0 security  F1   every /api/nfe/documents/[id] route (GET, submit, status, cancel) loads the
- *                     document by id only: any signed-in user can read another restaurant's notes
- *                     (customer CPF) and CANCEL a real note at SEFAZ with the other restaurant's key
- *   P0 fiscal    F5   the NFC-e ignores modifiers: 2 x (30 + 3 extra) is charged 66, declared 60
- *   P0 fiscal    F3   a network error / timeout / HTTP 5xx from the provider is recorded as "rejected":
- *                     the note may have been authorised, and emitting again issues a second note
+ *   (F1 fixed 2026-09-24: every /api/nfe/documents/[id] route (GET, PUT, DELETE, submit, status,
+ *   cancel) loaded the document by id only, so any signed-in user could read another restaurant's
+ *   notes (customer CPF) and CANCEL a real note at SEFAZ with the other restaurant's key; now scoped
+ *   through config.restaurantId and another restaurant's note is a 404)
+ *   (F5 fixed 2026-09-24: the NFC-e ignored modifiers, 2 x (30 + 3 extra) was charged 66 and declared
+ *   60; /api/nfe/emit now uses lib/comanda/line-total.ts)
+ *   (F3 fixed 2026-09-24: a network error / timeout / 408 / 429 / 5xx was recorded as "rejected" although
+ *   the note may have been authorised; now "processing", which blocks a second emission)
  *   P1 numbering F2   no unique (config, type, series, number): two notes can share a number
  *   P1 numbering F4   emitting again after a rejection creates a NEW document with the NEXT number,
  *                     leaving the rejected number as a gap SEFAZ requires to be voided (inutilização)
@@ -194,12 +196,12 @@ describe('bad day 7: fiscal rejection', () => {
       asOwnerB();
     });
 
-    it.failing('another restaurant cannot read a note (it holds the customer CPF)', async () => {
+    it('another restaurant cannot read a note (it holds the customer CPF)', async () => {
       const res = await readDoc(new Request(`http://localhost/api/nfe/documents/${doc.id}`) as any, { params: { id: doc.id } });
       expect(res.status).toBe(404);
     });
 
-    it.failing('another restaurant cannot cancel a note at SEFAZ', async () => {
+    it('another restaurant cannot cancel a note at SEFAZ', async () => {
       fakeProvider.cancelNFCe.mockResolvedValueOnce({ ok: true, status: 'cancelled' });
       const res = await post(cancelDoc, `http://localhost/api/nfe/documents/${doc.id}/cancel`,
         { justificativa: 'Cancelamento indevido por outro restaurante' }, { id: doc.id });
@@ -208,7 +210,7 @@ describe('bad day 7: fiscal rejection', () => {
       expect((await prisma.nFeDocument.findUnique({ where: { id: doc.id } })).status).toBe('authorized');
     });
 
-    it.failing('another restaurant cannot re-send a rejected note', async () => {
+    it('another restaurant cannot re-send a rejected note', async () => {
       await prisma.nFeDocument.update({ where: { id: doc.id }, data: { status: 'rejected' } });
       fakeProvider.emitNFCe.mockResolvedValueOnce(authorized());
       const res = await submitDoc(doc.id);
@@ -218,7 +220,7 @@ describe('bad day 7: fiscal rejection', () => {
   });
 
   describe('F5: the note declares what the customer paid', () => {
-    it.failing('2 burgers with extra cheese are declared 66.00, the amount charged', async () => {
+    it('2 burgers with extra cheese are declared 66.00, the amount charged', async () => {
       fakeProvider.emitNFCe.mockResolvedValueOnce(authorized());
       const s = await comanda(2, true);
 
@@ -239,16 +241,33 @@ describe('bad day 7: fiscal rejection', () => {
     const realFetch = global.fetch;
     afterEach(() => { global.fetch = realFetch; });
 
-    it.failing('a network error / timeout leaves the note to be checked, not rejected', async () => {
+    it('a network error / timeout leaves the note to be checked, not rejected', async () => {
       global.fetch = jest.fn().mockRejectedValue(new Error('ETIMEDOUT'));
       const result = await client.emitNFCe(payload);
       expect(result.status).not.toBe('rejected');
     });
 
-    it.failing('an HTTP 5xx from the provider leaves the note to be checked, not rejected', async () => {
+    it('an HTTP 5xx from the provider leaves the note to be checked, not rejected', async () => {
       global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: async () => ({}) });
       const result = await client.emitNFCe(payload);
       expect(result.status).not.toBe('rejected');
+    });
+
+    it('an unknown outcome keeps the note in processing and the comanda cannot be emitted again', async () => {
+      fakeProvider.emitNFCe.mockImplementationOnce((p) => new FocusNFeClient('key', 'sandbox').emitNFCe(p));
+      global.fetch = jest.fn().mockRejectedValue(new Error('ETIMEDOUT'));
+      const s = await comanda();
+
+      const body = await (await emitFor(s.id)).json();
+      const again = await emitFor(s.id);
+
+      expect(body.success).toBe(false);
+      expect(body.rejectionReason).toMatch(/processamento/);
+      const docs = await docsOf(s.id);
+      expect(docs).toHaveLength(1);
+      expect(docs[0].status).toBe('processing');
+      expect(docs[0].rejectionReason).toBeNull();
+      expect(again.status).toBe(409);
     });
 
     it('a validation error from the provider (HTTP 4xx) is a rejection with its message', async () => {
