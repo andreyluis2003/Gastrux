@@ -4328,3 +4328,20 @@ model PackagingQRScan {
   @@index([converted])
   @@map("packaging_qr_scans")
 }
+/// One row per Idempotency-Key a restaurant used: a request replayed by the offline queue (same
+/// key) gets the stored answer instead of running twice (lib/api/idempotency.ts).
+model IdempotencyRecord {
+  id           String   @id @default(cuid())
+  restaurantId String
+  key          String
+  method       String
+  path         String
+  /// 0 while the first request is still running
+  statusCode   Int      @default(0)
+  responseBody Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([restaurantId, key])
+  @@index([createdAt])
+  @@map("idempotency_records")
+}

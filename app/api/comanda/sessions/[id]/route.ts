@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
 import { MANAGER_ROLES, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
@@ -47,7 +48,7 @@ export async function GET(
 }
 
 // PUT /api/comanda/sessions/[id]
-export async function PUT(
+async function handlePUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -93,6 +94,7 @@ export async function PUT(
         notes: notes !== undefined ? notes : undefined,
         customerName: customerName !== undefined ? customerName : undefined,
         status: status !== undefined ? status : undefined,
+        ...(closing ? { closedAt: new Date() } : {}),
       },
       include: {
         items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
@@ -162,3 +164,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
+// Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
+export const PUT = idempotent(handlePUT);

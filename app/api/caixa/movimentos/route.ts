@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { idempotent } from '@/lib/api/idempotency';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 const MOVEMENT_TYPES = ['OPENING', 'SALE', 'WITHDRAWAL', 'REFUND', 'PAYMENT', 'CLOSING', 'ADJUSTMENT', 'OTHER'];
 
 // POST create cash movement (sangria, refund, etc)
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     // Any active member of THIS restaurant (a cashier does the sangria), recorded as createdBy
     const auth = await requireRestaurantRole(['OWNER', 'MANAGER', 'CASHIER', 'ADMIN']);
@@ -72,3 +73,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
+export const POST = idempotent(handlePOST);

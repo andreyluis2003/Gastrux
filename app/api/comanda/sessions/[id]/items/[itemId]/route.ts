@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { idempotent } from '@/lib/api/idempotency';
 import { isManager, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ const snapshot = (line: any) => ({
 });
 
 // PUT /api/comanda/sessions/[id]/items/[itemId]
-export async function PUT(
+async function handlePUT(
   request: NextRequest,
   { params }: { params: { id: string; itemId: string } }
 ) {
@@ -89,7 +90,7 @@ export async function PUT(
 }
 
 // DELETE /api/comanda/sessions/[id]/items/[itemId]  (body: { reason } when the kitchen has it)
-export async function DELETE(
+async function handleDELETE(
   request: NextRequest,
   { params }: { params: { id: string; itemId: string } }
 ) {
@@ -129,3 +130,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
+// Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
+export const PUT = idempotent(handlePUT);
+
+// Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
+export const DELETE = idempotent(handleDELETE);
