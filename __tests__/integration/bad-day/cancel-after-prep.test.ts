@@ -11,8 +11,8 @@
  *   user of ANY restaurant could read, change or cancel any order and the list showed every restaurant's
  *   orders; now scoped to getCurrentRestaurantId() and another restaurant's order is a 404)
  *   C4 C5 C6 C7 fixed with the loss recording (audit, items closed, idempotent, COMPLETED refused)
- *   P0 money     C8 C9      cancelling a paid online order keeps the money with no refund and no alert; a
- *                           pending payment of a cancelled order stays live
+ *   (C8 C9 fixed 2026-09-23: cancelling a paid online order now raises a critical refund-pending alert;
+ *   a pending payment of a cancelled order is cancelled locally and at Mercado Pago)
  *   P1 stock     C10 C11    completing twice deducts stock (and cashback) twice; a cancelled order can be completed
  *   P1 records   C4 C6 C7   no audit record, no idempotency, a COMPLETED order can be cancelled
  *   P2           C5 C12     items are not closed; READY notifies staff of other restaurants
@@ -23,10 +23,19 @@ import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helper
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
 jest.mock('../../../lib/whatsapp/get-restaurant', () => ({ getCurrentRestaurantId: jest.fn() }));
+jest.mock('../../../lib/mercadopago-connect/connection-service', () => ({
+  ...jest.requireActual('../../../lib/mercadopago-connect/connection-service'),
+  getMpClientForRestaurant: jest.fn().mockResolvedValue({ fake: 'client' }),
+}));
+jest.mock('../../../lib/mercadopago-connect/payments', () => ({
+  ...jest.requireActual('../../../lib/mercadopago-connect/payments'),
+  cancelConnectPayment: jest.fn().mockResolvedValue({}),
+}));
 
 import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { GET as readOrder, PUT as updateOrder, DELETE as cancelOrder } from '../../../app/api/kds/orders/[id]/route';
+import { cancelConnectPayment } from '../../../lib/mercadopago-connect/payments';
 import { GET as listKds } from '../../../app/api/kds/orders/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -233,25 +242,72 @@ describe('bad day 4: cancellation after the kitchen started', () => {
     });
   });
 
+  // C8/C9 (fixed 2026-09-23): cancelling used to leave a paid online order charged with no refund and no
+  // alert, and a pending payment of the dead order alive. Nothing is refunded automatically (giving money
+  // back is the operator's decision, through the audited refund route); the operator is told, once.
   describe('the customer already paid online', () => {
-    it.failing('is not left silently charged: a refund happened or the operator is told to refund (C8)', async () => {
+    it('is not left silently charged: ONE critical "reembolso pendente" alert, and the payment stays APPROVED (C8)', async () => {
       const order = await makeOrder({ paymentMethod: 'ONLINE_PIX', paymentStatus: 'APPROVED' });
       const payment = await makePayment(order, 'APPROVED');
 
+      const res = await del(order.id);
       await del(order.id);
 
-      const p = await prisma.payment.findUnique({ where: { id: payment.id } });
-      const alerts = await prisma.notification.count({ where: { restaurantId: A.restaurantId } });
-      expect(p.status === 'REFUNDED' || alerts > 0).toBe(true);
+      const body = await res.json();
+      expect(body.payments.refundPending).toEqual([{ id: payment.id, amount: 90, gateway: 'MERCADO_PAGO_CONNECT', method: 'PIX' }]);
+      const alerts = await prisma.notification.findMany({ where: { restaurantId: A.restaurantId } });
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].severity).toBe('CRITICAL');
+      expect(alerts[0].message).toContain(order.orderNumber);
+      expect(alerts[0].message).toContain('90.00');
+      expect((await prisma.payment.findUnique({ where: { id: payment.id } })).status).toBe('APPROVED');
+      expect(cancelConnectPayment).not.toHaveBeenCalled();
     });
 
-    it.failing('a still-PENDING payment of the cancelled order is cancelled too (a late PIX must not be accepted for a dead order) (C9)', async () => {
+    it('a cash payment on delivery (MANUAL gateway) raises no refund alert', async () => {
+      const order = await makeOrder({ paymentMethod: 'CASH' });
+      await makePayment(order, 'APPROVED', { gateway: 'MANUAL', method: 'CASH', gatewayPaymentId: null });
+
+      const body = await (await del(order.id)).json();
+
+      expect(body.payments.refundPending).toEqual([]);
+      expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(0);
+    });
+
+    it('a still-PENDING payment of the cancelled order is cancelled here AND at Mercado Pago (C9)', async () => {
       const order = await makeOrder({ paymentMethod: 'ONLINE_PIX', paymentStatus: 'PENDING', status: 'PENDING' });
-      const payment = await makePayment(order, 'PENDING');
+      const payment = await makePayment(order, 'PENDING', { gatewayPaymentId: '5551' });
+
+      const body = await (await del(order.id)).json();
+
+      expect((await prisma.payment.findUnique({ where: { id: payment.id } })).status).toBe('CANCELLED');
+      expect(body.payments.cancelled).toEqual([{ id: payment.id, gateway: 'MERCADO_PAGO_CONNECT', gatewayPaymentId: '5551' }]);
+      expect(cancelConnectPayment).toHaveBeenCalledTimes(1);
+      expect(cancelConnectPayment).toHaveBeenCalledWith({ fake: 'client' }, '5551');
+      expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(0);
+    });
+
+    it('the order is cancelled even when Mercado Pago cannot cancel the charge (it may have been approved meanwhile)', async () => {
+      (cancelConnectPayment as jest.Mock).mockRejectedValueOnce({ status: 400, message: 'payment already approved' });
+      const order = await makeOrder({ status: 'PENDING' });
+      const payment = await makePayment(order, 'PENDING', { gatewayPaymentId: '5552' });
+
+      const res = await del(order.id);
+
+      expect(res.status).toBe(200);
+      expect(await statusOf(order.id)).toBe('CANCELLED');
+      expect((await prisma.payment.findUnique({ where: { id: payment.id } })).status).toBe('CANCELLED');
+    });
+
+    it('payments of ANOTHER order or restaurant are untouched', async () => {
+      const order = await makeOrder({ status: 'PENDING' });
+      const other = await makeOrder({ status: 'PENDING' });
+      const otherPayment = await makePayment(other, 'PENDING', { gatewayPaymentId: '5553' });
 
       await del(order.id);
 
-      expect((await prisma.payment.findUnique({ where: { id: payment.id } })).status).toBe('CANCELLED');
+      expect((await prisma.payment.findUnique({ where: { id: otherPayment.id } })).status).toBe('PENDING');
+      expect(cancelConnectPayment).not.toHaveBeenCalled();
     });
   });
 

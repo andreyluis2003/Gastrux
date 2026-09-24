@@ -230,7 +230,7 @@ export async function DELETE(
 
     broadcastOrderUpdate(params.id, 'CANCELLED', { reason: 'Order cancelled' });
 
-    return NextResponse.json({ message: 'Order cancelled', order: outcome.order, loss: outcome.loss });
+    return NextResponse.json({ message: 'Order cancelled', order: outcome.order, loss: outcome.loss, payments: outcome.payments });
   } catch (error) {
     console.error('Error cancelling order:', error);
     return NextResponse.json(

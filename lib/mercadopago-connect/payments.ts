@@ -112,6 +112,15 @@ export async function refundConnectPayment(
   return refunds.create({ payment_id: mpPaymentId, body: { amount }, ...options });
 }
 
+/**
+ * Cancels a Mercado Pago payment that is still pending / in process (for example the PIX QR of an
+ * order that was cancelled), so the customer can no longer pay it. Mercado Pago refuses this once the
+ * payment is approved: that case is a refund, not a cancellation.
+ */
+export function cancelConnectPayment(client: MercadoPagoConfig, mpPaymentId: string) {
+  return new Payment(client).cancel({ id: mpPaymentId });
+}
+
 export function isUnauthorizedError(error: unknown): boolean {
   const e = error as any;
   return e?.status === 401 || e?.statusCode === 401;
