@@ -13,6 +13,8 @@ import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
 
 export const dynamic = 'force-dynamic';
 
+const ORDER_STATUSES = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED', 'ON_HOLD'];
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -35,7 +37,16 @@ export async function GET(req: NextRequest) {
     // An online (PIX/card) order reaches the kitchen only once its payment is APPROVED.
     // Only THIS restaurant's orders: the list used to be unscoped and showed every restaurant's kitchen.
     const where: any = { restaurantId, AND: [KITCHEN_VISIBLE_ORDER_WHERE] };
-    if (status) where.status = status;
+    // The KDS screen asks for several statuses at once (?status=PENDING,PREPARING,READY); the whole
+    // string used to be passed as ONE status, so the kitchen screen listed nothing
+    if (status) {
+      const statuses = status.split(',').map((st) => st.trim().toUpperCase()).filter(Boolean);
+      const unknown = statuses.filter((st) => !ORDER_STATUSES.includes(st));
+      if (unknown.length) {
+        return NextResponse.json({ error: `Status inválido: ${unknown.join(', ')}` }, { status: 400 });
+      }
+      where.status = { in: statuses };
+    }
     if (priority) where.priority = priority;
     if (station) {
       where.stationAssignments = {

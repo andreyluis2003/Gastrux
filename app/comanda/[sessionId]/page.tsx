@@ -259,7 +259,8 @@ export default function ComandaDetailPage() {
         toast.success(`Pedido ${data.order.orderNumber} enviado!`);
         setTimeout(() => router.push('/comanda'), 2000);
       } else {
-        toast.error('Erro ao enviar');
+        const data: any = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Erro ao enviar');
       }
     } catch (error) {
       console.error('Error:', error);

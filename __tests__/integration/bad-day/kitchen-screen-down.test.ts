@@ -8,15 +8,16 @@
  * kitchen screen lists the active orders oldest first and recovers them after being down; sending
  * a comanda to the kitchen always works and sends only what is new, with its modifiers; and an order
  * nobody started for too long alerts the floor (the screen or printer may be down).
- * A case that documents a known gap is written with `it.failing` (the suite stays green and a case
- * flips to a failure the day its gap is fixed). Gaps, by priority:
- *   P0 kitchen   K1   the KDS screen asks ?status=PENDING,PREPARING,READY and the route passes the
- *                     whole string as ONE status: the kitchen screen never lists anything
- *   P0 kitchen   K2   send-to-kitchen numbers orders KDS-000001.. per restaurant but the number is
- *                     globally unique: the second restaurant's first send fails
- *   P1 kitchen   K3   re-sending a comanda sends ALL its items again (the kitchen makes them twice)
- *   P1 kitchen   K4   the modifiers never reach the kitchen order (S5-5)
- *   P1 alert     K5   an order nobody started for 10 minutes alerts nobody
+ * All gaps below were fixed 2026-09-24:
+ *   K1  the KDS screen asks ?status=PENDING,PREPARING,READY and the route passed the whole string as
+ *       ONE status: the kitchen screen never listed anything (now a validated list)
+ *   K2  send-to-kitchen numbered orders KDS-000001.. per restaurant but the number is globally
+ *       unique: the second restaurant's first send failed (lib/kds/order-number.ts)
+ *   K3  re-sending a comanda sent ALL its items again (now only the lines added since the last send)
+ *   K4  the modifiers never reached the kitchen order (S5-5)
+ *   K5  an order nobody started for 10 minutes alerted nobody (lib/kds/stale-orders.ts, run by
+ *       POST /api/kds/stale-check with CRON_SECRET: NOT scheduled anywhere yet)
+ *   also: the KDS screen shows a "sem conexão" banner with the last update time when polling fails
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
@@ -29,6 +30,8 @@ import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { GET as listKitchen } from '../../../app/api/kds/orders/route';
 import { POST as sendToKitchen } from '../../../app/api/comanda/sessions/[id]/send-to-kitchen/route';
+import { POST as staleCheck } from '../../../app/api/kds/stale-check/route';
+import { NextRequest } from 'next/server';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -104,7 +107,11 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
   });
 
   describe('K1: the kitchen screen itself', () => {
-    it.failing('the query the KDS screen sends lists the active orders', async () => {
+    it('an unknown status is refused, not a server error', async () => {
+      expect((await list('?status=PENDING,DONE')).status).toBe(400);
+    });
+
+    it('the query the KDS screen sends lists the active orders', async () => {
       const pending = await mkOrder(A.restaurantId, 3, 'PENDING');
       const preparing = await mkOrder(A.restaurantId, 2, 'PREPARING');
       await mkOrder(A.restaurantId, 1, 'COMPLETED');
@@ -119,7 +126,7 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
   });
 
   describe('K2-K4: sending to the kitchen', () => {
-    it.failing("the second restaurant's first comanda reaches the kitchen", async () => {
+    it("the second restaurant's first comanda reaches the kitchen", async () => {
       const sA = await mkComanda(A.restaurantId, A.ownerId);
       await prisma.orderSessionItem.create({ data: { sessionId: sA.id, recipeId: burgerA.id, price: 30, quantity: 1 } });
       expect((await send(sA.id)).status).toBe(200);
@@ -131,7 +138,7 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
       expect((await send(sB.id)).status).toBe(200);
     });
 
-    it.failing('re-sending a comanda sends only the items added since the last send', async () => {
+    it('re-sending a comanda sends only the items added since the last send', async () => {
       const s = await mkComanda(A.restaurantId, A.ownerId);
       await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: burgerA.id, price: 30, quantity: 2 } });
       await send(s.id);
@@ -144,7 +151,7 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
       expect(orders.map((o) => o.items.map((i) => i.quantity))).toEqual([[2], [1]]);
     });
 
-    it.failing('the modifiers reach the kitchen order', async () => {
+    it('the modifiers reach the kitchen order', async () => {
       const s = await mkComanda(A.restaurantId, A.ownerId);
       const line = await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: burgerA.id, price: 30, quantity: 1 } });
       await prisma.orderSessionItemModifier.create({ data: { sessionItemId: line.id, modifierId: cheese.id, priceAdjustment: 0 } });
@@ -162,7 +169,7 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
   });
 
   describe('K5: an order nobody started alerts the floor', () => {
-    it.failing('an order PENDING for more than 10 minutes raises one alert', async () => {
+    it('an order PENDING for more than 10 minutes raises one alert', async () => {
       await mkOrder(A.restaurantId, 15, 'PENDING');
       await mkOrder(A.restaurantId, 2, 'PENDING');
       const { alertStaleKitchenOrders } = await import('../../../lib/kds/stale-orders');
@@ -174,6 +181,25 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
     });
   });
 
+  describe('the stale-order check route', () => {
+    const prev = process.env.CRON_SECRET;
+    beforeAll(() => { process.env.CRON_SECRET = 'cron-test-secret'; });
+    afterAll(() => { process.env.CRON_SECRET = prev; });
+
+    it('refuses a call without the cron secret', async () => {
+      const res = await staleCheck(new NextRequest('http://localhost/api/kds/stale-check', { method: 'POST' }));
+      expect(res.status).toBe(401);
+    });
+
+    it('alerts with the cron secret', async () => {
+      await mkOrder(A.restaurantId, 30, 'PENDING');
+      const res = await staleCheck(new NextRequest('http://localhost/api/kds/stale-check', {
+        method: 'POST', headers: { authorization: 'Bearer cron-test-secret' },
+      }));
+      expect(res.status).toBe(200);
+      expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
+    });
+  });
+
   it.todo('kitchen tickets are printed (no printing code exists: owner to say how the printer gets orders today)');
-  it.todo('the KDS screen shows an "offline / outdated" banner when polling fails');
 });

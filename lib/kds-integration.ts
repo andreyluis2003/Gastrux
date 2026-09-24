@@ -3,6 +3,7 @@
 import { prisma } from './prisma';
 import { broadcastOrderCreated, broadcastOrderUpdate } from './socket';
 import { KITCHEN_VISIBLE_ORDER_WHERE } from './kds-visibility';
+import { nextKdsOrderNumber } from './kds/order-number';
 
 /**
  * Create a KDS order from an external delivery order
@@ -123,17 +124,6 @@ export async function createOrderFromExternalOrder(
     console.error('Error creating order from external order:', error);
     return null;
   }
-}
-
-/** Next free "KDS-####" number: ignores orders numbered in any other format. */
-async function nextKdsOrderNumber(): Promise<string> {
-  const last = await prisma.order.findFirst({
-    where: { orderNumber: { startsWith: 'KDS-' } },
-    orderBy: { createdAt: 'desc' },
-    select: { orderNumber: true },
-  });
-  const current = last ? parseInt(last.orderNumber.slice(4), 10) : 0;
-  return `KDS-${String((Number.isFinite(current) ? current : 0) + 1).padStart(4, '0')}`;
 }
 
 /**

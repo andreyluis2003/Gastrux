@@ -18,6 +18,7 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<'all' | 'station'>(
     stationId ? 'station' : 'all'
   );
@@ -30,8 +31,10 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
         const ordersRes = await fetch(
           `/api/kds/orders?status=PENDING,PREPARING,READY`
         );
+        if (!ordersRes.ok) throw new Error('Failed to fetch orders');
         const ordersData = await ordersRes.json();
         setOrders(ordersData.orders || []);
+        setLastUpdate(new Date());
 
         // Fetch stations
         const stationsRes = await fetch(`/api/kds/stations`);
@@ -61,6 +64,7 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
         const ordersData = await ordersRes.json();
         setOrders(ordersData.orders || []);
         setConnected(true);
+        setLastUpdate(new Date());
       } catch (error) {
         console.error('Polling error:', error);
         setConnected(false);
@@ -121,6 +125,14 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
           </span>
         </div>
       </div>
+
+      {/* The kitchen must know when the list stopped updating: new orders may be missing */}
+      {!connected && (
+        <div role="alert" className="rounded-md border border-red-300 bg-red-50 text-red-800 px-4 py-3 font-semibold">
+          Sem conexão: a lista pode estar desatualizada e pedidos novos podem não aparecer.
+          {lastUpdate && ` Última atualização às ${lastUpdate.toLocaleTimeString('pt-BR')}.`} Avise o salão.
+        </div>
+      )}
 
       {/* Metrics */}
       <KDSMetrics orders={displayOrders} />
