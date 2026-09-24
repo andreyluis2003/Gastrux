@@ -9,18 +9,22 @@
  * history; and one restaurant can never adjust another's stock.
  * A case that documents a known gap is written with `it.failing` (the suite stays green and a case
  * flips to a failure the day its gap is fixed). Gaps, by priority:
- *   P1 records  K1   the ADJUSTMENT movement stores |difference|: a surplus of 3 and a shortage of 3
- *                    are the same movement (the sign is only in the free-text reason)
- *   P1 records  K2   no author: StockMovement has no user and no audit log is written
- *   P1 stock    K3   the count OVERWRITES stock with the counted number: a sale made between the
- *                    count and the save is erased (its deduction is lost)
- *   P1 input    K4   a negative or empty count is accepted (stock becomes negative / zero)
- *   P1 money    K7   the CMV ignores every ADJUSTMENT: a shortage found by the count never costs anything
- *   P2 alert    K6   a big difference raises no alert
- *   also seen   /api/stock/quick-movement treats "ADJUSTMENT" as a deduction (always down), the
- *               opposite convention of the count; a count is not atomic (per-item writes)
+ *   (all fixed 2026-09-24 in lib/stock/stock-count.ts, the CMV routes and migration
+ *   20260924130000_signed_stock_adjustments:)
+ *   K1  ADJUSTMENT quantities are signed (+ surplus / - shortage) everywhere; they used to store
+ *       |difference| (count) or always mean "out" (quick-movement, /api/stock/movement)
+ *   K2  the count writes an audit log with who counted
+ *   K3  the difference is measured against what the screen showed (systemQuantity + countId) and
+ *       applied as a delta: a sale between the count and the save is kept (it used to be erased)
+ *   K4  a negative / empty count is refused (400) and the whole count is all or nothing
+ *   K6  a difference of R$ 50 or 10% of the system quantity raises a notification
+ *   K7  the CMV counts count shortages as "perdas não identificadas" (unidentifiedLosses)
+ *   still open: reversing a count adjustment (it.todo); /api/stock/movement had no tenant check
+ *   before writing the movement (fixed with K1)
  */
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
 
@@ -52,8 +56,8 @@ describe('bad day 8: stock counted with a difference', () => {
   const asOwnerA = () => asUser(A.ownerId, A.restaurantId);
   const asOwnerB = () => asUser(B.ownerId, B.restaurantId);
 
-  const count = (counts: any[]) =>
-    saveCount(new Request('http://localhost/api/stock-count', { method: 'POST', body: JSON.stringify({ counts }) }) as any);
+  const count = (counts: any[], countId?: string) =>
+    saveCount(new Request('http://localhost/api/stock-count', { method: 'POST', body: JSON.stringify({ counts, countId }) }) as any);
   const stockOf = async (ingredientId: string) =>
     (await prisma.stock.findUnique({ where: { ingredientId } })).currentQuantity;
   const movementsOf = (ingredientId: string) =>
@@ -133,7 +137,7 @@ describe('bad day 8: stock counted with a difference', () => {
   });
 
   describe('K1 / K2: the adjustment says which way and who', () => {
-    it.failing('a shortage and a surplus are told apart by the movement itself', async () => {
+    it('a shortage and a surplus are told apart by the movement itself', async () => {
       await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }]);
       await setStock(flourB.id, 10);
       asOwnerB();
@@ -145,7 +149,7 @@ describe('bad day 8: stock counted with a difference', () => {
       expect(surplus.quantity).toBe(3);
     });
 
-    it.failing('the count records who counted', async () => {
+    it('the count records who counted', async () => {
       await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }]);
 
       const logs = await prisma.auditLog.findMany({ where: { userId: A.ownerId } });
@@ -154,18 +158,21 @@ describe('bad day 8: stock counted with a difference', () => {
   });
 
   describe('K3: sales between the count and the save are kept', () => {
-    it.failing('counted 7 when the screen showed 10, a sale of 2 happened before saving: stock ends at 5', async () => {
+    it('counted 7 when the screen showed 10, a sale of 2 happened before saving: stock ends at 5', async () => {
       // the operator loaded the screen (system 10) and counted 7; meanwhile a sale deducted 2
       await setStock(flour.id, 8);
 
-      await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }]);
+      await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }], 'count-k3');
 
       expect(await stockOf(flour.id)).toBe(5);
+      const [m] = await movementsOf(flour.id);
+      expect(m.quantity).toBe(-3);
+      expect(m.reason).toMatch(/preservados/);
     });
   });
 
   describe('K4: an impossible count is refused', () => {
-    it.failing('a negative count is refused and nothing changes', async () => {
+    it('a negative count is refused and nothing changes', async () => {
       const res = await count([{ ingredientId: flour.id, countedQuantity: -4, systemQuantity: 10 }]);
 
       expect(res.status).toBe(400);
@@ -173,7 +180,7 @@ describe('bad day 8: stock counted with a difference', () => {
       expect(await movementsOf(flour.id)).toHaveLength(0);
     });
 
-    it.failing('an empty count (null) is refused and nothing changes', async () => {
+    it('an empty count (null) is refused and nothing changes', async () => {
       const res = await count([{ ingredientId: flour.id, countedQuantity: null, systemQuantity: 10 }]);
 
       expect(res.status).toBe(400);
@@ -182,19 +189,74 @@ describe('bad day 8: stock counted with a difference', () => {
   });
 
   describe('K6 / K7: the manager sees the difference', () => {
-    it.failing('a big shortage raises an alert', async () => {
+    it('a big shortage raises an alert', async () => {
       await count([{ ingredientId: flour.id, countedQuantity: 4, systemQuantity: 10 }]);
 
       expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBeGreaterThan(0);
     });
 
-    it.failing('the shortage found by the count shows up in the CMV', async () => {
+    it('the shortage found by the count shows up in the CMV', async () => {
       const before = await (await readCmv(new Request('http://localhost/api/cmv?period=30') as any)).json();
 
       await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }]);
 
       const after = await (await readCmv(new Request('http://localhost/api/cmv?period=30') as any)).json();
       expect(after.cmv - before.cmv).toBeCloseTo(3 * COST);
+    });
+  });
+
+  describe('the same count saved twice / partially invalid', () => {
+    it('the same count id saved twice applies once, even after a sale in between', async () => {
+      await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }], 'count-twice');
+      await setStock(flour.id, 6); // a sale of 1 after the first save
+
+      await count([{ ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 }], 'count-twice');
+
+      expect(await movementsOf(flour.id)).toHaveLength(1);
+      expect(await stockOf(flour.id)).toBe(6);
+    });
+
+    it('one invalid line refuses the whole count: nothing is written', async () => {
+      const res = await count([
+        { ingredientId: flour.id, countedQuantity: 7, systemQuantity: 10 },
+        { ingredientId: flour.id, countedQuantity: 'abc', systemQuantity: 10 },
+      ], 'count-bad');
+
+      expect(res.status).toBe(400);
+      expect(await stockOf(flour.id)).toBe(10);
+      expect(await movementsOf(flour.id)).toHaveLength(0);
+    });
+
+    it('a small difference (under R$ 50 and 10%) raises no alert', async () => {
+      await setStock(flour.id, 100);
+      await count([{ ingredientId: flour.id, countedQuantity: 99, systemQuantity: 100 }], 'count-small');
+
+      expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(0);
+    });
+  });
+
+  describe('legacy adjustments (migration 20260924130000)', () => {
+    it('old positive adjustments become stock-outs, except count surpluses', async () => {
+      const mk = (quantity: number, reason: string | null, referenceType: string | null = null) =>
+        prisma.stockMovement.create({ data: { restaurantId: A.restaurantId, ingredientId: flour.id, quantity, movementType: 'ADJUSTMENT', reason, referenceType } });
+      const shortage = await mk(3, 'Contagem física: 10 → 7 (dif: -3.00)');
+      const surplus = await mk(2, 'Contagem física: 10 → 12 (dif: +2.00)');
+      const quick = await mk(4, 'Inventário rápido: ADJUSTMENT', 'QUICK_INVENTORY');
+      const manual = await mk(1, null);
+      const alreadySigned = await mk(-5, 'Contagem física: 10 → 5 (dif: -5.00)', 'STOCK_COUNT');
+
+      const sql = fs.readFileSync(
+        path.join(__dirname, '../../../prisma/migrations/20260924130000_signed_stock_adjustments/migration.sql'),
+        'utf8'
+      );
+      await prisma.$executeRawUnsafe(sql.replace(/--.*$/gm, ''));
+
+      const q = async (m: any) => (await prisma.stockMovement.findUnique({ where: { id: m.id } })).quantity;
+      expect(await q(shortage)).toBe(-3);
+      expect(await q(surplus)).toBe(2);
+      expect(await q(quick)).toBe(-4);
+      expect(await q(manual)).toBe(-1);
+      expect(await q(alreadySigned)).toBe(-5);
     });
   });
 

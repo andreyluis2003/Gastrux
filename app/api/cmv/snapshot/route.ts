@@ -57,7 +57,9 @@ export async function POST(req: NextRequest) {
       const cost = m.quantity * (m.ingredient?.referenceCost || 0);
       if (m.movementType === 'ENTRY') purchases += cost;
       else if (m.movementType === 'LOSS') losses += cost;
-      else if (m.movementType !== 'ADJUSTMENT') consumption += cost;
+      // Stock-count differences (signed: - shortage costs, + surplus gives back)
+      else if (m.movementType === 'ADJUSTMENT') losses -= cost;
+      else consumption += cost;
     }
     const totalCMV = consumption + losses;
 

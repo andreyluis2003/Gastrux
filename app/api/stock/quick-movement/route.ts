@@ -104,7 +104,8 @@ export async function POST(request: NextRequest) {
       data: {
         ingredientId,
         restaurantId: ingredient.restaurantId,
-        quantity,
+        // ADJUSTMENT quantities are signed (+ in, - out): here an adjustment removes stock
+        quantity: movementType === "ADJUSTMENT" ? -quantity : quantity,
         movementType,
         reason: reason || `Inventário rápido: ${movementType}`,
         referenceType: "QUICK_INVENTORY",
