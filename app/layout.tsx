@@ -11,7 +11,7 @@ import { MobileHeader } from '@/components/mobile-header';
 import { NotificationCenter } from '@/components/notification-center';
 import { WebVitalsTracker } from '@/components/web-vitals-tracker';
 import { OfflineIndicator } from '@/components/offline-indicator';
-import { SyncStatus } from '@/components/sync-status';
+import { OutboxProvider } from '@/components/offline/outbox-provider';
 import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { FontPreload } from '@/components/font-preload';
 import { PerformanceOptimizations } from '@/components/performance-optimizations';
@@ -94,6 +94,7 @@ export default function RootLayout({
           <QueryProvider>
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
               <SessionProvider>
+                <OutboxProvider>
                 <RadixPointerEventsFix />
                 <PerformanceOptimizations />
                 <ServiceWorkerRegister />
@@ -102,12 +103,12 @@ export default function RootLayout({
                 <MobileHeader />
                 <NotificationCenter />
                 <OfflineIndicator />
-                <SyncStatus />
                 <div className="md:pt-0 pt-14">
                   {children}
                 </div>
                 <FeedbackWidget />
                 <GastruxChat />
+                </OutboxProvider>
               </SessionProvider>
               <Toaster />
             </ThemeProvider>

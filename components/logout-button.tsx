@@ -1,6 +1,6 @@
 'use client';
 
-import { signOut } from 'next-auth/react';
+import { signOutSafely } from '@/lib/offline/sign-out';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
@@ -9,7 +9,7 @@ export function LogoutButton() {
     <Button
       variant="outline"
       size="sm"
-      onClick={() => signOut({ redirect: true, callbackUrl: '/auth/signin' })}
+      onClick={() => signOutSafely({ redirect: true, callbackUrl: '/auth/signin' })}
     >
       <LogOut className="mr-2 h-4 w-4" />
       Sair

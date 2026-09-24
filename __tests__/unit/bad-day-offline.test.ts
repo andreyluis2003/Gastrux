@@ -5,14 +5,16 @@
  * sync manager runs with a mocked IndexedDB layer and fetch. Each case states the DESIRED behaviour; a case
  * that documents a known gap is `it.failing` (green suite, flips to a failure when the gap is fixed).
  *
- * Gaps, by priority:
- *   O1 P0  nothing is queued offline: no app code creates a pending change or starts the sync, and the SW
- *          ignores every non-GET request, so an order, a comanda item or a payment made offline is simply lost
- *          while the banner says "App working offline"
- *   O2 P0  every GET /api/* response is cached and served offline as if it were live (no stale marker), and the
- *          cache is never cleared on logout, so the kitchen can see old orders as current and a second user on
- *          the same device can read the first one's cached data
- *   O3 P1  the (unused) sync manager retries a change with no idempotency key and retries 4xx answers
+ * Owner decision 2026-09-24: offline option (a) (market practice for cloud POS). All gaps below are fixed:
+ *   O1  nothing was queued offline (the old offline-storage / sync-manager were wired to nothing and sent
+ *       to wrong URLs): now lib/offline/outbox.ts, kept in IndexedDB, mounted in the root layout and used
+ *       by the comanda and the counter sale; the queue lives in the APP, not in the service worker
+ *       (background sync is not available everywhere), so the SW still does not touch POSTs
+ *   O2  every GET /api/* was cached and served offline as live, never cleared on logout: now only the
+ *       offline screens' reads are cached, served marked stale, and logout clears the caches
+ *   O3  retries had no idempotency key and repeated 4xx: now one Idempotency-Key per change (the server
+ *       stores the answer, lib/api/idempotency.ts) and a 4xx is marked failed, shown, discardable
+ * Server side of the replays: __tests__/integration/bad-day/offline-replay.test.ts.
  */
 import fs from 'fs';
 import path from 'path';
@@ -95,7 +97,7 @@ describe('bad day 1: service worker while the internet is down', () => {
   });
 
   // O2: an old kitchen list is answered as a normal 200: nothing tells the screen the data is stale.
-  it.failing('a response served from the cache while offline is marked as STALE (O2)', async () => {
+  it('a response served from the cache while offline is marked as STALE (O2)', async () => {
     const sw = loadServiceWorker();
     sw.state.network.set(KDS, () => new Response('{"orders":[]}', { status: 200 }));
     await sw.dispatchFetch(KDS);
@@ -108,7 +110,7 @@ describe('bad day 1: service worker while the internet is down', () => {
 
   // O2: the cache is never purged on logout: the app never posts CLEAR_CACHE, so the next user of the device
   // reads the previous user's API responses while offline.
-  it.failing('logging out clears the cached API responses (the app asks the service worker to do it) (O2)', () => {
+  it('logging out clears the cached API responses (the app asks the service worker to do it) (O2)', () => {
     const sources = walk(['app', 'components', 'hooks', 'lib']).filter((f) => !f.endsWith('sw.js'));
     const asksToClear = sources.some((f) => fs.readFileSync(f, 'utf8').includes('CLEAR_CACHE'));
     expect(asksToClear).toBe(true);
@@ -126,8 +128,8 @@ describe('bad day 1: service worker while the internet is down', () => {
     expect(sw.stores.size).toBe(0);
   });
 
-  // O1: a POST (a new order, a comanda item, a PIX) is not touched by the service worker: offline, it just fails.
-  it('a POST made offline is NOT intercepted by the service worker (nothing is queued)', async () => {
+  // By design: the outbox lives in the app (lib/offline/outbox.ts); the service worker never touches a POST.
+  it('a POST made offline is NOT intercepted by the service worker (the app outbox keeps it)', async () => {
     const sw = loadServiceWorker();
     sw.state.online = false;
 
@@ -136,13 +138,17 @@ describe('bad day 1: service worker while the internet is down', () => {
     expect(intercepted).toBe(false);
   });
 
-  it.failing('a POST that failed offline is kept and replayed when the connection returns (O1)', async () => {
+  it('an API outside the offline screens is never cached: offline it is an honest 503 (O2)', async () => {
     const sw = loadServiceWorker();
+    const REPORT = 'https://gastrux.test/api/reports/executive';
+    sw.state.network.set(REPORT, () => new Response('{"revenue":1}', { status: 200 }));
+    await sw.dispatchFetch(REPORT);
     sw.state.online = false;
 
-    const { intercepted } = await sw.dispatchFetch('https://gastrux.test/api/comanda/sessions/s1/items', 'POST');
+    const { response } = await sw.dispatchFetch(REPORT);
 
-    expect(intercepted).toBe(true);
+    expect(response.status).toBe(503);
+    expect((await response.json()).message).toMatch(/Sem internet/);
   });
 });
 
@@ -162,133 +168,177 @@ function walk(dirs: string[]): string[] {
 }
 
 describe('bad day 1: is the offline queue wired to anything?', () => {
-  const usedOutside = (symbol: string, definedIn: string[]) =>
-    walk(['app', 'components', 'hooks', 'lib', 'public'])
-      .filter((f) => !definedIn.some((d) => f.endsWith(d)))
-      .some((f) => new RegExp(`\\b${symbol}\\b`).test(fs.readFileSync(f, 'utf8')));
+  const read = (file: string) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
-  it.failing('some screen queues a change when the network is down (addPendingChange has a caller) (O1)', () => {
-    expect(usedOutside('addPendingChange', ['offline-storage.ts', 'sync-manager.ts'])).toBe(true);
+  it('the outbox is mounted for every screen (root layout) (O1)', () => {
+    expect(read('app/layout.tsx')).toContain('<OutboxProvider>');
   });
 
-  it.failing('the IndexedDB store is initialised by the app (initializeOfflineStorage has a caller) (O1)', () => {
-    expect(usedOutside('initializeOfflineStorage', ['offline-storage.ts', 'sync-manager.ts'])).toBe(true);
+  it('the comanda and the counter sale send their changes through the outbox (O1)', () => {
+    expect(read('app/comanda/[sessionId]/page.tsx')).toMatch(/useOutbox\(\)/);
+    expect(read('components/comanda/counter-sale.tsx')).toMatch(/queueable: true/);
   });
 
-  it.failing('the sync manager is imported, so it really syncs when the connection returns (O1)', () => {
-    expect(usedOutside('syncManager', ['sync-manager.ts'])).toBe(true);
+  it('the offline banner says what keeps working, what does not and what is waiting', () => {
+    const banner = read('components/offline-indicator.tsx');
+    expect(banner).toMatch(/aguardando envio/);
+    expect(banner).toMatch(/indisponíveis/);
+    expect(banner).not.toMatch(/No internet connection/); // the old English text shown on screen
   });
 
-  it('only the online/offline banner is wired (it reads navigator.onLine and says nothing about queued work)', () => {
-    const banner = fs.readFileSync(path.join(ROOT, 'components/offline-indicator.tsx'), 'utf8');
-    expect(banner).toContain('navigator.onLine');
-    expect(banner).not.toMatch(/pending|queued|fila/i);
+  it('the dead offline modules (wired to nothing, wrong URLs) are gone', () => {
+    expect(fs.existsSync(path.join(ROOT, 'lib/sync-manager.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(ROOT, 'lib/offline-storage.ts'))).toBe(false);
   });
 });
 
-// ---------- sync manager ----------
-jest.mock('../../lib/offline-storage', () => ({
-  getPendingChanges: jest.fn(),
-  markChangeAsSynced: jest.fn().mockResolvedValue(undefined),
-  updateSyncMetadata: jest.fn().mockResolvedValue(undefined),
-}));
+// ---------- device outbox ----------
+import { createOutbox, memoryStore, OfflineUnavailableError } from '../../lib/offline/outbox';
 
-import { getPendingChanges, markChangeAsSynced } from '../../lib/offline-storage';
-import { syncManager } from '../../lib/sync-manager';
-
-describe('bad day 1: replaying queued changes when the connection returns', () => {
-  const change = (over: any = {}) => ({
-    id: 'stock-1700000000000-abc',
-    type: 'stock',
-    action: 'create',
-    data: { id: '', quantity: 5 },
-    timestamp: new Date().toISOString(),
-    synced: false,
-    ...over,
+describe('bad day 1: the device outbox', () => {
+  const setup = (opts: { online?: boolean; fetch?: jest.Mock } = {}) => {
+    const state = { online: opts.online ?? true };
+    let n = 0;
+    const fetchMock = opts.fetch ?? jest.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    const sent: string[] = [];
+    const outbox = createOutbox({
+      store: memoryStore(),
+      fetch: fetchMock as any,
+      isOnline: () => state.online,
+      newKey: () => `key-${++n}`,
+      now: () => n * 1000,
+      onSent: (entry) => sent.push(entry.id),
+    });
+    return { outbox, state, fetchMock, sent };
+  };
+  const item = (label = 'Adicionar item') => ({
+    method: 'POST' as const,
+    url: '/api/comanda/sessions/s1/items',
+    body: { recipeId: 'r1' },
+    label,
+    scope: 's1',
+    queueable: true,
   });
-  const realFetch = global.fetch;
+  const keyOf = (call: any[]) => new Headers(call[1].headers).get('idempotency-key');
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jest.useFakeTimers({ advanceTimers: true });
-  });
-  afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
-    global.fetch = realFetch;
-  });
+  it('online, a change is sent at once with an Idempotency-Key', async () => {
+    const { outbox, fetchMock } = setup();
 
-  it('a change that goes through is marked as synced', async () => {
-    getPendingChanges.mockResolvedValue([change()]);
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    const result = await outbox.send(item());
 
-    expect(await syncManager.syncPendingChanges()).toBe(true);
-
-    expect(markChangeAsSynced).toHaveBeenCalledWith('stock-1700000000000-abc');
+    expect(result.queued).toBe(false);
+    expect(keyOf(fetchMock.mock.calls[0])).toBe('key-1');
+    expect(await outbox.entries()).toHaveLength(0);
   });
 
-  it('a change that keeps failing stays pending (nothing is lost) and the run reports the error', async () => {
-    getPendingChanges.mockResolvedValue([change()]);
-    global.fetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+  it('offline, a comanda change is kept on the device (O1)', async () => {
+    const { outbox, fetchMock } = setup({ online: false });
 
-    expect(await syncManager.syncPendingChanges()).toBe(false);
+    const result = await outbox.send(item());
 
-    expect(markChangeAsSynced).not.toHaveBeenCalled();
-    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect(result.queued).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await outbox.entries()).map((e) => e.status)).toEqual(['pending']);
   });
 
-  it('one failing change does not stop the next ones', async () => {
-    getPendingChanges.mockResolvedValue([change({ id: 'stock-1-a' }), change({ id: 'stock-2-b', data: { id: 'x' } })]);
-    global.fetch = jest
-      .fn()
-      .mockRejectedValueOnce(new TypeError('x'))
-      .mockRejectedValueOnce(new TypeError('x'))
-      .mockRejectedValueOnce(new TypeError('x'))
-      .mockResolvedValue({ ok: true, status: 200 });
+  it('a network error while "online" also keeps the change (the answer may be lost)', async () => {
+    const { outbox } = setup({ fetch: jest.fn().mockRejectedValue(new TypeError('Failed to fetch')) });
 
-    await syncManager.syncPendingChanges();
-
-    expect(markChangeAsSynced).toHaveBeenCalledTimes(1);
-    expect(markChangeAsSynced).toHaveBeenCalledWith('stock-2-b');
+    expect((await outbox.send(item())).queued).toBe(true);
   });
 
-  // O3: the server may have applied the request and only the ANSWER was lost; the retry then repeats a create.
-  it.failing('every attempt of a change carries the same idempotency key, so a repeated request can be ignored (O3)', async () => {
-    getPendingChanges.mockResolvedValue([change()]);
-    global.fetch = jest
-      .fn()
-      .mockRejectedValueOnce(new TypeError('response lost'))
-      .mockResolvedValue({ ok: true, status: 201 });
+  it('offline, what needs the internet (PIX, NFC-e, reports) is refused honestly, never queued', async () => {
+    const { outbox } = setup({ online: false });
 
-    await syncManager.syncPendingChanges();
-
-    const keys = global.fetch.mock.calls.map(([, init]) => new Headers(init.headers).get('idempotency-key'));
-    expect(keys).toHaveLength(2);
-    expect(keys[0]).toBeTruthy();
-    expect(keys[1]).toBe(keys[0]);
+    await expect(outbox.send({ ...item('Gerar PIX'), url: '/api/pagamentos/mp/pix', queueable: false })).rejects.toBeInstanceOf(OfflineUnavailableError);
+    expect(await outbox.entries()).toHaveLength(0);
   });
 
-  // O3: a 400/409/422 will never succeed by repeating it.
-  it.failing('a definite client error (4xx) is not retried (O3)', async () => {
-    getPendingChanges.mockResolvedValue([change()]);
-    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 422, statusText: 'Unprocessable' });
+  it('when the connection returns, the changes are sent in order and removed', async () => {
+    const { outbox, state, fetchMock, sent } = setup({ online: false });
+    await outbox.send(item('1'));
+    await outbox.send({ ...item('2'), url: '/api/comanda/sessions/s1/send-to-kitchen' });
+    state.online = true;
 
-    await syncManager.syncPendingChanges();
+    const result = await outbox.flush();
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ sent: 2, failed: 0, pending: 0 });
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/api/comanda/sessions/s1/items', '/api/comanda/sessions/s1/send-to-kitchen']);
+    expect(sent).toEqual(['key-1', 'key-2']);
+  });
+
+  it('every attempt of a change carries the same idempotency key (O3)', async () => {
+    const fetchMock = jest.fn().mockRejectedValueOnce(new TypeError('response lost')).mockResolvedValue(new Response('{}', { status: 201 }));
+    const { outbox } = setup({ fetch: fetchMock });
+
+    await outbox.send(item());
+    await outbox.flush();
+
+    expect(fetchMock.mock.calls.map(keyOf)).toEqual(['key-1', 'key-1']);
+  });
+
+  it('a definite client error (4xx) is not retried: it is marked failed for the operator (O3)', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Comanda fechada ou cancelada' }), { status: 409 }));
+    const { outbox, state } = setup({ online: false, fetch: fetchMock });
+    await outbox.send(item());
+    state.online = true;
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'Session not found' }), { status: 404 }));
+
+    const first = await outbox.flush();
+    const second = await outbox.flush();
+
+    expect(first.failed).toBe(1);
+    expect(second.failed).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [entry] = await outbox.entries();
+    expect(entry.status).toBe('failed');
+    expect(entry.lastError).toBe('Session not found');
+  });
+
+  it('a 5xx or 409 "still running" keeps the change and stops the run (order is kept)', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(new Response('{}', { status: 503 }));
+    const { outbox, state } = setup({ online: false, fetch: fetchMock });
+    await outbox.send(item('1'));
+    await outbox.send(item('2'));
+    state.online = true;
+
+    const result = await outbox.flush();
+
+    expect(result).toEqual({ sent: 0, failed: 0, pending: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('online, a new change waits behind older ones (an item before "send to kitchen")', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    const { outbox, state } = setup({ online: false, fetch: fetchMock });
+    await outbox.send(item('1'));
+    state.online = true;
+
+    const result = await outbox.send({ ...item('2'), url: '/api/comanda/sessions/s1/send-to-kitchen' });
+    await outbox.flush();
+
+    expect(result.queued).toBe(true);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(['/api/comanda/sessions/s1/items', '/api/comanda/sessions/s1/send-to-kitchen']);
   });
 
   it('two runs at the same time do not replay the queue twice', async () => {
-    getPendingChanges.mockResolvedValue([change()]);
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    const { outbox, state, fetchMock } = setup({ online: false });
+    await outbox.send(item());
+    state.online = true;
 
-    const [a, b] = await Promise.all([syncManager.syncPendingChanges(), syncManager.syncPendingChanges()]);
+    await Promise.all([outbox.flush(), outbox.flush()]);
 
-    expect([a, b].filter(Boolean)).toHaveLength(1);
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('the operator can discard a change that can never be applied', async () => {
+    const { outbox } = setup({ online: false });
+    const { entry } = (await outbox.send(item())) as any;
+
+    await outbox.discard(entry.id);
+
+    expect(await outbox.entries()).toHaveLength(0);
   });
 
   it.todo('an edit made offline does not silently overwrite a newer change made online (needs a version check, "last writer wins" today)');
-  it.todo('a change that can never be applied is shown to the operator and can be discarded, instead of being retried at every reconnect');
-  it.todo('the offline banner says what is waiting to be sent and that nothing was saved for orders or payments');
 });

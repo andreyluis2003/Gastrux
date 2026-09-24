@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Menu, X, Home, UtensilsCrossed, ClipboardList, ShoppingCart, TrendingDown, BarChart3, AlertCircle, LogOut, Settings, Calculator, Trash2, PieChart, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { signOutSafely } from '@/lib/offline/sign-out';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
@@ -26,7 +27,7 @@ export function MobileMenu() {
 
   const handleLogout = async () => {
     try {
-      await signOut({ redirect: true, callbackUrl: '/auth/signin' });
+      await signOutSafely({ redirect: true, callbackUrl: '/auth/signin' });
     } catch (error) {
       toast.error('Erro ao fazer logout');
     }

@@ -3,7 +3,9 @@
  * Handles offline mode, data persistence, and sync
  */
 
-const CACHE_VERSION = 'v1';
+// v2: API responses are cached only for the screens that work offline, marked stale when served
+// from the cache, and every cache is cleared on logout (bad-day scenario 1, O2)
+const CACHE_VERSION = 'v2';
 const CACHE_NAMES = {
   static: `static-${CACHE_VERSION}`,
   pages: `pages-${CACHE_VERSION}`,
@@ -26,12 +28,16 @@ const STATIC_ASSETS = [
   '/manifest.json',
 ];
 
-const API_ROUTES = [
-  '/api/ingredients',
-  '/api/recipes',
-  '/api/stock',
-  '/api/analytics',
-  '/api/forecasts',
+// Reads the offline screens need (offline option (a)): comanda, counter sale menu, cash register,
+// kitchen screen. Every other API answer is never cached: offline it is an honest 503.
+const OFFLINE_API_PREFIXES = [
+  '/api/comanda/sessions',
+  '/api/comanda/tables',
+  '/api/cardapio/itens',
+  '/api/modifiers',
+  '/api/caixa',
+  '/api/kds/orders',
+  '/api/kds/stations',
 ];
 
 // 1. INSTALL EVENT - Pre-cache critical assets
@@ -59,10 +65,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (
-            !Object.values(CACHE_NAMES).includes(cacheName) &&
-            cacheName.startsWith('v')
-          ) {
+          if (!Object.values(CACHE_NAMES).includes(cacheName)) {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -93,7 +96,7 @@ self.addEventListener('fetch', (event) => {
   if (isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirstStrategy(request));
   } else if (isAPIRoute(url.pathname)) {
-    event.respondWith(networkFirstStrategy(request));
+    event.respondWith(isOfflineAPI(url.pathname) ? apiNetworkFirst(request) : apiNetworkOnly(request));
   } else if (isImageRequest(request)) {
     event.respondWith(cacheFirstImageStrategy(request));
   } else {
@@ -216,6 +219,40 @@ async function networkFirstStrategy(request) {
   }
 }
 
+/**
+ * API reads for the offline screens: network first; the copy kept is served offline MARKED as stale
+ * (x-gastrux-cache: stale + x-gastrux-cached-at), so a screen can say the data may be outdated
+ * instead of showing an old kitchen list as current.
+ */
+async function apiNetworkFirst(request) {
+  const cache = await caches.open(CACHE_NAMES.api);
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const body = await response.clone().text();
+      const headers = new Headers(response.headers);
+      headers.set('x-gastrux-cached-at', new Date().toISOString());
+      cache.put(request, new Response(body, { status: response.status, statusText: response.statusText, headers }));
+    }
+    return response;
+  } catch (error) {
+    const cached = await cache.match(request);
+    if (!cached) return createOfflineResponse();
+    const headers = new Headers(cached.headers);
+    headers.set('x-gastrux-cache', 'stale');
+    return new Response(await cached.text(), { status: cached.status, statusText: cached.statusText, headers });
+  }
+}
+
+/** Every other API call: never cached (it may be another user's data after a logout). */
+async function apiNetworkOnly(request) {
+  try {
+    return await fetch(request);
+  } catch (error) {
+    return createOfflineResponse();
+  }
+}
+
 // ============ HELPERS ============
 
 function isStaticAsset(pathname) {
@@ -229,6 +266,10 @@ function isStaticAsset(pathname) {
 
 function isAPIRoute(pathname) {
   return pathname.startsWith('/api/');
+}
+
+function isOfflineAPI(pathname) {
+  return OFFLINE_API_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));
 }
 
 function isImageRequest(request) {
@@ -253,7 +294,7 @@ function createOfflineResponse() {
   return new Response(
     JSON.stringify({
       error: 'offline',
-      message: 'Application is offline. Please check your connection.',
+      message: 'Sem internet: esta informação precisa de conexão e não está guardada neste aparelho.',
     }),
     {
       status: 503,

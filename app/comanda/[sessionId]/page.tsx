@@ -7,6 +7,8 @@ import { lineTotal } from '@/lib/comanda/line-total';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { useOutbox } from '@/components/offline/outbox-provider';
+import { OfflineUnavailableError } from '@/lib/offline/outbox';
 import { ArrowLeft, Trash2, Plus, Send, Receipt, FileText, CheckCircle2 } from 'lucide-react';
 
 interface MenuItemEntry {
@@ -21,6 +23,9 @@ interface MenuItemEntry {
 
 interface SessionItem {
   id: string;
+  addedAt?: string;
+  /** A line made offline, still waiting in the device outbox. */
+  pending?: boolean;
   quantity: number;
   price: string | number;
   recipe: { name: string };
@@ -43,6 +48,7 @@ interface Session {
   };
   customerName?: string;
   status?: string;
+  sentToKitchenAt?: string | null;
 }
 
 export default function ComandaDetailPage() {
@@ -67,7 +73,57 @@ export default function ComandaDetailPage() {
   const [closeCpf, setCloseCpf] = useState('');
   const [closePayment, setClosePayment] = useState('dinheiro');
   const [closingBill, setClosingBill] = useState(false);
-  const isClosed = session?.status === 'CLOSED' || session?.status === 'CANCELLED';
+  const { send, pendingFor, online } = useOutbox();
+  // When the comanda shown is the copy kept on this device (no internet), since when
+  const [staleSince, setStaleSince] = useState<string | null>(null);
+
+  // What this device still has to send for this comanda (made offline): shown on the screen
+  const pendingOps = pendingFor(String(sessionId));
+  const pendingRemovals = new Set(
+    pendingOps.filter((e) => e.method === 'DELETE').map((e) => e.url.split('/').pop())
+  );
+  const pendingLines: SessionItem[] = pendingOps
+    .filter((e) => e.method === 'POST' && e.url.endsWith('/items'))
+    .map((e) => ({
+      id: e.id,
+      pending: true,
+      quantity: Number((e.display as any)?.quantity ?? 1),
+      price: Number((e.display as any)?.unitPrice ?? 0),
+      recipe: { name: String((e.display as any)?.name ?? 'Item') },
+      modifiers: ((e.display as any)?.modifiers ?? []) as SessionItem['modifiers'],
+    }));
+  const visibleItems: SessionItem[] = [
+    ...(session?.items ?? []).filter((item) => !pendingRemovals.has(item.id)),
+    ...pendingLines,
+  ];
+  const closePending = pendingOps.some((e) => e.method === 'PUT' && (e.body as any)?.status === 'CLOSED');
+  const isClosed = session?.status === 'CLOSED' || session?.status === 'CANCELLED' || closePending;
+
+  // Changes of this comanda go through the device outbox (components/offline/outbox-provider.tsx):
+  // offline they wait on this device and are sent once, in order, when the internet returns.
+  const mutate = async (
+    method: 'POST' | 'PUT' | 'DELETE',
+    url: string,
+    body: unknown,
+    label: string,
+    display?: Record<string, unknown>
+  ): Promise<Response | null> => {
+    const result = await send({ method, url, body, label, scope: String(sessionId), queueable: true, display });
+    if (result.queued) {
+      toast.info(`Sem internet: "${label}" ficou guardado neste aparelho e será enviado quando a conexão voltar.`);
+      return null;
+    }
+    return result.response;
+  };
+
+  // A change made offline reached the server: show the comanda as the server has it now
+  useEffect(() => {
+    const onSent = (event: Event) => {
+      if ((event as CustomEvent).detail?.scope === String(sessionId)) fetchSession();
+    };
+    window.addEventListener('gastrux:outbox-sent', onSent);
+    return () => window.removeEventListener('gastrux:outbox-sent', onSent);
+  }, [sessionId]);
 
   useEffect(() => {
     Promise.all([fetchSession(), fetchRecipes(), fetchModifiers()]);
@@ -80,15 +136,20 @@ export default function ComandaDetailPage() {
     }
     try {
       setEmittingNfce(true);
-      const res = await fetch('/api/nfe/emit', {
+      // Needs the internet (a note cannot be signed on this device): refused offline, never queued
+      const result = await send({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        url: '/api/nfe/emit',
+        label: 'Emitir NFC-e',
+        queueable: false,
+        body: {
           orderSessionId: sessionId,
           customerCPF: nfceCpf.replace(/\D/g, '') || undefined,
           customerName: nfceName.trim() || undefined,
-        }),
+        },
       });
+      if (result.queued) return;
+      const res = result.response;
       const data = await res.json();
       if (!res.ok || !data.success) {
         toast.error(data.rejectionReason || data.error || 'Erro ao emitir NFC-e');
@@ -97,7 +158,7 @@ export default function ComandaDetailPage() {
         setEmittedDoc(data.document);
       }
     } catch (e: any) {
-      toast.error(e?.message || 'Erro');
+      toast.error(e instanceof OfflineUnavailableError ? e.message : e?.message || 'Erro');
     } finally {
       setEmittingNfce(false);
     }
@@ -108,15 +169,18 @@ export default function ComandaDetailPage() {
   const handleCloseBill = async () => {
     try {
       setClosingBill(true);
-      const res = await fetch(`/api/comanda/sessions/${sessionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'CLOSED',
-          customerCPF: closeCpf.replace(/D/g, '') || undefined,
-          paymentMethod: closePayment,
-        }),
-      });
+      const res = await mutate(
+        'PUT',
+        `/api/comanda/sessions/${sessionId}`,
+        { status: 'CLOSED', customerCPF: closeCpf.replace(/\D/g, '') || undefined, paymentMethod: closePayment },
+        'Fechar conta'
+      );
+      if (!res) {
+        // Closed on this device; the server closes it (and issues the NFC-e) when the internet returns
+        toast.warning('A NFC-e será emitida quando a internet voltar.', { duration: 8000 });
+        setShowCloseModal(false);
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || 'Erro ao fechar a conta');
@@ -146,6 +210,10 @@ export default function ComandaDetailPage() {
       const res = await fetch(`/api/comanda/sessions/${sessionId}`);
       if (res.ok) {
         setSession(await res.json());
+        // Served from this device's copy (service worker) while offline
+        setStaleSince(res.headers.get('x-gastrux-cache') === 'stale' ? res.headers.get('x-gastrux-cached-at') : null);
+      } else if (res.status === 503) {
+        toast.error('Sem internet e esta comanda não está guardada neste aparelho.');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -186,18 +254,30 @@ export default function ComandaDetailPage() {
     }
 
     try {
-      const res = await fetch(`/api/comanda/sessions/${sessionId}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const chosen = modifiers.filter((m) => selectedModifiers.includes(m.id));
+      const res = await mutate(
+        'POST',
+        `/api/comanda/sessions/${sessionId}/items`,
+        {
           menuItemId: selectedRecipe.id,
           recipeId: selectedRecipe.recipeId || selectedRecipe.recipe?.id || null,
           quantity: quantity,
           modifierIds: selectedModifiers,
-        }),
-      });
+        },
+        `${quantity}x ${selectedRecipe.name}`,
+        {
+          name: selectedRecipe.name,
+          quantity,
+          unitPrice: Number(selectedRecipe.price || selectedRecipe.sellingPrice || 0),
+          modifiers: chosen.map((m) => ({ priceAdjustment: m.priceAdjustment, modifier: { name: m.name } })),
+        }
+      );
 
-      if (res.ok) {
+      if (!res) {
+        setSelectedRecipe(null);
+        setSelectedModifiers([]);
+        setQuantity(1);
+      } else if (res.ok) {
         toast.success('Item adicionado');
         setSelectedRecipe(null);
         setSelectedModifiers([]);
@@ -216,14 +296,22 @@ export default function ComandaDetailPage() {
   // An item the kitchen already has is a cancellation: a manager, with a reason (asked when needed)
   const handleRemoveItem = async (itemId: string, reason?: string) => {
     try {
-      const res = await fetch(
+      // Known on this device too, so the reason is asked before (online or not)
+      const item = session?.items?.find((i) => i.id === itemId);
+      const kitchenHasIt =
+        !!session?.sentToKitchenAt && !!item?.addedAt && new Date(item.addedAt) <= new Date(session.sentToKitchenAt);
+      if (kitchenHasIt && !reason) {
+        const asked = window.prompt('A cozinha já recebeu este item (exige gerente). Motivo do cancelamento:');
+        if (!asked || !asked.trim()) return;
+        reason = asked.trim();
+      }
+      const res = await mutate(
+        'DELETE',
         `/api/comanda/sessions/${sessionId}/items/${itemId}`,
-        {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(reason ? { reason } : {}),
-        }
+        reason ? { reason } : {},
+        `Remover ${item?.recipe?.name ?? 'item'}`
       );
+      if (!res) return;
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
@@ -242,17 +330,19 @@ export default function ComandaDetailPage() {
   };
 
   const handleSendToKitchen = async () => {
-    if (!session?.items || session.items.length === 0) {
+    if (visibleItems.length === 0) {
       toast.error('Adicione itens antes de enviar');
       return;
     }
 
     try {
       setSendingToKitchen(true);
-      const res = await fetch(
-        `/api/comanda/sessions/${sessionId}/send-to-kitchen`,
-        { method: 'POST' }
-      );
+      const res = await mutate('POST', `/api/comanda/sessions/${sessionId}/send-to-kitchen`, {}, 'Enviar para a cozinha');
+      if (!res) {
+        // Honest: the kitchen screen only gets it when the internet returns
+        toast.warning('A cozinha só recebe este pedido quando a internet voltar: avise a cozinha agora.', { duration: 10000 });
+        return;
+      }
 
       if (res.ok) {
         const data: any = await res.json();
@@ -292,7 +382,7 @@ export default function ComandaDetailPage() {
 
   // Same rule as the PIX charged for this tab (lib/comanda/line-total.ts), modifiers included.
   const totalPrice =
-    session?.items?.reduce(
+    visibleItems.reduce(
       (sum: number, item: SessionItem) =>
         sum + lineTotal(item.price, item.quantity, (item.modifiers ?? []).map((m) => m.priceAdjustment)),
       0
@@ -324,6 +414,14 @@ export default function ComandaDetailPage() {
             Mesa {session?.table?.number || session?.customerName}
           </h1>
         </div>
+
+        {(staleSince || !online) && (
+          <div role="status" className="mb-6 rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-sm">
+            Sem internet: esta é a comanda como estava
+            {staleSince ? ` às ${new Date(staleSince).toLocaleTimeString('pt-BR')}` : ' na última atualização'}. O que você
+            fizer agora fica guardado neste aparelho e é enviado quando a conexão voltar.
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
@@ -445,14 +543,15 @@ export default function ComandaDetailPage() {
               <h2 className="text-2xl font-bold mb-4">Comanda</h2>
 
               <div className="space-y-3 mb-6 max-h-48 overflow-y-auto">
-                {session?.items?.map((item) => (
+                {visibleItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex justify-between items-start gap-2 p-3 bg-gray-50 rounded-lg"
+                    className={`flex justify-between items-start gap-2 p-3 rounded-lg ${item.pending ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}
                   >
                     <div className="flex-1">
                       <div className="font-semibold text-sm">
                         {item.recipe.name}
+                        {item.pending && <span className="ml-2 text-xs font-normal text-amber-700">aguardando envio</span>}
                       </div>
                       <div className="text-xs text-gray-500">
                         {item.quantity}x R$ {Number(item.price).toFixed(2)}
@@ -464,14 +563,16 @@ export default function ComandaDetailPage() {
                         </div>
                       ))}
                     </div>
-                    <Button
-                      onClick={() => handleRemoveItem(item.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {!item.pending && (
+                      <Button
+                        onClick={() => handleRemoveItem(item.id)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -487,7 +588,7 @@ export default function ComandaDetailPage() {
 
               <Button
                 onClick={handleSendToKitchen}
-                disabled={sendingToKitchen || !session?.items?.length}
+                disabled={sendingToKitchen || visibleItems.length === 0 || isClosed}
                 className="w-full bg-blue-600"
                 size="lg"
               >
