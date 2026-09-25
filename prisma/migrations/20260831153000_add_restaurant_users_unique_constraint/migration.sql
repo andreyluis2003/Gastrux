@@ -1,3 +1,6 @@
+-- Made idempotent on 2026-09-25: the baseline migration already creates what this migration
+-- adds, so on an empty database it failed (42P07 / 42710). Guards skip what already exists and
+-- change nothing where it does not (the production history).
 -- The RestaurantUser model has declared @@unique([restaurantId, userId]) since
 -- before this migration history was baselined, but the constraint was never
 -- actually created on the live database (the initial schema was applied via
@@ -8,4 +11,4 @@
 -- breaking staff creation and any other restaurantUser upsert. No duplicate
 -- (restaurantId, userId) pairs exist in production, verified before this
 -- migration was written.
-CREATE UNIQUE INDEX "restaurant_users_restaurantId_userId_key" ON "restaurant_users"("restaurantId", "userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "restaurant_users_restaurantId_userId_key" ON "restaurant_users"("restaurantId", "userId");
