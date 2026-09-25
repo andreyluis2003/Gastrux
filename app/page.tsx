@@ -243,6 +243,7 @@ function HomePageContent() {
               <ul className="space-y-2 text-sm">
                 <li><Link href="/ajuda" className="hover:text-white">Central de Ajuda</Link></li>
                 <li><Link href="/suporte" className="hover:text-white">Abrir chamado</Link></li>
+                <li><a href="mailto:contato@helpflow.com.br" className="hover:text-white">contato@helpflow.com.br</a></li>
                 <li><Link href="/auth/signin" className="hover:text-white">Entrar</Link></li>
               </ul>
             </div>
