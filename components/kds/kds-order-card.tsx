@@ -36,6 +36,7 @@ interface OrderCardProps {
     specialInstructions?: string;
     externalOrder?: { id: string; customerName: string };
     reservation?: { id: string; guestName: string };
+    orderSession?: { tableNumber?: number | null; customerName?: string | null; table?: { number: number } | null } | null;
   };
   onStatusChange?: (orderId: string, newStatus: string) => void;
   onItemStatusChange?: (itemId: string, newStatus: string) => void;
@@ -94,11 +95,16 @@ export function KDSOrderCard({
   onItemStatusChange,
 }: OrderCardProps) {
   const [elapsed, setElapsed] = useState(0);
+  const tableNumber = order.orderSession?.table?.number ?? order.orderSession?.tableNumber;
   const source = order.externalOrder
     ? `Delivery: ${order.externalOrder.customerName}`
     : order.reservation
       ? `Reserva: ${order.reservation.guestName}`
-      : 'Pedido';
+      : tableNumber
+        ? `Mesa ${tableNumber}`
+        : order.orderSession
+          ? `Balcão${order.orderSession.customerName ? `: ${order.orderSession.customerName}` : ''}`
+          : 'Pedido';
 
   useEffect(() => {
     const startTime = new Date(order.createdAt).getTime();

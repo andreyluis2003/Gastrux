@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
         prepTimes: true,
         externalOrder: true,
         reservation: true,
+        orderSession: { select: { tableNumber: true, customerName: true, table: { select: { number: true } } } },
       },
       orderBy: [
         { priority: 'desc' }, // URGENT first

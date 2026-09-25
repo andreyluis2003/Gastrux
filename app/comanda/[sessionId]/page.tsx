@@ -48,6 +48,7 @@ interface Session {
     section: { name: string };
   };
   customerName?: string;
+  tableNumber?: number | null;
   status?: string;
   sentToKitchenAt?: string | null;
 }
@@ -415,7 +416,9 @@ export default function ComandaDetailPage() {
             <ArrowLeft className="w-6 h-6" />
           </Button>
           <h1 className="text-3xl font-bold">
-            Mesa {session?.table?.number || session?.customerName}
+            {session?.table?.number || session?.tableNumber
+              ? `Mesa ${session?.table?.number || session?.tableNumber}`
+              : session?.customerName || 'Balcão'}
           </h1>
         </div>
 
@@ -567,7 +570,7 @@ export default function ComandaDetailPage() {
                         </div>
                       ))}
                     </div>
-                    {!item.pending && (
+                    {!item.pending && !isClosed && (
                       <Button
                         onClick={() => handleRemoveItem(item.id)}
                         variant="ghost"
@@ -659,8 +662,9 @@ export default function ComandaDetailPage() {
               </p>
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-semibold block mb-1">CPF na nota?</label>
+                  <label htmlFor="close-cpf" className="text-sm font-semibold block mb-1">CPF na nota?</label>
                   <Input
+                    id="close-cpf"
                     placeholder="Opcional. Ex: 123.456.789-09"
                     value={closeCpf}
                     onChange={(e) => setCloseCpf(e.target.value)}
@@ -668,8 +672,9 @@ export default function ComandaDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-semibold block mb-1">Forma de pagamento</label>
+                  <label htmlFor="close-payment" className="text-sm font-semibold block mb-1">Forma de pagamento</label>
                   <select
+                    id="close-payment"
                     className="w-full border rounded-md h-10 px-3 bg-background"
                     value={closePayment}
                     onChange={(e) => setClosePayment(e.target.value)}

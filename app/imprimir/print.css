@@ -21,6 +21,8 @@
 .print-ticket .muted { font-size: 11px; }
 .print-ticket .break { word-break: break-all; }
 @media print {
+  /* floating widgets fade in/out: no transition may leave one half visible on the paper */
+  *, *::before, *::after { transition: none !important; animation: none !important; }
   body * { visibility: hidden; }
   .print-ticket, .print-ticket * { visibility: visible; }
   .print-ticket { position: absolute; left: 0; top: 0; }

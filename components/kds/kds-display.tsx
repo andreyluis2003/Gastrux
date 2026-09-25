@@ -72,7 +72,9 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
       try {
         // Fetch orders
         const ordersRes = await fetch(
-          `/api/kds/orders?status=PENDING,PREPARING,READY`
+          `/api/kds/orders?status=PENDING,PREPARING,READY`,
+          // always the live list (a cached answer kept the kitchen up to 5 min behind)
+          { cache: 'no-store' }
         );
         if (!ordersRes.ok) throw new Error('Failed to fetch orders');
         const ordersData = await ordersRes.json();
@@ -100,7 +102,9 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
     const pollInterval = setInterval(async () => {
       try {
         const ordersRes = await fetch(
-          `/api/kds/orders?status=PENDING,PREPARING,READY`
+          `/api/kds/orders?status=PENDING,PREPARING,READY`,
+          // always the live list (a cached answer kept the kitchen up to 5 min behind)
+          { cache: 'no-store' }
         );
         if (!ordersRes.ok) throw new Error('Failed to fetch orders');
         

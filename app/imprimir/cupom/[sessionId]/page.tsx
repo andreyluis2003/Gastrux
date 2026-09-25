@@ -16,6 +16,11 @@ const PAYMENT: Record<string, string> = {
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const groups = (key: string) => key.replace(/(.{4})/g, '$1 ').trim();
+const digits = (value: string) => value.replace(/\D/g, '');
+const cnpj = (value: string) =>
+  digits(value).length === 14 ? digits(value).replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : value;
+const cpf = (value: string) =>
+  digits(value).length === 11 ? digits(value).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : value;
 
 /**
  * Customer receipt in 80 mm with the NFC-e data (number, series, access key, protocol, QR code).
@@ -65,7 +70,7 @@ export default function ReceiptPage() {
       )}
       <div className="print-ticket">
         <h1>{receipt.restaurant.name}</h1>
-        {receipt.restaurant.cnpj && <div className="center muted">CNPJ {receipt.restaurant.cnpj}</div>}
+        {receipt.restaurant.cnpj && <div className="center muted">CNPJ {cnpj(receipt.restaurant.cnpj)}</div>}
         {receipt.restaurant.stateRegistration && <div className="center muted">IE {receipt.restaurant.stateRegistration}</div>}
         {receipt.restaurant.address && <div className="center muted">{receipt.restaurant.address}</div>}
         <hr />
@@ -108,7 +113,7 @@ export default function ReceiptPage() {
           </div>
         )}
         <hr />
-        {receipt.customerCPF ? <div>CONSUMIDOR CPF: {receipt.customerCPF}</div> : <div>CONSUMIDOR NÃO IDENTIFICADO</div>}
+        {receipt.customerCPF ? <div>CONSUMIDOR CPF: {cpf(receipt.customerCPF)}</div> : <div>CONSUMIDOR NÃO IDENTIFICADO</div>}
         {nfce ? (
           <>
             <hr />
@@ -128,7 +133,7 @@ export default function ReceiptPage() {
             {nfce.protocolNumber && <div>Protocolo de autorização: {nfce.protocolNumber}</div>}
             {qr && (
               <div className="center" style={{ marginTop: '2mm' }}>
-                <img src={qr} alt="QR code de consulta da NFC-e" style={{ width: '40mm', height: '40mm' }} />
+                <img src={qr} alt="QR code de consulta da NFC-e" style={{ width: '40mm', height: '40mm', display: 'block', margin: '0 auto' }} />
                 <div className="muted">Consulte pela chave de acesso ou pelo QR code</div>
               </div>
             )}

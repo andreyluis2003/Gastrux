@@ -128,12 +128,12 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       </div>
       <div className="grid sm:grid-cols-3 gap-3 items-end">
         <div>
-          <label className="text-sm font-semibold block mb-1">CPF na nota?</label>
-          <Input placeholder="Opcional" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+          <label htmlFor="counter-cpf" className="text-sm font-semibold block mb-1">CPF na nota?</label>
+          <Input id="counter-cpf" placeholder="Opcional" value={cpf} onChange={(e) => setCpf(e.target.value)} />
         </div>
         <div>
-          <label className="text-sm font-semibold block mb-1">Pagamento</label>
-          <select className="w-full border rounded-md h-10 px-3 bg-background" value={payment} onChange={(e) => setPayment(e.target.value)}>
+          <label htmlFor="counter-payment" className="text-sm font-semibold block mb-1">Pagamento</label>
+          <select id="counter-payment" className="w-full border rounded-md h-10 px-3 bg-background" value={payment} onChange={(e) => setPayment(e.target.value)}>
             <option value="dinheiro">Dinheiro</option>
             <option value="cartao de credito">Cartão de crédito</option>
             <option value="cartao de debito">Cartão de débito</option>
