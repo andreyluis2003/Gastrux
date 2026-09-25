@@ -84,8 +84,9 @@ export const BASE_PRICING_TIERS = {
     id: 'enterprise',
     name: 'Enterprise',
     description: 'Solução completa para grandes operações',
-    priceMonthly: 499,
-    priceAnnual: 5489,
+    // Owner decision 2026-09-25: price on request ("sob consulta"); no self-serve checkout
+    priceMonthly: null,
+    priceAnnual: null,
     currency: 'brl',
     features: [
       'Tudo do Business',

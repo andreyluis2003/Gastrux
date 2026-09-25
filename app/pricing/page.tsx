@@ -321,9 +321,9 @@ export default function PricingPage() {
           {/* Enterprise: consultation-only, not a self-serve card */}
           <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-8">
             Precisa de mais que o Business — mais lojas, mais usuários, requisitos específicos?{' '}
-            <Link href="/suporte/novo?tipo=enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-              Fale com a gente sobre o plano Enterprise
-            </Link>
+            <a href="mailto:contato@helpflow.com.br?subject=Plano%20Enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Plano Enterprise, preço sob consulta: contato@helpflow.com.br
+            </a>
           </p>
 
           {/* Trust badges */}

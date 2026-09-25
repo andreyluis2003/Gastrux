@@ -44,6 +44,12 @@ export async function POST(request: NextRequest) {
     if (tierId === 'starter') {
       return NextResponse.json({ error: 'O plano Starter é gratuito e não precisa de pagamento' }, { status: 400 });
     }
+    if (tier.priceMonthly == null) {
+      return NextResponse.json(
+        { error: 'O plano Enterprise é sob consulta. Fale com a gente: contato@helpflow.com.br' },
+        { status: 400 }
+      );
+    }
 
     // Only the owner subscribes, for the restaurant being worked in: the plan is copied to the
     // restaurants the subscriber owns (lib/billing/subscription-sync.ts), so a manager's payment
