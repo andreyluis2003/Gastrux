@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { listNumbersToVoid } from '@/lib/nfe/numbering';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +73,8 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    const config = await prisma.nFeConfig.findFirst({ where: { restaurantId }, select: { id: true } });
+
     // Agrupa topRejected por razão (primeiras 80 chars)
     const rejectionCounter: Record<string, number> = {};
     for (const r of topRejected) {
@@ -102,6 +105,8 @@ export async function GET(request: NextRequest) {
         last30d: Number(revenueLast30Agg._sum.totalAmount || 0),
       },
       topRejectedReasons: topRejectedSorted,
+      // Unused numbers SEFAZ requires to be voided (inutilização), usually by the 10th of next month
+      numbersToVoid: config ? await listNumbersToVoid(config.id) : [],
     });
   } catch (error: any) {
     console.error('Erro stats NFe:', error);

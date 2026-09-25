@@ -3,6 +3,7 @@
 // Sprint 2: includes menu engineering badges (Star/Puzzle highlights)
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hasActiveConnection } from '@/lib/mercadopago-connect/connection-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -127,7 +128,10 @@ export async function GET(
         section: table.section,
         qrToken: table.qrToken,
       },
-      restaurant: table.restaurant,
+      restaurant: {
+        ...table.restaurant,
+        acceptsOnlinePayment: await hasActiveConnection(table.restaurant.id),
+      },
       categories: enrichedCategories,
       combos,
     }, {

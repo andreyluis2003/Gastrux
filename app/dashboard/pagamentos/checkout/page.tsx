@@ -49,7 +49,7 @@ export default function PixCheckoutPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('/api/pagamentos/mp/pix', {
+      const response = await fetch('/api/pagamentos/mp/pix/manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -57,7 +57,6 @@ export default function PixCheckoutPage() {
           description: description || 'Pagamento PIX',
           payerEmail: payerEmail || undefined,
           payerName: payerName || undefined,
-          externalReference: `checkout-${Date.now()}`,
         }),
       });
 
@@ -81,7 +80,7 @@ export default function PixCheckoutPage() {
 
   const checkPaymentStatus = useCallback(async (paymentId: string) => {
     try {
-      const response = await fetch(`/api/pagamentos/mp/pix?paymentId=${paymentId}`);
+      const response = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${paymentId}`);
       const data = await response.json();
 
       if (data.status === 'approved') {

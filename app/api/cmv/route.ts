@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
     let purchases = 0;
     let consumption = 0;
     let losses = 0;
+    // Stock-count differences: ADJUSTMENT quantities are signed (+ surplus, - shortage), so a
+    // shortage found by the count costs (-quantity x cost) and a surplus gives it back
+    let unidentifiedLosses = 0;
     const byIngredient: Record<string, { name: string; purchases: number; consumption: number; losses: number }> = {};
 
     for (const m of movements) {
@@ -55,7 +58,10 @@ export async function GET(req: NextRequest) {
       } else if (m.movementType === 'LOSS') {
         losses += cost;
         byIngredient[key].losses += cost;
-      } else if (m.movementType !== 'ADJUSTMENT') {
+      } else if (m.movementType === 'ADJUSTMENT') {
+        unidentifiedLosses -= cost;
+        byIngredient[key].losses -= cost;
+      } else {
         consumption += cost;
         byIngredient[key].consumption += cost;
       }
@@ -66,10 +72,11 @@ export async function GET(req: NextRequest) {
     for (const m of prevMovements) {
       const cost = m.quantity * (m.ingredient.referenceCost || 0);
       if (m.movementType === 'ENTRY') prevPurchases += cost;
-      else if (m.movementType !== 'ADJUSTMENT' && m.movementType !== 'LOSS') prevConsumption += cost;
+      else if (m.movementType === 'ADJUSTMENT') prevConsumption -= cost;
+      else if (m.movementType !== 'LOSS') prevConsumption += cost;
     }
 
-    const cmv = consumption + losses;
+    const cmv = consumption + losses + unidentifiedLosses;
     const prevCmv = prevConsumption;
     const cmvChange = prevCmv > 0 ? ((cmv - prevCmv) / prevCmv) * 100 : 0;
 
@@ -99,7 +106,8 @@ export async function GET(req: NextRequest) {
       if (!dailyData[day]) dailyData[day] = { date: day, purchases: 0, consumption: 0 };
       const cost = m.quantity * (m.ingredient.referenceCost || 0);
       if (m.movementType === 'ENTRY') dailyData[day].purchases += cost;
-      else if (m.movementType !== 'ADJUSTMENT') dailyData[day].consumption += cost;
+      else if (m.movementType === 'ADJUSTMENT') dailyData[day].consumption -= cost;
+      else dailyData[day].consumption += cost;
     }
 
     const dailyChart = Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date));
@@ -112,6 +120,7 @@ export async function GET(req: NextRequest) {
       purchases,
       consumption,
       losses,
+      unidentifiedLosses,
       estimatedRevenue,
       topIngredients,
       dailyChart,

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +21,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const register = await prisma.cashRegister.findUnique({
-      where: { id: cashRegisterId },
+    // Scoped: another restaurant's register is a 404 (it used to be found by id only)
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) return NextResponse.json({ error: 'Cash register not found' }, { status: 404 });
+    const register = await prisma.cashRegister.findFirst({
+      where: { id: cashRegisterId, restaurantId },
       include: {
         movements: {
           orderBy: { createdAt: 'desc' },

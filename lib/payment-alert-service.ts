@@ -37,6 +37,12 @@ export interface CreatePaymentAlertInput {
   restaurantId?: string | null;
   userId?: string | null;
   actionUrl?: string | null;
+  /**
+   * Optional idempotency key. When given, an alert for the same restaurant that
+   * already carries this key is NOT created again (a webhook retry must not
+   * raise the same alert twice); the existing one is returned with duplicate:true.
+   */
+  dedupeKey?: string | null;
 }
 
 /**
@@ -100,8 +106,19 @@ function mapToNotificationSeverity(s: 'low' | 'medium' | 'high' | 'critical'): N
  */
 export async function createPaymentAlert(
   input: CreatePaymentAlertInput
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; duplicate?: boolean } | null> {
   try {
+    if (input.dedupeKey) {
+      const existing = await prisma.notification.findFirst({
+        where: {
+          restaurantId: input.restaurantId ?? null,
+          data: { path: ['dedupeKey'], equals: input.dedupeKey },
+        },
+        select: { id: true },
+      });
+      if (existing) return { id: existing.id, duplicate: true };
+    }
+
     const severity = input.severity ?? defaultSeverity(input.alertType);
     const notifType = mapToNotificationType(input.alertType);
     const notifSeverity = mapToNotificationSeverity(severity);
@@ -120,6 +137,7 @@ export async function createPaymentAlert(
           paymentId: input.paymentId ?? null,
           gateway: input.gateway ?? null,
           amount: typeof input.amount === 'number' ? input.amount : 0,
+          ...(input.dedupeKey ? { dedupeKey: input.dedupeKey } : {}),
         },
         actionUrl: input.actionUrl ?? '/dashboard/pagamentos/alertas',
         actionLabel: 'Ver Alerta',

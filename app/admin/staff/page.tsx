@@ -72,8 +72,14 @@ export default function StaffPage() {
           commissionValue: form.commissionValue ? parseFloat(form.commissionValue) : null,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      toast.success('Funcionário adicionado!');
+      const created = await res.json();
+      if (!res.ok) throw new Error(created.error);
+      if (created.temporaryPassword) {
+        // Shown once: hand it to the new staff member, who signs in with it
+        toast.success(`Funcionário adicionado! Senha provisória: ${created.temporaryPassword}`, { duration: 60000 });
+      } else {
+        toast.success('Funcionário adicionado!');
+      }
       setShowForm(false);
       setForm({ name: '', email: '', phone: '', cpf: '', staffRole: 'COOK', baseSalary: '', commissionType: 'PERCENTAGE', commissionValue: '', defaultStartTime: '08:00', defaultEndTime: '18:00' });
       fetchMembers();

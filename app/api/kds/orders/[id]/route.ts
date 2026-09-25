@@ -10,6 +10,9 @@ import { prisma } from '@/lib/prisma';
 import { getOrCreateLoyaltyProgram } from '@/lib/loyalty/get-program';
 import { broadcastOrderUpdate, broadcastOrderCompleted } from '@/lib/socket';
 import { notifyOrderReady } from '@/lib/notification-utils';
+import { cancelOrder } from '@/lib/kds-cancel-order';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +26,14 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: params.id },
+    // An order of another restaurant is "not found" (404), never readable or changeable.
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: params.id, restaurantId },
       include: {
         items: {
           include: {
@@ -65,6 +74,15 @@ export async function PUT(
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+    const owned = await prisma.order.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     const body = await req.json();
@@ -179,19 +197,37 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'OWNER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // A manager of THIS restaurant (the owner or a manager membership); it used to be OWNER only,
+    // read from the global role in the session
+    const auth = await requireRestaurantRole(MANAGER_ROLES, 'Cancelar um pedido da cozinha exige um gerente');
+    if (!auth.ok) return auth.response;
+    const { restaurantId, userId } = auth.member;
 
-    const order = await prisma.order.update({
-      where: { id: params.id },
-      data: { status: 'CANCELLED' },
-    });
+    // Optional reason in the body (a DELETE may come without one).
+    let reason: string | undefined;
+    try {
+      const body = await req.json();
+      if (typeof body?.reason === 'string' && body.reason.trim()) reason = body.reason.trim().slice(0, 200);
+    } catch {}
+
+    const outcome = await cancelOrder(params.id, { restaurantId, userId, reason });
+
+    if (outcome.kind === 'not-found') {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    if (outcome.kind === 'completed') {
+      return NextResponse.json(
+        { error: 'Um pedido concluído não pode ser cancelado', code: 'ORDER_ALREADY_COMPLETED' },
+        { status: 409 }
+      );
+    }
+    if (outcome.kind === 'already-cancelled') {
+      return NextResponse.json({ message: 'Order already cancelled', order: outcome.order });
+    }
 
     broadcastOrderUpdate(params.id, 'CANCELLED', { reason: 'Order cancelled' });
 
-    return NextResponse.json({ message: 'Order cancelled', order });
+    return NextResponse.json({ message: 'Order cancelled', order: outcome.order, loss: outcome.loss, payments: outcome.payments });
   } catch (error) {
     console.error('Error cancelling order:', error);
     return NextResponse.json(

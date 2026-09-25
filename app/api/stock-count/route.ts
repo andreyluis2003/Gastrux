@@ -4,8 +4,19 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getRestaurantContext } from '@/lib/api/restaurant-context';
+import { applyStockCount, StockCountError } from '@/lib/stock/stock-count';
 
 export const dynamic = 'force-dynamic';
+
+/** getRestaurantContext refuses a caller without an active membership in the selected restaurant. */
+function accessError(error: unknown) {
+  const message = (error as any)?.message || '';
+  if (message.startsWith('FORBIDDEN')) return NextResponse.json({ error: 'Acesso negado a este restaurante' }, { status: 403 });
+  if (message.startsWith('UNAUTHORIZED') || message.startsWith('NO_RESTAURANT')) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+  return null;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,6 +48,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(items);
   } catch (error) {
+    const denied = accessError(error);
+    if (denied) return denied;
     console.error('Stock count error:', error);
     return NextResponse.json({ error: 'Erro ao carregar itens' }, { status: 500 });
   }
@@ -47,61 +60,18 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-    const { restaurantId } = await getRestaurantContext();
+    const { restaurantId, userId } = await getRestaurantContext();
 
     const body = await req.json();
-    const { counts } = body; // Array of { ingredientId, countedQuantity }
+    // counts: Array<{ ingredientId, countedQuantity, systemQuantity (what the screen showed) }>
+    // countId: one id per count screen, so saving twice applies the count once
+    const { counts, countId } = body;
 
     if (!counts || !Array.isArray(counts)) {
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 });
     }
 
-    const results = [];
-    for (const item of counts) {
-      const { ingredientId, countedQuantity } = item;
-      if (!ingredientId || countedQuantity === undefined) continue;
-
-      // Scope by restaurantId so a client can't adjust another tenant's stock.
-      const ingredient = await prisma.ingredient.findFirst({ where: { id: ingredientId, restaurantId } });
-      if (!ingredient) continue;
-
-      const stock = await prisma.stock.findUnique({ where: { ingredientId } });
-      const systemQty = stock?.currentQuantity || 0;
-      const difference = countedQuantity - systemQty;
-
-      if (Math.abs(difference) > 0.01) {
-        // Create adjustment movement
-        await prisma.stockMovement.create({
-          data: {
-            restaurantId,
-            ingredientId,
-            quantity: Math.abs(difference),
-            movementType: 'ADJUSTMENT',
-            reason: `Contagem física: ${systemQty} → ${countedQuantity} (dif: ${difference > 0 ? '+' : ''}${difference.toFixed(2)})`,
-          },
-        });
-
-        // Update stock
-        if (stock) {
-          await prisma.stock.update({
-            where: { ingredientId },
-            data: { currentQuantity: countedQuantity, lastUpdated: new Date() },
-          });
-        } else {
-          await prisma.stock.create({
-            data: { ingredientId, currentQuantity: countedQuantity },
-          });
-        }
-      }
-
-      results.push({
-        ingredientId,
-        systemQuantity: systemQty,
-        countedQuantity,
-        difference,
-        adjusted: Math.abs(difference) > 0.01,
-      });
-    }
+    const results = await applyStockCount({ restaurantId, userId, countId, counts });
 
     const adjusted = results.filter(r => r.adjusted).length;
     return NextResponse.json({
@@ -111,6 +81,11 @@ export async function POST(req: NextRequest) {
       totalCounted: results.length,
     });
   } catch (error) {
+    const denied = accessError(error);
+    if (denied) return denied;
+    if (error instanceof StockCountError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error('Stock count POST error:', error);
     return NextResponse.json({ error: 'Erro ao salvar contagem' }, { status: 500 });
   }

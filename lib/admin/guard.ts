@@ -28,6 +28,16 @@ export function isPlatformAdminIdentity(
   return false;
 }
 
+/**
+ * Gastrux staff only: the PLATFORM_ADMIN_EMAILS allowlist and nothing else.
+ * Unlike isPlatformAdminIdentity this ignores the global User.role, which a
+ * restaurant can mint for its own staff (the staff route writes a caller-chosen
+ * role into User.role), so it must never gate cross-restaurant access.
+ */
+export function isPlatformStaffEmail(email: string | undefined | null): boolean {
+  return !!email && getPlatformAdminEmails().includes(email.toLowerCase());
+}
+
 export async function getPlatformAdminSession() {
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role as UserRole | undefined;

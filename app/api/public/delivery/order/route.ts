@@ -1,6 +1,9 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
+import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery-payments/choice';
+import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/delivery-payments/order-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +31,9 @@ export async function POST(req: NextRequest) {
       items,
       specialInstructions,
       deliveryFee = 0,
+      paymentMethod,
+      changeFor,
+      voucherBrand,
     } = body;
 
     if (!restaurantId || !customerName || !customerPhone || !deliveryAddress || !items?.length) {
@@ -87,10 +93,12 @@ export async function POST(req: NextRequest) {
       const mi = menuMap.get(item.menuItemId);
       if (!mi || !mi.recipeId) continue;
       const price = Number(mi.price);
-      subtotal += price * (item.quantity || 1);
+      // One normalized integer feeds the subtotal, the OrderItem and totalItems.
+      const quantity = normalizeQuantity(item.quantity);
+      subtotal += price * quantity;
       orderItems.push({
         recipeId: mi.recipeId,
-        quantity: item.quantity || 1,
+        quantity,
         specialInstructions: item.specialInstructions || undefined,
       });
     }
@@ -100,6 +108,18 @@ export async function POST(req: NextRequest) {
     // so a client can't submit a negative value to reduce the order total.
     const safeDeliveryFee = Math.max(0, Number(deliveryFee) || 0);
     const total = subtotal + safeDeliveryFee;
+
+    // The payment choice is validated on the server against what this restaurant
+    // offers (its settings and its Mercado Pago connection) and against the
+    // server-computed total; nothing the browser says about availability is trusted.
+    const paymentOptions = await getDeliveryPaymentOptions(restaurantId);
+    const choiceResult = validatePaymentChoice(paymentOptions, { paymentMethod, changeFor, voucherBrand }, total);
+    if (!choiceResult.ok) {
+      return NextResponse.json({ error: choiceResult.error }, { status: 400 });
+    }
+    const choice = choiceResult.choice;
+    const paymentNote = describePaymentForKitchen(choice, total);
+
     const orderNumber = generateOrderNumber();
 
     // Find or create customer, scoped to this restaurant. Customer.email is
@@ -128,6 +148,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Customer-supplied text that goes into the order note: each value is collapsed to one
+    // line (line breaks of any kind become " / "), so none of it can start a line of the note.
+    // Empty values are skipped, so no dangling label or ", ".
+    const noteComplement = singleLine(deliveryComplement);
+    const noteNeighborhood = singleLine(deliveryNeighborhood);
+    const noteCity = singleLine(deliveryCity);
+    const noteZipCode = singleLine(deliveryZipCode);
+    const noteReference = singleLine(deliveryReference);
+
     const order = await prisma.order.create({
       data: {
         restaurantId,
@@ -139,14 +168,20 @@ export async function POST(req: NextRequest) {
         subtotal,
         fees: safeDeliveryFee,
         total,
+        paymentMethod: choice.paymentMethod,
+        cashChangeFor: choice.changeFor,
+        voucherBrand: choice.voucherBrand,
+        // Only the server may write a line that starts with "Pagamento": every customer-supplied
+        // value is one line that begins with a fixed label (structural, not a word filter).
         specialInstructions: [
-          specialInstructions,
-          `Endereço: ${deliveryAddress}${deliveryComplement ? ', ' + deliveryComplement : ''}`,
-          deliveryNeighborhood ? `Bairro: ${deliveryNeighborhood}` : '',
-          deliveryCity ? `Cidade: ${deliveryCity}` : '',
-          deliveryZipCode ? `CEP: ${deliveryZipCode}` : '',
-          deliveryReference ? `Referência: ${deliveryReference}` : '',
-          `Cliente: ${customerName} - ${customerPhone}`,
+          sanitizeCustomerNote(specialInstructions),
+          `Endereço: ${singleLine(deliveryAddress)}${noteComplement ? ', ' + noteComplement : ''}`,
+          noteNeighborhood ? `Bairro: ${noteNeighborhood}` : '',
+          noteCity ? `Cidade: ${noteCity}` : '',
+          noteZipCode ? `CEP: ${noteZipCode}` : '',
+          noteReference ? `Referência: ${noteReference}` : '',
+          paymentNote,
+          `Cliente: ${singleLine(customerName)} - ${singleLine(customerPhone)}`,
         ].filter(Boolean).join('\n'),
         customerId: customer?.id || undefined,
         items: {
@@ -170,6 +205,8 @@ export async function POST(req: NextRequest) {
         deliveryFee: Number(order.fees),
         status: order.status,
         itemCount: order.totalItems,
+        paymentMethod: choice.paymentMethod,
+        paymentSummary: paymentNote,
       },
     });
   } catch (error: any) {

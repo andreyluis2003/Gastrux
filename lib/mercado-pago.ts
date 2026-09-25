@@ -104,11 +104,14 @@ export interface CreatePreferenceInput {
   expirationDateFrom?: string;
   expirationDateTo?: string;
   statementDescriptor?: string;
+  /** Mercado Pago payment TYPE ids to hide at checkout, e.g. 'ticket' (boleto) and 'atm'. */
+  excludedPaymentTypes?: string[];
 }
 
-export async function createCheckoutPreference(input: CreatePreferenceInput) {
-  const client = getMercadoPagoClient();
-
+export async function createCheckoutPreference(
+  input: CreatePreferenceInput,
+  client: MercadoPagoConfig = getMercadoPagoClient()
+) {
   const preference = new Preference(client);
 
   const body = {
@@ -139,7 +142,7 @@ export async function createCheckoutPreference(input: CreatePreferenceInput) {
     statement_descriptor: input.statementDescriptor,
     payment_methods: {
       excluded_payment_methods: [],
-      excluded_payment_types: [],
+      excluded_payment_types: (input.excludedPaymentTypes ?? []).map((id) => ({ id })),
       installments: 12,
       default_payment_method_id: null,
       default_installments: 1,
@@ -153,8 +156,7 @@ export async function createCheckoutPreference(input: CreatePreferenceInput) {
 // PAYMENT LOOKUP
 // ============================================================
 
-export async function getPayment(paymentId: string) {
-  const client = getMercadoPagoClient();
+export async function getPayment(paymentId: string, client: MercadoPagoConfig = getMercadoPagoClient()) {
   const payment = new Payment(client);
   return payment.get({ id: paymentId });
 }
@@ -297,16 +299,22 @@ export function getMPAutoRecurringForBillingCycle(
 // PIX (via Preference + external_reference tracking)
 // ============================================================
 
-export async function createPixPreference(input: Omit<CreatePreferenceInput, 'items'> & { amount: number; description: string }) {
-  return createCheckoutPreference({
-    ...input,
-    items: [{
-      id: 'pix-payment',
-      title: input.description,
-      quantity: 1,
-      unitPrice: input.amount,
-    }],
-  });
+export async function createPixPreference(
+  input: Omit<CreatePreferenceInput, 'items'> & { amount: number; description: string },
+  client?: MercadoPagoConfig
+) {
+  return createCheckoutPreference(
+    {
+      ...input,
+      items: [{
+        id: 'pix-payment',
+        title: input.description,
+        quantity: 1,
+        unitPrice: input.amount,
+      }],
+    },
+    client
+  );
 }
 
 // ============================================================

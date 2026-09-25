@@ -11,6 +11,7 @@ import {
   QrCode, Building2, CircleDollarSign, ChevronRight, Loader2,
   FileText, Bell, ScanLine
 } from 'lucide-react';
+import { MpConnectBanner } from '@/components/payments/mp-connect-banner';
 
 interface Payment {
   id: string;
@@ -98,7 +99,8 @@ export default function PagamentosDashboardPage() {
 
   const getGatewayIcon = (gateway: string) => {
     switch (gateway) {
-      case 'MERCADO_PAGO': return <QrCode className="w-4 h-4" />;
+      case 'MERCADO_PAGO':
+      case 'MERCADO_PAGO_CONNECT': return <QrCode className="w-4 h-4" />;
       case 'STRIPE_CONNECT': return <CreditCard className="w-4 h-4" />;
       default: return <CircleDollarSign className="w-4 h-4" />;
     }
@@ -113,6 +115,7 @@ export default function PagamentosDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        <MpConnectBanner />
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -262,6 +265,7 @@ export default function PagamentosDashboardPage() {
           >
             <option value="all">Todos os Gateways</option>
             <option value="MERCADO_PAGO">Mercado Pago</option>
+            <option value="MERCADO_PAGO_CONNECT">Mercado Pago (recebimentos)</option>
             <option value="STRIPE_CONNECT">Stripe Connect</option>
             <option value="MANUAL">Manual</option>
           </select>

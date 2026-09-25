@@ -1,6 +1,7 @@
 // Public delivery menu endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,9 +43,12 @@ export async function GET(
     });
 
     const filteredCategories = categories.filter((c) => c.items.length > 0);
+    const paymentOptions = await getDeliveryPaymentOptions(params.restaurantId);
+    // Kept for older clients: true when the restaurant can take PIX/card online.
+    const acceptsOnlinePayment = paymentOptions.online.pix;
 
     return NextResponse.json(
-      { restaurant, categories: filteredCategories },
+      { restaurant: { ...restaurant, acceptsOnlinePayment, paymentOptions }, categories: filteredCategories },
       { headers: { 'Cache-Control': 'public, max-age=60' } }
     );
   } catch (error) {

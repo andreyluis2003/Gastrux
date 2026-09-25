@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { signOutSafely } from '@/lib/offline/sign-out';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -137,7 +138,7 @@ export default function MinhaContaPage() {
       const res = await fetch('/api/conta/profile', { method: 'DELETE' });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
       toast.success('Conta desativada. Você será desconectado.');
-      setTimeout(() => signOut({ callbackUrl: '/' }), 2000);
+      setTimeout(() => signOutSafely({ callbackUrl: '/' }), 2000);
     } catch (e: any) {
       toast.error(e.message || 'Erro ao excluir conta');
     } finally {
@@ -356,7 +357,7 @@ export default function MinhaContaPage() {
 
       {/* Sair */}
       <div className="flex justify-center pb-8">
-        <Button variant="ghost" className="text-gray-500" onClick={() => signOut({ callbackUrl: '/' })}>
+        <Button variant="ghost" className="text-gray-500" onClick={() => signOutSafely({ callbackUrl: '/' })}>
           <LogOut className="h-4 w-4 mr-2" />
           Sair da conta
         </Button>

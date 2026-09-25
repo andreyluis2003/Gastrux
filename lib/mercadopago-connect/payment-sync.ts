@@ -1,0 +1,248 @@
+import type { PaymentStatus } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { mapMPStatusToPaymentStatus } from '@/lib/mercado-pago';
+import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
+import { getConnectPayment, isUnauthorizedError } from './payments';
+import { canTransition } from './payment-status';
+import { captureException } from '@/lib/sentry';
+import { createPaymentAlert } from '@/lib/payment-alert-service';
+import { reconcileTabPayment } from './tab-reconcile';
+
+export interface SyncResult {
+  updated: boolean;
+  reason?: string;
+  status?: string;
+}
+
+function parseMetadata(raw: string | null): Record<string, unknown> {
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The order was already paid (its update matched no row) and this Payment just
+ * became APPROVED too. If ANOTHER Payment of the same order is APPROVED, the
+ * customer was charged twice: the money is real, so it is reported (Sentry plus
+ * an operator alert) instead of being silently absorbed. Idempotent: the alert
+ * is keyed on the pair of payment ids, so a webhook retry (the self-healing
+ * branch re-runs this) raises nothing new. Never throws: the approval itself
+ * stays recorded whatever happens here. No PII: only ids.
+ */
+async function reportDoublePayment(
+  restaurantId: string,
+  payment: { id: string; orderId: string | null; amount?: unknown }
+): Promise<void> {
+  try {
+    if (!payment.orderId) return;
+    const other = await prisma.payment.findFirst({
+      where: { orderId: payment.orderId, restaurantId, status: 'APPROVED', id: { not: payment.id } },
+      select: { id: true },
+    });
+    if (!other) return;
+
+    const pair = [payment.id, other.id].sort();
+    const alert = await createPaymentAlert({
+      alertType: 'failure',
+      severity: 'critical',
+      title: 'Pedido pago duas vezes',
+      message:
+        'Um pedido que já estava pago recebeu um segundo pagamento aprovado. Confira o pedido e faça o reembolso de um dos pagamentos.',
+      paymentId: payment.id,
+      gateway: 'MERCADO_PAGO_CONNECT',
+      amount: Number(payment.amount ?? 0),
+      restaurantId,
+      dedupeKey: `double-payment:${pair[0]}:${pair[1]}`,
+    });
+    // Report to Sentry once per pair; a null result means the alert could not be stored.
+    if (alert?.duplicate) return;
+    captureException(new Error('Order paid twice: second approved payment for an already paid order'), {
+      endpoint: 'mp-connect/payment-sync',
+      restaurantId,
+      orderId: payment.orderId,
+      paymentIds: pair,
+    });
+  } catch (error) {
+    console.error('[mp-connect] could not report a double payment:', error);
+  }
+}
+
+/**
+ * A payment we had already CANCELLED just became APPROVED: Mercado Pago really
+ * received the money after we gave up on it (expired PIX paid late, a charge
+ * whose creation call timed out, ...). The approval is recorded (the row is the
+ * evidence and the refund route needs it APPROVED) and the operator is told to
+ * honor it or refund it. Nothing is refunded automatically: that is a decision
+ * about a live order. Idempotent through the alert's dedupeKey, never throws,
+ * no PII (ids only).
+ */
+async function reportLatePayment(
+  restaurantId: string,
+  payment: { id: string; orderId: string | null; amount?: unknown }
+): Promise<void> {
+  try {
+    const alert = await createPaymentAlert({
+      alertType: 'failure',
+      severity: 'critical',
+      title: 'Pagamento recebido após cancelamento',
+      message:
+        'Um pagamento que já estava cancelado foi aprovado pelo Mercado Pago: o cliente foi cobrado. Confira o pedido e honre a venda ou faça o reembolso do pagamento.',
+      paymentId: payment.id,
+      gateway: 'MERCADO_PAGO_CONNECT',
+      amount: Number(payment.amount ?? 0),
+      restaurantId,
+      dedupeKey: `late-payment:${payment.id}`,
+    });
+    if (alert?.duplicate) return;
+    captureException(new Error('Payment approved after it was cancelled'), {
+      endpoint: 'mp-connect/payment-sync',
+      restaurantId,
+      orderId: payment.orderId,
+      paymentId: payment.id,
+    });
+  } catch (error) {
+    console.error('[mp-connect] could not report a late payment:', error);
+  }
+}
+
+/**
+ * Writes that follow the Payment update: marks the linked Order paid and
+ * mirrors the MP data on the preference-based MercadoPagoTransaction row.
+ * Both writes are idempotent and scoped, so they are safe to repeat; the
+ * self-healing branch in syncRestaurantPayment relies on that.
+ */
+async function applyLinkedRecords(
+  restaurantId: string,
+  payment: { id: string; orderId: string | null; amount?: unknown },
+  mp: any,
+  orderStatus: 'APPROVED' | 'REFUNDED' | 'CHARGEBACK' | null
+): Promise<void> {
+  if (orderStatus && payment.orderId) {
+    const orderUpdate = await prisma.order.updateMany({
+      where: {
+        id: payment.orderId,
+        restaurantId,
+        // Paying moves the order off anything but APPROVED; a refund or a
+        // chargeback moves it ONLY off APPROVED, so the KDS/POS stops showing
+        // a refunded order as paid and neither move can happen twice.
+        paymentStatus: orderStatus === 'APPROVED' ? { not: 'APPROVED' } : 'APPROVED',
+      },
+      data: { paymentStatus: orderStatus },
+    });
+    // Nothing to move because the order is already paid: is it paid by ANOTHER payment?
+    if (orderStatus === 'APPROVED' && orderUpdate.count === 0) await reportDoublePayment(restaurantId, payment);
+  }
+
+  // Preference-based checkouts also keep a MercadoPagoTransaction row.
+  await prisma.mercadoPagoTransaction.updateMany({
+    where: { paymentId: payment.id },
+    data: {
+      mpPaymentId: String(mp.id),
+      mpStatus: mp.status,
+      mpStatusDetail: mp.status_detail,
+      lastWebhookAt: new Date(),
+    },
+  });
+}
+
+/**
+ * Applies a Mercado Pago payment to OUR Payment (and Order) records, using the
+ * restaurant's own token to fetch it. Used by the webhook and by the PIX
+ * status reconciliation. Safe to call repeatedly and concurrently.
+ */
+export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: string): Promise<SyncResult> {
+  const client = await getMpClientForRestaurant(restaurantId);
+  if (!client) return { updated: false, reason: 'no-active-connection' };
+
+  let mp: any;
+  try {
+    mp = await getConnectPayment(client, mpPaymentId);
+  } catch (error) {
+    if (isUnauthorizedError(error)) {
+      await markNeedsReconnect(restaurantId, 'Mercado Pago rejeitou o token (401)');
+      return { updated: false, reason: 'unauthorized' };
+    }
+    throw error;
+  }
+
+  const paymentId: string | undefined = mp?.external_reference;
+  if (!paymentId) return { updated: false, reason: 'no-external-reference' };
+
+  // Tenant guard: the payment must belong to THIS restaurant and this gateway.
+  const payment = await prisma.payment.findFirst({
+    where: { id: paymentId, restaurantId, gateway: 'MERCADO_PAGO_CONNECT' },
+  });
+  if (!payment) return { updated: false, reason: 'payment-not-found' };
+
+  // For PIX we recorded the Mercado Pago id at creation; another MP payment
+  // reusing the same external_reference must not be able to approve it.
+  if (payment.method === 'PIX' && payment.gatewayPaymentId && payment.gatewayPaymentId !== String(mp.id)) {
+    return { updated: false, reason: 'mp-id-mismatch' };
+  }
+
+  const mapped = mapMPStatusToPaymentStatus(mp.status) as PaymentStatus;
+  const amountMatches = Number(mp.transaction_amount) === Number(payment.amount);
+
+  if (!canTransition(payment.status, mapped)) {
+    // Self-healing: the Payment write and the Order write are not one
+    // transaction. If a previous run committed the Payment as APPROVED and then
+    // failed before the Order write, no later notification would ever mark the
+    // Order paid, because APPROVED -> APPROVED is not a transition. So repeat
+    // the idempotent linked writes. Runs only for an APPROVED notification on
+    // an already APPROVED Payment whose MP id was checked above and whose
+    // amount matches; it never touches the Payment row.
+    if (mapped === 'APPROVED' && payment.status === 'APPROVED' && payment.orderId && amountMatches) {
+      await applyLinkedRecords(restaurantId, payment, mp, 'APPROVED');
+    }
+    return { updated: false, reason: 'no-transition' };
+  }
+
+  if (mapped === 'APPROVED' && !amountMatches) {
+    console.warn(
+      `[mp-connect] amount mismatch for payment ${payment.id}: expected ${payment.amount}, MP reported ${mp.transaction_amount}`
+    );
+    return { updated: false, reason: 'amount-mismatch' };
+  }
+
+  const fee = ((mp.fee_details as Array<{ amount?: number }>) || []).reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
+  const approved = mapped === 'APPROVED';
+
+  // Optimistic concurrency: only apply if the status is still the one we read.
+  const result = await prisma.payment.updateMany({
+    where: { id: payment.id, restaurantId, status: payment.status },
+    data: {
+      status: mapped,
+      gatewayPaymentId: String(mp.id),
+      processedAt: approved ? new Date() : undefined,
+      gatewayFee: approved ? fee : undefined,
+      netAmount: approved ? Number(payment.amount) - fee : undefined,
+      metadata: JSON.stringify({
+        ...parseMetadata(payment.metadata),
+        mpPaymentId: String(mp.id),
+        mpStatus: mp.status,
+        mpStatusDetail: mp.status_detail,
+      }),
+    },
+  });
+  if (result.count === 0) return { updated: false, reason: 'concurrent' };
+
+  // A REFUNDED or CHARGEBACK notification must also move the Order off
+  // APPROVED, otherwise the KDS/POS keeps showing a refunded order as paid.
+  const orderStatus: 'APPROVED' | 'REFUNDED' | 'CHARGEBACK' | null = approved
+    ? 'APPROVED'
+    : mapped === 'REFUNDED' || mapped === 'CHARGEBACK'
+    ? mapped
+    : null;
+
+  await applyLinkedRecords(restaurantId, payment, mp, orderStatus);
+  if (approved && payment.status === 'CANCELLED') await reportLatePayment(restaurantId, payment);
+  // A table PIX is not linked to its comanda: check that the approved ones still add up to the tab.
+  if (approved && !payment.orderId) await reconcileTabPayment(restaurantId, payment);
+
+  return { updated: true, status: mapped };
+}

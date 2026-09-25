@@ -304,12 +304,36 @@ export async function compareFinancialReports(
  */
 export async function cleanupMultiTenantData(restaurantIds: string[]): Promise<void> {
   for (const restaurantId of restaurantIds) {
+    // Payment.restaurant is an OPTIONAL relation with no cascade, so deleting a
+    // test restaurant used to ORPHAN every Payment (and its PaymentRefund and
+    // MercadoPagoTransaction rows) created by the Mercado Pago suites. Delete
+    // them first, in FK-safe order: refunds and transactions reference the
+    // payment, the payment references the restaurant.
+    await prisma.paymentRefund.deleteMany({ where: { payment: { restaurantId } } });
+    await prisma.mercadoPagoTransaction.deleteMany({ where: { payment: { restaurantId } } });
+    await prisma.payment.deleteMany({ where: { restaurantId } });
+    await prisma.mercadoPagoConnection.deleteMany({ where: { restaurantId } });
+
     // Delete in order to respect foreign keys
     await prisma.auditLog.deleteMany({ where: { restaurantId } });
-    await prisma.notification.deleteMany({ where: { restaurantId } });
+    // Notification.restaurantId is optional and the Mercado Pago "reconnect"
+    // notices carry only a userId, so also clear the ones addressed to this
+    // restaurant's owner and members.
+    const members = await prisma.restaurantUser.findMany({
+      where: { restaurantId },
+      select: { userId: true },
+    });
+    const restaurantRow = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { ownerId: true },
+    });
+    const userIds = [...members.map((m) => m.userId), restaurantRow?.ownerId].filter(Boolean) as string[];
+    await prisma.notification.deleteMany({
+      where: { OR: [{ restaurantId }, ...(userIds.length ? [{ userId: { in: userIds } }] : [])] },
+    });
     await prisma.stockMovement.deleteMany({ where: { restaurantId } });
     await prisma.stock.deleteMany({ where: { restaurantId } });
-    await prisma.recipeIngredient.deleteMany({ where: { restaurantId } });
+    await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId } } });
     await prisma.recipe.deleteMany({ where: { restaurantId } });
     await prisma.ingredient.deleteMany({ where: { restaurantId } });
     await prisma.ingredientCategory.deleteMany({ where: { restaurantId } });

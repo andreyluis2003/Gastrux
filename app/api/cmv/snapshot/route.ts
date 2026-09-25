@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { lineTotal } from '@/lib/comanda/line-total';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -56,7 +57,9 @@ export async function POST(req: NextRequest) {
       const cost = m.quantity * (m.ingredient?.referenceCost || 0);
       if (m.movementType === 'ENTRY') purchases += cost;
       else if (m.movementType === 'LOSS') losses += cost;
-      else if (m.movementType !== 'ADJUSTMENT') consumption += cost;
+      // Stock-count differences (signed: - shortage costs, + surplus gives back)
+      else if (m.movementType === 'ADJUSTMENT') losses -= cost;
+      else consumption += cost;
     }
     const totalCMV = consumption + losses;
 
@@ -66,9 +69,13 @@ export async function POST(req: NextRequest) {
         addedAt: { gte: startDate, lte: endDate },
         session: { status: { not: 'CANCELLED' as any }, restaurantId },
       },
-      select: { quantity: true, price: true },
+      select: { quantity: true, price: true, modifiers: { select: { priceAdjustment: true } } },
     });
-    let revenue = sessionItems.reduce((s, i) => s + i.quantity * Number(i.price), 0);
+    // Modifier surcharges are revenue too, applied to each unit (lib/comanda/line-total.ts).
+    let revenue = sessionItems.reduce(
+      (s, i) => s + lineTotal(i.price, i.quantity, i.modifiers.map((m) => m.priceAdjustment)),
+      0
+    );
 
     if (revenue === 0) {
       // Fallback: production × selling price

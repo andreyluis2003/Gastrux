@@ -65,6 +65,9 @@ export const CACHE_STRATEGIES: Record<CacheType, CacheConfig> = {
  * Generate Cache-Control header value
  */
 export function generateCacheHeader(strategy: CacheConfig): string {
+  // Private data (anything behind the login) is never stored: not by a CDN, not by the browser
+  if (strategy.isPrivate) return 'private, no-store, max-age=0';
+
   const parts: string[] = [];
 
   parts.push(strategy.isPrivate ? 'private' : 'public');
@@ -107,8 +110,8 @@ export function getCacheHeaders(cacheType: CacheType): Record<string, string> {
     ...(strategy.staleWhileRevalidate && {
       'CDN-Cache-Control': cacheControl,
     }),
-    // Add Vary header to account for different scenarios
-    'Vary': 'Accept-Encoding, Authorization',
+    // The session travels in a cookie: an answer depends on it
+    'Vary': 'Accept-Encoding, Authorization, Cookie',
   };
 }
 
@@ -127,41 +130,16 @@ export function applyCache(
 }
 
 /**
- * Map API routes to cache types
+ * Map API routes to cache types.
+ *
+ * Every API answer of this app depends on the signed-in user and restaurant (ingredients, recipes,
+ * stock, orders, kitchen screen, reports...), so none may be public: a "public, s-maxage" answer
+ * can be kept by a CDN and served to ANOTHER user, and a max-age of 5 min kept the kitchen screen
+ * (and the comanda, the cash register) up to 5 minutes behind (found in the browser test of
+ * 2026-09-24: a new order never reached the KDS). A route may only be listed here with a public
+ * cache type if its answer is the same for everyone and needs no login.
  */
-export const ROUTE_CACHE_MAP: Record<string, CacheType> = {
-  // Ingredients - Master data
-  '/api/ingredients': 'master-data',
-  '/api/ingredients/*': 'master-data',
-
-  // Recipes - Master data
-  '/api/recipes': 'master-data',
-  '/api/recipes/*': 'master-data',
-
-  // Stock - Dynamic data
-  '/api/stock': 'dynamic-data',
-  '/api/stock/*': 'dynamic-data',
-
-  // Analytics - Dynamic data
-  '/api/analytics/*': 'dynamic-data',
-
-  // Forecasts - Dynamic data
-  '/api/forecasts': 'dynamic-data',
-  '/api/forecasts/*': 'dynamic-data',
-
-  // Alerts - Real-time
-  '/api/alerts': 'real-time',
-  '/api/alerts/*': 'real-time',
-
-  // Auth - User data (never cache)
-  '/api/auth/*': 'user-data',
-
-  // Reports - User data (never cache)
-  '/api/reports/*': 'user-data',
-
-  // Categories - Master data
-  '/api/ingredients/categories': 'master-data',
-};
+export const ROUTE_CACHE_MAP: Record<string, CacheType> = {};
 
 /**
  * Get cache type for a route
@@ -182,6 +160,6 @@ export function getCacheTypeForRoute(pathname: string): CacheType {
     }
   }
 
-  // Default to dynamic-data for safety
-  return 'dynamic-data';
+  // Default: private, never stored (see ROUTE_CACHE_MAP)
+  return 'user-data';
 }

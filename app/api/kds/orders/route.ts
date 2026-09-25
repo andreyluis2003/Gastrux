@@ -9,8 +9,11 @@ import { prisma } from '@/lib/prisma';
 import { broadcastOrderCreated } from '@/lib/socket';
 import { notifyNewOrder } from '@/lib/notification-utils';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
 
 export const dynamic = 'force-dynamic';
+
+const ORDER_STATUSES = ['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED', 'ON_HOLD'];
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,8 +34,19 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    const where: any = {};
-    if (status) where.status = status;
+    // An online (PIX/card) order reaches the kitchen only once its payment is APPROVED.
+    // Only THIS restaurant's orders: the list used to be unscoped and showed every restaurant's kitchen.
+    const where: any = { restaurantId, AND: [KITCHEN_VISIBLE_ORDER_WHERE] };
+    // The KDS screen asks for several statuses at once (?status=PENDING,PREPARING,READY); the whole
+    // string used to be passed as ONE status, so the kitchen screen listed nothing
+    if (status) {
+      const statuses = status.split(',').map((st) => st.trim().toUpperCase()).filter(Boolean);
+      const unknown = statuses.filter((st) => !ORDER_STATUSES.includes(st));
+      if (unknown.length) {
+        return NextResponse.json({ error: `Status inválido: ${unknown.join(', ')}` }, { status: 400 });
+      }
+      where.status = { in: statuses };
+    }
     if (priority) where.priority = priority;
     if (station) {
       where.stationAssignments = {
@@ -47,6 +61,8 @@ export async function GET(req: NextRequest) {
           include: {
             recipe: true,
             station: true,
+            // the kitchen must see "sem cebola" / "ponto da carne" on the screen too
+            modifiers: { include: { modifier: { select: { name: true } } } },
           },
         },
         stationAssignments: {
@@ -57,6 +73,7 @@ export async function GET(req: NextRequest) {
         prepTimes: true,
         externalOrder: true,
         reservation: true,
+        orderSession: { select: { tableNumber: true, customerName: true, table: { select: { number: true } } } },
       },
       orderBy: [
         { priority: 'desc' }, // URGENT first

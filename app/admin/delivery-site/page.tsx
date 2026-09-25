@@ -7,6 +7,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { Globe, Copy, ExternalLink, Loader2, CheckCircle, Bike, Link2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { PaymentSettingsCard } from '@/components/delivery/payment-settings-card';
 
 export default function DeliverySitePage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
@@ -111,6 +112,8 @@ export default function DeliverySitePage() {
           </div>
         )}
       </Card>
+
+      <PaymentSettingsCard />
     </div>
   );
 }

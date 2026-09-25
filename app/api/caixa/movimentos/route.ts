@@ -1,16 +1,20 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { idempotent } from '@/lib/api/idempotency';
+import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
+const MOVEMENT_TYPES = ['OPENING', 'SALE', 'WITHDRAWAL', 'REFUND', 'PAYMENT', 'CLOSING', 'ADJUSTMENT', 'OTHER'];
+
 // POST create cash movement (sangria, refund, etc)
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Any active member of THIS restaurant (a cashier does the sangria), recorded as createdBy
+    const auth = await requireRestaurantRole(['OWNER', 'MANAGER', 'CASHIER', 'ADMIN']);
+    if (!auth.ok) return auth.response;
+    const { member } = auth;
 
     const body = await req.json();
     const { cashRegisterId, type, amount, description, reference, operatorName, notes } = body;
@@ -21,10 +25,18 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      return NextResponse.json({ error: 'Valor inválido: informe um valor positivo' }, { status: 400 });
+    }
+    if (!MOVEMENT_TYPES.includes(type)) {
+      return NextResponse.json({ error: 'Tipo de movimento inválido' }, { status: 400 });
+    }
 
-    // Verify cash register exists
-    const register = await prisma.cashRegister.findUnique({
-      where: { id: cashRegisterId },
+    // The register must belong to the caller's restaurant (it used to be found by id only, so anyone
+    // signed in could post a withdrawal to another restaurant's register)
+    const register = await prisma.cashRegister.findFirst({
+      where: { id: cashRegisterId, restaurantId: member.restaurantId },
     });
 
     if (!register) {
@@ -34,31 +46,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create movement
-    const movement = await prisma.cashMovement.create({
-      data: {
-        cashRegisterId,
-        type,
-        amount: parseFloat(amount),
-        description,
-        reference,
-        operatorName,
-        notes,
-        createdBy: session.user?.id,
-      },
-    });
-
-    // Update expected balance
     const isDebit = ['WITHDRAWAL', 'REFUND'].includes(type);
-    const adjustment = isDebit ? -parseFloat(amount) : parseFloat(amount);
-    
-    await prisma.cashRegister.update({
-      where: { id: cashRegisterId },
-      data: {
-        expectedBalance: {
-          increment: adjustment,
+    const movement = await prisma.$transaction(async (tx) => {
+      const created = await tx.cashMovement.create({
+        data: {
+          cashRegisterId,
+          type,
+          amount: value,
+          description,
+          reference,
+          operatorName,
+          notes,
+          createdBy: member.userId,
         },
-      },
+      });
+      await tx.cashRegister.update({
+        where: { id: cashRegisterId },
+        data: { expectedBalance: { increment: isDebit ? -value : value } },
+      });
+      return created;
     });
 
     return NextResponse.json(movement, { status: 201 });
@@ -67,3 +73,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
+export const POST = idempotent(handlePOST);

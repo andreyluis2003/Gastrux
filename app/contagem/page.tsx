@@ -31,6 +31,8 @@ export default function ContagemPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('ALL');
+  // One id per loaded count: saving twice applies the count once (lib/stock/stock-count.ts)
+  const [countId, setCountId] = useState('');
 
   useEffect(() => { fetchItems(); }, []);
 
@@ -41,6 +43,7 @@ export default function ContagemPage() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setItems(data.map((item: any) => ({ ...item, countedQuantity: '', counted: false })));
+      setCountId(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
     } catch { toast.error('Erro ao carregar itens'); }
     finally { setLoading(false); }
   };
@@ -77,14 +80,20 @@ export default function ContagemPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          countId,
           counts: counted.map(i => ({
             ingredientId: i.id,
             countedQuantity: parseFloat(i.countedQuantity),
+            // What this screen showed: sales made while counting are kept, not overwritten
+            systemQuantity: i.systemQuantity,
           })),
         }),
       });
-      if (!res.ok) throw new Error();
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(result.error || 'Erro ao salvar contagem');
+        return;
+      }
       toast.success(result.message);
       fetchItems();
     } catch { toast.error('Erro ao salvar contagem'); }

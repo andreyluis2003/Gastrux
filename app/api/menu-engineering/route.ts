@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { lineTotal } from '@/lib/comanda/line-total';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
           ...(restaurantId ? { restaurantId } : {}),
         },
       },
-      select: { recipeId: true, quantity: true, price: true },
+      select: { recipeId: true, quantity: true, price: true, modifiers: { select: { priceAdjustment: true } } },
     });
 
     const salesByRecipe: Record<string, { qty: number; revenue: number }> = {};
@@ -61,7 +62,8 @@ export async function GET(req: NextRequest) {
       if (!item.recipeId) continue;
       if (!salesByRecipe[item.recipeId]) salesByRecipe[item.recipeId] = { qty: 0, revenue: 0 };
       salesByRecipe[item.recipeId].qty += item.quantity;
-      salesByRecipe[item.recipeId].revenue += item.quantity * Number(item.price);
+      // Modifier surcharges are revenue too, applied to each unit (lib/comanda/line-total.ts).
+      salesByRecipe[item.recipeId].revenue += lineTotal(item.price, item.quantity, item.modifiers.map((m) => m.priceAdjustment));
     }
 
     const totalSalesQty = Object.values(salesByRecipe).reduce((s, r) => s + r.qty, 0);

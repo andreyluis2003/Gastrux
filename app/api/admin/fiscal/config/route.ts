@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       crt: body.crt || '1',
       natOp: body.natOp || 'VENDA DE MERCADORIA',
       environment: body.environment || 'sandbox',
-      autoIssueOnSale: body.autoIssueOnSale || false,
+      autoIssueOnSale: body.autoIssueOnSale ?? true, // on unless the restaurant turns it off
       seriesNFCe: body.seriesNFCe || 1,
       seriesNFe: body.seriesNFe || 1,
     },

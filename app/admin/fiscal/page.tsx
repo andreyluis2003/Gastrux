@@ -363,7 +363,7 @@ export default function FiscalPage() {
                         </div>
                         <div className="flex items-end">
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="rounded" checked={form.autoIssueOnSale || false} onChange={e => setForm({ ...form, autoIssueOnSale: e.target.checked })} />
+                            <input type="checkbox" className="rounded" checked={form.autoIssueOnSale ?? true} onChange={e => setForm({ ...form, autoIssueOnSale: e.target.checked })} />
                             <span className="text-sm">Emitir automaticamente nas vendas</span>
                           </label>
                         </div>

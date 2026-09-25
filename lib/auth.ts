@@ -4,6 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { prisma } from './prisma';
+import { resolveEffectiveRole } from './auth/effective-role';
 import bcryptjs from 'bcryptjs';
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? process.env.NODE_ENV === 'production';
@@ -83,8 +84,10 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).role = token.role;
         (session.user as any).id = token.id;
+        // The role in the restaurant being worked in, read fresh on every request (the JWT keeps the
+        // global User.role from login): lib/auth/effective-role.ts
+        (session.user as any).role = await resolveEffectiveRole(token.id as string | undefined, token.role as string | undefined);
       }
       return session;
     },

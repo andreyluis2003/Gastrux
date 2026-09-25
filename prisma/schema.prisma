@@ -1645,6 +1645,9 @@ model Order {
   discount            Decimal?                 @db.Decimal(12, 2)
   total               Decimal?                 @db.Decimal(12, 2)
   paymentStatus       PaymentStatus            @default(PENDING)
+  paymentMethod       DeliveryPaymentMethod?
+  cashChangeFor       Decimal?                 @db.Decimal(12, 2)
+  voucherBrand        String?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
   loyaltyTransactions LoyaltyTransaction[]
@@ -2166,7 +2169,7 @@ model NFeConfig {
   environment           String        @default("sandbox")
   issueNFCeForCPF       Boolean       @default(true)
   issueNFeForCNPJ       Boolean       @default(true)
-  autoIssueOnSale       Boolean       @default(false)
+  autoIssueOnSale       Boolean       @default(true) // market practice: the note is issued when the sale closes
   active                Boolean       @default(true)
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
@@ -2226,6 +2229,8 @@ model NFeDocument {
   @@index([issueDate])
   @@index([orderId])
   @@index([orderSessionId])
+  // A number is used once per emitter, model and series (a rejected note is re-sent under its own number)
+  @@unique([configId, documentType, documentSeries, documentNumber], map: "nfe_documents_number_key")
   @@map("nfe_documents")
 }
 
@@ -2745,6 +2750,8 @@ model Restaurant {
   accountingMethod      String                    @default("SIMPLIFIED")
   stripeAccountId       String?
   mercadoPagoAccountId  String?
+  mercadoPagoConnection MercadoPagoConnection?
+  deliveryPaymentSettings DeliveryPaymentSettings?
   ifoodIntegrationId    String?
   rappiIntegrationId    String?
   uberIntegrationId     String?
@@ -3205,6 +3212,57 @@ model WhatsAppConfig {
   restaurant          Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("whatsapp_configs")
+}
+
+enum MercadoPagoConnectionStatus {
+  ACTIVE
+  NEEDS_RECONNECT
+}
+
+model MercadoPagoConnection {
+  id               String                      @id @default(cuid())
+  restaurantId     String                      @unique
+  mpUserId         String
+  accessToken      String
+  refreshToken     String
+  publicKey        String?
+  liveMode         Boolean                     @default(true)
+  lifetimeSeconds  Int
+  expiresAt        DateTime
+  status           MercadoPagoConnectionStatus @default(ACTIVE)
+  connectedAt      DateTime                    @default(now())
+  lastRefreshAt    DateTime?
+  lastRefreshError String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  restaurant       Restaurant                  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([status, expiresAt])
+  @@map("mercado_pago_connections")
+}
+
+enum DeliveryPaymentMethod {
+  ONLINE_PIX
+  ONLINE_CARD
+  CASH
+  CREDIT_ON_DELIVERY
+  DEBIT_ON_DELIVERY
+  VOUCHER_ON_DELIVERY
+}
+
+model DeliveryPaymentSettings {
+  id                      String     @id @default(cuid())
+  restaurantId            String     @unique
+  acceptCash              Boolean    @default(true)
+  acceptCreditOnDelivery  Boolean    @default(true)
+  acceptDebitOnDelivery   Boolean    @default(true)
+  acceptVoucherOnDelivery Boolean    @default(false)
+  voucherBrands           String[]   @default([])
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+  restaurant              Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("delivery_payment_settings")
 }
 
 model WhatsAppConversation {
@@ -3874,6 +3932,7 @@ enum PaymentGateway {
   MERCADO_PAGO
   STRIPE
   STRIPE_CONNECT
+  MERCADO_PAGO_CONNECT
   MANUAL
 }
 
@@ -4268,4 +4327,21 @@ model PackagingQRScan {
   @@index([scannedAt])
   @@index([converted])
   @@map("packaging_qr_scans")
+}
+/// One row per Idempotency-Key a restaurant used: a request replayed by the offline queue (same
+/// key) gets the stored answer instead of running twice (lib/api/idempotency.ts).
+model IdempotencyRecord {
+  id           String   @id @default(cuid())
+  restaurantId String
+  key          String
+  method       String
+  path         String
+  /// 0 while the first request is still running
+  statusCode   Int      @default(0)
+  responseBody Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([restaurantId, key])
+  @@index([createdAt])
+  @@map("idempotency_records")
 }

@@ -3,13 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
-import { Decimal } from '@prisma/client/runtime/library';
+import { addComandaItem, AddItemError } from '@/lib/comanda/add-item';
 
 export const dynamic = 'force-dynamic';
 
 // POST /api/comanda/sessions/[id]/items
-export async function POST(
+// Body: { menuItemId?, recipeId?, quantity?, specialInstructions?, modifierIds? } - prices come
+// from the menu and the modifier records (lib/comanda/add-item.ts)
+async function handlePOST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -20,7 +23,7 @@ export async function POST(
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
 
-    const { recipeId, menuItemId, quantity, specialInstructions } = await request.json();
+    const body = await request.json();
 
     const orderSession = await prisma.orderSession.findFirst({
       where: { id: params.id, restaurantId },
@@ -29,59 +32,20 @@ export async function POST(
     if (!orderSession) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
-
-    let resolvedRecipeId = recipeId;
-    let itemPrice: number | null = null;
-
-    // Se veio menuItemId, busca o item do cardápio para obter recipeId e preço
-    if (menuItemId) {
-      const menuItem = await prisma.menuItem.findFirst({
-        where: { id: menuItemId, restaurantId },
-        include: { recipe: { select: { id: true, sellingPrice: true } } },
-      });
-      if (!menuItem) {
-        return NextResponse.json({ error: 'Menu item not found' }, { status: 404 });
-      }
-      resolvedRecipeId = menuItem.recipeId || menuItem.recipe?.id || null;
-      itemPrice = Number(menuItem.price) || 0;
+    if (orderSession.status === 'CLOSED' || orderSession.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'Comanda fechada ou cancelada' }, { status: 409 });
     }
 
-    // Se temos um recipeId, valida que a receita existe
-    if (resolvedRecipeId) {
-      const recipe = await prisma.recipe.findFirst({
-        where: { id: resolvedRecipeId, restaurantId },
-      });
-      if (!recipe) {
-        return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
-      }
-      if (itemPrice === null) {
-        itemPrice = Number(recipe.sellingPrice) || 0;
-      }
-    }
-
-    if (!resolvedRecipeId) {
-      return NextResponse.json(
-        { error: 'Este item do cardápio não está vinculado a uma receita. Vincule uma receita primeiro.' },
-        { status: 400 }
-      );
-    }
-
-    const item = await prisma.orderSessionItem.create({
-      data: {
-        sessionId: params.id,
-        recipeId: resolvedRecipeId,
-        quantity: quantity || 1,
-        price: new Decimal(itemPrice || 0),
-        specialInstructions: specialInstructions || null,
-      },
-      include: {
-        recipe: { select: { name: true, sellingPrice: true } },
-      },
-    });
-
+    const item = await addComandaItem(prisma, restaurantId, params.id, body);
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
+    if (error instanceof AddItemError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
   }
 }
+
+// Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
+export const POST = idempotent(handlePOST);
