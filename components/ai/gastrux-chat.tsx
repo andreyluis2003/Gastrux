@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { MessageCircle, X, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ interface ChatMessage {
 
 export function GastruxChat() {
   const { data: session } = useSession() || {};
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -34,7 +36,9 @@ export function GastruxChat() {
     }
   }, [isOpen]);
 
-  if (!session?.user) return null;
+  // Public marketing pages have no restaurant data to ask about
+  const isPublicMarketingPage = pathname === '/' || pathname === '/pricing' || !!pathname?.startsWith('/para/');
+  if (!session?.user || isPublicMarketingPage) return null;
 
   const handleSend = async () => {
     const question = input.trim();

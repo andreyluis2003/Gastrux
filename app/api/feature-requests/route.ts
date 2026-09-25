@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,7 @@ export async function GET(req: NextRequest) {
   const sort = searchParams.get('sort') || 'votes';
 
   const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role;
-  const isAdmin = session && ['OWNER', 'ADMIN'].includes(role);
+  const isAdmin = !!session && isPlatformAdminIdentity((session.user as any)?.role, session.user?.email);
 
   const where: any = {};
   if (!isAdmin) where.isPublic = true;
@@ -77,8 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Faca login para sugerir' }, { status: 401 });
   }
   const userId = (session.user as any).id;
-  const role = (session.user as any).role;
-  const isAdmin = ['OWNER', 'ADMIN'].includes(role);
+  const isAdmin = isPlatformAdminIdentity((session.user as any)?.role, session.user?.email);
 
   const body = await req.json();
   const { title, description, category, status, priority } = body || {};

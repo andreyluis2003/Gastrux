@@ -1,9 +1,12 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminSession, logAdminAction, getRequestContext } from '@/lib/admin-helpers';
+import { logAdminAction, getRequestContext } from '@/lib/admin-helpers';
 import { prisma } from '@/lib/prisma';
 import { UserRole } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +15,10 @@ export const dynamic = 'force-dynamic';
  * Lista todos os usuários com filtros e paginação
  */
 export async function GET(request: NextRequest) {
-  const { error } = await requireAdminSession();
-  if (error) return error;
+  const session = await getServerSession(authOptions);
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, session.user?.email)) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -93,8 +98,10 @@ export async function GET(request: NextRequest) {
  * Criar novo usuário
  */
 export async function POST(request: NextRequest) {
-  const { error, session } = await requireAdminSession([UserRole.OWNER, UserRole.ADMIN]);
-  if (error) return error;
+  const session = await getServerSession(authOptions);
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, session.user?.email)) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+  }
 
   try {
     // Tier enforcement — check user limit
@@ -139,10 +146,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Criar StaffMember automaticamente se phone ou cpf fornecidos
-    if (phone || cpf) {
+    // Criar StaffMember automaticamente se phone ou cpf fornecidos e houver restaurante no contexto
+    if ((phone || cpf) && restId) {
       await prisma.staffMember.create({
         data: {
+          restaurantId: restId,
           userId: user.id,
           cpf: cpf || null,
           phone: phone || null,

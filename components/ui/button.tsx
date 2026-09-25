@@ -12,6 +12,14 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        // High-attention color for the primary buy/signup CTA on marketing
+        // pages (home, pricing) - the complementary of --primary's blue
+        // (217°) on the color wheel, picked specifically to contrast against
+        // this app's mostly blue/slate marketing pages. Not the app-wide
+        // default so internal screens (forms, "Salvar alterações", etc.)
+        // are unaffected.
+        cta:
+          "bg-[#F2650F] text-white shadow-sm hover:bg-[#D9560D] hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
         outline:

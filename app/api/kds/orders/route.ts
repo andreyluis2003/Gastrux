@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    const where: any = {};
-    if (status) where.status = status;
+    const where: any = { restaurantId };
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
+      where.status = statuses.length > 1 ? { in: statuses } : statuses[0];
+    }
     if (priority) where.priority = priority;
     if (station) {
       where.stationAssignments = {
@@ -96,6 +99,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
+    if (tierBlock) return tierBlock;
 
     const body = await req.json();
     const {
@@ -117,6 +123,7 @@ export async function POST(req: NextRequest) {
 
     // Generate order number
     const lastOrder = await prisma.order.findFirst({
+      where: { restaurantId },
       orderBy: { createdAt: 'desc' },
       select: { orderNumber: true },
     });
@@ -130,6 +137,7 @@ export async function POST(req: NextRequest) {
     // Create order with items
     const order = await prisma.order.create({
       data: {
+        restaurantId,
         orderNumber,
         orderType,
         externalOrderId: externalOrderId || undefined,
@@ -163,6 +171,7 @@ export async function POST(req: NextRequest) {
       where: {
         role: { in: ['COOK', 'MANAGER', 'OWNER'] },
         active: true,
+        restaurants: { some: { restaurantId, isActive: true } },
       },
       select: { id: true },
     });

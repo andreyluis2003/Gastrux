@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCacheHeader } from '@/lib/cache-headers';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +15,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     // Get real-time metrics with optimized field selection
     const stocks = await prisma.stock.findMany({
+      where: { restaurantId },
       select: {
         id: true,
         currentQuantity: true,
@@ -29,6 +36,7 @@ export async function GET(request: NextRequest) {
     });
 
     const forecasts = await prisma.stockForecast.findMany({
+      where: { restaurantId },
       select: {
         id: true,
         ingredientId: true,
@@ -46,6 +54,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
       },
       where: {
+        ingredient: { restaurantId },
         createdAt: {
           gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
         },

@@ -130,9 +130,9 @@ export async function calculateStockForecast(ingredientId: string) {
 /**
  * Calculate all forecasts
  */
-export async function calculateAllForecasts() {
+export async function calculateAllForecasts(restaurantId?: string) {
   const ingredients = await prisma.ingredient.findMany({
-    where: { active: true },
+    where: { active: true, ...(restaurantId ? { restaurantId } : {}) },
     select: { id: true },
   });
 

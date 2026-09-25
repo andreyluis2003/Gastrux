@@ -108,14 +108,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if customer already exists
-    const existingCustomer = await prisma.customer.findUnique({
-      where: { email },
+    // Check if customer already exists in this restaurant
+    const existingCustomer = await prisma.customer.findFirst({
+      where: { email, restaurantId },
     });
 
     if (existingCustomer) {
       return NextResponse.json(
         { error: 'Cliente com este email já existe' },
+        { status: 409 }
+      );
+    }
+
+    // Customer.email is globally unique in the schema, so a customer with
+    // this email under a different restaurant would still collide here.
+    const emailTakenElsewhere = await prisma.customer.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (emailTakenElsewhere) {
+      return NextResponse.json(
+        { error: 'Não foi possível cadastrar este email' },
         { status: 409 }
       );
     }

@@ -90,9 +90,16 @@ export async function POST(req: NextRequest) {
       case 'waste':
         htmlContent = await generateWasteReport(days, restaurantId);
         break;
-      case 'comprehensive':
+      case 'comprehensive': {
+        // Only the full executive/comprehensive report is a premium "Relatórios
+        // Avançados" feature - cmv/menu-engineering/waste stay available to
+        // every tier (CMV in particular is a Starter-advertised core feature).
+        const { enforceFeature } = await import('@/lib/api/tier-middleware');
+        const tierBlock = await enforceFeature(restaurantId, 'advancedReports');
+        if (tierBlock) return tierBlock;
         htmlContent = await generateComprehensiveReport(days, includeRecipes, restaurantId);
         break;
+      }
       default:
         return NextResponse.json({ error: 'Invalid report type' }, { status: 400 });
     }

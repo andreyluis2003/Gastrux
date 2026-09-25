@@ -57,6 +57,11 @@ model User {
   emailTrialEndingSentAt DateTime?
   emailWelcomeSentAt     DateTime?
   acceptedTermsAt        DateTime?
+  businessStage          String?
+  businessType           String?
+  locationCount          String?
+  mainPainPoint          String?
+  leadQuality            String?
   notifications          Notification[]          @relation("UserNotifications")
   accounts               Account[]
   adminLogs              AdminLog[]              @relation("AdminLogsUser")
@@ -3190,11 +3195,12 @@ model WhatsAppConfig {
   restaurantId        String     @unique
   phoneNumberId       String?
   businessAccountId   String?
+  metaBusinessId      String?
   accessToken         String?
   verifyToken         String?
   displayPhoneNumber  String?
   isActive            Boolean    @default(false)
-  greeting            String?    @default("Olá! 👋 Bem-vindo ao nosso restaurante. Digite *menu* para ver o cardápio ou *ajuda* para opções.")
+  greeting           String?    @default("Olá! 👋 Bem-vindo ao nosso restaurante. Digite *menu* para ver o cardápio ou *ajuda* para opções.")
   businessHours       String?
   outsideHoursMessage String?
   totalConversations  Int        @default(0)

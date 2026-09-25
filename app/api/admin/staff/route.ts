@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Only a genuinely new hire counts against the plan's user limit - editing
+  // an existing staff member's info must never be blocked by it.
+  if (!existingMember) {
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'users');
+    if (tierBlock) return tierBlock;
+  }
+
   // Link to restaurant
   await prisma.restaurantUser.upsert({
     where: { restaurantId_userId: { restaurantId, userId: staffUser.id } },

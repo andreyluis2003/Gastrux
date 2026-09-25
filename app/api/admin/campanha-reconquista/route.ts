@@ -5,28 +5,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-
-async function getRestaurantId(session: any) {
-  const userId = session?.user?.id;
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { restaurants: { include: { restaurant: true }, take: 1 } },
-  });
-  return user?.currentRestaurantId || user?.restaurants?.[0]?.restaurantId || null;
-}
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 // GET: Fetch reconquest campaign data (delivery customers + existing campaigns)
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    const restaurantId = await getRestaurantId(session);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     // Get delivery customers (from ExternalOrder) who could be reconquered
     const externalOrders = await prisma.externalOrder.findMany({
       where: {
+        restaurantId,
         status: 'DELIVERED',
       },
       select: {
@@ -71,6 +63,7 @@ export async function GET(req: NextRequest) {
     // Get existing reconquest campaigns (MessageCampaigns tagged with reconquista)
     const campaigns = await prisma.messageCampaign.findMany({
       where: {
+        restaurantId,
         name: { contains: 'reconquista', mode: 'insensitive' },
       },
       include: {
@@ -111,7 +104,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    const restaurantId = await getRestaurantId(session);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
     const userId = (session.user as any).id;
 
@@ -133,6 +126,7 @@ export async function POST(req: NextRequest) {
         // Create a default reconquista template
         template = await prisma.messageTemplate.create({
           data: {
+            restaurantId,
             name: `reconquista_${Date.now()}`,
             displayName: 'Reconquista - Pedido Direto',
             category: 'MARKETING',
@@ -148,6 +142,7 @@ export async function POST(req: NextRequest) {
     // Create campaign
     const campaign = await prisma.messageCampaign.create({
       data: {
+        restaurantId,
         name: `Reconquista: ${name}`,
         description: 'Campanha de reconquista de clientes delivery para pedido direto',
         templateId: finalTemplateId,

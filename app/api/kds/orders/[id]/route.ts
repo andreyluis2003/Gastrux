@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { getOrCreateLoyaltyProgram } from '@/lib/loyalty/get-program';
 import { broadcastOrderUpdate, broadcastOrderCompleted } from '@/lib/socket';
 import { notifyOrderReady } from '@/lib/notification-utils';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +24,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: params.id },
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id: params.id, restaurantId },
       include: {
         items: {
           include: {
@@ -67,6 +73,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const owned = await prisma.order.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
     const body = await req.json();
     const { status, priority, actualStartTime, completedAt, specialInstructions } = body;
 
@@ -107,6 +123,7 @@ export async function PUT(
         where: {
           role: { in: ['MANAGER', 'OWNER', 'CASHIER'] },
           active: true,
+          restaurants: { some: { restaurantId, isActive: true } },
         },
         select: { id: true },
       });
@@ -182,6 +199,16 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
     if (!session || (session.user as any).role !== 'OWNER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const owned = await prisma.order.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     const order = await prisma.order.update({

@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: any = {
+      ingredient: { restaurantId },
       createdAt: {
         gte: startDate,
         lte: endDate,
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
           ingredientId: m.ingredientId,
           ingredientName: m.ingredient.name,
           categoryName: m.ingredient.category?.name || 'Sem categoria',
-          unit: m.ingredient.unit || 'un',
+          unit: m.ingredient.standardUnit || 'un',
           totalQuantity: 0,
           totalCost: 0,
           frequency: 0,

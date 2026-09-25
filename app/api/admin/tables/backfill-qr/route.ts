@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'qrMenu');
+    if (tierBlock) return tierBlock;
+
     const tables = await prisma.table.findMany({
       where: { restaurantId, qrToken: null },
       select: { id: true },

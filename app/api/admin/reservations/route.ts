@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
     const startDate = searchParams.get('startDate');
@@ -21,8 +27,8 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '0');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    const where: any = {};
-    
+    const where: any = { restaurantId };
+
     if (status) where.status = status;
     
     if (startDate && endDate) {
@@ -73,6 +79,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const {
       guestName,
       guestEmail,
@@ -93,8 +104,8 @@ export async function POST(req: NextRequest) {
 
     // Check if table exists and has capacity
     if (tableId) {
-      const table = await prisma.table.findUnique({
-        where: { id: tableId },
+      const table = await prisma.table.findFirst({
+        where: { id: tableId, restaurantId },
       });
 
       if (!table) {
@@ -140,12 +151,13 @@ export async function POST(req: NextRequest) {
 
     // Get or create guest profile
     let guest = await prisma.guestProfile.findUnique({
-      where: { email: guestEmail },
+      where: { restaurantId_email: { restaurantId, email: guestEmail } },
     });
 
     if (!guest) {
       guest = await prisma.guestProfile.create({
         data: {
+          restaurantId,
           name: guestName,
           email: guestEmail,
           phone: guestPhone,
@@ -155,6 +167,7 @@ export async function POST(req: NextRequest) {
 
     const reservation = await prisma.reservation.create({
       data: {
+        restaurantId,
         guestId: guest.id,
         guestName,
         guestEmail,

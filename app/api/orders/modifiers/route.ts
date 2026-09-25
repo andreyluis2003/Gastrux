@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,11 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -24,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const modifiers = await prisma.orderItemModifier.findMany({
-      where: { orderItemId },
+      where: { orderItemId, orderItem: { order: { restaurantId } } },
       include: { modifier: true },
     });
 
@@ -45,6 +51,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { orderItemId, modifierId } = body;
 
@@ -55,16 +66,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const orderItem = await prisma.orderItem.findUnique({
-      where: { id: orderItemId },
+    const orderItem = await prisma.orderItem.findFirst({
+      where: { id: orderItemId, order: { restaurantId } },
     });
 
     if (!orderItem) {
       return NextResponse.json({ error: 'Order item not found' }, { status: 404 });
     }
 
-    const modifier = await prisma.itemModifier.findUnique({
-      where: { id: modifierId },
+    const modifier = await prisma.itemModifier.findFirst({
+      where: { id: modifierId, restaurantId },
     });
 
     if (!modifier) {

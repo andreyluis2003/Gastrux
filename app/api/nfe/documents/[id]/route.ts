@@ -29,9 +29,8 @@ export async function GET(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-
-    const document = await prisma.nFeDocument.findUnique({
-      where: { id: params.id },
+    const document = await prisma.nFeDocument.findFirst({
+      where: { id: params.id, config: { restaurantId } },
       include: {
         items: true,
         logs: {
@@ -74,15 +73,14 @@ export async function PUT(
       );
     }
 
-    const document = await prisma.nFeDocument.findUnique({
-      where: { id: params.id },
-    });
-
-
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
+
+    const document = await prisma.nFeDocument.findFirst({
+      where: { id: params.id, config: { restaurantId } },
+    });
 
     if (!document) {
       return NextResponse.json(
@@ -148,8 +146,13 @@ export async function DELETE(
       );
     }
 
-    const document = await prisma.nFeDocument.findUnique({
-      where: { id: params.id },
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const document = await prisma.nFeDocument.findFirst({
+      where: { id: params.id, config: { restaurantId } },
     });
 
     if (!document) {
@@ -157,12 +160,6 @@ export async function DELETE(
         { error: 'Document not found' },
         { status: 404 }
       );
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
     }
 
     const updated = await prisma.nFeDocument.update({

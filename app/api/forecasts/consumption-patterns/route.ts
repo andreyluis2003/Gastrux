@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const ingredientId = searchParams.get('ingredientId');
 
-    const where: any = ingredientId ? { ingredientId } : {};
+    const where: any = { restaurantId };
+    if (ingredientId) where.ingredientId = ingredientId;
 
     const patterns = await prisma.consumptionPattern.findMany({
       where,

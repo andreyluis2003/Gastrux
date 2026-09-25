@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Menu, X, Home, UtensilsCrossed, ClipboardList, ShoppingCart, TrendingDown, BarChart3, AlertCircle, LogOut, Settings, Calculator, Trash2, PieChart, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -23,6 +24,11 @@ const menuItems = [
 export function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const { data: session } = useSession() || {};
+  const pathname = usePathname();
+
+  // Public marketing pages have their own nav/menu already
+  const isPublicMarketingPage = pathname === '/' || pathname === '/pricing' || !!pathname?.startsWith('/para/');
+  if (isPublicMarketingPage) return null;
 
   const handleLogout = async () => {
     try {

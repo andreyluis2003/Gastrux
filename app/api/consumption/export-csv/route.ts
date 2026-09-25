@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       : ['MANUAL_DEDUCTION'];
 
     const where: any = {
+      ingredient: { restaurantId },
       createdAt: {
         gte: startDate,
         lte: endDate,
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       const category = m.ingredient.category?.name || 'Sem categoria';
       const movementType = m.movementType || 'DESCONHECIDO';
       const qty = m.quantity.toFixed(2);
-      const unit = m.ingredient.unit || 'un';
+      const unit = m.ingredient.standardUnit || 'un';
       const unitCost = (m.ingredient.referenceCost || 0).toFixed(2);
       const totalCost = cost.toFixed(2);
       csv += `"${date}","${ingredient}","${category}","${movementType}","${qty}","${unit}","${unitCost}","${totalCost}"\n`;

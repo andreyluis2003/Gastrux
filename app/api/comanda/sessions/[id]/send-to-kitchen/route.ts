@@ -41,6 +41,10 @@ export async function POST(
       return NextResponse.json({ error: 'No items in session' }, { status: 400 });
     }
 
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
+    if (tierBlock) return tierBlock;
+
     // Calculate estimated prep time
     const estimatedPrepTime = Math.max(
       ...orderSession.items.map(item => item.recipe.prepTimeMinutes || 10)

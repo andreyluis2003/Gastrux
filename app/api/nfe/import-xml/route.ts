@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,10 +73,7 @@ export async function POST(req: NextRequest) {
     const { xmlContent } = body;
     if (!xmlContent) return NextResponse.json({ error: 'xmlContent obrigat\u00f3rio' }, { status: 400 });
 
-    const restaurantUser = await prisma.restaurantUser.findFirst({
-      where: { userId: (session as any).user?.id || (session as any).id },
-    });
-    const restaurantId = restaurantUser?.restaurantId;
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante n\u00e3o encontrado' }, { status: 404 });
 
     const nfe = parseNFeXml(xmlContent);

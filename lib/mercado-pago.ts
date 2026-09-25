@@ -352,9 +352,28 @@ export function mapMPPaymentType(type: string): string {
 
 export type MPWebhookTopic = 'payment' | 'merchant_order' | 'preapproval';
 
+/**
+ * Normalizes a webhook topic/type to our three handled values.
+ *
+ * Besides the legacy IPN topics (payment, merchant_order, preapproval), MP's
+ * newer Webhooks v2 format sends subscription events under their own longer
+ * type names - subscription_authorized_payment for each recurring PreApproval
+ * charge, and subscription_preapproval for PreApproval status changes. These
+ * were previously falling through unrecognized and silently dropped (200 OK,
+ * no processing), meaning recurring subscription charges never reached
+ * handleSubscriptionRecurringCharge and PreApproval status changes never
+ * synced. Both map onto the existing 'payment'/'preapproval' handlers, which
+ * already fetch the full resource by id rather than trusting the webhook body.
+ */
 export function validateWebhookTopic(topic: string): MPWebhookTopic | null {
-  const validTopics: MPWebhookTopic[] = ['payment', 'merchant_order', 'preapproval'];
-  return validTopics.includes(topic as MPWebhookTopic) ? (topic as MPWebhookTopic) : null;
+  const aliases: Record<string, MPWebhookTopic> = {
+    payment: 'payment',
+    subscription_authorized_payment: 'payment',
+    merchant_order: 'merchant_order',
+    preapproval: 'preapproval',
+    subscription_preapproval: 'preapproval',
+  };
+  return aliases[topic] || null;
 }
 
 // ============================================================

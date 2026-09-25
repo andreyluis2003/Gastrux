@@ -182,6 +182,9 @@ export function getCacheTypeForRoute(pathname: string): CacheType {
     }
   }
 
-  // Default to dynamic-data for safety
-  return 'dynamic-data';
+  // Any route not explicitly whitelisted above is assumed to serve
+  // per-user/per-restaurant data - default to no-cache rather than a
+  // 5-minute public cache, which previously made writes on unmapped
+  // routes (e.g. /api/admin/tables) look like they silently reverted.
+  return 'user-data';
 }

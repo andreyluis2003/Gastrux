@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
           });
         } else {
           await prisma.stock.create({
-            data: { ingredientId, currentQuantity: countedQuantity },
+            data: { restaurantId, ingredientId, currentQuantity: countedQuantity },
           });
         }
       }

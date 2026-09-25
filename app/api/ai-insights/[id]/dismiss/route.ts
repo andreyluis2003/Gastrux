@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,12 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+
+    const owned = await prisma.aIInsight.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) return NextResponse.json({ error: 'Insight não encontrado' }, { status: 404 });
 
     await prisma.aIInsight.update({
       where: { id: params.id },

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,11 @@ export async function POST(request: NextRequest) {
         { error: 'Cozinheiros não podem importar insumos' },
         { status: 403 }
       );
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
     const formData = await request.formData();
@@ -158,12 +164,13 @@ export async function POST(request: NextRequest) {
 
         // Get or create category
         let category = await prisma.ingredientCategory.findUnique({
-          where: { name: row.categoria.trim() },
+          where: { restaurantId_name: { restaurantId, name: row.categoria.trim() } },
         });
 
         if (!category) {
           category = await prisma.ingredientCategory.create({
             data: {
+              restaurantId,
               name: row.categoria.trim(),
               color: generateRandomColor(),
             },
@@ -178,13 +185,13 @@ export async function POST(request: NextRequest) {
 
         // Check if ingredient already exists
         const existingIngredient = await prisma.ingredient.findUnique({
-          where: { code: row.código.trim() },
+          where: { restaurantId_code: { restaurantId, code: row.código.trim() } },
         });
 
         if (existingIngredient) {
           // Update existing
           await prisma.ingredient.update({
-            where: { code: row.código.trim() },
+            where: { restaurantId_code: { restaurantId, code: row.código.trim() } },
             data: {
               name: row.nome.trim(),
               description: row.descrição?.trim() || null,
@@ -200,6 +207,7 @@ export async function POST(request: NextRequest) {
           // Create new
           const ingredient = await prisma.ingredient.create({
             data: {
+              restaurantId,
               code: row.código.trim(),
               name: row.nome.trim(),
               description: row.descrição?.trim() || null,
@@ -215,6 +223,7 @@ export async function POST(request: NextRequest) {
           // Create stock entry
           await prisma.stock.create({
             data: {
+              restaurantId,
               ingredientId: ingredient.id,
               currentQuantity: 0,
             },

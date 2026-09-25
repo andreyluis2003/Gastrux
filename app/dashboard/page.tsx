@@ -10,6 +10,19 @@ import {
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { AlertsBanner } from '@/components/ai/alerts-banner';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
+
+// These module tiles link to pages backed by platform-admin-only APIs
+// (role === 'ADMIN', i.e. Gastrux staff managing the SaaS itself - not a
+// restaurant owner's own data). Shown to a regular tenant, they 401/403 and
+// render a confusing empty state instead of the real content.
+const PLATFORM_ADMIN_ONLY_MODULE_IDS = new Set([
+  'email-campaigns',
+  'survey-analytics',
+  'monitoring',
+  'beta-testers',
+  'partnerships',
+]);
 
 
 // Cache strategy: Revalidate dashboard every 60 seconds (1 minute)
@@ -170,6 +183,10 @@ export default async function DashboardPage() {
     { id: 'ia-monitoring', iconName: 'ShieldAlert' as const, href: '/admin/ia-monitoring', color: 'bg-rose-50', accentColor: 'text-rose-600' },
   ];
 
+  const visibleModules = isPlatformAdminIdentity(user.role, user.email)
+    ? modules
+    : modules.filter((m) => !PLATFORM_ADMIN_ONLY_MODULE_IDS.has(m.id));
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50">
       {/* Header */}
@@ -180,7 +197,7 @@ export default async function DashboardPage() {
         <AlertsBanner />
         <Suspense fallback={<DashboardAlertsLoadingSkeleton />}>
           {restaurantId ? (
-            <DashboardFullContent criticalData={critical} modules={modules} restaurantId={restaurantId} />
+            <DashboardFullContent criticalData={critical} modules={visibleModules} restaurantId={restaurantId} />
           ) : (
             <DashboardContent
               ingredientCount={0}
@@ -188,7 +205,7 @@ export default async function DashboardPage() {
               recentPlans={[]}
               recentAlerts={[]}
               lowStockCount={0}
-              modules={modules}
+              modules={visibleModules}
             />
           )}
         </Suspense>

@@ -86,6 +86,15 @@ export async function POST(req: NextRequest) {
       const changes: any[] = entry?.changes || [];
       for (const change of changes) {
         const value = change?.value || {};
+
+        if (change?.field === 'account_update') {
+          console.log('[wa-webhook] account_update', {
+            event: value?.event,
+            wabaId: value?.waba_info?.waba_id,
+          });
+          continue;
+        }
+
         const phoneNumberId: string | undefined = value?.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
 

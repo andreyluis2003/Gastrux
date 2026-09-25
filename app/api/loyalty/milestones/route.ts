@@ -51,6 +51,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Programa de fidelidade não encontrado' }, { status: 404 });
   }
 
+  const { enforceFeature } = await import('@/lib/api/tier-middleware');
+  const tierBlock = await enforceFeature(restaurantId, 'loyalty');
+  if (tierBlock) return tierBlock;
+
   try {
     const milestone = await prisma.loyaltyMilestone.create({
       data: {

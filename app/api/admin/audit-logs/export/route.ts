@@ -1,14 +1,18 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminSession } from '@/lib/admin-helpers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { convertToCSV } from '@/lib/csv-utils';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const { error } = await requireAdminSession();
-  if (error) return error;
+  const session = await getServerSession(authOptions);
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, session.user?.email)) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+  }
 
   try {
     const { searchParams } = new URL(request.url);

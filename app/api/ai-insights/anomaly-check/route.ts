@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
     // Return latest undismissed anomaly alerts
     const alerts = await prisma.aIInsight.findMany({
       where: {
+        restaurantId,
         type: 'ANOMALY_ALERT',
         dismissed: false,
       },
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
 }
 
 async function checkAndNotify(restaurantId: string, userId: string | null) {
-  const anomalies = await detectAnomalies(restaurantId);
+  const { anomalies } = await detectAnomalies(restaurantId);
 
   if (anomalies.length === 0) {
     return { anomalyCount: 0, alerts: [] };
@@ -115,10 +116,10 @@ async function checkAndNotify(restaurantId: string, userId: string | null) {
         title: `Alerta: ${anomaly.type}`,
         summary: anomaly.message,
         content: alertSummary,
-        dataSnapshot: anomaly as any,
+        dataSnapshot: JSON.stringify(anomaly),
         timeRange: 'instant',
         score: anomaly.severity === 'critical' ? 90 : anomaly.severity === 'warning' ? 60 : 30,
-        tags: ['alerta', anomaly.type.toLowerCase(), anomaly.severity],
+        tags: JSON.stringify(['alerta', anomaly.type.toLowerCase(), anomaly.severity]),
         restaurantId,
         ...(userId ? { createdById: userId } : {}),
       },

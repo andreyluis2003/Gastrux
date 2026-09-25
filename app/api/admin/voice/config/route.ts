@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest) {
   const restaurantId = await getCurrentRestaurantId();
   if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
+  const { enforceFeature } = await import('@/lib/api/tier-middleware');
+  const tierBlock = await enforceFeature(restaurantId, 'voiceAgent');
+  if (tierBlock) return tierBlock;
+
   const body = await req.json();
 
   // Mascara defesa: só atualiza se não tem bullets
@@ -69,7 +73,7 @@ export async function PATCH(req: NextRequest) {
   if (typeof body.defaultDurationMin === 'number') updateData.defaultDurationMin = body.defaultDurationMin;
 
   const cfg = await prisma.voiceAgentConfig.upsert({
-    where: {},
+    where: { restaurantId },
     update: updateData,
     create: { restaurantId, ...updateData },
   });

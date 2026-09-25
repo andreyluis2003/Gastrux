@@ -73,6 +73,10 @@ export async function POST(
       );
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'crm');
+    if (tierBlock) return tierBlock;
+
     const interaction = await prisma.customerInteraction.create({
       data: {
         customerId: params.id,
