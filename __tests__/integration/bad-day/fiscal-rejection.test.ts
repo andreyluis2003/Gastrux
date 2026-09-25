@@ -113,7 +113,8 @@ describe('bad day 7: fiscal rejection', () => {
     B = scenario.restaurantB;
     configA = await prisma.nFeConfig.create({
       data: {
-        restaurantId: A.restaurantId, cnpj: `${Date.now()}`.slice(-14).padStart(14, '1'), nfeApiKey: 'k',
+        // restaurant fiscal defaults (a sale needs fiscal data: lib/nfe/fiscal-data.ts)
+        defaultNcm: '21069090', defaultCfop: '5102', defaultOrigin: '0', defaultCsosn: '102', restaurantId: A.restaurantId, cnpj: `${Date.now()}`.slice(-14).padStart(14, '1'), nfeApiKey: 'k',
         environment: 'sandbox', uf: 'SP', issueNFCeForCPF: true,
       },
     });

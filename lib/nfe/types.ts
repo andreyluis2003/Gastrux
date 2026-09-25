@@ -30,6 +30,8 @@ export interface NFeEmitPayload {
   totalAmount: number;
   paymentMethod?: string; // dinheiro, cartao, pix...
   paymentAmount?: number;
+  /** PIS/COFINS situation code of every item (restaurant setting; the provider defaulted to 07) */
+  pisCofinsCst?: string;
 }
 
 export interface NFeEmitResult {

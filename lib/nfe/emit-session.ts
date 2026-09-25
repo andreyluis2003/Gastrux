@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
 import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
 import { createDocumentWithNextNumber, findReusableRejected } from '@/lib/nfe/numbering';
+import { resolveItemsFiscalData } from '@/lib/nfe/fiscal-data';
 import type { NFeEmitPayload, NFeEmitResult } from '@/lib/nfe/types';
 
 /**
@@ -71,6 +72,17 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
     return { httpStatus: 400, body: { error: 'NFeConfig não configurada. Configure em /admin/nfe/config' } };
   }
 
+  // Each item's fiscal data (product, else restaurant default), checked BEFORE a number is reserved:
+  // missing data refuses the note (no number used) instead of the old hardcoded NCM / CFOP / CSOSN
+  const fiscal = resolveItemsFiscalData(
+    config,
+    orderSession.items.map((item) => ({ ...(item.recipe ?? {}), name: item.recipe?.name || 'Produto' }))
+  );
+  if (!fiscal.ok) {
+    await alertMissingFiscalData(restaurantId, orderSessionId, fiscal.reason);
+    return { httpStatus: 422, body: { error: fiscal.reason, code: 'FISCAL_DATA_MISSING', products: fiscal.products } };
+  }
+
   const lines = orderSession.items.map((item, idx) => {
     const adjustments = item.modifiers.map((m) => m.priceAdjustment);
     const unitCents = toCents(item.price) + adjustments.reduce<number>((sum, adj) => sum + toCents(adj), 0);
@@ -81,8 +93,8 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
       unit: 'UN',
       unitPrice: unitCents / 100,
       totalPrice: totalCents / 100,
-      ncm: '21069090',
-      cfop: '5102',
+      ncm: fiscal.items[idx].ncm,
+      cfop: fiscal.items[idx].cfop,
       recipeId: item.recipeId,
       position: idx,
     };
@@ -170,18 +182,23 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
     customerCPF: customer.customerCPF || undefined,
     customerName: customer.customerName || undefined,
     customerEmail: customer.customerEmail || undefined,
-    items: document.items.map((it) => ({
-      description: it.description,
-      quantity: Number(it.quantity),
-      unit: it.unit,
-      unitPrice: Number(it.unitPrice),
-      totalPrice: Number(it.totalPrice),
-      ncm: it.ncm || undefined,
-      cfop: it.cfop || undefined,
+    // Built from the lines (same order as the fiscal check), each with its own fiscal data
+    items: lines.map((line, idx) => ({
+      description: line.description,
+      quantity: line.quantity,
+      unit: line.unit,
+      unitPrice: line.unitPrice,
+      totalPrice: line.totalPrice,
+      ncm: fiscal.items[idx].ncm,
+      cfop: fiscal.items[idx].cfop,
+      cest: fiscal.items[idx].cest,
+      icmsOrigin: fiscal.items[idx].origin,
+      icmsCST: fiscal.items[idx].csosn,
     })),
     totalAmount,
     paymentMethod,
     paymentAmount: totalAmount,
+    pisCofinsCst: config.pisCofinsCst || undefined,
   };
 
   await prisma.nFeLog.create({
@@ -274,6 +291,32 @@ export async function recordEmitResult(
 
   if (!result.ok) await alertFiscalProblem(restaurantId, updated);
   return updated;
+}
+
+/** One alert per comanda while its products lack fiscal data. Never throws. */
+async function alertMissingFiscalData(restaurantId: string, orderSessionId: string, reason: string) {
+  try {
+    const dedupeKey = `nfe-fiscal-data:${orderSessionId}`;
+    const existing = await prisma.notification.findFirst({
+      where: { restaurantId, data: { path: ['dedupeKey'], equals: dedupeKey }, read: false },
+      select: { id: true },
+    });
+    if (existing) return;
+    await prisma.notification.create({
+      data: {
+        restaurantId,
+        type: 'SYSTEM_ERROR',
+        severity: 'HIGH',
+        title: 'NFC-e não emitida: faltam dados fiscais',
+        message: reason,
+        actionUrl: '/admin/fiscal',
+        actionLabel: 'Completar dados fiscais',
+        data: { kind: 'nfe_fiscal_data_missing', dedupeKey, orderSessionId },
+      },
+    });
+  } catch (error) {
+    console.error('Could not store the fiscal data alert:', error);
+  }
 }
 
 const ALERT_TEXT: Record<string, { title: string; message: string }> = {

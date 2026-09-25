@@ -74,7 +74,8 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
     cheese = await prisma.itemModifier.create({ data: { restaurantId: A.restaurantId, name: `Queijo ${tag}`, priceAdjustment: 3 } });
     register = await prisma.cashRegister.create({ data: { name: `Caixa ${tag}`, restaurantId: A.restaurantId, expectedBalance: 100 } });
     config = await prisma.nFeConfig.create({
-      data: { restaurantId: A.restaurantId, cnpj: `8${Date.now()}`.slice(0, 14), nfeApiKey: 'k', environment: 'sandbox', autoIssueOnSale: true },
+      data: { // restaurant fiscal defaults (a sale needs fiscal data: lib/nfe/fiscal-data.ts)
+        defaultNcm: '21069090', defaultCfop: '5102', defaultOrigin: '0', defaultCsosn: '102', restaurantId: A.restaurantId, cnpj: `8${Date.now()}`.slice(0, 14), nfeApiKey: 'k', environment: 'sandbox', autoIssueOnSale: true },
     });
   });
 

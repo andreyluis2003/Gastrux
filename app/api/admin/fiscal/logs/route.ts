@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getRestaurantMember, MANAGER_ROLES } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-  const user = session.user as any;
-  const restaurantId = user.currentRestaurantId;
-  if (!restaurantId) return NextResponse.json({ error: 'Sem restaurante' }, { status: 400 });
+  // A manager of the restaurant being worked in (session.user.currentRestaurantId never existed)
+  const member = await getRestaurantMember();
+  if (!member || !MANAGER_ROLES.includes(member.role)) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  const restaurantId = member.restaurantId;
 
   const config = await prisma.nFeConfig.findUnique({
     where: { restaurantId },

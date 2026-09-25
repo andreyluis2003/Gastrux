@@ -317,6 +317,13 @@ model Recipe {
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
   sellingPrice     Float?
+  /// Fiscal data of the product on the NFC-e (set by the accountant); when empty, the restaurant
+  /// defaults in NFeConfig apply (lib/nfe/fiscal-data.ts). Never guessed by the system.
+  fiscalNcm        String?
+  fiscalCest       String?
+  fiscalCfop       String?
+  fiscalOrigin     String?
+  fiscalCsosn      String?
   menuEngSnapshots MenuEngineeringSnapshot[] @relation("RecipeMenuEngSnapshots")
   menuMappings     MenuItemMapping[]
   orderItems       OrderItem[]
@@ -2182,6 +2189,14 @@ model NFeConfig {
   uf                    String        @default("SP")
   crt                   String        @default("1")
   natOp                 String        @default("VENDA DE MERCADORIA")
+  /// Restaurant-wide fiscal defaults for products without their own data (set by the
+  /// accountant). No default means: the note is not issued until the data is filled in.
+  defaultNcm            String?
+  defaultCfop           String?
+  defaultOrigin         String?
+  defaultCsosn          String?
+  /// PIS/COFINS situation code on every item (the provider used to hardcode "07")
+  pisCofinsCst          String?
   documents             NFeDocument[]
   logs                  NFeLog[]
   restaurant            Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)

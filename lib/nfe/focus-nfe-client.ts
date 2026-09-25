@@ -60,10 +60,11 @@ export class FocusNFeClient implements NFeProvider {
       quantidade_tributavel: Number(item.quantity).toFixed(4),
       valor_unitario_tributavel: Number(item.unitPrice).toFixed(4),
       ncm: item.ncm || '21069090',
+      ...(item.cest ? { cest: item.cest } : {}),
       origem: item.icmsOrigin || '0',
       icms_situacao_tributaria: item.icmsCST || '102', // Simples Nacional sem permissão de crédito
-      pis_situacao_tributaria: '07',
-      cofins_situacao_tributaria: '07',
+      pis_situacao_tributaria: p.pisCofinsCst || '07',
+      cofins_situacao_tributaria: p.pisCofinsCst || '07',
     }));
 
     return {

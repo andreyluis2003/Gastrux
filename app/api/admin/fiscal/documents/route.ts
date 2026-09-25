@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getRestaurantMember, MANAGER_ROLES } from '@/lib/auth/restaurant-role';
 import { createDocumentWithNextNumber } from '@/lib/nfe/numbering';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * A manager of the restaurant being worked in. It used to read session.user.currentRestaurantId, a
+ * field the session never carries, so this page never loaded nor saved anything (browser test of
+ * 2026-09-25).
+ */
 async function getContext() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const user = session.user as any;
-  if (!['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'OWNER'].includes(user.role)) return null;
-  const restaurantId = user.currentRestaurantId;
-  if (!restaurantId) return null;
-  return { session, restaurantId };
+  const member = await getRestaurantMember();
+  if (!member || !MANAGER_ROLES.includes(member.role)) return null;
+  return { restaurantId: member.restaurantId };
 }
 
 export async function GET(req: NextRequest) {

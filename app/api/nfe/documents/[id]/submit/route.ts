@@ -36,7 +36,7 @@ export async function POST(
     // Scoped through the config: another restaurant's note is a 404
     const document = await prisma.nFeDocument.findFirst({
       where: { id: params.id, config: { restaurantId } },
-      include: { items: true, config: true },
+      include: { items: { orderBy: { position: 'asc' } }, config: true },
     });
 
     if (!document) {
@@ -90,7 +90,11 @@ export async function POST(
       customerCNPJ: document.customerCNPJ || undefined,
       customerName: document.customerName || undefined,
       customerEmail: document.customerEmail || undefined,
-      items: document.items.map((it) => ({
+      // The fiscal data first sent (origin, CSOSN, CEST) is kept on a re-send (lib/nfe/fiscal-data.ts)
+      items: document.items.map((it, idx) => ({
+        ...(previous.items?.[idx]?.description === it.description
+          ? { cest: previous.items[idx].cest, icmsOrigin: previous.items[idx].icmsOrigin, icmsCST: previous.items[idx].icmsCST }
+          : {}),
         description: it.description,
         quantity: Number(it.quantity),
         unit: it.unit,
@@ -102,6 +106,7 @@ export async function POST(
       totalAmount: Number(document.totalAmount),
       paymentMethod: previous.paymentMethod || 'dinheiro',
       paymentAmount: Number(document.totalAmount),
+      pisCofinsCst: previous.pisCofinsCst || config.pisCofinsCst || undefined,
     };
 
     await prisma.nFeLog.create({
