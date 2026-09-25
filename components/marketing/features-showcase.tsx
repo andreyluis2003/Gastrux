@@ -5,8 +5,8 @@ import { Package, BarChart3, ChefHat, Monitor, Bell, Truck } from 'lucide-react'
 const features = [
   {
     icon: BarChart3,
-    title: 'Seu lucro real, todo dia',
-    description: 'Chega de descobrir no fim do mês que não sobrou nada. Veja quanto lucra por prato, por dia.',
+    title: 'Margem de cada prato, todo dia',
+    description: 'Chega de descobrir no fim do mês que o prato não pagava o próprio custo. Veja o CMV e a margem de contribuição por prato e por dia.',
     color: 'bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400',
   },
   {
@@ -29,8 +29,8 @@ const features = [
   },
   {
     icon: Truck,
-    title: 'Delivery integrado',
-    description: 'Pedidos do iFood e Rappi entram direto no sistema. Sem digitar de novo, sem erro.',
+    title: 'Pedidos externos por API',
+    description: 'Sistemas de pedido podem enviar pedidos à Gastrux por webhook. Ainda não há conexão pronta com iFood, Rappi ou Uber Eats.',
     color: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400',
   },
   {

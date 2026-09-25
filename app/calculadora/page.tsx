@@ -496,7 +496,7 @@ export default function CalculadoraPage() {
               {!leadSent ? (
                 <div className="text-center">
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    Quer parar de adivinhar e ver o lucro real?
+                    Quer parar de adivinhar o custo de cada prato?
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-6">
                     Troque o caderno pela Gastrux — em 10 minutos você vê o custo de cada prato.
@@ -562,28 +562,6 @@ export default function CalculadoraPage() {
           </div>
         )}
 
-        {/* Social proof */}
-        <div className="mt-12 text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-            +500 donos de restaurante já trocaram o caderno pela Gastrux
-          </p>
-          <div className="flex items-center justify-center gap-6 text-gray-400 dark:text-gray-500">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">500+</p>
-              <p className="text-xs">Restaurantes</p>
-            </div>
-            <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">R$ 2M+</p>
-              <p className="text-xs">Economizados</p>
-            </div>
-            <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">4.8★</p>
-              <p className="text-xs">Avaliação</p>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

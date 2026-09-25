@@ -28,9 +28,8 @@ export type PPCCampaign = {
     title: string;
     description: string;
   }>;
-  // Social proof
+  // Product facts (no customer results: Gastrux has none it can prove yet, site claims review 2026-09-25)
   stats: Array<{ value: string; label: string }>;
-  testimonialSlug?: string; // link to case-studies
   // CTA final
   finalCta: {
     headline: string;
@@ -51,21 +50,21 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
     metaTitle:
       'Sistema para Pizzaria: controle estoque, margem e delivery em 1 app',
     metaDescription:
-      'Plataforma completa para pizzarias. Controle de mussarela, ficha técnica por sabor, integração com iFood. Teste grátis 30 dias.',
+      'Plataforma completa para pizzarias. Controle de mussarela, ficha técnica e margem por sabor. Plano Starter grátis, sem cartão.',
     hero: {
       eyebrow: '🍕 Específico para PIZZARIAS',
       headline: 'Pare de perder mussarela. Comece a ganhar margem.',
       subheadline:
-        'O sistema que pizzarias usam para controlar estoque em tempo real, saber a margem por sabor e integrar com iFood. Configure em 15 minutos.',
-      ctaPrimary: 'Testar Grátis 30 Dias',
+        'Controle o estoque em tempo real e saiba o custo e a margem de cada sabor pela ficha técnica.',
+      ctaPrimary: 'Começar Grátis',
       ctaSecondary: 'Ver Demonstração',
-      trustLine: '✅ Sem cartão de crédito • ⚡ Configure em 15 min • 🍕 500+ pizzarias',
+      trustLine: '✅ Sem cartão de crédito • 📱 Funciona no celular • 🍕 Ficha técnica por sabor',
     },
     painPoints: [
       'Mussarela sumindo sem explicação no fim do mês',
       'Dias de pico com ruptura de massa e queijo',
       'Margem diferente em cada sabor sem saber qual puxa o lucro',
-      'iFood e salão em planilhas separadas',
+      'Preço do queijo sobe e ninguém reajusta o cardápio',
     ],
     benefits: [
       {
@@ -82,9 +81,9 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
       {
         icon: 'Truck',
-        title: 'Integração com iFood',
+        title: 'Comanda e balcão sem internet',
         description:
-          'Pedidos do iFood entram direto no KDS. Sem digitação, sem erro.',
+          'Se a internet cair, comanda e venda de balcão continuam no aparelho e sincronizam quando ela volta.',
       },
       {
         icon: 'PieChart',
@@ -94,14 +93,13 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: '22%', label: 'Menos desperdício médio' },
-      { value: '+18%', label: 'Ganho de margem' },
-      { value: '45 dias', label: 'ROI médio' },
-      { value: '500+', label: 'Pizzarias ativas' },
+      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: 'Por sabor', label: 'Custo e margem' },
+      { value: 'Offline', label: 'Comanda e balcão' },
+      { value: 'NFC-e', label: 'No plano Business' },
     ],
-    testimonialSlug: 'pizzaria-bella',
     finalCta: {
-      headline: 'Sua próxima pizza pode ter +R$ 3 de margem',
+      headline: 'Descubra quanto cada sabor deixa de margem',
       button: 'Começar Grátis',
     },
     theme: {
@@ -116,15 +114,15 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
     metaTitle:
       'Sistema para Hamburgueria: padronize receitas, escale lojas',
     metaDescription:
-      'Hamburguerias que crescem usam o Gastrux. Ficha técnica, multi-loja, KDS e integração iFood. Teste grátis 30 dias.',
+      'Ficha técnica, multi-loja e KDS para hamburguerias. Plano Starter grátis, sem cartão.',
     hero: {
       eyebrow: '🍔 Específico para HAMBURGUERIAS',
       headline: 'Escale sua hamburgueria sem perder o sabor.',
       subheadline:
-        'Padronize receitas, controle CMV e abra a próxima loja com confiança. O sistema usado por hamburguerias que já abriram 3+ unidades.',
+        'Padronize receitas, controle CMV e abra a próxima loja com confiança.',
       ctaPrimary: 'Começar Grátis',
       ctaSecondary: 'Como funciona',
-      trustLine: '✅ 30 dias grátis • 🍔 Multi-loja incluso • ⚡ Setup em 20 min',
+      trustLine: '✅ Starter grátis • 🍔 Multi-loja no Business • 📱 Funciona no celular',
     },
     painPoints: [
       'Sabor inconsistente entre turnos',
@@ -143,7 +141,7 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
         icon: 'Building2',
         title: 'Multi-loja',
         description:
-          'Até 3 lojas no plano Business. Dashboard central para o dono.',
+          'Até 2 lojas no plano Business, ilimitadas no Enterprise. Visão central para o dono.',
       },
       {
         icon: 'Monitor',
@@ -159,15 +157,14 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: '3×', label: 'Lojas em 9 meses' },
-      { value: '100%', label: 'Padronização' },
-      { value: '-95%', label: 'Tempo de fechamento' },
-      { value: '9,1', label: 'NPS médio' },
+      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: 'Por receita', label: 'Gramatura e custo' },
+      { value: 'KDS', label: 'No plano Business' },
+      { value: '2 lojas', label: 'No plano Business' },
     ],
-    testimonialSlug: 'hamburgueria-central',
     finalCta: {
       headline: 'A próxima unidade começa com o sistema certo',
-      button: 'Testar Grátis Agora',
+      button: 'Começar Grátis',
     },
     theme: {
       accentFrom: 'from-amber-500',
@@ -181,10 +178,10 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
     metaTitle:
       'Controle de Estoque para Restaurantes: simples, rápido, em tempo real',
     metaDescription:
-      'Controle de estoque para restaurantes sem planilhas. Alertas automáticos, ficha técnica, integração com fornecedores. Gratuito por 30 dias.',
+      'Controle de estoque para restaurantes sem planilhas. Alertas automáticos, ficha técnica, cadastro de fornecedores. Plano Starter grátis, sem cartão.',
     hero: {
       eyebrow: '📦 CONTROLE DE ESTOQUE PARA RESTAURANTES',
-      headline: 'Estoque sob controle em menos de 30 dias.',
+      headline: 'Estoque sob controle, sem planilha.',
       subheadline:
         'Chega de planilha. Tenha visão em tempo real do seu estoque, alertas de mínimo e histórico de movimentações direto no celular.',
       ctaPrimary: 'Começar Agora',
@@ -224,12 +221,11 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: '22%', label: 'Menos desperdício' },
-      { value: '21h', label: 'Economia/semana' },
-      { value: '30 dias', label: 'Para controle total' },
-      { value: '4,8/5', label: 'Avaliação média' },
+      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: 'Automática', label: 'Baixa por receita' },
+      { value: 'Celular', label: 'Contagem de estoque' },
+      { value: 'CSV', label: 'Importa ingredientes' },
     ],
-    testimonialSlug: 'pizzaria-bella',
     finalCta: {
       headline: 'Comece com estoque real ainda hoje',
       button: 'Criar Conta Grátis',
@@ -251,10 +247,10 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       eyebrow: '📊 CMV SOB CONTROLE',
       headline: 'Você sabe qual prato paga seu aluguel?',
       subheadline:
-        'Calcule CMV por prato, acompanhe variações diárias e descubra quais itens do cardápio realmente dão lucro. Tudo automatizado.',
+        'Calcule CMV por prato, acompanhe variações diárias e descubra quais itens do cardápio têm a melhor margem de contribuição.',
       ctaPrimary: 'Quero Saber Meu CMV',
       ctaSecondary: 'Como funciona',
-      trustLine: '✅ Grátis 30 dias • 📊 DRE automática • ⚡ Configure rápido',
+      trustLine: '✅ Starter grátis • 📊 DRE com seus lançamentos • 📱 Funciona no celular',
     },
     painPoints: [
       'CMV oscilando sem explicação todo mês',
@@ -285,19 +281,18 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
         icon: 'FileBarChart',
         title: 'DRE em 1 clique',
         description:
-          'Demonstrativo financeiro fechado automaticamente com categorias de receita e custo.',
+          'Demonstrativo montado com as vendas, o CMV e as despesas que você lançar, por categoria.',
       },
     ],
     stats: [
-      { value: '29%', label: 'CMV médio estabilizado' },
-      { value: '+34%', label: 'Lucro líquido' },
-      { value: '+14%', label: 'Ticket médio' },
-      { value: '1 clique', label: 'Para fechar DRE' },
+      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: 'Por prato', label: 'CMV e margem' },
+      { value: 'Matriz', label: 'Engenharia de cardápio' },
+      { value: 'DRE', label: 'Com seus lançamentos' },
     ],
-    testimonialSlug: 'bistro-gourmet-rio',
     finalCta: {
-      headline: 'CMV sob controle = restaurante lucrativo',
-      button: 'Testar 30 dias Grátis',
+      headline: 'Saiba o CMV de cada prato antes de mudar o preço',
+      button: 'Começar Grátis',
     },
     theme: {
       accentFrom: 'from-violet-500',

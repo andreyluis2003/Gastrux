@@ -3,18 +3,16 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import * as LucideIcons from 'lucide-react';
-import { ArrowRight, CheckCircle2, Quote, Star } from 'lucide-react';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useAnalytics } from '@/hooks/use-analytics';
 import type { PPCCampaign } from '@/lib/marketing/ppc-campaigns';
-import type { CaseStudy } from '@/lib/marketing/case-studies';
 
 type Props = {
   campaign: PPCCampaign;
-  testimonial: CaseStudy | null;
   utms: Record<string, string>;
 };
 
-export default function PPCLandingClient({ campaign, testimonial, utms }: Props) {
+export default function PPCLandingClient({ campaign, utms }: Props) {
   const { trackEvent } = useAnalytics();
 
   useEffect(() => {
@@ -185,70 +183,11 @@ export default function PPCLandingClient({ campaign, testimonial, utms }: Props)
         </div>
       </section>
 
-      {/* Testimonial */}
-      {testimonial && (
-        <section className="py-16 md:py-24 bg-gray-50">
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-8 md:p-12">
-              <div className="flex items-center gap-2 mb-6">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star
-                    key={i}
-                    className="w-5 h-5 fill-yellow-400 text-yellow-400"
-                  />
-                ))}
-              </div>
-              <Quote className="w-10 h-10 text-gray-200" />
-              <p className="mt-4 text-xl md:text-2xl text-gray-800 italic leading-relaxed">
-                “{testimonial.quote}”
-              </p>
-              <div className="mt-6 flex items-center gap-4">
-                <div
-                  className={`w-14 h-14 rounded-xl bg-gradient-to-br ${testimonial.coverGradient} flex items-center justify-center text-2xl`}
-                >
-                  {testimonial.emoji}
-                </div>
-                <div>
-                  <div className="font-bold text-gray-900">
-                    {testimonial.ownerName}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {testimonial.ownerRole} — {testimonial.company}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-200">
-                {testimonial.metrics.map((m, i) => (
-                  <div key={i} className="text-center">
-                    <div
-                      className={`text-2xl font-bold ${
-                        m.highlight ? 'text-blue-600' : 'text-gray-800'
-                      }`}
-                    >
-                      {m.value}
-                    </div>
-                    <div className="text-xs text-gray-500">{m.label}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 text-center">
-                <Link
-                  href={`/casos-de-sucesso/${testimonial.slug}`}
-                  className="text-sm text-blue-600 hover:underline inline-flex items-center gap-1"
-                >
-                  Ler caso completo <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Trust features */}
       <section className="py-12 bg-white border-y border-gray-200">
         <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-sm text-gray-700">
           <div className="flex items-center justify-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" /> 30 dias grátis
+            <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Starter grátis
           </div>
           <div className="flex items-center justify-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Sem cartão de crédito
@@ -270,7 +209,7 @@ export default function PPCLandingClient({ campaign, testimonial, utms }: Props)
             {campaign.finalCta.headline}
           </h2>
           <p className="mt-4 text-lg md:text-xl text-white/90">
-            Configure em 15 minutos. Cancelável quando quiser.
+            Comece pelo plano grátis. Cancelável quando quiser.
           </p>
           <Link
             href={signupHref}
@@ -280,7 +219,7 @@ export default function PPCLandingClient({ campaign, testimonial, utms }: Props)
             {campaign.finalCta.button} <ArrowRight className="w-5 h-5" />
           </Link>
           <p className="mt-4 text-sm text-white/80">
-            🔒 Seus dados estão seguros • LGPD Compliant
+            🔒 Os dados de cada restaurante ficam separados
           </p>
         </div>
       </section>
@@ -290,10 +229,6 @@ export default function PPCLandingClient({ campaign, testimonial, utms }: Props)
           © {new Date().getFullYear()} Gastrux —{' '}
           <Link href="/pricing" className="hover:underline">
             Ver planos
-          </Link>{' '}
-          •{' '}
-          <Link href="/casos-de-sucesso" className="hover:underline">
-            Casos
           </Link>{' '}
           •{' '}
           <Link href="/ajuda" className="hover:underline">

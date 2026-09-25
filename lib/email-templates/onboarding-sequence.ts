@@ -83,17 +83,14 @@ export function buildDay14Email(userName?: string | null): { subject: string; ht
     subject: '🚀 Você já está no meio do trial — veja o que é possível',
     html: wrap(`
       <div class="header">
-        <h1>2 semanas depois, o que seus colegas estão fazendo?</h1>
-        <p>Casos reais para inspirar</p>
+        <h1>2 semanas depois: o que mais dá pra fazer</h1>
+        <p>Próximos passos no Gastrux</p>
       </div>
       <div class="content">
-        <p>Olá ${name}, você já tem 14 dias de uso. Restaurantes como o seu tipicamente observam nesta altura:</p>
-        <div class="stat"><div class="value">−18%</div><div class="label">de custo médio em insumos com ajuste de CMV</div></div>
-        <div class="stat"><div class="value">+23%</div><div class="label">de giro no pico de almoço com KDS</div></div>
-        <div class="stat"><div class="value">−2h</div><div class="label">por semana em trabalhos manuais de conferência</div></div>
-        <p style="margin-top: 20px;"><strong>Próximos passos sugeridos:</strong></p>
+        <p>Olá ${name}, você já tem 14 dias de uso. Se as fichas técnicas dos seus pratos principais já estão prontas, estes são bons próximos passos:</p>
+        <div class="step"><h3>📊 Revise a margem de cada prato</h3><p>Veja quais itens têm o CMV mais alto e se o preço de venda ainda cobre o custo.</p></div>
         <div class="step"><h3>🧑‍💼 CRM de clientes</h3><p>Comece a criar fidelização e campanhas de recompra.</p></div>
-        <div class="step"><h3>📱 Integração iFood</h3><p>Receba pedidos direto no KDS — sem tablet extra.</p></div>
+        <div class="step"><h3>📦 Contagem de estoque</h3><p>Conte o estoque pelo celular e compare com o que o sistema esperava.</p></div>
         <div class="action"><a href="${appUrl()}/analytics" class="btn">Ver meus relatórios</a></div>
       </div>
     `, 'Veja o que é possível'),
@@ -104,25 +101,20 @@ export function buildDay21Email(userName?: string | null, currentTier = 'starter
   const name = (userName || 'Restaurante').split(' ')[0];
   const isStarter = currentTier === 'starter';
   return {
-    subject: isStarter ? '🎁 Oferta especial: 20% off nos primeiros 3 meses do Pro' : '🎯 Recursos que você ainda pode explorar',
+    subject: isStarter ? '🚀 O que o plano Pro acrescenta' : '🎯 Recursos que você ainda pode explorar',
     html: wrap(`
       <div class="header">
         <h1>${isStarter ? 'Hora de destravar o Pro 🚀' : 'Recursos que você pode explorar'}</h1>
-        <p>${isStarter ? 'Oferta válida até o fim do mês' : 'Aproveite seu plano ao máximo'}</p>
+        <p>Aproveite seu plano ao máximo</p>
       </div>
       <div class="content">
         <p>Oi ${name}, você já está com a gente há 3 semanas. Algumas funcionalidades ainda podem turbinar sua operação:</p>
-        ${isStarter ? `
-          <div class="highlight">
-            <strong>🎁 Oferta exclusiva:</strong> 20% de desconto nos primeiros 3 meses do plano Pro. Use o cupom <strong>PROMO20</strong> no checkout.
-          </div>
-        ` : ''}
         <div class="step"><h3>📊 Relatórios avançados</h3><p>Breakdown de custos por prato, projeção de demanda e alertas inteligentes.</p></div>
         <div class="step"><h3>🌐 Multi-loja</h3><p>Gerencie várias unidades do mesmo painel com acesso centralizado.</p></div>
         <div class="step"><h3>🎯 Metas & KPIs</h3><p>Acompanhe objetivos diários e semanais de faturamento e margem.</p></div>
-        <div class="action"><a href="${appUrl()}/precos" class="btn btn-amber">${isStarter ? 'Fazer upgrade agora' : 'Ver planos'}</a></div>
+        <div class="action"><a href="${appUrl()}/pricing" class="btn btn-amber">${isStarter ? 'Fazer upgrade agora' : 'Ver planos'}</a></div>
       </div>
-    `, 'Oferta especial'),
+    `, 'Próximos recursos'),
   };
 }
 

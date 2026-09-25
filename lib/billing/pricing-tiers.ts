@@ -41,7 +41,7 @@ export const BASE_PRICING_TIERS = {
       '3 usuários',
       'Analytics em tempo real',
       'Previsão de demanda (ML)',
-      '1 integração com delivery',
+      'Pedidos externos por webhook (1 conexão)',
       'Suporte por email',
     ],
     limits: {
@@ -66,9 +66,9 @@ export const BASE_PRICING_TIERS = {
       'CRM e Programa de Fidelidade',
       'Multi-loja (até 2 lojas)',
       '5 usuários',
-      'Integração com iFood',
+      'Pedidos externos por webhook (até 3 conexões)',
       'Relatórios avançados',
-      'Nota Fiscal Eletrônica (NF-e)',
+      'NFC-e (nota do consumidor)',
       'Suporte pelo WhatsApp',
     ],
     limits: {
@@ -89,10 +89,7 @@ export const BASE_PRICING_TIERS = {
     currency: 'brl',
     features: [
       'Tudo do Business',
-      'Unlimited lojas',
-      'Nota Fiscal Eletrônica (NF-e)',
-      'Integração com sistemas contábeis',
-      'API customizada',
+      'Lojas ilimitadas',
       'Usuários ilimitados',
       'Suporte 24/7 dedicado',
       'Implementação customizada',

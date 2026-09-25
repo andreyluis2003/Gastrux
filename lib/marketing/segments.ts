@@ -18,12 +18,6 @@ export type Segment = {
     title: string;
     description: string;
   }>;
-  stats: Array<{ value: string; label: string }>;
-  testimonial: {
-    quote: string;
-    author: string;
-    role: string;
-  };
   cta: {
     headline: string;
     description: string;
@@ -40,7 +34,7 @@ export const SEGMENTS: Segment[] = [
     metaTitle: 'Sistema para Restaurantes | Gastrux',
     metaDescription: 'Software completo para gestão de restaurantes. Controle estoque, CMV, pedidos, mesas e financeiro em um único lugar.',
     heroHeadline: 'O sistema completo para o seu restaurante',
-    heroDescription: 'Gerencie estoque, cardápio, mesas, pedidos e financeiro em uma única plataforma. Reduza desperdício e aumente sua margem de lucro.',
+    heroDescription: 'Gerencie estoque, cardápio, mesas, pedidos e financeiro em uma única plataforma. Veja onde está o desperdício e qual a margem de cada prato.',
     painPoints: [
       'Falta de controle sobre o que sai da cozinha',
       'CMV calculado na mão, sempre atrasado',
@@ -55,20 +49,9 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Users', title: 'Gestão de Equipe', description: 'Controle de ponto, escalas, folha e performance da equipe.' },
       { icon: 'Brain', title: 'Insights com IA', description: 'Inteligência artificial analisa seus dados e sugere ações para melhorar.' },
     ],
-    stats: [
-      { value: '22%', label: 'Menos desperdício' },
-      { value: 'R$ 3.200', label: 'Economia média/mês' },
-      { value: '21h', label: 'Horas salvas/semana' },
-      { value: '+18%', label: 'Margem de lucro' },
-    ],
-    testimonial: {
-      quote: 'Depois do Gastrux, finalmente consigo ver o CMV real do meu restaurante. Reduzi o desperdício em 25% no primeiro mês.',
-      author: 'Carlos Mendes',
-      role: 'Dono de restaurante, SP',
-    },
     cta: {
       headline: 'Pronto para transformar a gestão do seu restaurante?',
-      description: 'Comece grátis e veja resultados em menos de 30 dias.',
+      description: 'Comece grátis, sem cartão, com os seus próprios pratos.',
     },
     color: 'from-blue-600 to-blue-800',
   },
@@ -78,9 +61,9 @@ export const SEGMENTS: Segment[] = [
     shortName: 'Delivery',
     emoji: '🛵',
     metaTitle: 'Sistema para Delivery | Gastrux',
-    metaDescription: 'Gerencie pedidos de delivery, integre com iFood, Rappi e Uber Eats. Controle entregas e aumente suas vendas online.',
+    metaDescription: 'Gerencie pedidos de delivery, estoque e margem por prato. KDS para a cozinha e pedidos pelo WhatsApp.',
     heroHeadline: 'Seu delivery organizado e lucrativo',
-    heroDescription: 'Centralize pedidos de iFood, Rappi e Uber Eats. Controle entregas, estoque e margem de cada canal em tempo real.',
+    heroDescription: 'Organize os pedidos do delivery, a cozinha e o estoque, e saiba a margem de cada prato. Ainda não há conexão pronta com iFood, Rappi ou Uber Eats.',
     painPoints: [
       'Pedidos chegando de vários apps sem controle',
       'Sem saber qual plataforma dá mais lucro',
@@ -88,24 +71,13 @@ export const SEGMENTS: Segment[] = [
       'Dificuldade de gerenciar entregadores e rotas',
     ],
     benefits: [
-      { icon: 'Smartphone', title: 'Hub de Pedidos Unificado', description: 'Todos os pedidos de todos os apps em uma tela só.' },
-      { icon: 'BarChart3', title: 'Analytics por Canal', description: 'Saiba exatamente a margem de lucro por plataforma de delivery.' },
+      { icon: 'Smartphone', title: 'Pedidos externos por API', description: 'Outros sistemas podem enviar pedidos à Gastrux por webhook (exige configuração técnica).' },
+      { icon: 'BarChart3', title: 'Margem por prato', description: 'CMV e margem de contribuição de cada item do cardápio.' },
       { icon: 'Package', title: 'Estoque Integrado', description: 'Estoque atualiza automaticamente a cada pedido recebido.' },
       { icon: 'Clock', title: 'Tempo de Preparo', description: 'KDS digital para cozinha com tempo médio de preparo por prato.' },
       { icon: 'MapPin', title: 'Gestão de Entregas', description: 'Controle status de cada entrega e performance dos entregadores.' },
       { icon: 'MessageSquare', title: 'Bot WhatsApp', description: 'Receba pedidos direto pelo WhatsApp com cardápio interativo.' },
     ],
-    stats: [
-      { value: '40%', label: 'Mais eficiência' },
-      { value: '15min', label: 'Tempo médio de preparo' },
-      { value: '3x', label: 'Mais pedidos/hora' },
-      { value: '98%', label: 'Pedidos corretos' },
-    ],
-    testimonial: {
-      quote: 'Centralizamos iFood e Rappi no Gastrux. Nosso tempo de preparo caiu de 35 para 18 minutos.',
-      author: 'Fernanda Lima',
-      role: 'Dona de delivery, RJ',
-    },
     cta: {
       headline: 'Pronto para escalar seu delivery?',
       description: 'Integre todos os seus canais em uma única plataforma.',
@@ -135,17 +107,6 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Shield', title: 'Controle de Acesso', description: 'Permissões por unidade — gerente vê só sua loja, franqueador vê tudo.' },
       { icon: 'TrendingUp', title: 'Relatórios Consolidados', description: 'DRE, CMV e fluxo de caixa consolidados ou por unidade.' },
     ],
-    stats: [
-      { value: '100%', label: 'Padronização' },
-      { value: '30%', label: 'Economia em compras' },
-      { value: '5min', label: 'Para ver todas as lojas' },
-      { value: '0', label: 'Desvios de receita' },
-    ],
-    testimonial: {
-      quote: 'Com o Gastrux, nossas 3 lojas operam com a mesma ficha técnica. O CMV caiu 8% em todas as unidades.',
-      author: 'Ricardo Souza',
-      role: 'Franqueador, MG',
-    },
     cta: {
       headline: 'Pronto para escalar suas franquias?',
       description: 'Padronize, monitore e cresça com controle total.',
@@ -170,22 +131,11 @@ export const SEGMENTS: Segment[] = [
     benefits: [
       { icon: 'Utensils', title: 'Cardápio Flexível', description: 'Monte sabores por tamanho, meia-pizza, borda recheada e adicionais.' },
       { icon: 'Calculator', title: 'CMV por Sabor', description: 'Saiba o custo real de cada sabor e tamanho automaticamente.' },
-      { icon: 'Truck', title: 'Delivery Integrado', description: 'Pedidos de iFood, WhatsApp e balcão em uma tela só.' },
+      { icon: 'Truck', title: 'Delivery Integrado', description: 'Pedidos do WhatsApp e do balcão em uma tela só.' },
       { icon: 'Timer', title: 'KDS para Forno', description: 'Tela de produção com timer por pizza e sequência de preparo.' },
       { icon: 'Package', title: 'Controle de Massa', description: 'Estoque de massa fresca, molho e queijo com alertas de validade.' },
       { icon: 'Star', title: 'Programa de Fidelidade', description: 'A cada 10 pizzas, 1 grátis. Configure promoções que fidelizam.' },
     ],
-    stats: [
-      { value: '200+', label: 'Pizzarias atendidas' },
-      { value: '25%', label: 'Menos desperdício de massa' },
-      { value: '2x', label: 'Mais pedidos delivery' },
-      { value: '15min', label: 'Tempo médio preparo' },
-    ],
-    testimonial: {
-      quote: 'Finalmente um sistema que entende pizzaria. O controle de meia-pizza e bordas mudou nosso delivery.',
-      author: 'Marcos Oliveira',
-      role: 'Dono de pizzaria, SP',
-    },
     cta: {
       headline: 'Pronto para modernizar sua pizzaria?',
       description: 'Teste grátis e veja a diferença no primeiro fim de semana.',
@@ -215,20 +165,9 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Timer', title: 'KDS por Chapa', description: 'Tela de produção com tempo por smash e sequência de montagem.' },
       { icon: 'TrendingUp', title: 'Menu Engineering', description: 'Descubra quais burgers são estrelas e quais precisam sair do cardápio.' },
     ],
-    stats: [
-      { value: '150+', label: 'Hamburguerias' },
-      { value: '18%', label: 'Aumento de margem' },
-      { value: 'R$ 2.800', label: 'Economia média/mês' },
-      { value: '4.9/5', label: 'Satisfação' },
-    ],
-    testimonial: {
-      quote: 'O Gastrux me mostrou que meu blend mais vendido tinha a pior margem. Ajustei e o lucro subiu 20%.',
-      author: 'Thiago Ferreira',
-      role: 'Dono de hamburgueria, BH',
-    },
     cta: {
       headline: 'Pronto para turbinar sua hamburgueria?',
-      description: 'Controle cada grama de carne e cada centavo de lucro.',
+      description: 'Controle cada grama de carne e o custo de cada lanche.',
     },
     color: 'from-amber-600 to-orange-700',
   },
@@ -255,17 +194,6 @@ export const SEGMENTS: Segment[] = [
       { icon: 'QrCode', title: 'Pedido por QR Code', description: 'Cliente faz pedido pelo celular no rodízio — menos garçons, mais agilidade.' },
       { icon: 'BarChart3', title: 'Análise de Popularidade', description: 'Descubra quais peças são mais pedidas e ajuste o preparo.' },
     ],
-    stats: [
-      { value: '30%', label: 'Menos desperdício de peixe' },
-      { value: 'R$ 4.500', label: 'Economia média/mês' },
-      { value: '100%', label: 'Rastreabilidade' },
-      { value: '2x', label: 'Velocidade do rodízio' },
-    ],
-    testimonial: {
-      quote: 'O controle de peixe fresco era nosso maior problema. Com o Gastrux, o desperdício caiu pela metade.',
-      author: 'Kenji Tanaka',
-      role: 'Chef e proprietário, SP',
-    },
     cta: {
       headline: 'Pronto para otimizar seu japonês?',
       description: 'Controle cada peça de sushi e cada lote de peixe.',
@@ -295,17 +223,6 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Smartphone', title: 'Pedidos WhatsApp', description: 'Receba pedidos pelo WhatsApp e integre com a produção.' },
       { icon: 'Receipt', title: 'NFC-e Automática', description: 'Emita nota fiscal de consumidor em 1 clique.' },
     ],
-    stats: [
-      { value: '50%', label: 'Menos tempo no caixa' },
-      { value: 'R$ 1.800', label: 'Economia média/mês' },
-      { value: '0', label: 'Furos no caixa' },
-      { value: '3s', label: 'Tempo de registro' },
-    ],
-    testimonial: {
-      quote: 'Sistema rápido, sem frescura. Perfeito para a correria da lanchonete no horário de almoço.',
-      author: 'Ana Paula Costa',
-      role: 'Dona de lanchonete, GO',
-    },
     cta: {
       headline: 'Pronto para modernizar sua lanchonete?',
       description: 'Sistema leve e rápido, sem complicação.',
@@ -335,17 +252,6 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Camera', title: 'Cardápio Visual', description: 'Cardápio digital com fotos dos doces para encantar clientes.' },
       { icon: 'Heart', title: 'Fidelidade', description: 'A cada 10 encomendas, ofereça desconto — fidelize suas clientes.' },
     ],
-    stats: [
-      { value: '100%', label: 'Custo preciso' },
-      { value: '20%', label: 'Aumento de margem' },
-      { value: '0', label: 'Encomendas esquecidas' },
-      { value: 'R$ 2.000', label: 'Economia média/mês' },
-    ],
-    testimonial: {
-      quote: 'Eu calculava custo de bolo no papel. O Gastrux faz em 5 segundos e mostra a margem real.',
-      author: 'Juliana Martins',
-      role: 'Confeiteira, PR',
-    },
     cta: {
       headline: 'Pronto para profissionalizar sua doceria?',
       description: 'Controle encomendas, custos e estoque como profissional.',
@@ -375,17 +281,6 @@ export const SEGMENTS: Segment[] = [
       { icon: 'BarChart3', title: 'Previsão de Demanda', description: 'IA prevê a demanda do dia baseada no histórico.' },
       { icon: 'Wallet', title: 'Assinaturas', description: 'Clientes assinam planos semanais/mensais de marmita.' },
     ],
-    stats: [
-      { value: '35%', label: 'Menos desperdício' },
-      { value: '500+', label: 'Marmitas/dia gerenciadas' },
-      { value: 'R$ 2.500', label: 'Economia média/mês' },
-      { value: '98%', label: 'Entregas no prazo' },
-    ],
-    testimonial: {
-      quote: 'Antes eu jogava fora 30 marmitas por dia. Com a previsão de demanda do Gastrux, caiu para 5.',
-      author: 'Roberto Silva',
-      role: 'Dono de marmitaria, MG',
-    },
     cta: {
       headline: 'Pronto para escalar sua marmitaria?',
       description: 'Produza mais, desperdice menos, lucre melhor.',
@@ -411,21 +306,10 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Utensils', title: 'Montagem Personalizada', description: 'Configure tamanhos, bases, toppings e adicionais com custo automático.' },
       { icon: 'Snowflake', title: 'Estoque de Polpa', description: 'Controle lotes de polpa congelada com validade e fornecedor.' },
       { icon: 'Calculator', title: 'CMV por Tamanho', description: 'Saiba a margem de cada copo, do P ao GG.' },
-      { icon: 'Truck', title: 'Delivery Integrado', description: 'iFood + WhatsApp + balcão em uma tela só.' },
+      { icon: 'Truck', title: 'Delivery Integrado', description: 'WhatsApp + balcão em uma tela só.' },
       { icon: 'Star', title: 'Fidelidade', description: 'Carimbo digital: comprou 10, ganhou 1. Sem cartãozinho de papel.' },
       { icon: 'Sun', title: 'Previsão por Clima', description: 'IA sugere produção baseada na previsão do tempo.' },
     ],
-    stats: [
-      { value: '300+', label: 'Lojas de açaí' },
-      { value: '20%', label: 'Menos desperdício de polpa' },
-      { value: '2x', label: 'Mais pedidos delivery' },
-      { value: 'R$ 1.500', label: 'Economia média/mês' },
-    ],
-    testimonial: {
-      quote: 'No verão nosso delivery explode. O Gastrux organizou tudo e não perdemos mais pedido.',
-      author: 'Camila Santos',
-      role: 'Dona de loja de açaí, BA',
-    },
     cta: {
       headline: 'Pronto para crescer sua loja de açaí?',
       description: 'Controle cada litro de polpa e cada topping.',
@@ -455,17 +339,6 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Music', title: 'Agenda de Eventos', description: 'Programe shows, DJs e eventos com controle de custo.' },
       { icon: 'Users', title: 'Controle de Acesso', description: 'Gerencie entrada, couvert e consumação mínima.' },
     ],
-    stats: [
-      { value: '0', label: 'Comandas perdidas' },
-      { value: '25%', label: 'Menos furo no caixa' },
-      { value: 'R$ 3.000', label: 'Economia média/mês' },
-      { value: '100%', label: 'Controle de chopp' },
-    ],
-    testimonial: {
-      quote: 'Acabou a era da comanda de papel. O Gastrux digitalizou tudo e nosso furo de caixa zerou.',
-      author: 'Pedro Augusto',
-      role: 'Dono de pub, SP',
-    },
     cta: {
       headline: 'Pronto para modernizar seu bar?',
       description: 'Comanda digital, controle de chopp e zero furo no caixa.',

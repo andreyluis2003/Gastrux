@@ -22,9 +22,9 @@ const steps = [
   {
     n: 3,
     icon: Rocket,
-    title: 'Veja seu lucro de verdade',
+    title: 'Veja custo e margem de verdade',
     description:
-      'Todo dia você sabe: quanto vendeu, quanto gastou, quanto lucrou. No celular, na hora que quiser.',
+      'Todo dia você sabe quanto vendeu, quanto custaram os ingredientes (CMV) e quanto sobrou de margem em cada prato. No celular, na hora que quiser.',
     color: 'from-emerald-500 to-green-500',
   },
 ];
