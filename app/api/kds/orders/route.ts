@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { broadcastOrderCreated } from '@/lib/socket';
 import { notifyNewOrder } from '@/lib/notification-utils';
+import { restaurantStaffIds } from '@/lib/kds/order-status';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
 
@@ -181,16 +182,7 @@ export async function POST(req: NextRequest) {
     broadcastOrderCreated(order);
 
     // Send notifications to cooks and kitchen staff
-    const kitchenStaff = await prisma.user.findMany({
-      where: {
-        role: { in: ['COOK', 'MANAGER', 'OWNER'] },
-        active: true,
-        restaurants: { some: { restaurantId, isActive: true } },
-      },
-      select: { id: true },
-    });
-
-    const kitchenStaffIds = kitchenStaff.map((s) => s.id);
+    const kitchenStaffIds = await restaurantStaffIds(restaurantId, ['COOK', 'MANAGER', 'OWNER']);
     if (kitchenStaffIds.length > 0) {
       await notifyNewOrder(order.id, order.orderNumber, order.totalItems, kitchenStaffIds);
     }

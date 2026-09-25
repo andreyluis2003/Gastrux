@@ -13,7 +13,8 @@
  *   C4 C5 C6 C7 fixed with the loss recording (audit, items closed, idempotent, COMPLETED refused)
  *   (C8 C9 fixed 2026-09-23: cancelling a paid online order now raises a critical refund-pending alert;
  *   a pending payment of a cancelled order is cancelled locally and at Mercado Pago)
- *   P1 stock     C10 C11    completing twice deducts stock (and cashback) twice; a cancelled order can be completed
+ *   (C10 C11 fixed 2026-09-25: lib/kds/order-status.ts, COMPLETED/CANCELLED are final and the completion
+ *   is claimed once, with the stock in the same transaction)
  *   P1 records   C4 C6 C7   no audit record, no idempotency, a COMPLETED order can be cancelled
  *   P2           C5 C12     items are not closed; READY notifies staff of other restaurants
  */
@@ -37,6 +38,8 @@ import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { GET as readOrder, PUT as updateOrder, DELETE as cancelOrder } from '../../../app/api/kds/orders/[id]/route';
 import { cancelConnectPayment } from '../../../lib/mercadopago-connect/payments';
 import { GET as listKds } from '../../../app/api/kds/orders/route';
+import { PUT as updateItem } from '../../../app/api/kds/items/[id]/route';
+import { POST as autoDeduct } from '../../../app/api/stock/auto-deduct/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -315,7 +318,7 @@ describe('bad day 4: cancellation after the kitchen started', () => {
   describe('stock', () => {
     const complete = (id: string) => put(id, { status: 'COMPLETED' });
 
-    it.failing('completing the same order twice deducts the ingredients ONCE (C10)', async () => {
+    it('completing the same order twice deducts the ingredients ONCE (C10)', async () => {
       const order = await makeOrder({ status: 'READY' });
 
       await complete(order.id);
@@ -325,7 +328,7 @@ describe('bad day 4: cancellation after the kitchen started', () => {
       expect(await prisma.stockMovement.count({ where: { restaurantId: A.restaurantId, referenceId: order.id } })).toBe(1);
     });
 
-    it.failing('a cancelled order cannot be completed afterwards (no deduction, no resurrection) (C11)', async () => {
+    it('a cancelled order cannot be completed afterwards (no deduction, no resurrection) (C11)', async () => {
       const order = await makeOrder();
       await del(order.id);
       const stockAfterCancel = await stockNow();
@@ -335,6 +338,39 @@ describe('bad day 4: cancellation after the kitchen started', () => {
       expect(res.status).toBe(409);
       expect(await statusOf(order.id)).toBe('CANCELLED');
       expect(await stockNow()).toBe(stockAfterCancel);
+    });
+
+    it('five screens completing the same order at once deduct the ingredients once', async () => {
+      const order = await makeOrder({ status: 'READY' });
+
+      const results = await Promise.all(Array.from({ length: 5 }, () => complete(order.id)));
+
+      expect(results.every((r) => r.status === 200)).toBe(true);
+      expect(await stockNow()).toBe(STOCK_START - 3 * QTY_PER_DISH);
+      expect(await prisma.stockMovement.count({ where: { restaurantId: A.restaurantId, referenceId: order.id } })).toBe(1);
+    });
+
+    it('a completed order goes back to nothing: no status change, no item change, no cancel-by-status', async () => {
+      const order = await makeOrder({ status: 'READY' });
+      await complete(order.id);
+
+      expect((await put(order.id, { status: 'PREPARING' })).status).toBe(409);
+      expect((await put(order.id, { status: 'CANCELLED' })).status).toBe(400);
+      expect((await put(order.id, { status: 'WHATEVER' })).status).toBe(400);
+      expect(await statusOf(order.id)).toBe('COMPLETED');
+      const item = await prisma.orderItem.findFirst({ where: { orderId: order.id } });
+      const res = await updateItem(new Request('http://localhost/x', { method: 'PUT', body: JSON.stringify({ status: 'PENDING' }) }) as any, { params: { id: item.id } });
+      expect(res.status).toBe(409);
+    });
+
+    it('the old auto-deduct route no longer takes the same order out of stock again', async () => {
+      const order = await makeOrder({ status: 'READY' });
+      await complete(order.id);
+
+      const res = await autoDeduct();
+
+      expect(res.status).toBe(410);
+      expect(await stockNow()).toBe(STOCK_START - 3 * QTY_PER_DISH);
     });
   });
 
@@ -424,6 +460,18 @@ describe('bad day 4: cancellation after the kitchen started', () => {
       await put(order.id, { status: 'READY' });
 
       expect(await prisma.notification.count({ where: { userId: B.ownerId } })).toBe(0);
+      // ...and the owner of THIS restaurant is told (the global role used to decide)
+      expect(await prisma.notification.count({ where: { userId: A.ownerId, type: 'ORDER_READY' } })).toBe(1);
+    });
+
+    it('"pronto" is announced once: completing a READY order does not announce it again', async () => {
+      const order = await makeOrder();
+
+      await put(order.id, { status: 'READY' });
+      await put(order.id, { status: 'READY' });
+      await put(order.id, { status: 'COMPLETED' });
+
+      expect(await prisma.notification.count({ where: { userId: A.ownerId, type: 'ORDER_READY' } })).toBe(1);
     });
   });
 });

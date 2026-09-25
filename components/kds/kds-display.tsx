@@ -129,11 +129,16 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
         body: JSON.stringify({ status: newStatus }),
       });
 
+      const updatedOrder = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to update order status');
+        // 409: another screen already completed or cancelled it; show its real status
+        if (response.status === 409 && updatedOrder.currentStatus) {
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: updatedOrder.currentStatus } : o)));
+        }
+        toast.error(updatedOrder.error || 'Erro ao atualizar pedido');
+        return;
       }
 
-      const updatedOrder = await response.json();
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? updatedOrder : o))
       );

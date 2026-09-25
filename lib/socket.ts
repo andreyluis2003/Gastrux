@@ -1,6 +1,9 @@
 // @ts-nocheck
 // Socket.io integration - placeholder for future WebSocket implementation
 // Currently using polling instead
+// The kitchen screen polls /api/kds/orders, which only returns the current restaurant's orders.
+// When real-time is built, every event must go to a room of ONE restaurant, joined only after
+// checking the connection's membership (lib/auth/restaurant-role.ts); never to every screen.
 
 export const getIO = () => {
   console.warn('Socket.io not initialized - using polling fallback');

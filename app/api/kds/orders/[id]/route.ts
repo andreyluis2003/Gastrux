@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getOrCreateLoyaltyProgram } from '@/lib/loyalty/get-program';
+import { changeOrderStatus, OPEN_STATUSES, restaurantStaffIds } from '@/lib/kds/order-status';
 import { broadcastOrderUpdate, broadcastOrderCompleted } from '@/lib/socket';
 import { notifyOrderReady } from '@/lib/notification-utils';
 import { cancelOrder } from '@/lib/kds-cancel-order';
@@ -85,101 +85,50 @@ export async function PUT(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    const body = await req.json();
-    const { status, priority, actualStartTime, completedAt, specialInstructions } = body;
+    const body = await req.json().catch(() => ({}));
+    const { status, priority, specialInstructions } = body;
 
-    const update: any = {};
-    if (status) update.status = status;
-    if (priority) update.priority = priority;
-    if (actualStartTime) update.actualStartTime = new Date(actualStartTime);
-    if (completedAt) update.completedAt = new Date(completedAt);
-    if (specialInstructions !== undefined) update.specialInstructions = specialInstructions;
-
-    const order = await prisma.order.update({
-      where: { id: params.id },
-      data: update,
-      include: {
-        items: {
-          include: {
-            recipe: true,
-            station: true,
-          },
-        },
-        stationAssignments: {
-          include: {
-            station: true,
-          },
-        },
-      },
-    });
-
-    // Broadcast status change
-    broadcastOrderUpdate(params.id, status || order.status, { order });
-
-    // If order is completed, notify all kitchen stations and managers
-    if (status === 'COMPLETED' || status === 'READY') {
-      broadcastOrderCompleted(params.id);
-
-      // Send notification to managers and cashiers
-      const staff = await prisma.user.findMany({
-        where: {
-          role: { in: ['MANAGER', 'OWNER', 'CASHIER'] },
-          active: true,
-          restaurants: { some: { restaurantId, isActive: true } },
-        },
-        select: { id: true },
+    // Details (priority, notes) change only while the order is open
+    const details: any = {};
+    if (priority) details.priority = priority;
+    if (specialInstructions !== undefined) details.specialInstructions = specialInstructions;
+    if (Object.keys(details).length > 0) {
+      const edited = await prisma.order.updateMany({
+        where: { id: params.id, restaurantId, status: { in: OPEN_STATUSES as any } },
+        data: details,
       });
+      if (edited.count === 0 && !status) {
+        return NextResponse.json({ error: 'Este pedido já foi encerrado', code: 'ORDER_CLOSED' }, { status: 409 });
+      }
+    }
 
-      const staffIds = staff.map((s) => s.id);
+    if (!status) {
+      const order = await prisma.order.findFirst({
+        where: { id: params.id, restaurantId },
+        include: { items: { include: { recipe: true, station: true } }, stationAssignments: { include: { station: true } } },
+      });
+      return NextResponse.json(order);
+    }
+
+    // State machine and stock/cashback once: lib/kds/order-status.ts
+    const change = await changeOrderStatus(restaurantId, params.id, status);
+    if (change.kind === 'not-found') return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (change.kind === 'invalid') return NextResponse.json({ error: change.error }, { status: 400 });
+    if (change.kind === 'conflict') {
+      return NextResponse.json({ error: change.error, code: change.code, currentStatus: change.currentStatus }, { status: 409 });
+    }
+    const order = change.order;
+    if (change.kind === 'unchanged') return NextResponse.json(order);
+
+    broadcastOrderUpdate(params.id, status, { order });
+
+    // "Pronto" is announced once, when the order reaches READY (or goes straight to COMPLETED),
+    // to this restaurant's staff only
+    if (status === 'READY' || (status === 'COMPLETED' && change.from !== 'READY')) {
+      broadcastOrderCompleted(params.id);
+      const staffIds = await restaurantStaffIds(restaurantId, ['OWNER', 'MANAGER', 'CASHIER']);
       if (staffIds.length > 0) {
         await notifyOrderReady(order.id, order.orderNumber, staffIds);
-      }
-
-      // Auto-deduct stock on completion
-      if (status === 'COMPLETED') {
-        try {
-          const fullOrder = await prisma.order.findUnique({
-            where: { id: params.id },
-            include: { items: { include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } } } },
-          });
-          if (fullOrder) {
-            const aggregated = new Map();
-            for (const item of fullOrder.items) {
-              if (!item.recipe?.ingredients) continue;
-              for (const ri of item.recipe.ingredients) {
-                const qty = ri.quantity * item.quantity;
-                const existing = aggregated.get(ri.ingredientId);
-                if (existing) { existing.total += qty; } else { aggregated.set(ri.ingredientId, { total: qty }); }
-              }
-            }
-            for (const [ingredientId, data] of aggregated) {
-              const stock = await prisma.stock.findFirst({ where: { ingredientId } });
-              if (stock) {
-                await prisma.stock.update({ where: { id: stock.id }, data: { currentQuantity: { decrement: data.total }, lastUpdated: new Date() } });
-              }
-              await prisma.stockMovement.create({
-                data: { restaurantId: fullOrder.restaurantId, ingredientId, quantity: -data.total, movementType: 'AUTO_DEDUCTION', reason: `Pedido #${fullOrder.orderNumber}`, referenceId: fullOrder.id, referenceType: 'ORDER' },
-              });
-            }
-          }
-        } catch (stockErr) { console.error('Auto stock deduction error:', stockErr); }
-
-        // Auto-credit cashback
-        if (order.customerId) {
-          try {
-            const total = Number(order.total || 0);
-            if (total > 0) {
-              const program = await getOrCreateLoyaltyProgram(order.restaurantId);
-              let account = await prisma.customerLoyaltyAccount.findFirst({ where: { customerId: order.customerId, programId: program.id } });
-              if (!account) { account = await prisma.customerLoyaltyAccount.create({ data: { customerId: order.customerId, programId: program.id } }); }
-              const cashback = Math.floor(total * 5 / 100);
-              if (cashback > 0) {
-                await prisma.loyaltyTransaction.create({ data: { customerId: order.customerId, accountId: account.id, programId: program.id, type: 'EARNING', amount: cashback, reason: 'Cashback 5%', orderId: order.id, balanceBefore: account.currentPoints, balanceAfter: account.currentPoints + cashback } });
-                await prisma.customerLoyaltyAccount.update({ where: { id: account.id }, data: { currentPoints: { increment: cashback }, totalPointsEarned: { increment: cashback }, lastActivityAt: new Date() } });
-              }
-            }
-          } catch (cashbackErr) { console.error('Auto cashback error:', cashbackErr); }
-        }
       }
     }
 
