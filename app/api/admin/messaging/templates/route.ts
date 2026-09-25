@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
   try {
     const tpl = await prisma.messageTemplate.create({
       data: {
+        restaurantId,
         name: slug,
         displayName,
         category: category || 'UTILITY',

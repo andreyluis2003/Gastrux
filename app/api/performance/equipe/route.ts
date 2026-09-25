@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,7 @@ export async function GET(req: NextRequest) {
     const start = new Date();
     start.setDate(start.getDate() - days);
 
-    const restaurantUser = await prisma.restaurantUser.findFirst({ where: { userId: (session as any).user?.id || (session as any).id } });
-    const restaurantId = restaurantUser?.restaurantId;
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante n\u00e3o encontrado' }, { status: 404 });
 
     // Staff members
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     // Prep time distribution
     const prepTimes = await prisma.orderPrepTime.findMany({
-      where: { createdAt: { gte: start }, isCompleted: true },
+      where: { order: { restaurantId }, createdAt: { gte: start }, isCompleted: true },
       select: { estimatedMinutes: true, actualMinutes: true },
     });
     const avgEstimated = prepTimes.reduce((s, p) => s + p.estimatedMinutes, 0) / (prepTimes.length || 1);

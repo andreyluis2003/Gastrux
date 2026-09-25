@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,15 +24,15 @@ export async function GET(req: NextRequest) {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
-    const restaurantUser = await prisma.restaurantUser.findFirst({
-      where: { userId: (session as any).user?.id || (session as any).id },
-    });
-    const restaurantId = restaurantUser?.restaurantId;
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 400 });
+    }
 
     // 1. RECEITA BRUTA - Revenue from completed orders
     const orders = await prisma.order.findMany({
       where: {
-        restaurantId: restaurantId || undefined,
+        restaurantId,
         createdAt: { gte: start, lte: end },
         status: { in: ['COMPLETED', 'READY'] },
       },
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
     // 3. CMV (Custo de Mercadoria Vendida) - from CMV snapshots or estimate
     const cmvSnapshots = await prisma.cMVSnapshot.findMany({
       where: {
-        restaurantId: restaurantId || undefined,
+        restaurantId,
         periodStart: { gte: start },
         periodEnd: { lte: end },
       },
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
       const orderItems = await prisma.orderItem.findMany({
         where: {
           order: {
-            restaurantId: restaurantId || undefined,
+            restaurantId,
             createdAt: { gte: start, lte: end },
             status: { in: ['COMPLETED', 'READY'] },
           },
@@ -81,6 +82,7 @@ export async function GET(req: NextRequest) {
     // 4. DESPESAS OPERACIONAIS - from CashMovements
     const cashMovements = await prisma.cashMovement.findMany({
       where: {
+        cashRegister: { restaurantId },
         createdAt: { gte: start, lte: end },
         type: { in: ['PAYMENT', 'WITHDRAWAL', 'OTHER'] },
       },
@@ -91,7 +93,7 @@ export async function GET(req: NextRequest) {
 
     // 5. DESPESAS COM PESSOAL - from StaffMembers
     const staff = await prisma.staffMember.findMany({
-      where: { restaurantId: restaurantId || undefined, status: 'ACTIVE' },
+      where: { restaurantId, status: 'ACTIVE' },
       select: { basesalary: true },
     });
     const monthsInRange = Math.max(1, (end.getTime() - start.getTime()) / (30 * 24 * 60 * 60 * 1000));
@@ -105,7 +107,7 @@ export async function GET(req: NextRequest) {
     // Payment method breakdown for revenue
     const payments = await prisma.payment.findMany({
       where: {
-        restaurantId: restaurantId || undefined,
+        restaurantId,
         createdAt: { gte: start, lte: end },
         status: 'APPROVED',
       },
@@ -121,6 +123,7 @@ export async function GET(req: NextRequest) {
     // Income from CashMovements (SALE type)
     const salesMovements = await prisma.cashMovement.findMany({
       where: {
+        cashRegister: { restaurantId },
         createdAt: { gte: start, lte: end },
         type: 'SALE',
       },

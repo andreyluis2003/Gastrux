@@ -89,6 +89,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'nfe');
+    if (tierBlock) return tierBlock;
 
     const body = await request.json();
     const {

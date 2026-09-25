@@ -31,6 +31,9 @@ export async function createMultiRestaurantScenario(): Promise<{
       name: 'Restaurant A - Integration Test',
       status: 'ACTIVE',
       subscriptionStatus: 'active',
+      // a paying plan with the features the suites exercise (NF-e, kitchen screen, more users);
+      // plan limits themselves are tested on purpose where they matter
+      subscriptionTier: 'business',
       ownerId: 'owner-a',
     },
   });
@@ -41,6 +44,9 @@ export async function createMultiRestaurantScenario(): Promise<{
       name: 'Restaurant B - Integration Test',
       status: 'ACTIVE',
       subscriptionStatus: 'active',
+      // a paying plan with the features the suites exercise (NF-e, kitchen screen, more users);
+      // plan limits themselves are tested on purpose where they matter
+      subscriptionTier: 'business',
       ownerId: 'owner-b',
     },
   });

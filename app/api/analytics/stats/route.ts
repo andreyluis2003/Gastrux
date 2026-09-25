@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +14,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const now = new Date();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // Get stock value
     const stocks = await prisma.stock.findMany({
+      where: { restaurantId },
       include: { ingredient: true },
     });
     const stockValue = stocks.reduce((sum, s) => {
@@ -26,10 +33,10 @@ export async function GET(request: NextRequest) {
     }, 0);
 
     // Get total movements
-    const totalMovements = await prisma.stockMovement.count();
+    const totalMovements = await prisma.stockMovement.count({ where: { ingredient: { restaurantId } } });
 
     // Get average cost per item
-    const ingredients = await prisma.ingredient.findMany();
+    const ingredients = await prisma.ingredient.findMany({ where: { restaurantId } });
     const averageCostPerItem = ingredients.length > 0
       ? ingredients.reduce((sum: number, i: any) => sum + Number(i.referenceCost || 0), 0) / ingredients.length
       : 0;
@@ -37,6 +44,7 @@ export async function GET(request: NextRequest) {
     // Get critical items
     const criticalItems = await prisma.stock.count({
       where: {
+        restaurantId,
         currentQuantity: {
           lt: 0,
         },
@@ -46,6 +54,7 @@ export async function GET(request: NextRequest) {
     // Get consumption rate (last 30 days)
     const consumptions = await prisma.stockMovement.findMany({
       where: {
+        ingredient: { restaurantId },
         createdAt: {
           gte: thirtyDaysAgo,
           lte: now,
@@ -93,16 +102,16 @@ export async function GET(request: NextRequest) {
 
     // Get risk distribution
     const criticalCount = await prisma.stockForecast.count({
-      where: { riskLevel: 'CRITICAL' },
+      where: { restaurantId, riskLevel: 'CRITICAL' },
     });
     const highCount = await prisma.stockForecast.count({
-      where: { riskLevel: 'HIGH' },
+      where: { restaurantId, riskLevel: 'HIGH' },
     });
     const mediumCount = await prisma.stockForecast.count({
-      where: { riskLevel: 'MEDIUM' },
+      where: { restaurantId, riskLevel: 'MEDIUM' },
     });
     const lowCount = await prisma.stockForecast.count({
-      where: { riskLevel: 'LOW' },
+      where: { restaurantId, riskLevel: 'LOW' },
     });
 
     return NextResponse.json({

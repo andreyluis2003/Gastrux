@@ -90,7 +90,7 @@ export function isTierFeatureEnabled(
     qrMenu: ['business', 'enterprise'],
     crm: ['business', 'enterprise'],
     loyalty: ['business', 'enterprise'],
-    nfe: ['enterprise'],
+    nfe: ['business', 'enterprise'],
     customApi: ['enterprise'],
     multiLocation: ['business', 'enterprise'],
     advancedReports: ['business', 'enterprise'],

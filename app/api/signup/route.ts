@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     // Send welcome email asynchronously (fire and forget)
     fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/email/send-welcome`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': process.env.CRON_SECRET || '' },
       body: JSON.stringify({
         userId: user.id,
         userEmail: user.email,

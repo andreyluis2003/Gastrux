@@ -1,14 +1,20 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { SEGMENTS } from '@/lib/marketing/segments';
 
+const INITIAL_COUNT = 6;
+
 export function SegmentsSection() {
+  const [showAll, setShowAll] = useState(false);
+  const visibleSegments = showAll ? SEGMENTS : SEGMENTS.slice(0, INITIAL_COUNT);
+
   return (
-    <section id="segmentos" className="py-20 px-4 sm:px-6 bg-slate-50 dark:bg-slate-800/50">
+    <section id="segmentos" className="py-16 px-4 sm:px-6 bg-slate-50 dark:bg-slate-800/50">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
+        <div className="text-center mb-10">
           <span className="inline-block px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
             Para cada tipo de negócio
           </span>
@@ -19,8 +25,8 @@ export function SegmentsSection() {
             Funcionalidades adaptadas às necessidades reais de cada tipo de estabelecimento.
           </p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {SEGMENTS.map((seg) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {visibleSegments.map((seg) => (
             <Link
               key={seg.slug}
               href={`/para/${seg.slug}`}
@@ -34,6 +40,17 @@ export function SegmentsSection() {
             </Link>
           ))}
         </div>
+        {!showAll && SEGMENTS.length > INITIAL_COUNT && (
+          <div className="text-center mt-8">
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="text-blue-600 dark:text-blue-400 hover:underline font-semibold text-sm"
+            >
+              Ver todos os segmentos ({SEGMENTS.length})
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

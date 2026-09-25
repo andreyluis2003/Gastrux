@@ -14,6 +14,7 @@ import { TestimonialsCarousel } from '@/components/marketing/testimonials-carous
 import { FAQSection } from '@/components/marketing/faq-section';
 import { GatewayChoiceDialog } from '@/components/billing/gateway-choice-dialog';
 import { cn } from '@/lib/utils';
+import { ClarityScript } from '@/components/analytics/clarity-script';
 
 const FEATURES_COMPARISON = [
   { category: 'Transações', name: 'Transações Diárias' },
@@ -31,7 +32,7 @@ const FEATURES_COMPARISON = [
   { category: 'Integrações', name: 'Integração iFood/Rappi/Uber' },
   { category: 'Integrações', name: 'Multi-loja' },
   { category: 'Suporte', name: 'Suporte Email' },
-  { category: 'Suporte', name: 'Suporte Prioritário' },
+  { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
   { category: 'Premium', name: 'Nota Fiscal Eletrônica (NF-e)' },
   { category: 'Premium', name: 'API customizada' },
 ];
@@ -62,8 +63,8 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
         ? (tier.limits.locations === 999999 ? 'Ilimitado' : `${tier.limits.locations} lojas`)
         : false,
     'Suporte Email': true,
-    'Suporte Prioritário': ['business', 'enterprise'].includes(tierId),
-    'Nota Fiscal Eletrônica (NF-e)': tierId === 'enterprise',
+    'Suporte pelo WhatsApp': tierId === 'business',
+    'Nota Fiscal Eletrônica (NF-e)': ['business', 'enterprise'].includes(tierId),
     'API customizada': tierId === 'enterprise',
   };
 
@@ -79,7 +80,8 @@ export default function PricingPage() {
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [gatewayDialogTier, setGatewayDialogTier] = useState<{ id: string; name: string } | null>(null);
 
-  const tiers = Object.values(STRIPE_PRICING_TIERS);
+  // Enterprise is consultation-only - not a self-serve card on this page.
+  const tiers = Object.values(STRIPE_PRICING_TIERS).filter((t: any) => t.id !== 'enterprise');
 
   useEffect(() => {
     fetch('/api/billing/gateways')
@@ -126,12 +128,6 @@ export default function PricingPage() {
       return;
     }
 
-    if (tierId === 'enterprise') {
-      toast.info('Um consultor vai falar com você para montar o plano Enterprise');
-      router.push('/suporte/novo?tipo=enterprise');
-      return;
-    }
-
     if (mercadoPagoEnabled) {
       setGatewayDialogTier(tier);
       return;
@@ -149,6 +145,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
+      <ClarityScript />
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -161,7 +158,7 @@ export default function PricingPage() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup">
-              <Button>Começar Grátis</Button>
+              <Button variant="cta">Começar Grátis</Button>
             </Link>
           </div>
         </div>
@@ -214,7 +211,7 @@ export default function PricingPage() {
       {/* Pricing Cards */}
       <section className="py-12 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {tiers.map((tier) => {
               const isPopular = tier.id === 'business';
               const isCustom = tier.priceMonthly === null;
@@ -292,11 +289,8 @@ export default function PricingPage() {
                     <Button
                       onClick={() => handleUpgrade(tier)}
                       disabled={loading === tier.id}
-                      className={cn(
-                        'w-full mb-6',
-                        isPopular && 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white'
-                      )}
-                      variant={isPopular ? 'default' : tier.id === 'starter' ? 'default' : 'outline'}
+                      className="w-full mb-6"
+                      variant="cta"
                     >
                       {loading === tier.id ? (
                         'Processando...'
@@ -326,6 +320,14 @@ export default function PricingPage() {
               );
             })}
           </div>
+
+          {/* Enterprise: consultation-only, not a self-serve card */}
+          <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-8">
+            Precisa de mais que o Business — mais lojas, mais usuários, requisitos específicos?{' '}
+            <Link href="/suporte/novo?tipo=enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Fale com a gente sobre o plano Enterprise
+            </Link>
+          </p>
 
           {/* Trust badges */}
           <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-slate-600 dark:text-slate-400">
@@ -461,16 +463,11 @@ export default function PricingPage() {
           <p className="text-base sm:text-lg mb-8 text-blue-100">
             Comece gratuitamente hoje. Se não servir, é só cancelar.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth/signup">
-              <Button size="lg" variant="secondary" className="gap-2">
+              <Button size="lg" variant="cta" className="gap-2">
                 Começar Grátis
                 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/suporte/novo">
-              <Button size="lg" variant="outline" className="gap-2 bg-transparent border-white text-white hover:bg-white hover:text-blue-700">
-                Falar com vendas
               </Button>
             </Link>
           </div>

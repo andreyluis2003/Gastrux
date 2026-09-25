@@ -469,6 +469,22 @@ describe('bad day 7: fiscal rejection', () => {
       expect(await docsOf(s.id)).toHaveLength(0);
     });
 
+    it('on a plan without NF-e, closing closes the bill and says so, without a note', async () => {
+      await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'starter' } });
+      try {
+        const s = await openComanda();
+
+        const body = await (await close(s.id)).json();
+
+        expect(body.status).toBe('CLOSED');
+        expect(body.nfce.message).toMatch(/não disponível no plano/);
+        expect(fakeProvider.emitNFCe).not.toHaveBeenCalled();
+        expect(await docsOf(s.id)).toHaveLength(0);
+      } finally {
+        await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'business' } });
+      }
+    });
+
     it('a cancelled comanda cannot be closed', async () => {
       const s = await openComanda();
       await prisma.orderSession.update({ where: { id: s.id }, data: { status: 'CANCELLED' } });

@@ -417,7 +417,8 @@ describe('bad day 4: cancellation after the kitchen started', () => {
   });
 
   describe('notifications', () => {
-    it.failing('marking an order READY does not notify the staff of OTHER restaurants (C12)', async () => {
+    // C12 fixed in the main working tree (merged 2026-09-25)
+    it('marking an order READY does not notify the staff of OTHER restaurants (C12)', async () => {
       const order = await makeOrder();
 
       await put(order.id, { status: 'READY' });

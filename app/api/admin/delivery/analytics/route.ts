@@ -35,7 +35,7 @@ export async function GET() {
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [integrations, orders30d, orders7d, byStatus30d] = await Promise.all([
-    prisma.deliveryIntegration.findMany({ where: {} }),
+    prisma.deliveryIntegration.findMany({ where: { restaurantId } }),
     prisma.externalOrder.findMany({
       where: { restaurantId, orderReceivedAt: { gte: thirtyDaysAgo } },
       include: { integration: { select: { platform: true } } },

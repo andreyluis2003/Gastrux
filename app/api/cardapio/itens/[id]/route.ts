@@ -63,6 +63,20 @@ export async function PUT(
     const body = await req.json();
     const { name, description, price, available, position, displayOnQR, displayOnWeb, recipeId, categoryId } = body;
 
+    if (recipeId) {
+      const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, restaurantId }, select: { id: true } });
+      if (!recipe) {
+        return NextResponse.json({ error: 'Recipe not found' }, { status: 404 });
+      }
+    }
+
+    if (categoryId) {
+      const category = await prisma.menuCategory.findFirst({ where: { id: categoryId, restaurantId }, select: { id: true } });
+      if (!category) {
+        return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      }
+    }
+
     const item = await prisma.menuItem.update({
       where: { id: params.id },
       data: {

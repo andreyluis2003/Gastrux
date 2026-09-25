@@ -23,6 +23,10 @@ async function handlePOST(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
+    if (tierBlock) return tierBlock;
+
     return await sendSessionToKitchen(restaurantId, params.id);
   } catch (error) {
     console.error('Error:', error);

@@ -35,6 +35,12 @@ async function handlePOST(request: Request) {
   }
 
   const existing = await prisma.orderSession.findUnique({ where: { id: clientId } });
+  if (!existing) {
+    // A counter sale is a transaction of the plan, like a comanda sent to the kitchen
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(member.restaurantId, 'dailyTransactions');
+    if (tierBlock) return tierBlock;
+  }
   if (existing) {
     if (existing.restaurantId !== member.restaurantId) {
       return NextResponse.json({ error: 'clientId inválido' }, { status: 400 });

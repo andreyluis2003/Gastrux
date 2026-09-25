@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const ingredientId = searchParams.get('ingredientId');
     const showExpired = searchParams.get('expired') === 'true';
@@ -29,6 +35,7 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       active: !showExpired ? true : undefined,
+      ingredient: { restaurantId },
     };
 
     if (ingredientId) {
@@ -100,6 +107,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const body = await request.json();
     const {
       ingredientId,
@@ -122,9 +134,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if ingredient exists
-    const ingredient = await prisma.ingredient.findUnique({
-      where: { id: ingredientId },
+    // Check if ingredient exists and belongs to the caller's restaurant
+    const ingredient = await prisma.ingredient.findFirst({
+      where: { id: ingredientId, restaurantId },
     });
 
     if (!ingredient) {

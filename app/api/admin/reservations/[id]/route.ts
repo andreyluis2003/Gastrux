@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: params.id },
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const reservation = await prisma.reservation.findFirst({
+      where: { id: params.id, restaurantId },
       include: {
         guest: true,
         table: {
@@ -56,6 +62,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const owned = await prisma.reservation.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
+    }
+
     const {
       status,
       tableId,
@@ -66,6 +82,13 @@ export async function PUT(
       isNoShow,
       noShowReason,
     } = await req.json();
+
+    if (tableId) {
+      const table = await prisma.table.findFirst({ where: { id: tableId, restaurantId }, select: { id: true } });
+      if (!table) {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 });
+      }
+    }
 
     const reservation = await prisma.reservation.update({
       where: { id: params.id },
@@ -114,6 +137,16 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
+    const owned = await prisma.reservation.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
     }
 
     const reservation = await prisma.reservation.update({

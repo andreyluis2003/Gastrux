@@ -9,19 +9,26 @@ import { useScrollTracking } from '@/hooks/use-scroll-tracking';
 import { useTimeTracking } from '@/hooks/use-time-tracking';
 import { useABTest } from '@/hooks/use-ab-test';
 import { AB_TESTS } from '@/lib/ab-testing';
-import { MetricStrip } from '@/components/marketing/metric-strip';
 import { HowItWorks } from '@/components/marketing/how-it-works';
 import { FeaturesShowcase } from '@/components/marketing/features-showcase';
 import { TestimonialsCarousel } from '@/components/marketing/testimonials-carousel';
 import { FAQSection } from '@/components/marketing/faq-section';
 import { SegmentsSection } from '@/components/marketing/segments-section';
 import { WhyGastrux } from '@/components/marketing/why-gastrux';
+import { ClarityScript } from '@/components/analytics/clarity-script';
 
 const heroBenefits = [
   'Sai do caderno em 10 minutos',
   'Veja seu lucro real todo dia',
   'Funciona no celular',
   'Começa grátis, sem cartão',
+];
+
+const heroStats = [
+  { value: '500+', label: 'Donos largaram o caderno' },
+  { value: 'R$ 3.200', label: 'Economia média/mês' },
+  { value: '10 min', label: 'Pra começar a usar' },
+  { value: '4,8/5', label: 'Nota dos donos' },
 ];
 
 function HomePageContent() {
@@ -31,7 +38,6 @@ function HomePageContent() {
 
   const heroHeadline = useABTest(AB_TESTS.HERO_HEADLINE);
   const heroPrimaryBtn = useABTest(AB_TESTS.HERO_CTA_PRIMARY);
-  const heroSecondaryBtn = useABTest(AB_TESTS.HERO_CTA_SECONDARY);
   const finalCtaHeadline = useABTest(AB_TESTS.FINAL_CTA_HEADLINE);
   const finalCtaBtn = useABTest(AB_TESTS.FINAL_CTA_BUTTON);
   const heroDescription = useABTest(AB_TESTS.HERO_DESCRIPTION);
@@ -50,6 +56,7 @@ function HomePageContent() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
+      <ClarityScript />
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -76,7 +83,7 @@ function HomePageContent() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup" className="hidden sm:block">
-              <Button className="gap-1">Começar Grátis</Button>
+              <Button variant="cta" className="gap-1">Começar Grátis</Button>
             </Link>
             <button
               className="md:hidden p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -107,7 +114,7 @@ function HomePageContent() {
                 <Button variant="outline" className="w-full">Entrar</Button>
               </Link>
               <Link href="/auth/signup" onClick={() => setMobileMenuOpen(false)}>
-                <Button className="w-full">Começar Grátis</Button>
+                <Button variant="cta" className="w-full">Começar Grátis</Button>
               </Link>
             </div>
           </div>
@@ -152,16 +159,11 @@ function HomePageContent() {
             ))}
           </ul>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handlePrimaryCtaClick}>
-              <Button size="lg" className="w-full sm:w-auto gap-2 shadow-lg shadow-blue-600/20">
+              <Button size="lg" variant="cta" className="w-full sm:w-auto gap-2 shadow-lg shadow-orange-600/20">
                 {heroPrimaryBtn.isLoaded ? heroPrimaryBtn.content : 'Trocar o Caderno Agora'}
                 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="#features" onClick={() => trackCTAClick('hero_view_features', '#features')}>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                {heroSecondaryBtn.isLoaded ? heroSecondaryBtn.content : 'Ver Como Funciona'}
               </Button>
             </Link>
           </div>
@@ -169,10 +171,20 @@ function HomePageContent() {
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Sem cartão • Sem contrato • Se não gostar, volta pro caderno
           </p>
+
+          {/* Trust stats - right under the fold, before the visitor scrolls past */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 pt-8 border-t border-slate-200 dark:border-slate-700">
+            {heroStats.map((s) => (
+              <div key={s.label}>
+                <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
+                  {s.value}
+                </div>
+                <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">{s.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
-
-      <MetricStrip />
 
       <FeaturesShowcase />
 
@@ -181,40 +193,6 @@ function HomePageContent() {
       <TestimonialsCarousel />
 
       <SegmentsSection />
-
-      {/* ROI Snapshot */}
-      <section className="py-20 px-4 sm:px-6 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white">
-        <div className="max-w-5xl mx-auto text-center">
-          <span className="inline-block px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold tracking-wide uppercase mb-4">
-            ROI médio em 45 dias
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-bold mb-6">
-            No caderno, você não vê o dinheiro sumindo. Aqui, você vê.
-          </h2>
-          <p className="text-base sm:text-lg text-slate-300 max-w-3xl mx-auto mb-10">
-            Quem controla na mão perde entre 8% e 18% do faturamento sem perceber — em desperdício, preço errado e compra a mais. Com a Gastrux, você enxerga cada centavo em menos de 2 meses.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-            {[
-              { v: 'R$ 3.200', l: 'Economia média/mês' },
-              { v: '21h', l: 'Horas salvas/semana' },
-              { v: '22%', l: 'Menos desperdício' },
-              { v: '+18%', l: 'Margem de contribuição' },
-            ].map((m, i) => (
-              <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-4">
-                <div className="text-2xl sm:text-3xl font-bold text-white">{m.v}</div>
-                <div className="text-sm text-slate-300 mt-1">{m.l}</div>
-              </div>
-            ))}
-          </div>
-          <Link href="/auth/signup" onClick={() => trackCTAClick('roi_cta', '/auth/signup')}>
-            <Button size="lg" variant="secondary" className="gap-2">
-              Calcular meu ROI na prática
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Link>
-        </div>
-      </section>
 
       <WhyGastrux />
 
@@ -231,16 +209,11 @@ function HomePageContent() {
           <p className="text-lg mb-8 text-blue-100 max-w-2xl mx-auto">
             Começa grátis em 10 minutos. Se não gostar, volta pro caderno — sem custo, sem burocracia.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handleFinalCtaClick}>
-              <Button size="lg" variant="secondary" className="gap-2 shadow-xl">
+              <Button size="lg" variant="cta" className="gap-2 shadow-xl">
                 {finalCtaBtn.isLoaded ? finalCtaBtn.content : 'Criar Conta Grátis'}
                 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/pricing" onClick={() => trackCTAClick('final_view_pricing', '/pricing')}>
-              <Button size="lg" variant="outline" className="gap-2 bg-transparent border-white text-white hover:bg-white hover:text-blue-700">
-                Ver Planos
               </Button>
             </Link>
           </div>

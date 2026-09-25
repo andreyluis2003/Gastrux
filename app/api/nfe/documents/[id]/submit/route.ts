@@ -29,6 +29,9 @@ export async function POST(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'nfe');
+    if (tierBlock) return tierBlock;
 
     // Scoped through the config: another restaurant's note is a 404
     const document = await prisma.nFeDocument.findFirst({

@@ -125,6 +125,7 @@ export async function PUT(
         where: {
           role: { in: ['MANAGER', 'OWNER', 'CASHIER'] },
           active: true,
+          restaurants: { some: { restaurantId, isActive: true } },
         },
         select: { id: true },
       });

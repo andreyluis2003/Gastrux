@@ -94,6 +94,8 @@ describe('bad day 9: a new operator makes a mistake', () => {
     const scenario = await createMultiRestaurantScenario();
     A = scenario.restaurantA;
     B = scenario.restaurantB;
+    // this suite creates more staff than the business plan allows (5 users); the limit has its own case
+    await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'enterprise' } });
     cashier = await mkUser('CASHIER', 'CASHIER', A.restaurantId);
     manager = await mkUser('MANAGER', 'MANAGER', A.restaurantId);
     ownerElsewhere = await mkUser('OWNER', 'CASHIER', A.restaurantId);
@@ -339,6 +341,16 @@ describe('bad day 9: a new operator makes a mistake', () => {
       const res = await newStaff('MANAGER');
       expect(res.status).toBe(201);
       expect((await auditFor(A.ownerId)).some((l) => l.entityType === 'StaffMember')).toBe(true);
+    });
+
+    it('a hire beyond the plan user limit is refused', async () => {
+      await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'starter' } });
+      try {
+        as(manager);
+        expect((await newStaff('COOK')).status).toBe(403);
+      } finally {
+        await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'enterprise' } });
+      }
     });
 
     it('a new staff user does not get the fixed password "temp123"', async () => {

@@ -37,7 +37,7 @@ export default function SignUpPage() {
     try {
       await signIn('google', {
         redirect: true,
-        callbackUrl: '/dashboard',
+        callbackUrl: '/auth/qualification',
       });
     } catch (error) {
       toast.error('Erro ao criar conta com Google');
@@ -93,7 +93,7 @@ export default function SignUpPage() {
       if (signInResult?.ok) {
         // Track successful conversion
         trackEvent('signup_form_complete', { event_category: 'conversion', email });
-        router.replace('/dashboard');
+        router.replace('/auth/qualification');
       }
     } catch (error) {
       toast.error('Erro ao criar conta');
@@ -173,8 +173,9 @@ export default function SignUpPage() {
             <span>
               Li e aceito os{' '}
               <Link href="/termos" target="_blank" className="text-blue-600 hover:underline">Termos de Uso</Link>
-              {' '}e a{' '}
+              {', a '}
               <Link href="/privacidade" target="_blank" className="text-blue-600 hover:underline">Política de Privacidade</Link>
+              {' e autorizo o tratamento dos meus dados conforme a LGPD (Lei Geral de Proteção de Dados)'}
             </span>
           </label>
 

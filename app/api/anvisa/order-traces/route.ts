@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,13 +22,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get('orderId');
     const batchId = searchParams.get('batchId');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const where: any = {};
+    const where: any = { order: { restaurantId } };
     if (orderId) where.orderId = orderId;
     if (batchId) where.batchId = batchId;
 
@@ -81,6 +87,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { orderId, batchId, quantity, unit, orderItemId } = body;
 
@@ -92,10 +103,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify order and batch exist
+    // Verify order and batch exist and belong to the caller's restaurant
     const [order, batch] = await Promise.all([
-      prisma.order.findUnique({ where: { id: orderId } }),
-      prisma.ingredientBatch.findUnique({ where: { id: batchId } }),
+      prisma.order.findFirst({ where: { id: orderId, restaurantId } }),
+      prisma.ingredientBatch.findFirst({ where: { id: batchId, ingredient: { restaurantId } } }),
     ]);
 
     if (!order || !batch) {

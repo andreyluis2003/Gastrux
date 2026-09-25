@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, X, Zap, Brain, BarChart3, Smartphone, CreditCard, Shield } from 'lucide-react';
+import { Check, X, Brain, BarChart3, Shield } from 'lucide-react';
 
 const COMPETITORS = ['Saipos', 'Consumer', 'SisFood', 'GrandChef'];
 
@@ -28,24 +28,9 @@ const COMPARISON: FeatureRow[] = [
 
 const DIFFERENTIALS = [
   {
-    icon: Smartphone,
-    title: 'Funciona no celular',
-    description: 'Não precisa de computador, nem instalar nada. Abre no celular e já funciona — igual abrir o WhatsApp.',
-  },
-  {
     icon: BarChart3,
     title: 'Custo real de cada prato',
     description: 'O caderno não calcula CMV. A Gastrux mostra o custo exato de cada prato — e onde você está perdendo margem.',
-  },
-  {
-    icon: CreditCard,
-    title: 'Grátis pra começar',
-    description: 'Plano Starter sem cartão, sem prazo. Se não gostar, volta pro caderno — sem custo nenhum.',
-  },
-  {
-    icon: Zap,
-    title: 'Simples como um caderno',
-    description: 'Se você sabe anotar, sabe usar. Interface limpa, sem menus complicados, sem termos técnicos.',
   },
   {
     icon: Brain,

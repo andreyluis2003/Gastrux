@@ -78,6 +78,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (paymentId) {
+    const payment = await prisma.payment.findFirst({ where: { id: paymentId, restaurantId }, select: { id: true } });
+    if (!payment) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+    }
+  }
+
   const record = await prisma.cashFlowRecord.create({
     data: {
       restaurantId,

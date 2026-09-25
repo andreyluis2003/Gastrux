@@ -5,16 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-
-async function getRestaurantId(session: any) {
-  const userId = session?.user?.id;
-  if (!userId) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { restaurants: { include: { restaurant: true }, take: 1 } },
-  });
-  return user?.currentRestaurantId || user?.restaurants?.[0]?.restaurantId || null;
-}
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 // Typical marketplace fees
 const PLATFORM_FEES: Record<string, number> = {
@@ -27,7 +18,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    const restaurantId = await getRestaurantId(session);
+    const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const url = req.nextUrl;
@@ -39,6 +30,7 @@ export async function GET(req: NextRequest) {
     // 1. External Orders (marketplace)
     const externalOrders = await prisma.externalOrder.findMany({
       where: {
+        restaurantId,
         orderReceivedAt: { gte: startDate },
         status: { in: ['DELIVERED', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'] },
       },
@@ -54,6 +46,7 @@ export async function GET(req: NextRequest) {
     // 2. Direct Orders (own channel)
     const directOrders = await prisma.order.findMany({
       where: {
+        restaurantId,
         createdAt: { gte: startDate },
         orderType: 'DELIVERY',
         status: { notIn: ['CANCELLED'] },
@@ -68,6 +61,7 @@ export async function GET(req: NextRequest) {
     // 3. QR Scans
     const qrScans = await prisma.packagingQRScan.findMany({
       where: {
+        restaurantId,
         scannedAt: { gte: startDate },
       },
       select: {
@@ -96,6 +90,7 @@ export async function GET(req: NextRequest) {
 
     const allExternalOrders = await prisma.externalOrder.findMany({
       where: {
+        restaurantId,
         orderReceivedAt: { gte: sixMonthsAgo },
         status: { in: ['DELIVERED', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'] },
       },
@@ -104,6 +99,7 @@ export async function GET(req: NextRequest) {
 
     const allDirectOrders = await prisma.order.findMany({
       where: {
+        restaurantId,
         createdAt: { gte: sixMonthsAgo },
         orderType: 'DELIVERY',
         status: { notIn: ['CANCELLED'] },

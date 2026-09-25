@@ -63,6 +63,10 @@ export async function POST(req: NextRequest) {
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
 
+    const { enforceFeature } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceFeature(restaurantId, 'kds');
+    if (tierBlock) return tierBlock;
+
     const body = await req.json();
     const { name, description, displayColor, position } = body;
 

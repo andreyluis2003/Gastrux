@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const where: any = {};
+    const where: any = { batch: { ingredient: { restaurantId } } };
 
     if (batchId) where.batchId = batchId;
     if (orderId) where.orderId = orderId;
@@ -113,9 +113,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get batch
-    const batch = await prisma.ingredientBatch.findUnique({
-      where: { id: batchId },
+    // Get batch and verify it belongs to the caller's restaurant
+    const batch = await prisma.ingredientBatch.findFirst({
+      where: { id: batchId, ingredient: { restaurantId } },
     });
 
     if (!batch) {

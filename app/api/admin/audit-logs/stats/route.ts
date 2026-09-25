@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminSession } from '@/lib/admin-helpers';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { UserRole } from '@prisma/client';
+import { isPlatformAdminIdentity } from '@/lib/admin/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +12,10 @@ export const dynamic = 'force-dynamic';
  * Estatísticas de logs de auditoria
  */
 export async function GET(request: NextRequest) {
-  const { error } = await requireAdminSession([UserRole.OWNER, UserRole.ADMIN]);
-  if (error) return error;
+  const session = await getServerSession(authOptions);
+  if (!session || !isPlatformAdminIdentity((session.user as any)?.role, session.user?.email)) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 403 });
+  }
 
   try {
     const { searchParams } = new URL(request.url);

@@ -22,20 +22,20 @@ async function gatherData(type: string, restaurantId: string) {
   if (type === 'SALES') {
     const [transactions, topItems, dailySales] = await Promise.all([
       prisma.pOSTransaction.aggregate({
-        where: { transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
+        where: { restaurantId, transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
         _count: true,
         _sum: { amount: true },
         _avg: { amount: true },
       }),
       prisma.pOSTransaction.findMany({
-        where: { transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
+        where: { restaurantId, transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
         take: 50,
         orderBy: { transactionDate: 'desc' },
         select: { amount: true, items: true, paymentMethod: true, transactionDate: true },
       }),
       prisma.pOSTransaction.groupBy({
         by: ['paymentMethod'],
-        where: { transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
+        where: { restaurantId, transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
         _count: true,
         _sum: { amount: true },
       }),
@@ -64,14 +64,15 @@ async function gatherData(type: string, restaurantId: string) {
 
   if (type === 'CUSTOMERS') {
     const [total, topSpenders, recent] = await Promise.all([
-      prisma.customer.count(),
+      prisma.customer.count({ where: { restaurantId } }),
       prisma.customer.findMany({
+        where: { restaurantId },
         orderBy: { totalSpent: 'desc' },
         take: 10,
         select: { name: true, totalSpent: true, totalOrders: true, lastOrderAt: true, segment: true },
       }),
       prisma.customer.count({
-        where: { createdAt: { gte: thirtyDaysAgo } },
+        where: { restaurantId, createdAt: { gte: thirtyDaysAgo } },
       }),
     ]);
     return { total, newLast30Days: recent, topSpenders };
@@ -97,7 +98,7 @@ async function gatherData(type: string, restaurantId: string) {
 
   if (type === 'FINANCIAL') {
     const revenue = await prisma.pOSTransaction.aggregate({
-      where: { transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
+      where: { restaurantId, transactionDate: { gte: thirtyDaysAgo }, status: 'COMPLETED' },
       _sum: { amount: true },
       _count: true,
     });

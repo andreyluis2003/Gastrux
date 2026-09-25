@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: any = {
+      ingredient: { restaurantId },
       createdAt: {
         gte: startDate,
         lte: endDate,

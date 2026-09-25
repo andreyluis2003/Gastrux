@@ -13,6 +13,11 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const cashRegisterId = req.nextUrl.searchParams.get('cashRegisterId');
     if (!cashRegisterId) {
       return NextResponse.json(
@@ -22,8 +27,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Scoped: another restaurant's register is a 404 (it used to be found by id only)
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) return NextResponse.json({ error: 'Cash register not found' }, { status: 404 });
     const register = await prisma.cashRegister.findFirst({
       where: { id: cashRegisterId, restaurantId },
       include: {
@@ -73,6 +76,11 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
+    }
+
     const body = await req.json();
     const { cashRegisterId, actualBalance } = body;
 
@@ -81,6 +89,11 @@ export async function POST(req: NextRequest) {
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    const owned = await prisma.cashRegister.findFirst({ where: { id: cashRegisterId, restaurantId }, select: { id: true } });
+    if (!owned) {
+      return NextResponse.json({ error: 'Cash register not found' }, { status: 404 });
     }
 
     const register = await prisma.cashRegister.update({
