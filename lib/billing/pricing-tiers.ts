@@ -91,9 +91,8 @@ export const BASE_PRICING_TIERS = {
       'Tudo do Business',
       'Lojas ilimitadas',
       'Usuários ilimitados',
-      'Suporte 24/7 dedicado',
-      'Implementação customizada',
-      'SLA garantido',
+      // Owner decision 2026-09-25: no 24/7 support, custom implementation or SLA promised
+      'Suporte e implementação: sob consulta',
     ],
     limits: {
       dailyTransactions: 999999,
