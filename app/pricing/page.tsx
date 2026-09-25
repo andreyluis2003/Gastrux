@@ -100,7 +100,7 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        toast.error('Erro ao criar sessão de checkout');
+        toast.error(data.error || 'Erro ao criar sessão de checkout');
       }
     } catch (error) {
       console.error('Checkout error:', error);

@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { webhookSecretMatches } from '@/lib/pos/webhook-secret';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,9 +29,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'unknown merchant' }, { status: 404 });
     }
 
-    // Validacao opcional de secret
-    const sig = req.headers.get('x-stone-signature');
-    if (settings.webhookSecret && sig && settings.webhookSecret !== sig) {
+    // The secret is required: it used to be checked only when the header was sent, so anyone who
+    // knew a merchant code could post fake sales into that restaurant
+    if (!webhookSecretMatches(settings.webhookSecret, req.headers.get('x-stone-signature'))) {
       return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
     }
 
@@ -41,12 +42,13 @@ export async function POST(req: NextRequest) {
     const status = statusRaw === 'APPROVED' ? 'COMPLETED' : statusRaw === 'DECLINED' ? 'FAILED' : 'COMPLETED';
     const transactionDate = tx.created_at ? new Date(tx.created_at) : new Date();
 
+    // Scoped to this restaurant: a global id let one restaurant's webhook overwrite another's sale
     await prisma.pOSTransaction.upsert({
-      where: { transactionId },
+      where: { restaurantId_provider_transactionId: { restaurantId: settings.restaurantId, provider: 'STONE', transactionId: String(transactionId) } },
       update: { status, amount, paymentMethod },
       create: {
         restaurantId: settings.restaurantId,
-        transactionId,
+        transactionId: String(transactionId),
         provider: 'STONE',
         amount,
         currency: tx.currency || 'BRL',

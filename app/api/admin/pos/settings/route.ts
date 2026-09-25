@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getRestaurantMember, MANAGER_ROLES, recordAudit } from '@/lib/auth/restaurant-role';
 import { randomBytes } from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * A manager of the restaurant being worked in. This used to read session.user.currentRestaurantId,
+ * a field the session never carries, so every call answered 401 and the PDV screens never loaded.
+ */
 async function getContext() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const user = session.user as any;
-  if (!['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'OWNER'].includes(user.role)) return null;
-  const restaurantId = user.currentRestaurantId;
-  if (!restaurantId) return null;
-  return { session, restaurantId };
+  const member = await getRestaurantMember();
+  if (!member || !MANAGER_ROLES.includes(member.role)) return null;
+  return { member, restaurantId: member.restaurantId };
 }
 
 function maskSecret(val: string | null | undefined): string | null {
@@ -97,6 +96,10 @@ export async function POST(req: NextRequest) {
   }
 
   const settings = await prisma.pOSSettings.create({ data });
+  await recordAudit(ctx.member, {
+    action: 'CREATE', entityType: 'POSSettings', entityId: settings.id,
+    changes: { provider, syncEnabled: data.syncEnabled, autoReconcile: data.autoReconcile },
+  });
 
   return NextResponse.json({
     settings: {
@@ -154,6 +157,11 @@ export async function PATCH(req: NextRequest) {
   );
 
   const updated = await prisma.pOSSettings.update({ where: { id }, data });
+  // Keys are recorded as "changed", never their values
+  await recordAudit(ctx.member, {
+    action: 'UPDATE', entityType: 'POSSettings', entityId: id,
+    changes: Object.fromEntries(Object.keys(data).map((k) => [k, /ApiKey|AccessToken/.test(k) ? 'alterada' : data[k]])),
+  });
 
   return NextResponse.json({
     settings: {
@@ -181,5 +189,6 @@ export async function DELETE(req: NextRequest) {
   if (!existing) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 });
 
   await prisma.pOSSettings.delete({ where: { id } });
+  await recordAudit(ctx.member, { action: 'DELETE', entityType: 'POSSettings', entityId: id, changes: { provider: existing.provider } });
   return NextResponse.json({ success: true });
 }

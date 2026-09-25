@@ -230,7 +230,7 @@ describe('mercadopago-connect/payment-sweep', () => {
       const res = await call({ 'x-internal-trigger': 'cron-secret' });
 
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ examined: 1, resolved: 1, unchanged: 0, skippedNoConnection: 0, failed: 0, stoppedEarly: false });
+      expect(await res.json()).toEqual({ examined: 1, resolved: 1, unchanged: 0, skippedNoConnection: 0, failed: 0, stoppedEarly: false, expiredSubscriptions: 0 });
     });
   });
 });

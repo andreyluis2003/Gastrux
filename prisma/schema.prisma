@@ -786,7 +786,7 @@ model POSSettings {
 model POSTransaction {
   id              String               @id @default(cuid())
   restaurantId    String
-  transactionId   String               @unique
+  transactionId   String
   provider        POSProvider
   amount          Decimal              @default(0)
   discount        Decimal              @default(0)
@@ -810,6 +810,8 @@ model POSTransaction {
   restaurant      Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   saleItems       POSSaleItem[]
 
+  /// A sale id is only unique per restaurant and machine: senders number their sales from 1
+  @@unique([restaurantId, provider, transactionId])
   @@index([restaurantId])
   @@index([transactionDate])
   @@index([provider])

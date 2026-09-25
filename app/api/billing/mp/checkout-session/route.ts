@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { findPayingSubscription } from '@/lib/billing/cancel';
 import { getTierById } from '@/lib/stripe-config';
 import { createPreApproval, getMPAutoRecurringForBillingCycle } from '@/lib/mercado-pago';
 
@@ -19,34 +21,50 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
     const { tierId, billing } = await request.json();
     if (!tierId) {
-      return NextResponse.json({ error: 'Missing tierId' }, { status: 400 });
+      return NextResponse.json({ error: 'Escolha um plano' }, { status: 400 });
     }
 
     const tier = getTierById(tierId);
     if (!tier) {
-      return NextResponse.json({ error: 'Invalid tier' }, { status: 400 });
+      return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
     }
 
     if (tierId === 'starter') {
+      return NextResponse.json({ error: 'O plano Starter é gratuito e não precisa de pagamento' }, { status: 400 });
+    }
+
+    // Only the owner subscribes, for the restaurant being worked in: the plan is copied to the
+    // restaurants the subscriber owns (lib/billing/subscription-sync.ts), so a manager's payment
+    // used to upgrade nothing.
+    const auth = await requireRestaurantRole(['OWNER'], 'Só o dono do restaurante pode assinar um plano');
+    if (!auth.ok) return auth.response;
+    const { member } = auth;
+
+    const paying = await findPayingSubscription(member.userId);
+    if (paying) {
       return NextResponse.json(
-        { error: 'The free tier does not require checkout' },
-        { status: 400 }
+        { error: `Você já tem uma assinatura ativa (${paying.planName || paying.tier}). Para trocar de plano, cancele a atual em Conta › Cobrança.` },
+        { status: 409 }
       );
     }
+    // One free trial per owner: cancel-and-subscribe-again must not restart it
+    const hadTrial = (await prisma.subscription.count({
+      where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },
+    })) > 0;
 
     const isAnnual = billing === 'annual';
     const amount = isAnnual ? tier.priceAnnual : tier.priceMonthly;
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: member.userId },
     });
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }
 
     const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'https://gastrux.com';
@@ -54,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     const subscription = await prisma.subscription.create({
       data: {
-        restaurantId: user.currentRestaurantId,
+        restaurantId: member.restaurantId,
         userId: user.id,
         tier: tier.id,
         planName: tier.name,
@@ -63,8 +81,8 @@ export async function POST(request: NextRequest) {
         amount,
         currency: 'BRL',
         status: 'incomplete',
-        trialStart: new Date(),
-        trialEnd: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+        trialStart: hadTrial ? null : new Date(),
+        trialEnd: hadTrial ? null : new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -80,7 +98,7 @@ export async function POST(request: NextRequest) {
           transactionAmount: amount,
           currencyId: 'BRL',
           billingDayProportional: true,
-          freeTrial: { frequency: TRIAL_DAYS, frequencyType: 'days' },
+          ...(hadTrial ? {} : { freeTrial: { frequency: TRIAL_DAYS, frequencyType: 'days' } }),
         },
       });
     } catch (mpError) {
@@ -108,7 +126,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[MP checkout-session] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to create Mercado Pago checkout session' },
+      { error: 'Não foi possível abrir o pagamento no Mercado Pago. Tente de novo em alguns minutos.' },
       { status: 500 }
     );
   }

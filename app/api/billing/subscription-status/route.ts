@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,6 @@ export async function GET(request: NextRequest) {
         id: true,
         email: true,
         name: true,
-        currentRestaurantId: true,
         stripeCustomerId: true,
       },
     });
@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+    // The plan of the restaurant being worked in, only while the user still belongs to it (the raw
+    // User.currentRestaurantId outlives a removed membership)
+    const currentRestaurantId = await getCurrentRestaurantId();
 
     // Try to get subscription data from the restaurant first (source of truth)
     let subscriptionData: {
@@ -37,9 +40,9 @@ export async function GET(request: NextRequest) {
       stripeCustomerId?: string | null;
     } | null = null;
 
-    if (user.currentRestaurantId) {
+    if (currentRestaurantId) {
       const restaurant = await prisma.restaurant.findUnique({
-        where: { id: user.currentRestaurantId },
+        where: { id: currentRestaurantId },
         select: {
           subscriptionTier: true,
           subscriptionStatus: true,
@@ -91,7 +94,7 @@ export async function GET(request: NextRequest) {
       where: {
         OR: [
           { userId: user.id },
-          user.currentRestaurantId ? { restaurantId: user.currentRestaurantId } : undefined,
+          currentRestaurantId ? { restaurantId: currentRestaurantId } : undefined,
         ].filter(Boolean) as any,
       },
       orderBy: { createdAt: 'desc' },

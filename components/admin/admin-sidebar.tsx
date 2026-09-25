@@ -201,7 +201,7 @@ const adminNavigation: NavItem[] = [
     href: '/admin/integrations',
     icon: <CreditCard className="w-5 h-5" />,
     submenu: [
-      { label: 'Maquininha', href: '/admin/integrations/pos', icon: <CreditCard className="w-4 h-4" /> },
+      { label: 'Maquininha', href: '/admin/pdv', icon: <CreditCard className="w-4 h-4" /> },
       { label: 'Delivery', href: '/admin/integrations/delivery', icon: <ShoppingBag className="w-4 h-4" /> },
       { label: 'Analytics Delivery', href: '/admin/integrations/delivery/analytics', icon: <TrendingUp className="w-4 h-4" /> },
       { label: 'WhatsApp Bot', href: '/admin/integrations/whatsapp', icon: <MessageSquare className="w-4 h-4" /> },

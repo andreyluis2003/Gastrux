@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { reconcilePOSTransaction } from '@/lib/pos/reconcile';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +53,13 @@ export async function POST(req: NextRequest) {
 
     // Check duplicate
     const exists = await prisma.pOSTransaction.findUnique({
-      where: { transactionId: body.transactionId },
+      where: {
+        restaurantId_provider_transactionId: {
+          restaurantId: settings.restaurantId,
+          provider: settings.provider,
+          transactionId: String(body.transactionId),
+        },
+      },
     });
     if (exists) {
       return NextResponse.json({ message: 'Transaction already processed', id: exists.id }, { status: 200 });
@@ -80,7 +87,7 @@ export async function POST(req: NextRequest) {
     const transaction = await prisma.pOSTransaction.create({
       data: {
         restaurantId: settings.restaurantId,
-        transactionId: body.transactionId,
+        transactionId: String(body.transactionId),
         provider: settings.provider,
         amount,
         discount,
@@ -108,14 +115,12 @@ export async function POST(req: NextRequest) {
       include: { saleItems: true },
     });
 
-    // Auto-reconcile: deduct stock based on recipe ingredients
+    // Auto-reconcile: the sale leaves stock once (lib/pos/reconcile.ts); on failure it stays
+    // pending for the manual "Reconciliar" button
+    let reconciled = false;
     if (settings.autoReconcile) {
       try {
-        await reconcileStock(settings.restaurantId, transaction.saleItems);
-        await prisma.pOSTransaction.update({
-          where: { id: transaction.id },
-          data: { reconciled: true, reconciledAt: new Date() },
-        });
+        reconciled = await reconcilePOSTransaction(settings.restaurantId, transaction.id);
       } catch (err) {
         console.error('[POS Webhook] Auto-reconcile failed:', err);
       }
@@ -130,64 +135,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       id: transaction.id,
-      reconciled: transaction.reconciled,
+      reconciled,
     }, { status: 201 });
   } catch (error: any) {
+    // The same sale sent twice at once: the second insert hits the unique index
+    if (error?.code === 'P2002') {
+      return NextResponse.json({ message: 'Transaction already processed' }, { status: 200 });
+    }
     console.error('[POS Webhook] Error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
-/**
- * Auto-reconcile: deduct ingredients from stock based on sale items linked to recipes.
- */
-async function reconcileStock(restaurantId: string, saleItems: any[]) {
-  const recipeIds = saleItems.filter((si) => si.recipeId).map((si) => si.recipeId);
-  if (recipeIds.length === 0) return;
-
-  // Get recipe ingredients
-  const recipeIngredients = await prisma.recipeIngredient.findMany({
-    where: { recipeId: { in: recipeIds } },
-    include: { ingredient: { select: { id: true, name: true } } },
-  });
-
-  // Group by recipeId
-  const byRecipe: Record<string, any[]> = {};
-  for (const ri of recipeIngredients) {
-    if (!byRecipe[ri.recipeId]) byRecipe[ri.recipeId] = [];
-    byRecipe[ri.recipeId].push(ri);
-  }
-
-  // For each sale item, deduct stock
-  for (const saleItem of saleItems) {
-    if (!saleItem.recipeId || !byRecipe[saleItem.recipeId]) continue;
-
-    const ingredients = byRecipe[saleItem.recipeId];
-    for (const ri of ingredients) {
-      const deduction = ri.quantity * saleItem.quantity;
-
-      // Find or create stock
-      const stock = await prisma.stock.findFirst({
-        where: { ingredientId: ri.ingredientId },
-      });
-
-      if (stock) {
-        await prisma.stock.update({
-          where: { id: stock.id },
-          data: { currentQuantity: { decrement: deduction } },
-        });
-
-        // Create stock movement
-        await prisma.stockMovement.create({
-          data: {
-            restaurantId,
-            ingredientId: ri.ingredientId,
-            movementType: 'AUTO_DEDUCTION',
-            quantity: -Math.abs(deduction),
-            reason: `Venda PDV - ${saleItem.name} x${saleItem.quantity}`,
-          },
-        });
-      }
-    }
-  }
-}

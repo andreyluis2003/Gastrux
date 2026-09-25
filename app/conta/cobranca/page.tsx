@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 import { Download, Loader2, Receipt, CreditCard, Calendar, TrendingUp, CheckCircle2 } from 'lucide-react'
 
 function formatMoney(value: any, currency = 'BRL') {
@@ -17,18 +18,45 @@ export default function CobrancaPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [canCancel, setCanCancel] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [canceling, setCanceling] = useState(false)
 
-  useEffect(() => {
+  const load = () =>
     Promise.all([
-      fetch('/api/conta/subscription').then((r) => r.json()),
-      fetch('/api/invoices').then((r) => r.json()),
+      fetch('/api/conta/subscription').then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => ({})) })),
+      fetch('/api/invoices').then((r) => r.json()).catch(() => ({})),
     ]).then(([sub, inv]) => {
-      setSubscription(sub.subscription)
-      setPayments(sub.payments || [])
+      // A cashier or cook gets 403 here: say so instead of "no subscription"
+      setLoadError(sub.ok ? null : sub.data.error || 'Não foi possível carregar a cobrança')
+      setSubscription(sub.ok ? sub.data.subscription : null)
+      setPayments(sub.ok ? sub.data.payments || [] : [])
+      setCanCancel(!!sub.data.canCancel)
       setInvoices(inv.invoices || [])
       setLoading(false)
     })
-  }, [])
+
+  useEffect(() => { load() }, [])
+
+  const cancel = async () => {
+    if (!confirm('Cancelar a assinatura? Nada mais será cobrado. O plano fica até o fim do período já pago; no período de teste, termina agora.')) return
+    setCanceling(true)
+    try {
+      const res = await fetch('/api/conta/subscription/cancel', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error)
+      toast.success(
+        data.accessUntil
+          ? `Assinatura cancelada. O plano continua até ${new Date(data.accessUntil).toLocaleDateString('pt-BR')}.`
+          : 'Assinatura cancelada. O restaurante voltou para o plano Starter.'
+      )
+      await load()
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível cancelar agora')
+    } finally {
+      setCanceling(false)
+    }
+  }
 
   const downloadInvoice = (id: string, number: string) => {
     const link = document.createElement('a')
@@ -52,7 +80,7 @@ export default function CobrancaPage() {
     active: { label: 'Ativa', color: 'bg-emerald-100 text-emerald-700' },
     trialing: { label: 'Período de teste', color: 'bg-blue-100 text-blue-700' },
     past_due: { label: 'Pendente', color: 'bg-red-100 text-red-700' },
-    cancelled: { label: 'Cancelada', color: 'bg-gray-100 text-gray-600' },
+    canceled: { label: 'Cancelada', color: 'bg-gray-100 text-gray-600' },
     inactive: { label: 'Sem assinatura', color: 'bg-gray-100 text-gray-600' },
   }
   const s = STATUS_LABELS[subStatus] || STATUS_LABELS.inactive
@@ -94,12 +122,20 @@ export default function CobrancaPage() {
                       : '—'}
                   </p>
                 </div>
-                {subscription.cancelAtPeriodEnd && (
+                {(subscription.cancelAtPeriodEnd || subscription.status === 'canceled') ? (
                   <div className="md:col-span-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                    Sua assinatura será cancelada ao final do período atual.
+                    Assinatura cancelada: nada mais será cobrado e o plano termina ao final do período atual.
                   </div>
-                )}
+                ) : canCancel ? (
+                  <div className="md:col-span-3">
+                    <Button variant="outline" onClick={cancel} disabled={canceling}>
+                      {canceling ? 'Cancelando...' : 'Cancelar assinatura'}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
+            ) : loadError ? (
+              <p className="py-8 text-center text-gray-600">{loadError}</p>
             ) : (
               <div className="py-8 text-center">
                 <p className="text-gray-600 mb-4">Você ainda não tem uma assinatura ativa.</p>
