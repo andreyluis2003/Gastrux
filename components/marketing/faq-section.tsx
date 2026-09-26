@@ -15,11 +15,11 @@ const DEFAULT_FAQS: FAQ[] = [
   },
   {
     q: 'Quanto tempo leva pra começar a usar?',
-    a: 'Uns 10 minutos. Você cadastra o restaurante, coloca os pratos principais e os ingredientes — e já começa a ver seu custo e lucro.',
+    a: 'Uns 10 minutos. Você cadastra o restaurante, coloca os pratos principais e os ingredientes — e já começa a ver o custo e a margem de cada prato.',
   },
   {
     q: 'Funciona no celular? Não tenho computador no restaurante.',
-    a: 'Funciona 100% no celular. Aliás, a maioria dos donos usa só pelo celular mesmo. Não precisa instalar nada, é só abrir no navegador.',
+    a: 'Funciona 100% no celular. Não precisa instalar nada, é só abrir no navegador. Comanda e venda de balcão continuam funcionando se a internet cair e sincronizam quando ela volta.',
   },
   {
     q: 'E se eu não gostar, perco alguma coisa?',
@@ -27,11 +27,15 @@ const DEFAULT_FAQS: FAQ[] = [
   },
   {
     q: 'Integra com iFood e outros apps de delivery?',
-    a: 'Sim. Nos planos pagos, os pedidos do iFood, Rappi e Uber Eats entram automático no sistema — sem você digitar nada.',
+    a: 'Ainda não há conexão pronta com iFood, Rappi ou Uber Eats. Nos planos pagos, outros sistemas podem enviar pedidos à Gastrux por uma API (webhook), o que exige configuração técnica.',
+  },
+  {
+    q: 'A Gastrux mostra o lucro do restaurante?',
+    a: 'Ela mostra o custo dos ingredientes (CMV) e a margem de contribuição de cada prato, a partir das fichas técnicas e das vendas. Aluguel, folha e outras despesas fixas ficam fora dessa conta, então o resultado líquido do restaurante depende também delas.',
   },
   {
     q: 'Meus dados ficam seguros?',
-    a: 'Ficam. Tudo armazenado em servidores seguros com backup diário. Você pode exportar seus dados a qualquer momento.',
+    a: 'Cada restaurante só enxerga os próprios dados, cada pessoa da equipe acessa só o que o papel dela permite, e as ações importantes ficam registradas.',
   },
 ];
 

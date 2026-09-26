@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { signOutSafely } from '@/lib/offline/sign-out';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BackButton } from '@/components/ui';
@@ -67,7 +68,7 @@ export default function SettingsPage() {
   }, [session]);
 
   const handleLogout = async () => {
-    await signOut({ redirect: false });
+    await signOutSafely({ redirect: false });
     router.push('/auth/signin');
   };
 

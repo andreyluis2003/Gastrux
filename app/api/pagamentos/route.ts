@@ -13,7 +13,9 @@
  *   - settlementStatus     (pending | settled | failed | all)
  *   - minAmount, maxAmount (numbers)
  *   - search               (id, description, customerEmail, customerName, gatewayPaymentId)
- *   - orderId / reservationId / subscriptionId / transactionId / restaurantId
+ *   - orderId / reservationId / subscriptionId / transactionId
+ *   - restaurantId         (PLATFORM ADMINS ONLY; every other caller is forced to
+ *                           its own current restaurant and this filter is ignored)
  *   - limit, page          (pagination; limit <= 500, default 50)
  *   - sortBy               (createdAt | amount | status | gateway) — default createdAt
  *   - sortOrder            (asc | desc) — default desc
@@ -68,10 +70,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isPlatformStaffEmail } from '@/lib/admin/guard';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
 const VALID_GATEWAYS = ['MERCADO_PAGO', 'STRIPE', 'STRIPE_CONNECT', 'MANUAL'] as const;
+// Read-only filter values: MERCADO_PAGO_CONNECT rows are created only by the
+// Mercado Pago connect flow, never by the manual-payment POST below.
+const FILTER_GATEWAYS = [...VALID_GATEWAYS, 'MERCADO_PAGO_CONNECT'] as const;
 const VALID_STATUSES = [
   'PENDING',
   'PROCESSING',
@@ -149,6 +156,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Tenant scoping: payments carry customer data (name, e-mail, document) and
+    // amounts, so a normal caller only ever sees its OWN current restaurant and
+    // the `restaurantId` query parameter is ignored. Only a platform admin
+    // (Gastrux staff) may list across restaurants.
+    const isPlatformAdmin = isPlatformStaffEmail((session.user as any)?.email);
+    let scopedRestaurantId: string | null = null;
+    if (!isPlatformAdmin) {
+      scopedRestaurantId = await getCurrentRestaurantId();
+      if (!scopedRestaurantId) {
+        return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+      }
+    }
+
     const url = new URL(req.url);
     const q = url.searchParams;
 
@@ -195,7 +215,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (gateway !== 'all' && VALID_GATEWAYS.includes(gateway as any)) {
+    if (gateway !== 'all' && (FILTER_GATEWAYS as readonly string[]).includes(gateway)) {
       where.gateway = gateway;
     }
     if (status !== 'all' && VALID_STATUSES.includes(status as any)) {
@@ -218,7 +238,13 @@ export async function GET(req: NextRequest) {
     if (reservationId) where.reservationId = reservationId;
     if (subscriptionId) where.subscriptionId = subscriptionId;
     if (transactionId) where.transactionId = transactionId;
-    if (restaurantId) where.restaurantId = restaurantId;
+    // Applied LAST so nothing can widen it again. Non-admins are pinned to their
+    // own restaurant; the summary/aggregate below reuses this same `where`.
+    if (isPlatformAdmin) {
+      if (restaurantId) where.restaurantId = restaurantId;
+    } else {
+      where.restaurantId = scopedRestaurantId;
+    }
 
     if (search) {
       where.OR = [
@@ -352,6 +378,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Same tenant rule as GET: a manual payment row is attributed to the
+    // caller's own current restaurant, never to a restaurant named in the body.
+    const isPlatformAdmin = isPlatformStaffEmail((session.user as any)?.email);
+    let scopedRestaurantId: string | null = null;
+    if (!isPlatformAdmin) {
+      scopedRestaurantId = await getCurrentRestaurantId();
+      if (!scopedRestaurantId) {
+        return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+      }
+    }
+
     const body = await req.json();
     const {
       orderId,
@@ -406,7 +443,7 @@ export async function POST(req: NextRequest) {
         reservationId: reservationId || null,
         subscriptionId: subscriptionId || null,
         transactionId: transactionId || null,
-        restaurantId: restaurantId || null,
+        restaurantId: isPlatformAdmin ? restaurantId || null : scopedRestaurantId,
         amount: parsedAmount,
         method,
         gateway: gateway || 'MANUAL',

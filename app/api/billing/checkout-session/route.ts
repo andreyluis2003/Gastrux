@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth';
 import Stripe from 'stripe';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { findPayingSubscription } from '@/lib/billing/cancel';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 
 export const dynamic = 'force-dynamic';
@@ -27,24 +29,46 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
     const { tierId, billing } = await request.json();
     if (!tierId) {
-      return NextResponse.json(
-        { error: 'Missing tierId' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Escolha um plano' }, { status: 400 });
     }
 
     const tier = Object.values(STRIPE_PRICING_TIERS).find(t => t.id === tierId);
     if (!tier) {
+      return NextResponse.json({ error: 'Plano inválido' }, { status: 400 });
+    }
+    if (tierId === 'starter') {
+      return NextResponse.json({ error: 'O plano Starter é gratuito e não precisa de pagamento' }, { status: 400 });
+    }
+    if (tier.priceMonthly == null) {
       return NextResponse.json(
-        { error: 'Invalid tier' },
+        { error: 'O plano Enterprise é sob consulta. Fale com a gente: contato@helpflow.com.br' },
         { status: 400 }
       );
     }
+
+    // Only the owner subscribes, for the restaurant being worked in: the plan is copied to the
+    // restaurants the subscriber owns (lib/billing/subscription-sync.ts), so a manager's payment
+    // used to upgrade nothing.
+    const auth = await requireRestaurantRole(['OWNER'], 'Só o dono do restaurante pode assinar um plano');
+    if (!auth.ok) return auth.response;
+    const { member } = auth;
+
+    const paying = await findPayingSubscription(member.userId);
+    if (paying) {
+      return NextResponse.json(
+        { error: `Você já tem uma assinatura ativa (${paying.planName || paying.tier}). Para trocar de plano, cancele a atual em Conta › Cobrança.` },
+        { status: 409 }
+      );
+    }
+    // One free trial per owner: cancel-and-subscribe-again must not restart it
+    const hadTrial = (await prisma.subscription.count({
+      where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },
+    })) > 0;
 
     const isAnnual = billing === 'annual';
     const stripePriceId = isAnnual ? tier.stripePriceIdAnnual : tier.stripePriceId;
@@ -58,12 +82,12 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: member.userId },
     });
 
     if (!user) {
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: 'Usuário não encontrado' },
         { status: 404 }
       );
     }
@@ -104,8 +128,10 @@ export async function POST(request: NextRequest) {
       ...(isSubscription
         ? {
             subscription_data: {
-              trial_period_days: 30,
-              metadata: { userId: user.id, tierId, billing: isAnnual ? 'annual' : 'monthly' },
+              ...(hadTrial ? {} : { trial_period_days: 30 }),
+              // The restaurant is fixed at checkout: the webhook used to take whichever restaurant
+              // the owner had open when Stripe called back
+              metadata: { userId: user.id, restaurantId: member.restaurantId, tierId, billing: isAnnual ? 'annual' : 'monthly' },
             },
           }
         : {}),
@@ -113,6 +139,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${origin}/pricing`,
       metadata: {
         userId: user.id,
+        restaurantId: member.restaurantId,
         tierId: tierId,
       },
     });
@@ -124,7 +151,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Checkout session error:', error);
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      { error: 'Não foi possível abrir o pagamento. Tente de novo em alguns minutos.' },
       { status: 500 }
     );
   }

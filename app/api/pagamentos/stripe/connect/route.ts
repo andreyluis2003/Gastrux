@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { prisma } from '@/lib/prisma';
 import {
   createExpressAccount,
@@ -46,13 +47,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Only OWNER can setup Stripe Connect
-    if (!['OWNER', 'ADMIN'].includes(session.user.role || '')) {
-      return NextResponse.json(
-        { error: 'Only OWNER or ADMIN can setup payment accounts' },
-        { status: 403 }
-      );
-    }
+    // Only the OWNER of this restaurant sets up where its money goes
+    const auth = await requireRestaurantRole(['OWNER'], 'Only the restaurant OWNER can setup payment accounts');
+    if (!auth.ok) return auth.response;
 
     const restaurant = user.restaurants?.[0]?.restaurant;
     if (!restaurant) {

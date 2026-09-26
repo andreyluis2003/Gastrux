@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { broadcastOrderUpdate } from '@/lib/socket';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { OPEN_STATUSES } from '@/lib/kds/order-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,14 +29,23 @@ export async function PUT(
 
     const owned = await prisma.orderItem.findFirst({
       where: { id: params.id, order: { restaurantId } },
-      select: { id: true },
+      select: { id: true, order: { select: { status: true } } },
     });
     if (!owned) {
       return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
     }
+    // A completed or cancelled order is closed: its items no longer change
+    if (!OPEN_STATUSES.includes(owned.order.status)) {
+      return NextResponse.json({ error: 'Este pedido já foi encerrado', code: 'ORDER_CLOSED' }, { status: 409 });
+    }
 
     const body = await req.json();
     const { status, stationId, startedAt, completedAt } = body;
+    // Only a station of this restaurant
+    if (stationId) {
+      const station = await prisma.kitchenStation.findFirst({ where: { id: stationId, restaurantId }, select: { id: true } });
+      if (!station) return NextResponse.json({ error: 'Estação não encontrada' }, { status: 404 });
+    }
 
     const update: any = {};
     if (status) update.status = status;

@@ -46,10 +46,24 @@ export async function getRestaurantContext(): Promise<SessionWithRestaurant> {
     throw new Error('NO_RESTAURANT: User has no restaurant selected');
   }
 
+  // The selected restaurant only counts while the user still owns it or has an ACTIVE membership
+  // there (a removed staff member used to keep access until the session ended), and the role is
+  // the role in THAT restaurant, not the global User.role
+  const [owned, membership] = await Promise.all([
+    prisma.restaurant.findFirst({ where: { id: user.currentRestaurantId, ownerId: user.id }, select: { id: true } }),
+    prisma.restaurantUser.findFirst({
+      where: { restaurantId: user.currentRestaurantId, userId: user.id, isActive: true },
+      select: { role: true },
+    }),
+  ]);
+  if (!owned && !membership) {
+    throw new Error('FORBIDDEN: no active membership in the selected restaurant');
+  }
+
   return {
     userId: user.id,
     restaurantId: user.currentRestaurantId,
-    role: user.role || 'MANAGER',
+    role: owned ? 'OWNER' : membership!.role,
   };
 }
 

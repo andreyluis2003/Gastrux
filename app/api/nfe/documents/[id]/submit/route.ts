@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { recordEmitResult } from '@/lib/nfe/emit-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,9 +33,10 @@ export async function POST(
     const tierBlock = await enforceFeature(restaurantId, 'nfe');
     if (tierBlock) return tierBlock;
 
+    // Scoped through the config: another restaurant's note is a 404
     const document = await prisma.nFeDocument.findFirst({
       where: { id: params.id, config: { restaurantId } },
-      include: { items: true, config: true },
+      include: { items: { orderBy: { position: 'asc' } }, config: true },
     });
 
     if (!document) {
@@ -62,8 +64,19 @@ export async function POST(
       });
     }
 
+    // Two clicks must not send the same note twice: claim it (optimistic, on updatedAt)
+    const claimed = await prisma.nFeDocument.updateMany({
+      where: { id: document.id, status: document.status, updatedAt: document.updatedAt },
+      data: { status: 'pending' },
+    });
+    if (claimed.count === 0) {
+      return NextResponse.json({ error: 'Este documento já está sendo reenviado' }, { status: 409 });
+    }
+
     const config = document.config;
     const provider = getProvider(config);
+    // The payment method first declared (F7: it used to be re-sent as "dinheiro")
+    const previous: any = document.dataSnapshot || {};
 
     const payload = {
       providerRef,
@@ -77,7 +90,11 @@ export async function POST(
       customerCNPJ: document.customerCNPJ || undefined,
       customerName: document.customerName || undefined,
       customerEmail: document.customerEmail || undefined,
-      items: document.items.map((it) => ({
+      // The fiscal data first sent (origin, CSOSN, CEST) is kept on a re-send (lib/nfe/fiscal-data.ts)
+      items: document.items.map((it, idx) => ({
+        ...(previous.items?.[idx]?.description === it.description
+          ? { cest: previous.items[idx].cest, icmsOrigin: previous.items[idx].icmsOrigin, icmsCST: previous.items[idx].icmsCST }
+          : {}),
         description: it.description,
         quantity: Number(it.quantity),
         unit: it.unit,
@@ -87,8 +104,9 @@ export async function POST(
         cfop: it.cfop || undefined,
       })),
       totalAmount: Number(document.totalAmount),
-      paymentMethod: 'dinheiro',
+      paymentMethod: previous.paymentMethod || 'dinheiro',
       paymentAmount: Number(document.totalAmount),
+      pisCofinsCst: previous.pisCofinsCst || config.pisCofinsCst || undefined,
     };
 
     await prisma.nFeLog.create({
@@ -96,7 +114,7 @@ export async function POST(
         configId: document.configId,
         documentId: document.id,
         eventType: 'submit',
-        description: `Submetendo ao provider ${provider.name}`,
+        description: `Reenviando nº ${document.documentNumber} ao provider ${provider.name}`,
         requestData: JSON.stringify(payload).slice(0, 4000),
       },
     });
@@ -105,52 +123,12 @@ export async function POST(
       ? await provider.emitNFCe(payload)
       : await provider.emitNFe(payload);
 
-    const updateData: any = {
-      dataSnapshot: payload,
-      submittedAt: new Date(),
-    };
-    if (result.ok) {
-      updateData.status = result.status;
-      updateData.accessKey = result.accessKey || null;
-      updateData.protocolNumber = result.protocolNumber || null;
-      updateData.qrCodeData = result.qrCodeData || null;
-      updateData.qrCodeUrl = result.qrCodeUrl || null;
-      updateData.pdfUrl = result.danfeUrl || null;
-      updateData.xmlUrl = result.xmlUrl || null;
-      updateData.statusDescription = result.statusDescription || null;
-      updateData.rejectionReason = null;
-      if (result.status === 'authorized') {
-        updateData.authorizedAt = new Date();
-      }
-    } else {
-      updateData.status = 'rejected';
-      updateData.rejectionReason = result.rejectionReason || 'Erro';
-      updateData.statusDescription = result.statusDescription || null;
-    }
-
-    const updated = await prisma.nFeDocument.update({
-      where: { id: document.id },
-      data: updateData,
-    });
-
-    await prisma.nFeLog.create({
-      data: {
-        configId: document.configId,
-        documentId: document.id,
-        eventType: result.ok ? 'submit_success' : 'submit_error',
-        description: result.ok
-          ? `Emitido: ${result.status}`
-          : `Erro: ${result.rejectionReason}`,
-        responseData: JSON.stringify(result.raw || {}).slice(0, 4000),
-        statusCode: result.ok ? 200 : 400,
-        errorMessage: result.ok ? null : result.rejectionReason,
-      },
-    });
+    const updated = await recordEmitResult(document.id, document.configId, payload, result, restaurantId);
 
     return NextResponse.json({
       success: result.ok,
       document: updated,
-      status: result.status,
+      status: updated.status,
       rejectionReason: result.rejectionReason,
     });
   } catch (error: any) {

@@ -1,54 +1,43 @@
 'use client';
 
-import { Check, X, Brain, BarChart3, Shield } from 'lucide-react';
+import { Check, Brain, BarChart3, Shield } from 'lucide-react';
 
-const COMPETITORS = ['Saipos', 'Consumer', 'SisFood', 'GrandChef'];
+// Only what Gastrux itself does and the plan it comes in (lib/tier-guard.ts). No claims about named
+// competitors: nothing here could be sourced and kept current (site claims review, 2026-09-25).
+type FeatureRow = { feature: string; plan: string };
 
-type FeatureRow = {
-  feature: string;
-  gastrux: boolean | string;
-  competitors: (boolean | string)[];
-  highlight?: boolean;
-};
-
-const COMPARISON: FeatureRow[] = [
-  { feature: 'CMV automático por prato', gastrux: true, competitors: [false, false, false, false], highlight: true },
-  { feature: 'Inteligência Artificial integrada', gastrux: true, competitors: [false, false, false, false], highlight: true },
-  { feature: 'Previsão de demanda (ML)', gastrux: true, competitors: [false, false, false, false], highlight: true },
-  { feature: 'Engenharia de cardápio', gastrux: true, competitors: [false, false, false, false] },
-  { feature: '100% na nuvem (sem instalar)', gastrux: true, competitors: [true, false, true, true] },
-  { feature: 'Plano grátis para sempre', gastrux: true, competitors: [false, '200 ped/mês', false, false] },
-  { feature: 'Multi-loja', gastrux: true, competitors: [true, false, false, false] },
-  { feature: 'CRM + Programa de fidelidade', gastrux: true, competitors: [false, false, false, false] },
-  { feature: 'WhatsApp Bot + Agente de Voz IA', gastrux: true, competitors: [false, false, false, false], highlight: true },
-  { feature: 'Integração iFood, Rappi, Uber', gastrux: true, competitors: [true, true, true, false] },
-  { feature: 'Kitchen Display System (KDS)', gastrux: true, competitors: [true, true, false, false] },
-  { feature: 'Nota Fiscal Eletrônica (NF-e)', gastrux: true, competitors: [true, true, true, false] },
+const FEATURES: FeatureRow[] = [
+  { feature: 'Custo (CMV) e margem de contribuição por prato', plan: 'Todos' },
+  { feature: 'Estoque com alertas de baixa quantidade', plan: 'Todos' },
+  { feature: 'Engenharia de cardápio', plan: 'Todos' },
+  { feature: '100% na nuvem, sem instalar', plan: 'Todos' },
+  { feature: 'Comanda e venda de balcão sem internet', plan: 'Todos' },
+  { feature: 'Previsão de demanda', plan: 'Pro ou superior' },
+  { feature: 'Kitchen Display System (KDS)', plan: 'Business ou superior' },
+  { feature: 'Cardápio digital com QR Code', plan: 'Business ou superior' },
+  { feature: 'CRM e programa de fidelidade', plan: 'Business ou superior' },
+  { feature: 'Multi-loja', plan: 'Business (2 lojas) ou Enterprise' },
+  { feature: 'NFC-e (com certificado e dados do contador)', plan: 'Business ou superior' },
+  { feature: 'Recebimento de pedidos externos por webhook (API)', plan: 'Pro ou superior' },
 ];
 
 const DIFFERENTIALS = [
   {
     icon: BarChart3,
-    title: 'Custo real de cada prato',
-    description: 'O caderno não calcula CMV. A Gastrux mostra o custo exato de cada prato — e onde você está perdendo margem.',
+    title: 'Custo de cada prato',
+    description: 'O caderno não calcula CMV. A Gastrux calcula o custo de cada prato pela ficha técnica e mostra a margem de contribuição de cada um.',
   },
   {
     icon: Brain,
-    title: 'Inteligência que o caderno não tem',
-    description: 'Previsão de vendas, alertas automáticos e sugestões de compra. Você toma decisão com dados, não no achismo.',
+    title: 'Alertas e previsão',
+    description: 'Alerta de estoque baixo, previsão de vendas a partir do seu histórico e lista de compras. Decisão com dados, não no achismo.',
   },
   {
     icon: Shield,
     title: 'Tudo num lugar só',
-    description: 'Estoque, vendas, custo, delivery, clientes — tudo junto. Sem precisar de 5 caderninhos diferentes.',
+    description: 'Estoque, vendas, custo, caixa e clientes — tudo junto. Sem precisar de 5 caderninhos diferentes.',
   },
 ];
-
-function CellValue({ value }: { value: boolean | string }) {
-  if (value === true) return <Check className="w-5 h-5 text-emerald-500 mx-auto" />;
-  if (value === false) return <X className="w-5 h-5 text-slate-300 dark:text-slate-600 mx-auto" />;
-  return <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{value}</span>;
-}
 
 export function WhyGastrux() {
   return (
@@ -57,13 +46,13 @@ export function WhyGastrux() {
         {/* Header */}
         <div className="text-center mb-14">
           <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide uppercase mb-3">
-            Comparativo honesto
+            O que a Gastrux faz
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
-            Por que a Gastrux e não o caderno (ou outro sistema)?
+            Por que a Gastrux e não o caderno?
           </h2>
           <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-            Se você já pensou em usar um sistema mas achou complicado ou caro demais — a Gastrux é diferente. Veja por quê.
+            Se você já pensou em usar um sistema mas achou complicado ou caro demais, veja o que ela faz e em qual plano.
           </p>
         </div>
 
@@ -80,56 +69,34 @@ export function WhyGastrux() {
           ))}
         </div>
 
-        {/* Comparison Table */}
+        {/* Feature list by plan */}
         <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
           <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Tabela comparativa</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Funcionalidades que fazem a diferença no dia a dia</p>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Funcionalidades e planos</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              O detalhe de limites e preços está na <a href="/pricing" className="underline hover:text-blue-600">página de planos</a>.
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700">
-                  <th className="text-left py-3 px-4 font-medium text-slate-500 dark:text-slate-400 min-w-[200px]">Funcionalidade</th>
-                  <th className="text-center py-3 px-3 font-bold text-blue-600 dark:text-blue-400 min-w-[90px] bg-blue-50/50 dark:bg-blue-900/10">Gastrux</th>
-                  {COMPETITORS.map((c) => (
-                    <th key={c} className="text-center py-3 px-3 font-medium text-slate-400 dark:text-slate-500 min-w-[80px]">{c}</th>
-                  ))}
+                  <th className="text-left py-3 px-4 font-medium text-slate-500 dark:text-slate-400 min-w-[220px]">Funcionalidade</th>
+                  <th className="text-left py-3 px-4 font-medium text-slate-500 dark:text-slate-400 min-w-[160px]">Disponível em</th>
                 </tr>
               </thead>
               <tbody>
-                {COMPARISON.map((row, i) => (
-                  <tr
-                    key={i}
-                    className={`border-b border-slate-100 dark:border-slate-700/50 ${
-                      row.highlight ? 'bg-emerald-50/50 dark:bg-emerald-900/5' : ''
-                    }`}
-                  >
+                {FEATURES.map((row) => (
+                  <tr key={row.feature} className="border-b border-slate-100 dark:border-slate-700/50">
                     <td className="py-3 px-4 text-slate-700 dark:text-slate-200 font-medium">
+                      <Check className="inline w-4 h-4 mr-2 text-emerald-500" aria-hidden />
                       {row.feature}
-                      {row.highlight && (
-                        <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
-                          Exclusivo
-                        </span>
-                      )}
                     </td>
-                    <td className="py-3 px-3 text-center bg-blue-50/50 dark:bg-blue-900/10">
-                      <CellValue value={row.gastrux} />
-                    </td>
-                    {row.competitors.map((val, j) => (
-                      <td key={j} className="py-3 px-3 text-center">
-                        <CellValue value={val} />
-                      </td>
-                    ))}
+                    <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{row.plan}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-          <div className="p-4 text-center border-t border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              * Dados baseados em informações públicas dos sites oficiais dos concorrentes (jun/2026)
-            </p>
           </div>
         </div>
       </div>

@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     // Check if transaction already exists
     const existing = await prisma.pOSTransaction.findUnique({
-      where: { transactionId },
+      where: { restaurantId_provider_transactionId: { restaurantId, provider, transactionId } },
     });
 
     if (existing) {

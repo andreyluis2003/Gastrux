@@ -53,7 +53,7 @@ export async function PUT(
     }
     const ownedPayment = await prisma.payment.findFirst({
       where: { id: params.id, restaurantId },
-      select: { id: true },
+      select: { id: true, gateway: true },
     });
     if (!ownedPayment) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
@@ -61,6 +61,18 @@ export async function PUT(
 
     const body = await req.json();
     const { status, processedAt, refundedAt } = body;
+
+    // Payments received through the restaurant's own Mercado Pago account are
+    // driven by the signed webhook and the refund route, which check the
+    // gateway status, the amount and the allowed transitions. Letting any
+    // member of the restaurant set an arbitrary status here would be a way to
+    // flip a real payment to APPROVED or REFUNDED by hand.
+    if (status && ownedPayment.gateway === 'MERCADO_PAGO_CONNECT') {
+      return NextResponse.json(
+        { error: 'O status deste pagamento é controlado pelo Mercado Pago' },
+        { status: 409 }
+      );
+    }
 
     const payment = await prisma.payment.update({
       where: { id: params.id },

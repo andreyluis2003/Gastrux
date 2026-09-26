@@ -4,6 +4,11 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { assertDedicatedTestDb } from '../../lib/testing/assert-test-db';
+
+// Defense in depth: the jest workers must refuse to touch anything but a dedicated
+// test database, even if globalSetup was bypassed. Must run before the client is created.
+assertDedicatedTestDb(process.env);
 
 const prisma = new PrismaClient();
 

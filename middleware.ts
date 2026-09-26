@@ -104,6 +104,8 @@ function isPlatformAdminToken(token: any): boolean {
   return false;
 }
 
+const CHANGE_PASSWORD_PAGE = '/conta/trocar-senha';
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -121,6 +123,11 @@ export async function middleware(request: NextRequest) {
         const signInUrl = new URL('/auth/signin', request.url);
         signInUrl.searchParams.set('callbackUrl', pathname);
         return NextResponse.redirect(signInUrl);
+      }
+
+      // A password chosen by someone else (a hire, a reset) is changed before anything else
+      if (token.mustChangePassword && pathname !== CHANGE_PASSWORD_PAGE) {
+        return NextResponse.redirect(new URL(CHANGE_PASSWORD_PAGE, request.url));
       }
 
       // Block tenants from platform-internal pages (achado nº1)
@@ -173,6 +180,14 @@ export async function middleware(request: NextRequest) {
         response.headers.set('X-Authenticated', 'true');
       } else {
         response.headers.set('X-Authenticated', 'false');
+      }
+
+      // Until the temporary password is changed, only the password change itself answers
+      if (token?.mustChangePassword && pathname !== '/api/conta/profile') {
+        return NextResponse.json(
+          { error: 'Troque a senha provisória para continuar', code: 'PASSWORD_CHANGE_REQUIRED' },
+          { status: 403 },
+        );
       }
 
       // Block tenants from platform-internal APIs (achado nº1) — defense in depth

@@ -19,6 +19,7 @@ import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { FadeIn } from '@/components/ui/animate';
 import { GlassCard } from '@/components/ui/glass-card';
 import { formatBRL } from '@/lib/formatters';
+import { RecipeFiscalCard } from '@/components/fiscal/recipe-fiscal-card';
 
 interface RecipeIngredient {
   id: string;
@@ -46,6 +47,11 @@ interface Recipe {
   id: string;
   code: string;
   name: string;
+  fiscalNcm?: string | null;
+  fiscalCest?: string | null;
+  fiscalCfop?: string | null;
+  fiscalOrigin?: string | null;
+  fiscalCsosn?: string | null;
   description?: string;
   baseYield: number;
   yieldUnit: string;
@@ -425,6 +431,11 @@ export default function ReceitaDetailPage() {
             </div>
           </div>
         </Card>
+      </FadeIn>
+
+      {/* Fiscal data of the product on the NFC-e (launch plan item 3) */}
+      <FadeIn delay={0.32}>
+        <RecipeFiscalCard key={recipe.id} recipeId={recipe.id} initial={recipe} />
       </FadeIn>
 
       {/* Description */}

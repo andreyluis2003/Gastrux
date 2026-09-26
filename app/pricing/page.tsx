@@ -5,12 +5,11 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
-import { CheckCircle2, X, Zap, ArrowRight, ChefHat, ShieldCheck, HelpCircle, RefreshCw, Star } from 'lucide-react';
+import { CheckCircle2, X, Zap, ArrowRight, ChefHat, ShieldCheck, HelpCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
-import { TestimonialsCarousel } from '@/components/marketing/testimonials-carousel';
 import { FAQSection } from '@/components/marketing/faq-section';
 import { GatewayChoiceDialog } from '@/components/billing/gateway-choice-dialog';
 import { cn } from '@/lib/utils';
@@ -29,12 +28,11 @@ const FEATURES_COMPARISON = [
   { category: 'Produção', name: 'Previsão de Demanda (ML)' },
   { category: 'Analytics', name: 'Dashboard Analítico' },
   { category: 'Analytics', name: 'Relatórios Executivos' },
-  { category: 'Integrações', name: 'Integração iFood/Rappi/Uber' },
+  { category: 'Integrações', name: 'Pedidos externos por webhook (API)' },
   { category: 'Integrações', name: 'Multi-loja' },
   { category: 'Suporte', name: 'Suporte Email' },
   { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
-  { category: 'Premium', name: 'Nota Fiscal Eletrônica (NF-e)' },
-  { category: 'Premium', name: 'API customizada' },
+  { category: 'Premium', name: 'NFC-e (nota do consumidor)' },
 ];
 
 const getTierFeatureValue = (tierId: string, featureName: string) => {
@@ -54,18 +52,17 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Previsão de Demanda (ML)': ['pro', 'business', 'enterprise'].includes(tierId),
     'Dashboard Analítico': tierId !== 'starter',
     'Relatórios Executivos': ['business', 'enterprise'].includes(tierId),
-    'Integração iFood/Rappi/Uber':
+    'Pedidos externos por webhook (API)':
       tier.limits.deliveryIntegrations > 0
-        ? (tier.limits.deliveryIntegrations === 999999 ? 'Ilimitado' : `${tier.limits.deliveryIntegrations} apps`)
+        ? (tier.limits.deliveryIntegrations === 999999 ? 'Ilimitado' : `${tier.limits.deliveryIntegrations} conexões`)
         : false,
     'Multi-loja':
       tier.limits.locations && tier.limits.locations > 0
         ? (tier.limits.locations === 999999 ? 'Ilimitado' : `${tier.limits.locations} lojas`)
         : false,
     'Suporte Email': true,
-    'Suporte pelo WhatsApp': tierId === 'business',
-    'Nota Fiscal Eletrônica (NF-e)': ['business', 'enterprise'].includes(tierId),
-    'API customizada': tierId === 'enterprise',
+    'Suporte pelo WhatsApp': ['business', 'enterprise'].includes(tierId),
+    'NFC-e (nota do consumidor)': ['business', 'enterprise'].includes(tierId),
   };
 
   return featureMap[featureName] ?? false;
@@ -103,7 +100,7 @@ export default function PricingPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        toast.error('Erro ao criar sessão de checkout');
+        toast.error(data.error || 'Erro ao criar sessão de checkout');
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -234,7 +231,7 @@ export default function PricingPage() {
                 >
                   {isPopular && (
                     <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-500 to-violet-500 text-white text-xs font-semibold text-center py-1.5 tracking-wider uppercase">
-                      ⭐ Mais escolhido
+                      Recomendado
                     </div>
                   )}
 
@@ -324,24 +321,20 @@ export default function PricingPage() {
           {/* Enterprise: consultation-only, not a self-serve card */}
           <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-8">
             Precisa de mais que o Business — mais lojas, mais usuários, requisitos específicos?{' '}
-            <Link href="/suporte/novo?tipo=enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-              Fale com a gente sobre o plano Enterprise
-            </Link>
+            <a href="mailto:contato@helpflow.com.br?subject=Plano%20Enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Plano Enterprise, preço sob consulta: contato@helpflow.com.br
+            </a>
           </p>
 
           {/* Trust badges */}
           <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-500" />
-              <span>Dados seguros (AWS)</span>
+              <span>Dados separados por restaurante</span>
             </div>
             <div className="flex items-center gap-2">
               <RefreshCw className="w-5 h-5 text-emerald-500" />
               <span>Cancele quando quiser</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-              <span>4,8/5 em 500+ restaurantes</span>
             </div>
             <div className="flex items-center gap-2">
               <HelpCircle className="w-5 h-5 text-blue-500" />
@@ -384,7 +377,7 @@ export default function PricingPage() {
                       >
                         {tier.name}
                         {tier.id === 'business' && (
-                          <span className="block text-xs font-normal text-blue-500 mt-0.5">Mais escolhido</span>
+                          <span className="block text-xs font-normal text-blue-500 mt-0.5">Recomendado</span>
                         )}
                       </th>
                     ))}
@@ -447,9 +440,6 @@ export default function PricingPage() {
           )}
         </div>
       </section>
-
-      {/* Testimonials */}
-      <TestimonialsCarousel />
 
       {/* FAQ */}
       <FAQSection />

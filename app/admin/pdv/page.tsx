@@ -49,6 +49,7 @@ export default function PDVPage() {
     try {
       const res = await fetch('/api/admin/pos/settings');
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setSettings(data.settings || []);
     } catch { toast.error('Erro ao carregar configurações'); }
   }, []);
@@ -57,6 +58,7 @@ export default function PDVPage() {
     try {
       const res = await fetch(`/api/admin/pos/transactions?period=${period}&limit=100`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setTransactions(data);
     } catch { toast.error('Erro ao carregar transações'); }
   }, [period]);
@@ -64,8 +66,8 @@ export default function PDVPage() {
   const fetchReconcileStats = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/pos/reconcile');
-      const data = await res.json();
-      setReconcileStats(data);
+      if (!res.ok) return;
+      setReconcileStats(await res.json());
     } catch {}
   }, []);
 
@@ -97,7 +99,8 @@ export default function PDVPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Remover essa integração PDV?')) return;
     try {
-      await fetch(`/api/admin/pos/settings?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/pos/settings?id=${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
       toast.success('Integração removida');
       await fetchSettings();
     } catch { toast.error('Erro ao remover'); }
@@ -112,9 +115,10 @@ export default function PDVPage() {
         body: JSON.stringify({}),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       toast.success(`Reconciliado: ${data.reconciled} transações`);
       await Promise.all([fetchTransactions(), fetchReconcileStats()]);
-    } catch { toast.error('Erro na reconciliação'); }
+    } catch (err: any) { toast.error(err?.message || 'Erro na reconciliação'); }
     finally { setReconciling(false); }
   };
 

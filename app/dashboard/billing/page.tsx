@@ -120,7 +120,7 @@ export default function BillingPage() {
                     <p className="font-semibold">
                       {currentTier?.priceMonthly
                         ? `R$${currentTier.priceMonthly}`
-                        : 'Contato'}
+                        : 'Sob consulta'}
                     </p>
                   </div>
                 </div>

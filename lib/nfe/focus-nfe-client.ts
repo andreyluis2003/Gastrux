@@ -2,6 +2,25 @@
 import { NFeProvider, NFeEmitPayload, NFeEmitResult } from './types';
 
 /**
+ * A timeout, a network error, 408, 429 or a 5xx does not say whether SEFAZ authorised the note: the
+ * provider may have sent it. Such an outcome is "processing" (to be checked with getStatus on the
+ * same ref), never "rejected", or emitting again would issue a second note for the same sale.
+ */
+function isUnknownOutcome(httpStatus: number): boolean {
+  return httpStatus >= 500 || httpStatus === 408 || httpStatus === 429;
+}
+
+function unknownOutcome(cause: string, raw: any): NFeEmitResult {
+  return {
+    ok: false,
+    status: 'processing',
+    rejectionReason: `Sem resposta conclusiva do provedor (${cause}): a nota está em processamento, consulte o status antes de emitir de novo`,
+    statusDescription: 'Resultado desconhecido',
+    raw,
+  };
+}
+
+/**
  * Focus NFe REST API client.
  *
  * Docs: https://focusnfe.com.br/doc/
@@ -41,10 +60,11 @@ export class FocusNFeClient implements NFeProvider {
       quantidade_tributavel: Number(item.quantity).toFixed(4),
       valor_unitario_tributavel: Number(item.unitPrice).toFixed(4),
       ncm: item.ncm || '21069090',
+      ...(item.cest ? { cest: item.cest } : {}),
       origem: item.icmsOrigin || '0',
       icms_situacao_tributaria: item.icmsCST || '102', // Simples Nacional sem permissão de crédito
-      pis_situacao_tributaria: '07',
-      cofins_situacao_tributaria: '07',
+      pis_situacao_tributaria: p.pisCofinsCst || '07',
+      cofins_situacao_tributaria: p.pisCofinsCst || '07',
     }));
 
     return {
@@ -93,6 +113,10 @@ export class FocusNFeClient implements NFeProvider {
 
       const json = await res.json().catch(() => ({}));
 
+      if (isUnknownOutcome(res.status)) {
+        return unknownOutcome(`HTTP ${res.status}`, json);
+      }
+
       if (!res.ok) {
         return {
           ok: false,
@@ -105,12 +129,7 @@ export class FocusNFeClient implements NFeProvider {
 
       return this.parseResponse(json);
     } catch (err: any) {
-      return {
-        ok: false,
-        status: 'rejected',
-        rejectionReason: err?.message || 'Erro de rede',
-        raw: { error: err?.message },
-      };
+      return unknownOutcome(err?.message || 'Erro de rede', { error: err?.message });
     }
   }
 
@@ -195,7 +214,8 @@ export class FocusNFeClient implements NFeProvider {
     if (rawStatus === 'autorizado') status = 'authorized';
     else if (rawStatus === 'processando_autorizacao') status = 'processing';
     else if (rawStatus === 'cancelado') status = 'cancelled';
-    else if (rawStatus === 'denegado' || rawStatus === 'erro_autorizacao' || rawStatus === 'rejeitado') status = 'rejected';
+    else if (rawStatus === 'denegado') status = 'denied'; // the number was used: never re-sent
+    else if (rawStatus === 'erro_autorizacao' || rawStatus === 'rejeitado') status = 'rejected';
     else if (rawStatus) status = 'submitted';
 
     return {
@@ -207,7 +227,7 @@ export class FocusNFeClient implements NFeProvider {
       qrCodeUrl: json?.qrcode_url, // pode ser mesma string
       danfeUrl: json?.caminho_danfe ? `${this.baseUrl}${json.caminho_danfe}` : json?.url_danfe,
       xmlUrl: json?.caminho_xml_nota_fiscal ? `${this.baseUrl}${json.caminho_xml_nota_fiscal}` : json?.url_xml,
-      rejectionReason: status === 'rejected' ? (json?.mensagem_sefaz || json?.mensagem || 'Rejeitado pela SEFAZ') : undefined,
+      rejectionReason: status === 'rejected' || status === 'denied' ? (json?.mensagem_sefaz || json?.mensagem || 'Rejeitado pela SEFAZ') : undefined,
       statusDescription: json?.mensagem_sefaz || json?.status,
       raw: json,
     };

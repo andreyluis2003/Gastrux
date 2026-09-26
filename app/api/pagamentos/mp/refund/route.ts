@@ -6,10 +6,11 @@
  * Refunds a Mercado Pago payment (full or partial)
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { requireRestaurantManager } from '@/lib/mercadopago-connect/guard';
 import { refundPayment } from '@/lib/mercado-pago';
+import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
+import { refundConnectPayment } from '@/lib/mercadopago-connect/payments';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -17,18 +18,17 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Authorized by membership in the CURRENT restaurant (its owner, or an active
+    // OWNER/ADMIN/MANAGER member), never by the global JWT role: a user who is
+    // OWNER of restaurant X and only a cashier of this one must not refund here.
+    const auth = await requireRestaurantManager(
+      ['OWNER', 'ADMIN', 'MANAGER'],
+      'Apenas o dono, administrador ou gerente pode reembolsar pagamentos'
+    );
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
-
-    // Only OWNER, ADMIN, MANAGER can process refunds
-    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(session.user.role || '')) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to process refunds' },
-        { status: 403 }
-      );
-    }
+    const { session, restaurantId } = auth;
 
     const { paymentId, amount, reason, description } = await request.json();
 
@@ -39,9 +39,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A provided amount must be a positive number: 0 or garbage must never fall through to a full refund.
+    if (amount !== undefined && amount !== null && amount !== '') {
+      const parsedAmount = Number(amount);
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        return NextResponse.json({ error: 'Valor de reembolso inválido' }, { status: 400 });
+      }
+    }
+
+    // The payment must belong to the current restaurant (the one the caller was
+    // just authorized for) - otherwise a manager could refund another restaurant's payment.
+
     // Find the payment
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
+    const payment = await prisma.payment.findFirst({
+      where: { id: paymentId, restaurantId },
       include: { mercadoPagoData: true, refunds: true },
     });
 
@@ -70,10 +81,27 @@ export async function POST(request: NextRequest) {
     }
 
     const refundAmount = amount ? Number(amount) : remainingAmount;
-    const isFullRefund = refundAmount >= Number(payment.amount);
 
-    // Get MP payment ID
-    const mpPaymentId = payment.mercadoPagoData?.mpPaymentId;
+    // Nothing left to refund. Without this guard a third call after a full
+    // refund computed refundAmount = 0 and reached refundConnectPayment /
+    // refundPayment with an undefined amount, which is a FULL refund request
+    // against the restaurant's account. Mirrors lib/payment-unified.ts.
+    if (!(refundAmount > 0)) {
+      return NextResponse.json({ error: 'Nada a reembolsar' }, { status: 400 });
+    }
+
+    // Counted against what was ALREADY refunded: refunding 60 of 100 and then
+    // the remaining 40 must end as REFUNDED, not PARTIALLY_REFUNDED.
+    const isFullRefund = totalRefunded + refundAmount >= Number(payment.amount);
+
+    // An identical repeated request (double click, client retry after a
+    // timeout) maps to the SAME key, so Mercado Pago refunds only once.
+    const idempotencyKey = `refund:${payment.id}:${totalRefunded}:${refundAmount}`;
+
+    // Get MP payment ID. Payments received by a restaurant through its own
+    // Mercado Pago account (MERCADO_PAGO_CONNECT) keep it in gatewayPaymentId.
+    const isConnect = payment.gateway === 'MERCADO_PAGO_CONNECT';
+    const mpPaymentId = isConnect ? payment.gatewayPaymentId : payment.mercadoPagoData?.mpPaymentId;
     if (!mpPaymentId) {
       return NextResponse.json(
         { error: 'Mercado Pago payment ID not found' },
@@ -81,11 +109,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process refund via MP API
-    const mpRefund = await refundPayment(
-      mpPaymentId,
-      amount ? Number(amount) : undefined
-    );
+    // Process refund via MP API - with the restaurant's own token for Connect payments.
+    let mpRefund;
+    if (isConnect) {
+      const client = await getMpClientForRestaurant(restaurantId);
+      if (!client) {
+        return NextResponse.json(
+          { error: 'Conexão com o Mercado Pago indisponível. Reconecte sua conta para reembolsar.' },
+          { status: 409 }
+        );
+      }
+      mpRefund = await refundConnectPayment(
+        client,
+        mpPaymentId,
+        amount ? Number(amount) : undefined,
+        idempotencyKey
+      );
+    } else {
+      mpRefund = await refundPayment(mpPaymentId, amount ? Number(amount) : undefined);
+    }
 
     // Create refund record
     const refund = await prisma.paymentRefund.create({
@@ -94,7 +136,7 @@ export async function POST(request: NextRequest) {
         amount: refundAmount,
         currency: payment.currency,
         reason: reason || 'requested_by_customer',
-        gateway: 'MERCADO_PAGO',
+        gateway: payment.gateway,
         gatewayRefundId: String(mpRefund.id),
         status: 'completed',
         description: description || `Refund for payment ${payment.id}`,
@@ -113,6 +155,16 @@ export async function POST(request: NextRequest) {
         refundedAt: new Date(),
       },
     });
+
+    // A fully refunded payment must not leave its order showing as paid in the
+    // KDS/POS. Idempotent and restaurantId-scoped, and only from APPROVED; a
+    // PARTIAL refund keeps the order APPROVED.
+    if (newStatus === 'REFUNDED' && payment.orderId) {
+      await prisma.order.updateMany({
+        where: { id: payment.orderId, restaurantId, paymentStatus: 'APPROVED' },
+        data: { paymentStatus: 'REFUNDED' },
+      });
+    }
 
     const duration = Date.now() - startTime;
     trackApiCall('POST', '/api/pagamentos/mp/refund', 200, duration);

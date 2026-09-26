@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { createDocumentWithNextNumber } from '@/lib/nfe/numbering';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,19 +127,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get next document number
-    const nextNumber = documentType === 'NFCe' ? config.nextNumberNFCe : config.nextNumberNFe;
-    const series = documentType === 'NFCe' ? config.seriesNFCe : config.seriesNFe;
-
-    // Create document
-    const document = await prisma.nFeDocument.create({
+    // Number reserved atomically with the insert (lib/nfe/numbering.ts): never shared, never skipped
+    const document = await createDocumentWithNextNumber({
+      configId: config.id,
+      documentType: documentType === 'NFe' ? 'NFe' : 'NFCe',
       data: {
-        configId: config.id,
         orderId,
         paymentId,
-        documentType,
-        documentNumber: nextNumber,
-        documentSeries: series,
         customerName,
         customerCPF,
         customerCNPJ,
@@ -168,26 +163,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update config with next number
-    if (documentType === 'NFCe') {
-      await prisma.nFeConfig.update({
-        where: { id: config.id },
-        data: { nextNumberNFCe: nextNumber + 1 },
-      });
-    } else {
-      await prisma.nFeConfig.update({
-        where: { id: config.id },
-        data: { nextNumberNFe: nextNumber + 1 },
-      });
-    }
-
     // Log creation
     await prisma.nFeLog.create({
       data: {
         configId: config.id,
         documentId: document.id,
         eventType: 'create',
-        description: `Created ${documentType} document #${nextNumber}`,
+        description: `Created ${documentType} document #${document.documentNumber}`,
       },
     });
 

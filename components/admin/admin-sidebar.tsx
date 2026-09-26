@@ -37,7 +37,8 @@ import {
   Package,
   QrCode,
 } from 'lucide-react';
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+import { signOutSafely } from '@/lib/offline/sign-out';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -200,7 +201,7 @@ const adminNavigation: NavItem[] = [
     href: '/admin/integrations',
     icon: <CreditCard className="w-5 h-5" />,
     submenu: [
-      { label: 'Maquininha', href: '/admin/integrations/pos', icon: <CreditCard className="w-4 h-4" /> },
+      { label: 'Maquininha', href: '/admin/pdv', icon: <CreditCard className="w-4 h-4" /> },
       { label: 'Delivery', href: '/admin/integrations/delivery', icon: <ShoppingBag className="w-4 h-4" /> },
       { label: 'Analytics Delivery', href: '/admin/integrations/delivery/analytics', icon: <TrendingUp className="w-4 h-4" /> },
       { label: 'WhatsApp Bot', href: '/admin/integrations/whatsapp', icon: <MessageSquare className="w-4 h-4" /> },
@@ -362,7 +363,7 @@ export function AdminSidebar() {
         {/* Logout button */}
         <div className="p-4 border-t border-slate-700 flex-shrink-0">
           <button
-            onClick={() => signOut({ redirect: true, callbackUrl: '/auth/signin' })}
+            onClick={() => signOutSafely({ redirect: true, callbackUrl: '/auth/signin' })}
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
           >
             <LogOut className="w-5 h-5" />

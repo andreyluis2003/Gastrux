@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,15 +20,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
+    // Cancelling a fiscal note at SEFAZ is a manager decision (market practice)
+    const auth = await requireRestaurantRole(MANAGER_ROLES, 'Cancelar uma NFC-e exige um gerente');
+    if (!auth.ok) return auth.response;
+    const { restaurantId } = auth.member;
 
 
     const body = await request.json();
@@ -40,6 +36,7 @@ export async function POST(
       );
     }
 
+    // Scoped through the config: another restaurant's note is a 404
     const document = await prisma.nFeDocument.findFirst({
       where: { id: params.id, config: { restaurantId } },
       include: { config: true },
@@ -101,6 +98,15 @@ export async function POST(
         errorMessage: result.ok ? null : result.rejectionReason,
       },
     });
+
+    if (result.ok) {
+      await recordAudit(auth.member, {
+        action: 'STATUS_CHANGE',
+        entityType: 'NFeDocument',
+        entityId: document.id,
+        changes: { number: document.documentNumber, series: document.documentSeries, from: document.status, to: 'cancelled', justificativa },
+      });
+    }
 
     if (!result.ok) {
       return NextResponse.json(

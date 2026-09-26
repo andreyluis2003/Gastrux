@@ -90,7 +90,7 @@ export const AB_TESTS = {
     variants: {
       control: 'Trocar o Caderno Agora',
       'variant-a': 'Começar Grátis em 10 Min',
-      'variant-b': 'Ver Meu Lucro Real',
+      'variant-b': 'Ver a Margem dos Meus Pratos',
     },
     description: 'Test primary CTA button text',
   } as ABTestConfig,
@@ -99,7 +99,7 @@ export const AB_TESTS = {
     testId: 'hero-cta-secondary',
     variants: {
       control: 'Ver Como Funciona',
-      'variant-a': 'Calcular Meu Lucro',
+      'variant-a': 'Calcular Meu CMV',
       'variant-b': 'Quero Saber Mais',
     },
     description: 'Test secondary CTA button text',
@@ -109,8 +109,8 @@ export const AB_TESTS = {
     testId: 'final-cta-headline',
     variants: {
       control: 'Seu restaurante merece mais que um caderno',
-      'variant-a': 'Chega de adivinhar se está lucrando ou não',
-      'variant-b': 'Troque o caderno. Veja seu lucro de verdade.',
+      'variant-a': 'Chega de adivinhar quanto custa cada prato',
+      'variant-b': 'Troque o caderno. Veja a margem de cada prato.',
     },
     description: 'Test final CTA section headline',
   } as ABTestConfig,
@@ -129,8 +129,8 @@ export const AB_TESTS = {
     testId: 'hero-description',
     variants: {
       control: 'Você sabe quanto custa cada prato que serve? Com a Gastrux, em 10 minutos você descobre — e nunca mais precisa de caderno, planilha ou calculadora.',
-      'variant-a': 'Se você ainda anota no caderno ou na planilha, está perdendo dinheiro sem saber. A Gastrux mostra seu lucro real em cada prato.',
-      'variant-b': 'Pare de adivinhar se está lucrando. A Gastrux calcula seu CMV, controla estoque e mostra onde você perde dinheiro — tudo no celular.',
+      'variant-a': 'Se você ainda anota no caderno ou na planilha, está perdendo dinheiro sem saber. A Gastrux mostra o custo e a margem de cada prato.',
+      'variant-b': 'Pare de adivinhar quanto sobra em cada prato. A Gastrux calcula seu CMV, controla estoque e mostra onde você perde dinheiro — tudo no celular.',
     },
     description: 'Test hero description text',
   } as ABTestConfig,

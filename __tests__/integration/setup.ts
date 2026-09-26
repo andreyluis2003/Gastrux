@@ -6,8 +6,8 @@
 import { PrismaClient } from '@prisma/client';
 import * as dotenv from 'dotenv';
 
-// Load environment variables from .env file
-dotenv.config({ path: '.env' });
+// Load environment variables from .env.test (never .env: these suites delete fixture data)
+dotenv.config({ path: '.env.test' });
 
 const prisma = new PrismaClient();
 

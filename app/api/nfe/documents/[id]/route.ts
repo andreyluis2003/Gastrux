@@ -29,6 +29,7 @@ export async function GET(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
+    // Scoped through the config: another restaurant's note is a 404 (it holds the customer CPF)
     const document = await prisma.nFeDocument.findFirst({
       where: { id: params.id, config: { restaurantId } },
       include: {

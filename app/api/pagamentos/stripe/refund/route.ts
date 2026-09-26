@@ -6,7 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { createRefund, isStripeConnectConfigured } from '@/lib/stripe-connect';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
@@ -20,12 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(session.user.role || '')) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions to process refunds' },
-        { status: 403 }
-      );
-    }
+    // A manager of THIS restaurant (the global session role let the owner of another restaurant
+    // who is only a cashier here refund)
+    const auth = await requireRestaurantRole(MANAGER_ROLES, 'Insufficient permissions to process refunds');
+    if (!auth.ok) return auth.response;
 
     const { paymentId, amount, reason, description } = await request.json();
 
@@ -36,8 +36,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
+    // The payment must belong to the caller's own restaurant - otherwise
+    // any OWNER/ADMIN/MANAGER could refund another restaurant's payment.
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: { id: paymentId, restaurantId },
       include: { stripeData: true, refunds: true },
     });
 

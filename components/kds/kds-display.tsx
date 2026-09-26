@@ -8,6 +8,23 @@ import { KDSOrderCard } from './kds-order-card';
 import { KDSStationView } from './kds-station-view';
 import { KDSMetrics } from './kds-metrics';
 import { toast } from 'sonner';
+import { printInHiddenFrame } from '@/lib/print/print-frame';
+
+// Per device (the kitchen computer): print new orders by itself, and which orders were printed
+const AUTOPRINT_KEY = 'gastrux:kds-autoprint';
+const PRINTED_KEY = 'gastrux:kds-printed';
+const readPrinted = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(PRINTED_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+const savePrinted = (ids: string[]) => {
+  try {
+    localStorage.setItem(PRINTED_KEY, JSON.stringify(ids.slice(-300)));
+  } catch {}
+};
 
 interface KDSDisplayProps {
   stationId?: string;
@@ -18,6 +35,33 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [autoPrint, setAutoPrint] = useState(false);
+
+  useEffect(() => {
+    try {
+      setAutoPrint(localStorage.getItem(AUTOPRINT_KEY) === '1');
+    } catch {}
+  }, []);
+
+  // Printing phase 1: every NEW order (not printed on this device yet) gets its kitchen ticket
+  useEffect(() => {
+    if (!autoPrint) return;
+    const printed = readPrinted();
+    const fresh = orders.filter((o) => o.status === 'PENDING' && !printed.includes(o.id));
+    if (fresh.length === 0) return;
+    savePrinted([...printed, ...fresh.map((o) => o.id)]);
+    fresh.forEach((o, i) => setTimeout(() => printInHiddenFrame(`/imprimir/cozinha/${o.id}`), i * 1500));
+  }, [orders, autoPrint]);
+
+  const toggleAutoPrint = (on: boolean) => {
+    // turning it on does not print the orders already on the screen, only the next ones
+    if (on) savePrinted([...readPrinted(), ...orders.map((o) => o.id)]);
+    try {
+      localStorage.setItem(AUTOPRINT_KEY, on ? '1' : '0');
+    } catch {}
+    setAutoPrint(on);
+  };
   const [viewMode, setViewMode] = useState<'all' | 'station'>(
     stationId ? 'station' : 'all'
   );
@@ -28,10 +72,14 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
       try {
         // Fetch orders
         const ordersRes = await fetch(
-          `/api/kds/orders?status=PENDING,PREPARING,READY`
+          `/api/kds/orders?status=PENDING,PREPARING,READY`,
+          // always the live list (a cached answer kept the kitchen up to 5 min behind)
+          { cache: 'no-store' }
         );
+        if (!ordersRes.ok) throw new Error('Failed to fetch orders');
         const ordersData = await ordersRes.json();
         setOrders(ordersData.orders || []);
+        setLastUpdate(new Date());
 
         // Fetch stations
         const stationsRes = await fetch(`/api/kds/stations`);
@@ -54,13 +102,16 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
     const pollInterval = setInterval(async () => {
       try {
         const ordersRes = await fetch(
-          `/api/kds/orders?status=PENDING,PREPARING,READY`
+          `/api/kds/orders?status=PENDING,PREPARING,READY`,
+          // always the live list (a cached answer kept the kitchen up to 5 min behind)
+          { cache: 'no-store' }
         );
         if (!ordersRes.ok) throw new Error('Failed to fetch orders');
         
         const ordersData = await ordersRes.json();
         setOrders(ordersData.orders || []);
         setConnected(true);
+        setLastUpdate(new Date());
       } catch (error) {
         console.error('Polling error:', error);
         setConnected(false);
@@ -78,11 +129,16 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
         body: JSON.stringify({ status: newStatus }),
       });
 
+      const updatedOrder = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to update order status');
+        // 409: another screen already completed or cancelled it; show its real status
+        if (response.status === 409 && updatedOrder.currentStatus) {
+          setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: updatedOrder.currentStatus } : o)));
+        }
+        toast.error(updatedOrder.error || 'Erro ao atualizar pedido');
+        return;
       }
 
-      const updatedOrder = await response.json();
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? updatedOrder : o))
       );
@@ -110,6 +166,10 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
       {/* Connection Status */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Kitchen Display System</h1>
+        <label className="flex items-center gap-2 text-sm" title="Para imprimir sem a janela de confirmação, abra o Chrome da cozinha com --kiosk-printing">
+          <input type="checkbox" checked={autoPrint} onChange={(e) => toggleAutoPrint(e.target.checked)} />
+          Imprimir pedidos novos automaticamente
+        </label>
         <div className="flex items-center gap-2">
           <div
             className={`w-3 h-3 rounded-full ${
@@ -121,6 +181,14 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
           </span>
         </div>
       </div>
+
+      {/* The kitchen must know when the list stopped updating: new orders may be missing */}
+      {!connected && (
+        <div role="alert" className="rounded-md border border-red-300 bg-red-50 text-red-800 px-4 py-3 font-semibold">
+          Sem conexão: a lista pode estar desatualizada e pedidos novos podem não aparecer.
+          {lastUpdate && ` Última atualização às ${lastUpdate.toLocaleTimeString('pt-BR')}.`} Avise o salão.
+        </div>
+      )}
 
       {/* Metrics */}
       <KDSMetrics orders={displayOrders} />

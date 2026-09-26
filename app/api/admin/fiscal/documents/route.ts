@@ -2,17 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getRestaurantMember, MANAGER_ROLES } from '@/lib/auth/restaurant-role';
+import { createDocumentWithNextNumber } from '@/lib/nfe/numbering';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * A manager of the restaurant being worked in. It used to read session.user.currentRestaurantId, a
+ * field the session never carries, so this page never loaded nor saved anything (browser test of
+ * 2026-09-25).
+ */
 async function getContext() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-  const user = session.user as any;
-  if (!['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'OWNER'].includes(user.role)) return null;
-  const restaurantId = user.currentRestaurantId;
-  if (!restaurantId) return null;
-  return { session, restaurantId };
+  const member = await getRestaurantMember();
+  if (!member || !MANAGER_ROLES.includes(member.role)) return null;
+  return { restaurantId: member.restaurantId };
 }
 
 export async function GET(req: NextRequest) {
@@ -92,23 +95,15 @@ export async function POST(req: NextRequest) {
   const documentType = body.documentType || 'NFCe';
   const isNFCe = documentType === 'NFCe';
 
-  // Increment document number
-  const numberField = isNFCe ? 'nextNumberNFCe' : 'nextNumberNFe';
-  const seriesField = isNFCe ? 'seriesNFCe' : 'seriesNFe';
-  const docNumber = config[numberField];
-  const docSeries = config[seriesField];
-
   // Calculate totals
   const items = body.items || [];
   const totalAmount = items.reduce((sum: number, i: any) => sum + (Number(i.totalPrice) || 0), 0);
 
-  // Create document
-  const document = await prisma.nFeDocument.create({
+  // Number reserved atomically with the insert (lib/nfe/numbering.ts): never shared, never skipped
+  const document = await createDocumentWithNextNumber({
+    configId: config.id,
+    documentType: isNFCe ? 'NFCe' : 'NFe',
     data: {
-      configId: config.id,
-      documentType,
-      documentNumber: docNumber,
-      documentSeries: docSeries,
       customerName: body.customerName || null,
       customerCPF: body.customerCPF || null,
       customerCNPJ: body.customerCNPJ || null,
@@ -136,11 +131,8 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   });
 
-  // Increment next number
-  await prisma.nFeConfig.update({
-    where: { id: config.id },
-    data: isNFCe ? { nextNumberNFCe: { increment: 1 } } : { nextNumberNFe: { increment: 1 } },
-  });
+  const docNumber = document.documentNumber;
+  const docSeries = document.documentSeries;
 
   // Log submission
   await prisma.nFeLog.create({

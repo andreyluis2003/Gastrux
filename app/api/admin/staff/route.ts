@@ -3,20 +3,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import crypto from 'crypto';
+import { MANAGER_ROLES, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+
+/** Which roles each role may give (market practice: nobody self-promotes, a manager hires below manager). */
+const ASSIGNABLE_ROLES: Record<string, string[]> = {
+  OWNER: ['MANAGER', 'CASHIER', 'COOK'],
+  MANAGER: ['CASHIER', 'COOK'],
+};
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * The team with salaries and commissions: the owner and managers of THIS restaurant only. It used to
+ * answer anyone signed in (a cashier saw everybody's salary), from the raw currentRestaurantId or the
+ * user's first restaurant, without checking the membership.
+ */
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'N\u00e3o autorizado' }, { status: 401 });
-
-  const userId = (session.user as any).id;
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { currentRestaurantId: true, restaurants: { take: 1, select: { restaurantId: true } } },
-  });
-  const restaurantId = u?.currentRestaurantId || u?.restaurants?.[0]?.restaurantId;
-  if (!restaurantId) return NextResponse.json({ members: [] });
+  const auth = await requireRestaurantRole(MANAGER_ROLES, 'Sem permiss\u00e3o');
+  if (!auth.ok) return auth.response;
+  const restaurantId = auth.member.restaurantId;
 
   const members = await prisma.staffMember.findMany({
     where: { restaurantId },
@@ -32,37 +38,41 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'N\u00e3o autorizado' }, { status: 401 });
-
-  const userId = (session.user as any).id;
-  const role = (session.user as any).role;
-  if (!['OWNER', 'MANAGER', 'ADMIN'].includes(role)) {
-    return NextResponse.json({ error: 'Sem permiss\u00e3o' }, { status: 403 });
-  }
-
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { currentRestaurantId: true, restaurants: { take: 1, select: { restaurantId: true } } },
-  });
-  const restaurantId = u?.currentRestaurantId || u?.restaurants?.[0]?.restaurantId;
-  if (!restaurantId) return NextResponse.json({ error: 'Restaurante n\u00e3o encontrado' }, { status: 404 });
+  // A manager of THIS restaurant (the role checked used to be the global session role)
+  const auth = await requireRestaurantRole(MANAGER_ROLES, 'Sem permiss\u00e3o');
+  if (!auth.ok) return auth.response;
+  const { member } = auth;
+  const restaurantId = member.restaurantId;
 
   const body = await req.json();
-  const { name, email, phone, cpf, staffRole, baseSalary, commissionType, commissionValue, defaultStartTime, defaultEndTime } = body;
+  const { name, email, phone, cpf, baseSalary, commissionType, commissionValue, defaultStartTime, defaultEndTime } = body;
+  const staffRole = body.staffRole || 'COOK';
 
   if (!name || !email) {
     return NextResponse.json({ error: 'Nome e email s\u00e3o obrigat\u00f3rios' }, { status: 400 });
   }
 
-  // Check/create user
+  // Nobody becomes OWNER or a platform ADMIN through this route; a manager hires below manager
+  if (!ASSIGNABLE_ROLES[member.role]?.includes(staffRole)) {
+    return NextResponse.json(
+      { error: 'Voc\u00ea n\u00e3o pode atribuir este papel', allowed: ASSIGNABLE_ROLES[member.role] ?? [] },
+      { status: 403 }
+    );
+  }
+
+  // Check/create user. A new user gets a RANDOM temporary password, shown once to whoever hired
+  // them (every staff user used to get the fixed password "temp123")
   let staffUser = await prisma.user.findUnique({ where: { email } });
+  let temporaryPassword: string | null = null;
   if (!staffUser) {
     const bcrypt = await import('bcryptjs');
+    temporaryPassword = crypto.randomBytes(9).toString('base64url');
     staffUser = await prisma.user.create({
       data: {
-        email, name, password: await bcrypt.hash('temp123', 10),
-        role: staffRole || 'COOK', active: true,
+        email, name, password: await bcrypt.hash(temporaryPassword, 10),
+        // The hire changes it at the first access (middleware.ts)
+        mustChangePassword: true,
+        role: staffRole, active: true, currentRestaurantId: restaurantId,
       },
     });
   }
@@ -82,6 +92,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Someone already here with a role the caller may not give (a manager, the owner) cannot be
+  // re-assigned by them: a manager must not demote another manager through this route
+  const currentMembership = await prisma.restaurantUser.findUnique({
+    where: { restaurantId_userId: { restaurantId, userId: staffUser.id } },
+    select: { role: true },
+  });
+  const ownsRestaurant = await prisma.restaurant.findFirst({ where: { id: restaurantId, ownerId: staffUser.id }, select: { id: true } });
+  if (ownsRestaurant || (currentMembership && !ASSIGNABLE_ROLES[member.role].includes(currentMembership.role))) {
+    return NextResponse.json({ error: 'Você não pode alterar o papel desta pessoa' }, { status: 403 });
+  }
+
   // Only a genuinely new hire counts against the plan's user limit - editing
   // an existing staff member's info must never be blocked by it.
   if (!existingMember) {
@@ -93,15 +114,15 @@ export async function POST(req: NextRequest) {
   // Link to restaurant
   await prisma.restaurantUser.upsert({
     where: { restaurantId_userId: { restaurantId, userId: staffUser.id } },
-    update: { role: staffRole || 'COOK', isActive: true },
-    create: { restaurantId, userId: staffUser.id, role: staffRole || 'COOK', permissions: [], acceptedAt: new Date() },
+    update: { role: staffRole, isActive: true },
+    create: { restaurantId, userId: staffUser.id, role: staffRole, permissions: [], acceptedAt: new Date() },
   });
 
   // Create staff member
-  const member = await prisma.staffMember.upsert({
+  const staffMember = await prisma.staffMember.upsert({
     where: { userId: staffUser.id },
     update: {
-      phone, cpf, role: staffRole || 'COOK', status: 'ACTIVE',
+      phone, cpf, role: staffRole, status: 'ACTIVE',
       basesalary: baseSalary || null,
       commissionType: commissionType || 'PERCENTAGE',
       commissionValue: commissionValue || null,
@@ -110,7 +131,7 @@ export async function POST(req: NextRequest) {
     },
     create: {
       restaurantId, userId: staffUser.id, phone, cpf,
-      role: staffRole || 'COOK', status: 'ACTIVE',
+      role: staffRole, status: 'ACTIVE',
       basesalary: baseSalary || null,
       commissionType: commissionType || 'PERCENTAGE',
       commissionValue: commissionValue || null,
@@ -119,5 +140,12 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ member }, { status: 201 });
+  await recordAudit(member, {
+    action: 'CREATE',
+    entityType: 'StaffMember',
+    entityId: staffMember.id,
+    changes: { email, role: staffRole, newUser: temporaryPassword !== null },
+  });
+
+  return NextResponse.json({ member: staffMember, temporaryPassword }, { status: 201 });
 }

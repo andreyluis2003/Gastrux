@@ -4,7 +4,6 @@ import {
   getCampaign,
   getAllCampaignSlugs,
 } from '@/lib/marketing/ppc-campaigns';
-import { getCaseStudyBySlug } from '@/lib/marketing/case-studies';
 import PPCLandingClient from './ppc-client';
 
 export async function generateStaticParams() {
@@ -34,10 +33,6 @@ export default function PPCLandingPage({
   const campaign = getCampaign(params.campaign);
   if (!campaign) notFound();
 
-  const testimonial = campaign.testimonialSlug
-    ? getCaseStudyBySlug(campaign.testimonialSlug)
-    : null;
-
   const utms = {
     utm_source: searchParams?.utm_source || '',
     utm_medium: searchParams?.utm_medium || '',
@@ -50,7 +45,6 @@ export default function PPCLandingPage({
   return (
     <PPCLandingClient
       campaign={campaign}
-      testimonial={testimonial}
       utms={utms}
     />
   );

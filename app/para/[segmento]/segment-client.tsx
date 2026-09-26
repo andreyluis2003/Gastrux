@@ -203,35 +203,6 @@ export function SegmentPageClient({ segment }: { segment: Segment }) {
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="py-16 px-4 sm:px-6">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white text-center mb-10">
-            Resultados reais de quem usa
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {segment.stats.map((s, i) => (
-              <div key={i} className="text-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5">
-                <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">{s.value}</div>
-                <div className="text-sm text-slate-600 dark:text-slate-300 mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonial */}
-      <section className="py-16 px-4 sm:px-6 bg-slate-50 dark:bg-slate-800/50">
-        <div className="max-w-3xl mx-auto text-center">
-          <Star className="w-8 h-8 text-yellow-500 mx-auto mb-4" />
-          <blockquote className="text-xl sm:text-2xl font-medium text-slate-900 dark:text-white mb-6 italic leading-relaxed">
-            &ldquo;{segment.testimonial.quote}&rdquo;
-          </blockquote>
-          <p className="font-semibold text-slate-900 dark:text-white">{segment.testimonial.author}</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{segment.testimonial.role}</p>
-        </div>
-      </section>
-
       {/* Lead Capture Form */}
       <LeadCaptureSection segment={segment.slug} segmentName={segment.shortName} />
 
@@ -281,7 +252,6 @@ export function SegmentPageClient({ segment }: { segment: Segment }) {
           <div className="flex gap-6 text-sm">
             <Link href="/#segmentos" className="hover:text-white">Segmentos</Link>
             <Link href="/pricing" className="hover:text-white">Planos</Link>
-            <Link href="/casos-de-sucesso" className="hover:text-white">Casos de sucesso</Link>
           </div>
           <p className="text-xs">&copy; 2026 Gastrux. Todos os direitos reservados.</p>
         </div>

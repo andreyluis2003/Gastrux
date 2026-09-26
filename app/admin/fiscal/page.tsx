@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 type TabType = 'dashboard' | 'config' | 'documents' | 'logs';
 
 const UF_LIST = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
+import { ORIGIN_LABELS, SUPPORTED_CSOSN } from '@/lib/nfe/fiscal-data';
+
 const CRT_OPTIONS = [
   { value: '1', label: '1 - Simples Nacional' },
   { value: '2', label: '2 - Simples Nacional (excesso)' },
@@ -45,6 +47,8 @@ export default function FiscalPage() {
   const [saving, setSaving] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [form, setForm] = useState<any>({});
+  // Products that could not go on a note today (lib/nfe/fiscal-data.ts)
+  const [fiscalPending, setFiscalPending] = useState<any>(null);
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [issueForm, setIssueForm] = useState<any>({ documentType: 'NFCe', items: [{ description: '', quantity: 1, unitPrice: 0 }] });
 
@@ -55,6 +59,13 @@ export default function FiscalPage() {
       setConfig(data.config);
       if (data.config) setForm(data.config);
     } catch { toast.error('Erro ao carregar config fiscal'); }
+  }, []);
+
+  const fetchFiscalPending = useCallback(async () => {
+    try {
+      const res = await fetch('/api/nfe/fiscal-pending', { cache: 'no-store' });
+      if (res.ok) setFiscalPending(await res.json());
+    } catch {}
   }, []);
 
   const fetchDocs = useCallback(async () => {
@@ -74,8 +85,8 @@ export default function FiscalPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchConfig(), fetchDocs(), fetchLogs()]).finally(() => setLoading(false));
-  }, [fetchConfig, fetchDocs, fetchLogs]);
+    Promise.all([fetchConfig(), fetchDocs(), fetchLogs(), fetchFiscalPending()]).finally(() => setLoading(false));
+  }, [fetchConfig, fetchDocs, fetchLogs, fetchFiscalPending]);
 
   const handleSaveConfig = async () => {
     setSaving(true);
@@ -90,6 +101,7 @@ export default function FiscalPage() {
       const data = await res.json();
       setConfig(data.config);
       toast.success('Configuração fiscal salva!');
+      fetchFiscalPending();
     } catch (err: any) { toast.error(err.message || 'Erro ao salvar'); }
     finally { setSaving(false); }
   };
@@ -363,12 +375,66 @@ export default function FiscalPage() {
                         </div>
                         <div className="flex items-end">
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="rounded" checked={form.autoIssueOnSale || false} onChange={e => setForm({ ...form, autoIssueOnSale: e.target.checked })} />
+                            <input type="checkbox" className="rounded" checked={form.autoIssueOnSale ?? true} onChange={e => setForm({ ...form, autoIssueOnSale: e.target.checked })} />
                             <span className="text-sm">Emitir automaticamente nas vendas</span>
                           </label>
                         </div>
                       </div>
                     </div>
+
+                    {/* Default taxation (set by the accountant) for products without their own data */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2"><FileCheck className="w-4 h-4" /> Tributação padrão dos produtos</h3>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Preenchida pelo contador. Vale para os produtos sem dados fiscais próprios (cadastre os próprios na tela de cada receita).
+                        Sem estes dados a NFC-e não é emitida: o sistema não inventa NCM nem tributação. Suporte atual: Simples Nacional.
+                      </p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div>
+                          <label htmlFor="fiscal-default-ncm" className="text-xs font-medium text-gray-600 mb-1 block">NCM padrão</label>
+                          <input id="fiscal-default-ncm" inputMode="numeric" placeholder="8 dígitos" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultNcm || ''} onChange={e => setForm({ ...form, defaultNcm: e.target.value })} />
+                        </div>
+                        <div>
+                          <label htmlFor="fiscal-default-cfop" className="text-xs font-medium text-gray-600 mb-1 block">CFOP padrão</label>
+                          <input id="fiscal-default-cfop" inputMode="numeric" placeholder="ex.: 5102" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultCfop || ''} onChange={e => setForm({ ...form, defaultCfop: e.target.value })} />
+                        </div>
+                        <div>
+                          <label htmlFor="fiscal-default-origin" className="text-xs font-medium text-gray-600 mb-1 block">Origem padrão</label>
+                          <select id="fiscal-default-origin" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultOrigin || ''} onChange={e => setForm({ ...form, defaultOrigin: e.target.value })}>
+                            <option value="">—</option>
+                            {Object.entries(ORIGIN_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="fiscal-default-csosn" className="text-xs font-medium text-gray-600 mb-1 block">CSOSN padrão</label>
+                          <select id="fiscal-default-csosn" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultCsosn || ''} onChange={e => setForm({ ...form, defaultCsosn: e.target.value })}>
+                            <option value="">—</option>
+                            {SUPPORTED_CSOSN.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="fiscal-pis-cofins" className="text-xs font-medium text-gray-600 mb-1 block">CST PIS/COFINS</label>
+                          <input id="fiscal-pis-cofins" inputMode="numeric" placeholder="2 dígitos" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.pisCofinsCst || ''} onChange={e => setForm({ ...form, pisCofinsCst: e.target.value })} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {fiscalPending && (fiscalPending.blockedReason || fiscalPending.pending?.length > 0) && (
+                      <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2">
+                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                          {fiscalPending.blockedReason
+                            ? fiscalPending.blockedReason
+                            : `${fiscalPending.pending.length} de ${fiscalPending.total} produtos não sairiam na NFC-e hoje (dados fiscais incompletos):`}
+                        </p>
+                        {!fiscalPending.blockedReason && (
+                          <ul className="text-sm flex flex-wrap gap-2">
+                            {fiscalPending.pending.slice(0, 40).map((p: any) => (
+                              <li key={p.id}><a className="underline" href={`/receitas/${p.id}`}>{p.name}</a></li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex gap-2 pt-2">
                       <Button onClick={handleSaveConfig} disabled={saving}>

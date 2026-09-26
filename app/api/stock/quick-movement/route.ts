@@ -73,31 +73,39 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let newQuantity = stock.currentQuantity;
-    switch (movementType) {
-      case "ENTRY":
-        newQuantity += quantity;
-        break;
-      case "MANUAL_DEDUCTION":
-      case "ADJUSTMENT":
-        newQuantity = Math.max(0, newQuantity - quantity);
-        break;
-    }
+    const isDeduction = movementType === "MANUAL_DEDUCTION" || movementType === "ADJUSTMENT";
 
-    const updatedStock = await prisma.stock.update({
+    // Atomic increment/decrement - computing newQuantity from a prior read
+    // and writing it back loses updates when two movements for the same
+    // ingredient happen concurrently.
+    let updatedStock = await prisma.stock.update({
       where: { ingredientId },
       data: {
-        currentQuantity: newQuantity,
+        currentQuantity: isDeduction ? { decrement: quantity } : { increment: quantity },
         lastUpdated: new Date(),
       },
       include: { ingredient: true },
     });
 
+    // Deductions never go below zero - correct it if a decrement crossed
+    // zero (the clamp itself doesn't need to be atomic with the decrement
+    // above since it only ever pulls the value up to a floor).
+    if (updatedStock.currentQuantity < 0) {
+      updatedStock = await prisma.stock.update({
+        where: { ingredientId },
+        data: { currentQuantity: 0 },
+        include: { ingredient: true },
+      });
+    }
+
+    const newQuantity = updatedStock.currentQuantity;
+
     const movement = await prisma.stockMovement.create({
       data: {
         ingredientId,
         restaurantId: ingredient.restaurantId,
-        quantity,
+        // ADJUSTMENT quantities are signed (+ in, - out): here an adjustment removes stock
+        quantity: movementType === "ADJUSTMENT" ? -quantity : quantity,
         movementType,
         reason: reason || `Inventário rápido: ${movementType}`,
         referenceType: "QUICK_INVENTORY",

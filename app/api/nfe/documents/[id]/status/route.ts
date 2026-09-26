@@ -28,6 +28,7 @@ export async function GET(
     }
 
 
+    // Scoped through the config: another restaurant's note is a 404
     const document = await prisma.nFeDocument.findFirst({
       where: { id: params.id, config: { restaurantId } },
       include: { config: true },

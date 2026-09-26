@@ -37,6 +37,7 @@ yarn-error.log*
 .env*.local
 .env.production
 .env.development
+.env.test
 
 # vercel
 .vercel
@@ -53,3 +54,38 @@ yarn-error.log*
 
 # QA / temp scripts
 __qa-crawl*
+
+# Environment & Secrets (AIOX)
+.env.local
+.env.*.local
+*.key
+
+# Dependencies (AIOX)
+node_modules/
+
+# Build & Logs (AIOX)
+dist/
+build/
+*.log
+logs/
+
+# IDE & OS (AIOX)
+Thumbs.db
+.idea/
+*.swp
+
+# AIOX Local (AIOX)
+.aiox-core/local/
+.claude/settings.local.json
+.aiox/install-log.txt
+
+# Local AI tooling configuration (not part of the product; owner decision 2026-09-25)
+.aiox-core/
+.antigravity/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.kimi/
+.superpowers/
+.github/agents/

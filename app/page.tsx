@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChefHat, ArrowRight, Check, Star, ShieldCheck, Menu, X } from 'lucide-react';
+import { ChefHat, ArrowRight, Check, Sparkles, ShieldCheck, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAnalytics } from '@/hooks/use-analytics';
 import { useScrollTracking } from '@/hooks/use-scroll-tracking';
@@ -11,7 +11,7 @@ import { useABTest } from '@/hooks/use-ab-test';
 import { AB_TESTS } from '@/lib/ab-testing';
 import { HowItWorks } from '@/components/marketing/how-it-works';
 import { FeaturesShowcase } from '@/components/marketing/features-showcase';
-import { TestimonialsCarousel } from '@/components/marketing/testimonials-carousel';
+import { TrustSection } from '@/components/marketing/trust-section';
 import { FAQSection } from '@/components/marketing/faq-section';
 import { SegmentsSection } from '@/components/marketing/segments-section';
 import { WhyGastrux } from '@/components/marketing/why-gastrux';
@@ -19,16 +19,18 @@ import { ClarityScript } from '@/components/analytics/clarity-script';
 
 const heroBenefits = [
   'Sai do caderno em 10 minutos',
-  'Veja seu lucro real todo dia',
+  'Custo (CMV) e margem de cada prato',
   'Funciona no celular',
   'Começa grátis, sem cartão',
 ];
 
+// Product facts only: Gastrux has no customer results to publish yet, so no customer counts, ratings
+// or savings figures go here (site claims review, 2026-09-25).
 const heroStats = [
-  { value: '500+', label: 'Donos largaram o caderno' },
-  { value: 'R$ 3.200', label: 'Economia média/mês' },
-  { value: '10 min', label: 'Pra começar a usar' },
-  { value: '4,8/5', label: 'Nota dos donos' },
+  { value: 'R$ 0', label: 'Plano Starter, sem cartão' },
+  { value: 'Celular', label: 'E computador, sem instalar' },
+  { value: 'Offline', label: 'Comanda e balcão sem internet' },
+  { value: 'NFC-e', label: 'Emissão ao fechar a conta*' },
 ];
 
 function HomePageContent() {
@@ -68,9 +70,6 @@ function HomePageContent() {
             <Link href="#features" className="text-slate-600 dark:text-slate-300 hover:text-blue-600">
               Funcionalidades
             </Link>
-            <Link href="/casos-de-sucesso" className="text-slate-600 dark:text-slate-300 hover:text-blue-600">
-              Casos de sucesso
-            </Link>
             <Link href="/#segmentos" className="text-slate-600 dark:text-slate-300 hover:text-blue-600">
               Segmentos
             </Link>
@@ -100,9 +99,6 @@ function HomePageContent() {
             <Link href="#features" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600" onClick={() => setMobileMenuOpen(false)}>
               Funcionalidades
             </Link>
-            <Link href="/casos-de-sucesso" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600" onClick={() => setMobileMenuOpen(false)}>
-              Casos de sucesso
-            </Link>
             <Link href="/#segmentos" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600" onClick={() => setMobileMenuOpen(false)}>
               Segmentos
             </Link>
@@ -129,12 +125,8 @@ function HomePageContent() {
         </div>
         <div className="max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 shadow-sm mb-6 backdrop-blur">
-            <span className="flex" aria-hidden>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              ))}
-            </span>
-            <span>+500 donos de restaurante já trocaram o caderno</span>
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" aria-hidden />
+            <span>Custo de cada prato, estoque, comanda e caixa num lugar só</span>
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 dark:text-slate-100 mb-6 leading-tight tracking-tight">
             <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
@@ -172,7 +164,7 @@ function HomePageContent() {
             Sem cartão • Sem contrato • Se não gostar, volta pro caderno
           </p>
 
-          {/* Trust stats - right under the fold, before the visitor scrolls past */}
+          {/* Product facts - right under the fold, before the visitor scrolls past */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 pt-8 border-t border-slate-200 dark:border-slate-700">
             {heroStats.map((s) => (
               <div key={s.label}>
@@ -183,6 +175,9 @@ function HomePageContent() {
               </div>
             ))}
           </div>
+          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+            * NFC-e nos planos Business e Enterprise, com certificado digital e dados fiscais preenchidos pelo seu contador.
+          </p>
         </div>
       </section>
 
@@ -190,7 +185,7 @@ function HomePageContent() {
 
       <HowItWorks />
 
-      <TestimonialsCarousel />
+      <TrustSection />
 
       <SegmentsSection />
 
@@ -217,7 +212,7 @@ function HomePageContent() {
               </Button>
             </Link>
           </div>
-          <p className="text-sm text-blue-100 mt-6">+500 donos já largaram o caderno • 4,8/5 estrelas • Grátis para sempre no Starter</p>
+          <p className="text-sm text-blue-100 mt-6">Sem cartão • Sem contrato • Grátis para sempre no Starter</p>
         </div>
       </section>
 
@@ -231,15 +226,15 @@ function HomePageContent() {
                 Gastrux
               </Link>
               <p className="text-sm leading-relaxed">
-                A calculadora inteligente do seu restaurante. Sai do caderno, enxerga seu lucro real e toma decisão com segurança.
+                A calculadora inteligente do seu restaurante. Sai do caderno, enxerga o custo e a margem de cada prato e toma decisão com segurança.
               </p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">Produto</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="#features" className="hover:text-white">Funcionalidades</Link></li>
+                <li><Link href="#como-comecar" className="hover:text-white">Como é a implantação</Link></li>
                 <li><Link href="/pricing" className="hover:text-white">Planos</Link></li>
-                <li><Link href="/casos-de-sucesso" className="hover:text-white">Casos de sucesso</Link></li>
                 <li><Link href="/#segmentos" className="hover:text-white">Segmentos</Link></li>
               </ul>
             </div>
@@ -248,6 +243,7 @@ function HomePageContent() {
               <ul className="space-y-2 text-sm">
                 <li><Link href="/ajuda" className="hover:text-white">Central de Ajuda</Link></li>
                 <li><Link href="/suporte" className="hover:text-white">Abrir chamado</Link></li>
+                <li><a href="mailto:contato@helpflow.com.br" className="hover:text-white">contato@helpflow.com.br</a></li>
                 <li><Link href="/auth/signin" className="hover:text-white">Entrar</Link></li>
               </ul>
             </div>

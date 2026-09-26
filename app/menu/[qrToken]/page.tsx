@@ -1,7 +1,7 @@
 // FASE 50: Public customer-facing menu page - accessed via QR code scan
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { ShoppingBag, Plus, Minus, X, Check, Search, ChefHat, QrCode, Loader2, CreditCard, Copy, CheckCircle } from 'lucide-react';
@@ -59,7 +59,7 @@ interface CartItem {
 
 interface MenuData {
   table: { id: string; number: number; section: { name: string } };
-  restaurant: { id: string; name: string };
+  restaurant: { id: string; name: string; acceptsOnlinePayment?: boolean };
   categories: MenuCategory[];
   combos?: Combo[];
 }
@@ -84,6 +84,24 @@ export default function PublicMenuPage() {
   const [pixPaid, setPixPaid] = useState(false);
   const [pixPolling, setPixPolling] = useState(false);
   const [orderTotal, setOrderTotal] = useState(0);
+
+  // PIX polling lives in refs so it can always be cancelled (a new QR, leaving the screen, unmount), and a
+  // late answer for an OLD QR can never flip the screen of the current one: the tab may have grown and its
+  // QR been regenerated for a higher amount, and paying the old one must not read as "paid".
+  const pixIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pixTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Id of the payment whose QR is the CURRENT one (set synchronously, before its polling starts)
+  const currentPixPaymentIdRef = useRef<string | null>(null);
+
+  const stopPixPolling = useCallback(() => {
+    if (pixIntervalRef.current) clearInterval(pixIntervalRef.current);
+    if (pixTimeoutRef.current) clearTimeout(pixTimeoutRef.current);
+    pixIntervalRef.current = null;
+    pixTimeoutRef.current = null;
+    setPixPolling(false);
+  }, []);
+
+  useEffect(() => () => stopPixPolling(), [stopPixPolling]);
 
   useEffect(() => {
     const load = async () => {
@@ -174,23 +192,22 @@ export default function PublicMenuPage() {
   };
 
   // Generate Pix QR Code for table payment
-  const generatePixPayment = async (amount: number) => {
+  // The server computes the amount from the table's open tab: the browser only
+  // says which table it is (qrToken).
+  const generatePixPayment = async () => {
     setPixLoading(true);
     try {
-      const tableInfo = menu?.table;
       const res = await fetch('/api/pagamentos/mp/pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount,
-          description: `Mesa ${tableInfo?.number || '?'} - ${menu?.restaurant?.name || 'Restaurante'}`,
-          payerEmail: 'cliente@restaurante.com',
+          qrToken,
           payerName: customerName || 'Cliente',
-          externalReference: `mesa-${tableInfo?.id || 'unknown'}-${Date.now()}`,
         }),
       });
       const data = await res.json();
       if (data.success && data.qrCode) {
+        currentPixPaymentIdRef.current = data.paymentId;
         setPixData({
           paymentId: data.paymentId,
           qrCode: data.qrCode,
@@ -198,11 +215,11 @@ export default function PublicMenuPage() {
           ticketUrl: data.ticketUrl || '',
         });
         setShowPixPayment(true);
-        setOrderTotal(amount);
+        setOrderTotal(Number(data.amount) || 0);
         // Start polling for payment status
         startPixPolling(data.paymentId);
       } else {
-        toast.error('Erro ao gerar QR Code Pix');
+        toast.error(data.error || 'Erro ao gerar QR Code Pix');
       }
     } catch (err) {
       console.error(err);
@@ -212,30 +229,33 @@ export default function PublicMenuPage() {
     }
   };
 
+  const payCartWithPix = async () => {
+    if (cart.length === 0) return;
+    const submitted = await submitOrder();
+    if (submitted) await generatePixPayment();
+  };
+
   const startPixPolling = (paymentId: string) => {
+    // One poller at a time: a new QR replaces the previous one's polling.
+    stopPixPolling();
+    currentPixPaymentIdRef.current = paymentId;
     setPixPolling(true);
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes (every 5s)
     const interval = setInterval(async () => {
-      attempts++;
-      if (attempts > maxAttempts) {
-        clearInterval(interval);
-        setPixPolling(false);
-        return;
-      }
       try {
-        const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${paymentId}`);
+        const res = await fetch(`/api/pagamentos/mp/pix/status?paymentId=${encodeURIComponent(paymentId)}`);
         const data = await res.json();
+        // Ignore an answer that no longer belongs to the QR on screen (polling stopped, or a newer QR).
+        if (pixIntervalRef.current !== interval || currentPixPaymentIdRef.current !== paymentId) return;
         if (data.approved) {
-          clearInterval(interval);
+          stopPixPolling();
           setPixPaid(true);
-          setPixPolling(false);
           toast.success('Pagamento confirmado! ✅');
         }
       } catch { /* ignore polling errors */ }
     }, 5000);
-    // Cleanup on unmount
-    return () => clearInterval(interval);
+    pixIntervalRef.current = interval;
+    // Stop after 5 minutes
+    pixTimeoutRef.current = setTimeout(stopPixPolling, 5 * 60 * 1000);
   };
 
   const copyPixCode = () => {
@@ -248,8 +268,8 @@ export default function PublicMenuPage() {
     }
   };
 
-  const submitOrder = async () => {
-    if (cart.length === 0) return;
+  const submitOrder = async (): Promise<boolean> => {
+    if (cart.length === 0) return false;
     try {
       setSubmitting(true);
       const res = await fetch(`/api/public/orders/${qrToken}`, {
@@ -268,7 +288,7 @@ export default function PublicMenuPage() {
       if (!res.ok) {
         const err = await res.json();
         toast.error(err.error || 'Erro ao enviar pedido');
-        return;
+        return false;
       }
 
       setOrderTotal(cartTotal);
@@ -276,9 +296,11 @@ export default function PublicMenuPage() {
       setCart([]);
       setCartOpen(false);
       toast.success('Pedido enviado para a cozinha!');
+      return true;
     } catch (err) {
       console.error(err);
       toast.error('Erro ao enviar pedido');
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -323,7 +345,7 @@ export default function PublicMenuPage() {
               <p className="text-gray-600 text-sm mb-4">
                 R$ {orderTotal.toFixed(2)} pago via Pix com sucesso.
               </p>
-              <Button onClick={() => { setShowPixPayment(false); setPixData(null); setPixPaid(false); setSuccess(false); }} className="w-full">
+              <Button onClick={() => { stopPixPolling(); currentPixPaymentIdRef.current = null; setShowPixPayment(false); setPixData(null); setPixPaid(false); setSuccess(false); }} className="w-full">
                 Fazer outro pedido
               </Button>
             </>
@@ -375,7 +397,7 @@ export default function PublicMenuPage() {
               </div>
 
               <div className="space-y-2">
-                <Button variant="outline" className="w-full" onClick={() => { setShowPixPayment(false); setPixData(null); }}>
+                <Button variant="outline" className="w-full" onClick={() => { stopPixPolling(); currentPixPaymentIdRef.current = null; setShowPixPayment(false); setPixData(null); }}>
                   Voltar
                 </Button>
               </div>
@@ -399,15 +421,17 @@ export default function PublicMenuPage() {
             mesa.
           </p>
           <div className="space-y-3">
-            <Button
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => generatePixPayment(cartTotal > 0 ? cartTotal : orderTotal)}
-              disabled={pixLoading}
-            >
-              {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-              Pagar com Pix
-            </Button>
+            {menu?.restaurant?.acceptsOnlinePayment && (
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => generatePixPayment()}
+                disabled={pixLoading}
+              >
+                {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                Pagar com Pix
+              </Button>
+            )}
             <Button onClick={() => setSuccess(false)} className="w-full">
               Fazer outro pedido
             </Button>
@@ -733,18 +757,22 @@ export default function PublicMenuPage() {
               >
                 {submitting ? 'Enviando...' : 'Enviar pedido para cozinha'}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => { setOrderTotal(cartTotal); generatePixPayment(cartTotal); }}
-                disabled={pixLoading || cart.length === 0}
-                className="w-full h-10 text-sm gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                Pagar com Pix agora
-              </Button>
-              <p className="text-xs text-gray-500 text-center">
-                Envie o pedido ou pague direto com Pix.
-              </p>
+              {menu?.restaurant?.acceptsOnlinePayment && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={payCartWithPix}
+                    disabled={pixLoading || submitting || cart.length === 0}
+                    className="w-full h-10 text-sm gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                  >
+                    {pixLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                    Pagar com Pix agora
+                  </Button>
+                  <p className="text-xs text-gray-500 text-center">
+                    Envie o pedido ou pague direto com Pix.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

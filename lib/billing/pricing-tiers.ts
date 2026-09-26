@@ -41,7 +41,7 @@ export const BASE_PRICING_TIERS = {
       '3 usuários',
       'Analytics em tempo real',
       'Previsão de demanda (ML)',
-      '1 integração com delivery',
+      'Pedidos externos por webhook (1 conexão)',
       'Suporte por email',
     ],
     limits: {
@@ -66,9 +66,9 @@ export const BASE_PRICING_TIERS = {
       'CRM e Programa de Fidelidade',
       'Multi-loja (até 2 lojas)',
       '5 usuários',
-      'Integração com iFood',
+      'Pedidos externos por webhook (até 3 conexões)',
       'Relatórios avançados',
-      'Nota Fiscal Eletrônica (NF-e)',
+      'NFC-e (nota do consumidor)',
       'Suporte pelo WhatsApp',
     ],
     limits: {
@@ -84,19 +84,16 @@ export const BASE_PRICING_TIERS = {
     id: 'enterprise',
     name: 'Enterprise',
     description: 'Solução completa para grandes operações',
-    priceMonthly: 499,
-    priceAnnual: 5489,
+    // Owner decision 2026-09-25: price on request ("sob consulta"); no self-serve checkout
+    priceMonthly: null,
+    priceAnnual: null,
     currency: 'brl',
     features: [
       'Tudo do Business',
-      'Unlimited lojas',
-      'Nota Fiscal Eletrônica (NF-e)',
-      'Integração com sistemas contábeis',
-      'API customizada',
+      'Lojas ilimitadas',
       'Usuários ilimitados',
-      'Suporte 24/7 dedicado',
-      'Implementação customizada',
-      'SLA garantido',
+      // Owner decision 2026-09-25: no 24/7 support, custom implementation or SLA promised
+      'Suporte e implementação: sob consulta',
     ],
     limits: {
       dailyTransactions: 999999,

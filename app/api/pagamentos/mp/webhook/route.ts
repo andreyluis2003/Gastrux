@@ -16,6 +16,7 @@ import { upsertSubscriptionFromGatewayEvent } from '@/lib/billing/subscription-s
 import { logPaymentEvent, PaymentEventType } from '@/lib/payment-logger';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
+import { syncRestaurantPayment } from '@/lib/mercadopago-connect/payment-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,6 +82,16 @@ export async function POST(request: NextRequest) {
     const sig = verifyMercadoPagoSignature(request, id, MP_WEBHOOK_SECRET);
     if (!sig.ok) {
       console.warn(`[MP Webhook] Invalid signature: ${sig.reason}`);
+      // Reported so a SYSTEMATIC rejection is visible - above all for the
+      // per-restaurant notifications (?rid=), whose signing secret is an
+      // unverified premise. rid, mpId and topic are plain ids: never secrets
+      // and never headers.
+      captureException(new Error(`MP webhook signature rejected: ${sig.reason}`), {
+        endpoint: '/api/pagamentos/mp/webhook',
+        rid: url.searchParams.get('rid'),
+        mpId: id,
+        topic,
+      });
       return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
     }
 
@@ -97,6 +108,18 @@ export async function POST(request: NextRequest) {
       metadata: { topic, mpId: id },
     });
 
+    // Payments received by a RESTAURANT through its own Mercado Pago account
+    // carry ?rid=<restaurantId> (set in notification_url when the payment was
+    // created). They are fetched with THAT restaurant's token and never touch
+    // the platform-billing handlers below, which stay unchanged.
+    const rid = url.searchParams.get('rid');
+    if (rid) {
+      if (validTopic === 'payment') {
+        await syncRestaurantPayment(rid, id);
+      }
+      return NextResponse.json({ received: true });
+    }
+
     switch (validTopic) {
       case 'payment':
         await handlePaymentNotification(id);
@@ -111,8 +134,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
+    const failedUrl = new URL(request.url);
     captureException(error instanceof Error ? error : new Error(String(error)), {
       endpoint: '/api/pagamentos/mp/webhook',
+      rid: failedUrl.searchParams.get('rid'),
+      mpId: failedUrl.searchParams.get('id') || failedUrl.searchParams.get('data.id'),
+      topic: failedUrl.searchParams.get('topic') || failedUrl.searchParams.get('type'),
     });
     console.error('[MP Webhook] Error:', error);
     return NextResponse.json(

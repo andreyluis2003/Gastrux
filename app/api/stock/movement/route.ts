@@ -31,22 +31,27 @@ export const POST = safeHandler(async (req, context) => {
 
   const body = await req.json();
 
-  // Create movement record
+  // The ingredient must belong to this restaurant BEFORE anything is written (the movement used to
+  // be created first, for any ingredient id)
+  const ingredient = await prisma.ingredient.findFirst({
+    where: {
+      id: body.ingredientId,
+      restaurantId: context.restaurantId,
+    },
+  });
+  if (!ingredient) {
+    return NextResponse.json({ error: 'Ingrediente não encontrado' }, { status: 404 });
+  }
+
+  // Create movement record. ADJUSTMENT quantities are signed (+ in, - out): an adjustment made
+  // here removes stock, like any non-ENTRY movement of this route
   const movement = await prisma.stockMovement.create({
     data: {
       restaurantId: context.restaurantId,
       ingredientId: body.ingredientId,
-      quantity: body.quantity,
+      quantity: body.movementType === 'ADJUSTMENT' ? -Math.abs(body.quantity) : body.quantity,
       movementType: body.movementType,
       reason: body.reason,
-    },
-  });
-
-  // Get ingredient data for notifications
-  const ingredient = await prisma.ingredient.findUnique({
-    where: {
-      id: body.ingredientId,
-      restaurantId: context.restaurantId,
     },
   });
 
@@ -61,12 +66,11 @@ export const POST = safeHandler(async (req, context) => {
   });
 
   if (stock && ingredient) {
-    const newQuantity =
-      body.movementType === 'ENTRY'
-        ? stock.currentQuantity + body.quantity
-        : stock.currentQuantity - body.quantity;
-
-    await prisma.stock.update({
+    // Atomic increment/decrement - computing newQuantity from a prior read
+    // and writing it back loses updates when two movements for the same
+    // ingredient happen concurrently (e.g. two orders auto-deducting stock
+    // at the same time).
+    const updatedStock = await prisma.stock.update({
       where: {
         restaurantId_ingredientId: {
           restaurantId: context.restaurantId,
@@ -74,10 +78,14 @@ export const POST = safeHandler(async (req, context) => {
         },
       },
       data: {
-        currentQuantity: newQuantity,
+        currentQuantity:
+          body.movementType === 'ENTRY'
+            ? { increment: body.quantity }
+            : { decrement: body.quantity },
         lastUpdated: new Date(),
       },
     });
+    const newQuantity = updatedStock.currentQuantity;
 
     // Trigger low stock notification if below minimum
     if (newQuantity < ingredient.minimumStock) {

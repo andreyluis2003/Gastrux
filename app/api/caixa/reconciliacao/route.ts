@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Scoped: another restaurant's register is a 404 (it used to be found by id only)
     const register = await prisma.cashRegister.findFirst({
       where: { id: cashRegisterId, restaurantId },
       include: {

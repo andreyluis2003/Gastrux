@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { handleInboundMessage, type InboundMessage } from '@/lib/whatsapp/bot';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Verifies Meta's X-Hub-Signature-256 header (HMAC-SHA256 of the raw body,
+ * keyed with the Meta App Secret shared across every restaurant's WhatsApp
+ * number). Without this, phoneNumberId - which is not a secret - is the
+ * only thing standing between an attacker and forging inbound messages
+ * (fake orders, fake loyalty/cashback redemptions, bot abuse) for any
+ * restaurant.
+ */
+function verifyMetaSignature(rawBody: string, signatureHeader: string | null): boolean {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret) return false;
+  if (!signatureHeader?.startsWith('sha256=')) return false;
+
+  const expected = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
+  const provided = signatureHeader.slice('sha256='.length);
+
+  try {
+    const a = Buffer.from(provided, 'hex');
+    const b = Buffer.from(expected, 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Webhook da Meta Cloud API.
@@ -45,7 +71,12 @@ export async function GET(req: NextRequest) {
 // POST - recebe mensagens
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    if (!verifyMetaSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
+      console.warn('[wa-webhook] rejected: missing or invalid X-Hub-Signature-256');
+      return NextResponse.json({ ok: false }, { status: 401 });
+    }
+    const body = JSON.parse(rawBody);
 
     // Formato Meta Cloud API
     // body.entry[].changes[].value.messages[] + .metadata.phone_number_id
@@ -55,6 +86,15 @@ export async function POST(req: NextRequest) {
       const changes: any[] = entry?.changes || [];
       for (const change of changes) {
         const value = change?.value || {};
+
+        if (change?.field === 'account_update') {
+          console.log('[wa-webhook] account_update', {
+            event: value?.event,
+            wabaId: value?.waba_info?.waba_id,
+          });
+          continue;
+        }
+
         const phoneNumberId: string | undefined = value?.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
 
