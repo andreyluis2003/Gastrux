@@ -82,7 +82,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head suppressHydrationWarning>
-        <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
         <FontPreload />
         <GAScript />
       </head>
