@@ -14,17 +14,15 @@ const ASSIGNABLE_ROLES: Record<string, string[]> = {
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * The team with salaries and commissions: the owner and managers of THIS restaurant only. It used to
+ * answer anyone signed in (a cashier saw everybody's salary), from the raw currentRestaurantId or the
+ * user's first restaurant, without checking the membership.
+ */
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: 'N\u00e3o autorizado' }, { status: 401 });
-
-  const userId = (session.user as any).id;
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { currentRestaurantId: true, restaurants: { take: 1, select: { restaurantId: true } } },
-  });
-  const restaurantId = u?.currentRestaurantId || u?.restaurants?.[0]?.restaurantId;
-  if (!restaurantId) return NextResponse.json({ members: [] });
+  const auth = await requireRestaurantRole(MANAGER_ROLES, 'Sem permiss\u00e3o');
+  if (!auth.ok) return auth.response;
+  const restaurantId = auth.member.restaurantId;
 
   const members = await prisma.staffMember.findMany({
     where: { restaurantId },
@@ -72,6 +70,8 @@ export async function POST(req: NextRequest) {
     staffUser = await prisma.user.create({
       data: {
         email, name, password: await bcrypt.hash(temporaryPassword, 10),
+        // The hire changes it at the first access (middleware.ts)
+        mustChangePassword: true,
         role: staffRole, active: true, currentRestaurantId: restaurantId,
       },
     });

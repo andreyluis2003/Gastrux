@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
               where: { id: existingByEmail.id },
               data: {
                 password: await bcryptjs.hash(password, 10),
+                mustChangePassword: true,
                 active: true,
                 trialEndsAt: accessEndsAt,
                 subscriptionStatus: 'trialing',
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
             data: {
               email,
               password: hashed,
+              mustChangePassword: true,
               name,
               role: 'OWNER',
               active: true,

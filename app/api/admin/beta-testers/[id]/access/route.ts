@@ -64,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const newPassword = randomBytes(6).toString('hex');
       await prisma.user.update({
         where: { id: tester.userId },
-        data: { password: await bcryptjs.hash(newPassword, 10) },
+        data: { password: await bcryptjs.hash(newPassword, 10), mustChangePassword: true },
       });
       return NextResponse.json({ success: true, tempPassword: newPassword });
     }

@@ -14,6 +14,8 @@ model User {
   email                  String                  @unique
   name                   String?
   password               String?
+  /// Set when someone else chose the password (a hire, a reset): changed at the first access
+  mustChangePassword     Boolean                 @default(false)
   image                  String?
   emailVerified          DateTime?
   role                   UserRole                @default(COOK)

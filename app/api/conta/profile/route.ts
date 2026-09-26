@@ -88,8 +88,11 @@ export async function PATCH(request: NextRequest) {
     if (!currentPassword || !newPassword) {
       return NextResponse.json({ error: 'Senhas são obrigatórias' }, { status: 400 });
     }
-    if (newPassword.length < 6) {
-      return NextResponse.json({ error: 'Nova senha deve ter pelo menos 6 caracteres' }, { status: 400 });
+    if (newPassword.length < 8) {
+      return NextResponse.json({ error: 'A nova senha deve ter pelo menos 8 caracteres' }, { status: 400 });
+    }
+    if (newPassword === currentPassword) {
+      return NextResponse.json({ error: 'A nova senha deve ser diferente da atual' }, { status: 400 });
     }
     const valid = await bcryptjs.compare(currentPassword, user.password);
     if (!valid) {
@@ -98,7 +101,8 @@ export async function PATCH(request: NextRequest) {
     const hashed = await bcryptjs.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: user.id },
-      data: { password: hashed },
+      // The temporary password is gone: the session is refreshed by the page (update())
+      data: { password: hashed, mustChangePassword: false },
     });
     return NextResponse.json({ success: true });
   }

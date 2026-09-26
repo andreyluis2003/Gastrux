@@ -50,6 +50,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          mustChangePassword: user.mustChangePassword,
         };
       },
     }),
@@ -60,10 +61,17 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger }) {
       if (user) {
         token.role = (user as any).role || 'OWNER';
         token.id = user.id;
+        // A password someone else chose must be changed first (middleware.ts sends the user there)
+        token.mustChangePassword = !!(user as any).mustChangePassword;
+      }
+      // After the password change the page calls update(): read the flag again
+      if (trigger === 'update' && token.id) {
+        const fresh = await prisma.user.findUnique({ where: { id: token.id as string }, select: { mustChangePassword: true } });
+        token.mustChangePassword = !!fresh?.mustChangePassword;
       }
       // For Google SSO users, ensure role is always set
       if (!token.role) {
