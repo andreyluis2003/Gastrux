@@ -113,4 +113,10 @@ describe('first access with a temporary password', () => {
     expect(refreshed.mustChangePassword).toBe(false);
     expect((await credentialsLogin('NovaSenha#2026')).mustChangePassword).toBe(false);
   });
+
+  it('the login finds the account however the e-mail is typed (capitals, spaces)', async () => {
+    const provider = authOptions.providers.find((p: any) => p.id === 'credentials');
+    const logged = await provider.options.authorize({ email: `  ${email.toUpperCase()} `, password: 'NovaSenha#2026' });
+    expect(logged.id).toBe(hiredId);
+  });
 });

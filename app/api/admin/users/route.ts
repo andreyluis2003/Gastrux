@@ -114,7 +114,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, password, name, role, phone, cpf } = body;
+    const { password, name, role, phone, cpf } = body;
+    // E-mails are stored in lower case (the login looks them up that way)
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email e senha são obrigatórios' }, { status: 400 });

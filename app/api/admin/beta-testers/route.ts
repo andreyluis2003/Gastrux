@@ -50,9 +50,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    // E-mails are stored in lower case (the login looks them up that way)
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const {
       name,
-      email,
       phone,
       restaurantName,
       restaurantCity,
