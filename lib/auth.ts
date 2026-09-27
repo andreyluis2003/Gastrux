@@ -25,7 +25,8 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          // E-mails are stored in lower case: "Fulano@x.com" and "fulano@x.com" are the same person
+          where: { email: credentials.email.trim().toLowerCase() },
         });
 
         if (!user || !user.password) {

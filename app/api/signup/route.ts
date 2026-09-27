@@ -6,7 +6,10 @@ import { randomBytes } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name, acceptedTerms } = await req.json();
+    const body = await req.json();
+    const { password, name, acceptedTerms } = body;
+    // Stored in lower case, so the login finds it however the person types it
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
 
     if (!email || !password) {
       return NextResponse.json(

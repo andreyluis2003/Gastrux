@@ -66,6 +66,7 @@ model User {
   leadQuality            String?
   notifications          Notification[]          @relation("UserNotifications")
   accounts               Account[]
+  passwordResetTokens    PasswordResetToken[]
   adminLogs              AdminLog[]              @relation("AdminLogsUser")
   aiInsightsCreated      AIInsight[]             @relation("userAIInsights")
   alertPreferences       AlertPreference[]
@@ -4369,4 +4370,19 @@ model IdempotencyRecord {
   @@unique([restaurantId, key])
   @@index([createdAt])
   @@map("idempotency_records")
+}
+
+/// "Esqueci minha senha": one-time link sent by e-mail (lib/auth/password-reset.ts). Only the
+/// SHA-256 of the token is stored, so a copy of the table cannot be used to reset anyone.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("password_reset_tokens")
 }

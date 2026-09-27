@@ -45,7 +45,8 @@ export async function POST(req: NextRequest) {
   const restaurantId = member.restaurantId;
 
   const body = await req.json();
-  const { name, email, phone, cpf, baseSalary, commissionType, commissionValue, defaultStartTime, defaultEndTime } = body;
+  const { name, phone, cpf, baseSalary, commissionType, commissionValue, defaultStartTime, defaultEndTime } = body;
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const staffRole = body.staffRole || 'COOK';
 
   if (!name || !email) {
