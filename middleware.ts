@@ -25,6 +25,8 @@ const PUBLIC_PATHS = [
   '/',
   '/auth/signin',
   '/auth/signup',
+  '/auth/esqueci-senha',
+  '/auth/redefinir-senha',
   '/pricing',
   '/ajuda',
   '/casos-de-sucesso',
