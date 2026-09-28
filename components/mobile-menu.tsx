@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X, Home, UtensilsCrossed, ClipboardList, ShoppingCart, TrendingDown, BarChart3, AlertCircle, LogOut, Settings, Calculator, Trash2, PieChart, ClipboardCheck } from 'lucide-react';
+import { Menu, X, Home, UtensilsCrossed, ClipboardList, ShoppingCart, TrendingDown, BarChart3, AlertCircle, LogOut, Settings, Calculator, Trash2, PieChart, ClipboardCheck, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -44,7 +44,7 @@ export function MobileMenu() {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-2.5 left-3 z-40 md:hidden p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
+        className="fixed top-2.5 left-3 z-[60] md:hidden p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
       >
         {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
       </button>
@@ -52,14 +52,14 @@ export function MobileMenu() {
       {/* Mobile Menu Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 bg-black/50 z-[45] md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu: above the sticky page headers (z-40), which used to cover it */}
       <div
-        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 z-40 md:hidden transform transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 z-50 md:hidden transform transition-transform duration-300 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -94,6 +94,14 @@ export function MobileMenu() {
           {/* Settings & Logout — only when authenticated */}
           {session && (
             <div className="space-y-2">
+              <Link
+                href="/conta#alterar-senha"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <UserCog className="h-5 w-5" />
+                <span className="font-medium">Minha conta e senha</span>
+              </Link>
               <Link
                 href="/settings"
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"

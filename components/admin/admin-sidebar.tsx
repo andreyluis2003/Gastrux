@@ -35,8 +35,7 @@ import {
   Plug,
   Target,
   Package,
-  QrCode,
-} from 'lucide-react';
+  QrCode, UserCog } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { signOutSafely } from '@/lib/offline/sign-out';
 import { cn } from '@/lib/utils';
@@ -360,8 +359,15 @@ export function AdminSidebar() {
           ))}
         </nav>
 
-        {/* Logout button */}
-        <div className="p-4 border-t border-slate-700 flex-shrink-0">
+        {/* Account (password change) and logout */}
+        <div className="p-4 border-t border-slate-700 flex-shrink-0 space-y-1">
+          <Link
+            href="/conta#alterar-senha"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            <UserCog className="w-5 h-5" />
+            <span className="text-sm font-medium">Minha conta e senha</span>
+          </Link>
           <button
             onClick={() => signOutSafely({ redirect: true, callbackUrl: '/auth/signin' })}
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
