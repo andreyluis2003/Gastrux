@@ -55,6 +55,15 @@ export default function MinhaContaPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // Links from the dashboard and the menus open /conta#alterar-senha; the section only exists after
+  // loading, so the browser's own jump to the anchor misses it (on a phone it is below the fold)
+  useEffect(() => {
+    if (!loading && window.location.hash === '#alterar-senha') {
+      document.getElementById('alterar-senha')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('currentPw')?.focus({ preventScroll: true });
+    }
+  }, [loading]);
+
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -94,7 +103,7 @@ export default function MinhaContaPage() {
 
   async function handleChangePassword() {
     if (!currentPassword || !newPassword) { toast.error('Preencha todos os campos'); return; }
-    if (newPassword.length < 6) { toast.error('Nova senha deve ter pelo menos 6 caracteres'); return; }
+    if (newPassword.length < 8) { toast.error('A nova senha deve ter pelo menos 8 caracteres'); return; }
     if (newPassword !== confirmNewPassword) { toast.error('Senhas não coincidem'); return; }
     setSavingPassword(true);
     try {
@@ -227,8 +236,8 @@ export default function MinhaContaPage() {
         </div>
       </Card>
 
-      {/* Alterar Senha */}
-      <Card className="p-6">
+      {/* Alterar Senha: the dashboard, the mobile menu and the admin sidebar link here (#alterar-senha) */}
+      <Card id="alterar-senha" className="p-6 scroll-mt-24">
         <div className="flex items-center gap-2 mb-4">
           <Lock className="h-5 w-5 text-amber-600" />
           <h2 className="text-lg font-semibold">Alterar Senha</h2>
