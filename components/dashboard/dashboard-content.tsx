@@ -63,6 +63,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { formatDate } from '@/lib/formatters';
+import type { DashboardStats, StatCard } from '@/lib/dashboard/stats';
 import { ReactNode, useState, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import type { TranslationKey } from '@/lib/i18n/translations';
@@ -77,11 +78,9 @@ const iconMap = {
 } as const;
 
 export interface DashboardContentProps {
-  ingredientCount: number;
-  recipeCount: number;
-  recentPlans: any[];
+  /** Computed from the restaurant's data (lib/dashboard/stats.ts) */
+  stats: DashboardStats;
   recentAlerts: any[];
-  lowStockCount: number;
   modules: Array<{
     id: string;
     iconName: keyof typeof iconMap;
@@ -190,12 +189,36 @@ const MODULE_CATEGORY: Record<string, CategoryId> = {
 const DASHBOARD_MODE_KEY = 'gastrux-dashboard-mode';
 
 // ── Component ──────────────────────────────────────────────────
+/** One dashboard card: the value, and a trend and a line only when the data has them. */
+function StatTile({ label, card, color }: { label: string; card: StatCard; color: string }) {
+  const up = (card.delta ?? 0) > 0;
+  const down = (card.delta ?? 0) < 0;
+  return (
+    <GlassCard className="h-full p-4 sm:p-6 flex flex-col">
+      <p className="text-xs sm:text-sm font-medium text-slate-600 mb-2">{label}</p>
+      <p className="text-2xl sm:text-3xl font-bold text-primary">{card.value}</p>
+      {card.delta !== null && (
+        <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+          <span className={`inline-flex items-center gap-0.5 font-semibold ${up ? 'text-green-600' : down ? 'text-amber-600' : 'text-slate-500'}`}>
+            {up && <ArrowUp className="w-3 h-3" />}
+            {down && <ArrowDown className="w-3 h-3" />}
+            {card.delta > 0 ? `+${card.delta}` : card.delta}
+          </span>
+          {card.deltaLabel}
+        </p>
+      )}
+      {card.series.length > 1 && (
+        <div className="mt-3">
+          <Sparkline data={card.series.map((value) => ({ value }))} color={color} height={20} />
+        </div>
+      )}
+    </GlassCard>
+  );
+}
+
 export function DashboardContent({
-  ingredientCount,
-  recipeCount,
-  recentPlans,
+  stats,
   recentAlerts,
-  lowStockCount,
   modules,
 }: DashboardContentProps) {
   const { t } = useI18n();
@@ -262,53 +285,10 @@ export function DashboardContent({
       {/* Stats Section */}
       <FadeIn>
         <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <GlassCard className="p-4 sm:p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs sm:text-sm font-medium text-slate-600">{t('dashboard.stats.ingredients')}</p>
-              <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-green-600">
-                <ArrowUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>12%</span>
-              </div>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-primary mb-3">{ingredientCount}</p>
-            <Sparkline data={[{value:20},{value:22},{value:20},{value:25},{value:28},{value:26},{value:30}]} color="hsl(142 71% 45%)" height={20} />
-          </GlassCard>
-
-          <GlassCard className="p-4 sm:p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs sm:text-sm font-medium text-slate-600">{t('dashboard.stats.recipes')}</p>
-              <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-green-600">
-                <ArrowUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>8%</span>
-              </div>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-primary mb-3">{recipeCount}</p>
-            <Sparkline data={[{value:15},{value:17},{value:16},{value:18},{value:19},{value:18},{value:20}]} color="hsl(142 71% 45%)" height={20} />
-          </GlassCard>
-
-          <GlassCard className="p-4 sm:p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs sm:text-sm font-medium text-slate-600">{t('dashboard.stats.plans')}</p>
-              <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-blue-600">
-                <ArrowUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>5%</span>
-              </div>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-primary mb-3">{recentPlans.length}</p>
-            <Sparkline data={[{value:2},{value:2},{value:3},{value:2},{value:3},{value:3},{value:3}]} color="hsl(221 83% 53%)" height={20} />
-          </GlassCard>
-
-          <GlassCard className="p-4 sm:p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs sm:text-sm font-medium text-slate-600">{t('dashboard.stats.lowStock')}</p>
-              <div className="flex items-center gap-1 text-xs sm:text-sm font-semibold text-red-600">
-                <ArrowDown className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>3%</span>
-              </div>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-primary mb-3">{lowStockCount}</p>
-            <Sparkline data={[{value:8},{value:7},{value:6},{value:5},{value:4},{value:3},{value:2}]} color="hsl(0 84% 60%)" height={20} />
-          </GlassCard>
+          <StatTile label={t('dashboard.stats.ingredients')} card={stats.ingredients} color="hsl(142 71% 45%)" />
+          <StatTile label={t('dashboard.stats.recipes')} card={stats.recipes} color="hsl(142 71% 45%)" />
+          <StatTile label={t('dashboard.stats.plans')} card={stats.plansThisWeek} color="hsl(221 83% 53%)" />
+          <StatTile label={t('dashboard.stats.lowStock')} card={stats.lowStock} color="hsl(0 84% 60%)" />
         </div>
       </FadeIn>
 

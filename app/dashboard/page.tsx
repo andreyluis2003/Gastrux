@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { DashboardContent, type DashboardContentProps } from '@/components/dashboard/dashboard-content';
+import { getDashboardStats } from '@/lib/dashboard/stats';
 import {
   DashboardAlertsLoadingSkeleton,
 } from '@/components/dashboard/dashboard-loading-skeleton';
@@ -37,42 +38,6 @@ interface User {
   role?: string;
 }
 
-// CRITICAL DATA - Fetch immediately (< 100ms)
-async function CriticalData(restaurantId: string) {
-  const [ingredientCount, recipeCount] = await Promise.all([
-    prisma.ingredient.count({ where: { active: true, restaurantId } }),
-    prisma.recipe.count({ where: { active: true, restaurantId } }),
-  ]);
-
-  return { ingredientCount, recipeCount };
-}
-
-// HIGH PRIORITY DATA - Fetch after 100-200ms
-async function HighPriorityData(restaurantId: string) {
-  const lowStockCount = await prisma.stock.count({
-    where: {
-      restaurantId,
-      currentQuantity: {
-        lt: 0,
-      },
-    },
-  });
-
-  return { lowStockCount };
-}
-
-// MEDIUM PRIORITY DATA - Fetch after 500ms
-async function MediumPriorityData(restaurantId: string) {
-  const recentPlans = await prisma.productionPlan.findMany({
-    take: 3,
-    where: { restaurantId },
-    orderBy: { planDate: 'desc' },
-    include: { items: true },
-  });
-
-  return { recentPlans };
-}
-
 // LOW PRIORITY DATA - Fetch after 1000ms+
 async function LowPriorityData(restaurantId: string) {
   const recentAlerts = await prisma.alert.findMany({
@@ -84,31 +49,20 @@ async function LowPriorityData(restaurantId: string) {
   return { recentAlerts };
 }
 
-async function DashboardFullContent({ 
-  criticalData, 
+const EMPTY_CARD = { value: 0, delta: null, deltaLabel: null, series: [] };
+const EMPTY_STATS = { ingredients: EMPTY_CARD, recipes: EMPTY_CARD, plansThisWeek: EMPTY_CARD, lowStock: EMPTY_CARD };
+
+async function DashboardFullContent({
   modules,
   restaurantId,
-}: { 
-  criticalData: { ingredientCount: number; recipeCount: number }; 
+}: {
   modules: DashboardContentProps['modules'];
   restaurantId: string;
 }) {
-  const [high, medium, low] = await Promise.all([
-    HighPriorityData(restaurantId),
-    MediumPriorityData(restaurantId),
-    LowPriorityData(restaurantId),
-  ]);
+  // The cards come from the restaurant's data (lib/dashboard/stats.ts): no fixed trends
+  const [stats, low] = await Promise.all([getDashboardStats(restaurantId), LowPriorityData(restaurantId)]);
 
-  return (
-    <DashboardContent
-      ingredientCount={criticalData.ingredientCount}
-      recipeCount={criticalData.recipeCount}
-      recentPlans={medium.recentPlans}
-      recentAlerts={low.recentAlerts}
-      lowStockCount={high.lowStockCount}
-      modules={modules}
-    />
-  );
+  return <DashboardContent stats={stats} recentAlerts={low.recentAlerts} modules={modules} />;
 }
 
 export default async function DashboardPage() {
@@ -121,11 +75,6 @@ export default async function DashboardPage() {
   const user = session.user as User;
 
   const restaurantId = await getCurrentRestaurantId();
-
-  // Fetch critical data immediately (scoped to the current restaurant)
-  const critical = restaurantId
-    ? await CriticalData(restaurantId)
-    : { ingredientCount: 0, recipeCount: 0 };
 
   const modules = [
     { id: 'cardapio-digital', iconName: 'ChefHat' as const, href: '/admin/cardapio', color: 'bg-amber-50', accentColor: 'text-amber-600' },
@@ -197,16 +146,9 @@ export default async function DashboardPage() {
         <AlertsBanner />
         <Suspense fallback={<DashboardAlertsLoadingSkeleton />}>
           {restaurantId ? (
-            <DashboardFullContent criticalData={critical} modules={visibleModules} restaurantId={restaurantId} />
+            <DashboardFullContent modules={visibleModules} restaurantId={restaurantId} />
           ) : (
-            <DashboardContent
-              ingredientCount={0}
-              recipeCount={0}
-              recentPlans={[]}
-              recentAlerts={[]}
-              lowStockCount={0}
-              modules={visibleModules}
-            />
+            <DashboardContent stats={EMPTY_STATS} recentAlerts={[]} modules={visibleModules} />
           )}
         </Suspense>
       </main>
