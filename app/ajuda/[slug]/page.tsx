@@ -29,7 +29,9 @@ interface Related {
 
 // Super light markdown renderer (h2, h3, bold, lists, blockquote, code, images)
 function renderMarkdown(md: string): string {
-  const escape = (s: string) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Quotes too: a " in an image URL used to close the src attribute and let an article run script
+  const escape = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const lines = md.split('\n');
   const out: string[] = [];
   let inList = false;

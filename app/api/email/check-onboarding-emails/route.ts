@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isCronAuthorized } from '@/lib/mercadopago-connect/cron-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,11 @@ interface UserForOnboarding {
 
 export async function GET(req: NextRequest) {
   try {
+    // Automatic jobs only (CRON_SECRET, compared in constant time, refused when not configured).
+    // It had no check: anyone could list accounts by sign-up date.
+    if (!isCronAuthorized(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const now = new Date();
     const day3Threshold = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
     const day7Threshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

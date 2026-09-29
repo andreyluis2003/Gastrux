@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isCronAuthorized } from '@/lib/mercadopago-connect/cron-auth';
 import { sendNotificationEmail } from '@/lib/email-service';
 import { buildDay3OnboardingEmail, buildDay7OnboardingEmail } from '@/lib/email-onboarding';
 
@@ -13,6 +14,11 @@ const NOTIF_IDS = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Automatic jobs only (CRON_SECRET, compared in constant time, refused when not configured).
+    // It had no check: anyone could make the platform e-mail any account.
+    if (!isCronAuthorized(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const { userId, day } = await req.json();
 
     if (!userId || !['3', '7'].includes(day)) {

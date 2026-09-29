@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { twimlSay } from '@/lib/voice/twiml';
+import { formToParams, isValidTwilioRequest, publicRequestUrl } from '@/lib/voice/twilio-signature';
 import { decideNextReply } from '@/lib/voice/conversation-manager';
 import { validateDraft, createReservationFromDraft } from '@/lib/voice/reservation-helper';
 
@@ -34,7 +35,11 @@ export async function POST(req: NextRequest) {
     return twimlResp(twimlSay({ text: 'Erro interno. Desculpe.', hangup: true }));
   }
   const cfg = call.restaurant.voiceAgentConfig;
-  const gatherUrl = `${url.origin}/api/voice/webhook/gather?callSid=${encodeURIComponent(callSid)}`;
+  // Only Twilio: a forged "speech" could make the agent create reservations
+  if (!isValidTwilioRequest(cfg.twilioAuthToken, req.headers.get('x-twilio-signature'), publicRequestUrl(req.url), formToParams(form))) {
+    return new Response('Forbidden', { status: 403 });
+  }
+  const gatherUrl = publicRequestUrl(new URL(`/api/voice/webhook/gather?callSid=${encodeURIComponent(callSid)}`, req.url).toString());
 
   if (isTimeout || !speech) {
     return twimlResp(

@@ -287,16 +287,16 @@ export default function MessagingProvidersPage() {
                     <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
                       <div className="text-xs font-semibold text-gray-700">Webhook de status de entrega</div>
                       <div className="flex items-center gap-2">
-                        <code className="text-xs bg-white p-2 border rounded flex-1 truncate">{webhookBase}/api/messaging/webhook/{p.id.toLowerCase()}</code>
+                        <code className="text-xs bg-white p-2 border rounded flex-1 truncate">{webhookBase}/api/messaging/webhook/{p.id.toLowerCase()}?token=MESSAGING_WEBHOOK_SECRET</code>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => copyWebhook(p.id, `${webhookBase}/api/messaging/webhook/${p.id.toLowerCase()}`)}
+                          onClick={() => copyWebhook(p.id, `${webhookBase}/api/messaging/webhook/${p.id.toLowerCase()}?token=MESSAGING_WEBHOOK_SECRET`)}
                         >
                           {copied === p.id ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         </Button>
                       </div>
-                      <p className="text-[11px] text-gray-500">Configure esta URL no painel do {p.name} para receber status de entrega/leitura.</p>
+                      <p className="text-[11px] text-gray-500">Configure esta URL no painel do {p.name} para receber status de entrega/leitura, trocando MESSAGING_WEBHOOK_SECRET pelo valor dessa variável no servidor. Sem o token certo o aviso é recusado.</p>
                     </div>
                   )}
 

@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import QRCode from 'qrcode';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,6 +73,9 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // Menu, prices, money and settings are changed by the owner or a manager (it accepted any role)
+    const managerCheck = await requireRestaurantRole(MANAGER_ROLES, 'Configurar o QR da embalagem exige um gerente');
+    if (!managerCheck.ok) return managerCheck.response;
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     const restaurantId = await getCurrentRestaurantId();

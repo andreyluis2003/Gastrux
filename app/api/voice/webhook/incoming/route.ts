@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { twimlSay } from '@/lib/voice/twiml';
+import { formToParams, isValidTwilioRequest, publicRequestUrl } from '@/lib/voice/twilio-signature';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,8 @@ export async function POST(req: NextRequest) {
     where: { twilioPhoneNumber: toNumber, isActive: true },
   });
 
-  if (!cfg) {
+  // Only Twilio, signing with this restaurant's auth token (a forged POST used to be accepted)
+  if (!cfg || !isValidTwilioRequest(cfg.twilioAuthToken, req.headers.get('x-twilio-signature'), publicRequestUrl(req.url), formToParams(form))) {
     return twimlResp(
       twimlSay({
         text: 'Atendimento indisponível no momento. Por favor, tente novamente mais tarde.',
@@ -84,8 +86,8 @@ export async function POST(req: NextRequest) {
   });
 
   // Origem para o webhook de gather
-  const url = new URL(req.url);
-  const gatherUrl = `${url.origin}/api/voice/webhook/gather?callSid=${encodeURIComponent(callSid)}`;
+  // The public address (the one Twilio can reach and signs), not the internal one behind the proxy
+  const gatherUrl = publicRequestUrl(new URL(`/api/voice/webhook/gather?callSid=${encodeURIComponent(callSid)}`, req.url).toString());
 
   return twimlResp(
     twimlSay({

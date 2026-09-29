@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { formToParams, isValidTwilioRequest, publicRequestUrl } from '@/lib/voice/twilio-signature';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,16 @@ export async function POST(req: NextRequest) {
 
   if (!callSid) return NextResponse.json({ ok: true });
 
-  const call = await prisma.voiceCall.findUnique({ where: { callSid } });
+  const call = await prisma.voiceCall.findUnique({
+    where: { callSid },
+    include: { restaurant: { select: { voiceAgentConfig: { select: { twilioAuthToken: true } } } } },
+  });
   if (!call) return NextResponse.json({ ok: true });
+  // Only Twilio may end or change a call
+  const token = call.restaurant?.voiceAgentConfig?.twilioAuthToken;
+  if (!isValidTwilioRequest(token, req.headers.get('x-twilio-signature'), publicRequestUrl(req.url), formToParams(form))) {
+    return NextResponse.json({ error: 'invalid signature' }, { status: 403 });
+  }
 
   const statusMap: Record<string, string> = {
     completed: 'COMPLETED',

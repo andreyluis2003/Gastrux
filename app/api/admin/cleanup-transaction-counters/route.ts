@@ -13,21 +13,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { resetDailyCounters } from '@/lib/transaction-limiter';
+import { isCronAuthorized } from '@/lib/mercadopago-connect/cron-auth';
 
 export const dynamic = 'force-dynamic';
 
-const ADMIN_SECRET = process.env.ADMIN_CLEANUP_SECRET || 'default-secret';
-
 export async function POST(request: NextRequest) {
   try {
-    // Validar secret para seguranca
-    const adminSecret = request.headers.get('X-Admin-Secret');
-    
-    if (adminSecret !== ADMIN_SECRET) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Automatic jobs only (CRON_SECRET, compared in constant time, refused when not configured).
+    // It fell back to the public password "default-secret" when ADMIN_CLEANUP_SECRET was unset.
+    if (!isCronAuthorized(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Executar limpeza

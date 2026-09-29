@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,23 @@ export const dynamic = 'force-dynamic';
  * para normalizar. Para Meta Cloud, o webhook existente de WhatsApp
  * (Phase 51) permanece em /api/whatsapp/webhook.
  */
+/**
+ * The provider must call the URL with ?token=<MESSAGING_WEBHOOK_SECRET>: it accepted anyone, who could
+ * mark campaign messages as delivered/read. Refused when the secret is not configured.
+ */
+function tokenMatches(req: NextRequest): boolean {
+  const secret = process.env.MESSAGING_WEBHOOK_SECRET;
+  const given = new URL(req.url).searchParams.get('token') || req.headers.get('x-webhook-token') || '';
+  if (!secret || !given) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest, { params }: any) {
+  if (!tokenMatches(req)) {
+    return NextResponse.json({ error: 'invalid token' }, { status: 401 });
+  }
   const providerRaw = (params?.provider || '').toUpperCase();
   const body = await req.json().catch(() => ({}));
 

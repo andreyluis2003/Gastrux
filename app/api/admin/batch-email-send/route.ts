@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isCronAuthorized } from '@/lib/mercadopago-connect/cron-auth';
 import { assignUserVariant } from '@/lib/email-ab-test';
 
 interface EmailJob {
@@ -15,9 +16,12 @@ interface EmailJob {
  * Used by daemon tasks for scheduled email sending
  */
 export async function POST(request: NextRequest) {
+  const req = request;
   try {
-    const adminSecret = request.headers.get('x-admin-secret');
-    if (adminSecret !== process.env.ADMIN_CLEANUP_SECRET) {
+    // Automatic jobs only (CRON_SECRET, compared in constant time, refused when not configured).
+    // It compared x-admin-secret with ADMIN_CLEANUP_SECRET: with the variable unset, a request
+    // without the header matched (undefined === undefined) and anyone could send e-mail batches.
+    if (!isCronAuthorized(req)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -184,10 +184,11 @@ export async function POST(req: NextRequest) {
               notes,
               status: 'CONFIRMED',
             },
+            // Public route: never return the stored guest profile (booking with someone else's e-mail
+            // used to return that person's whole profile)
             include: {
-              guest: true,
               table: {
-                include: { section: true },
+                select: { id: true, number: true, capacity: true, section: { select: { id: true, name: true } } },
               },
             },
           });
