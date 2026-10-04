@@ -177,3 +177,22 @@ describe('unauthorizedReason', () => {
     expect(unauthorizedReason({ status: 401 })).toBe('Mercado Pago rejeitou o token (401)');
   });
 });
+
+describe('isUnauthorizedError', () => {
+  const { isUnauthorizedError } = require('../../lib/mercadopago-connect/payments');
+
+  it('a revoked or invalid token is unauthorized', () => {
+    expect(isUnauthorizedError({ status: 401, message: 'invalid access token' })).toBe(true);
+    expect(isUnauthorizedError({ statusCode: 401 })).toBe(true);
+  });
+
+  it('a payer rejected by a test seller ("live credentials") does not disconnect the restaurant', () => {
+    expect(
+      isUnauthorizedError({ status: 401, message: 'Unauthorized use of live credentials', error: 'unauthorized' })
+    ).toBe(false);
+  });
+
+  it('other statuses are not unauthorized', () => {
+    expect(isUnauthorizedError({ status: 400, message: 'bad request' })).toBe(false);
+  });
+});

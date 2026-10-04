@@ -121,9 +121,16 @@ export function cancelConnectPayment(client: MercadoPagoConfig, mpPaymentId: str
   return new Payment(client).cancel({ id: mpPaymentId });
 }
 
+/**
+ * True when the restaurant's token itself is unusable (callers then mark the connection NEEDS_RECONNECT).
+ * "Unauthorized use of live credentials" is also a 401, but it rejects the PAYER (a test seller paid by a
+ * non-test buyer, seen in homologation 2026-10-04): the token is fine, so it must not disconnect anyone.
+ */
 export function isUnauthorizedError(error: unknown): boolean {
   const e = error as any;
-  return e?.status === 401 || e?.statusCode === 401;
+  if (!(e?.status === 401 || e?.statusCode === 401)) return false;
+  const text = [e?.message, e?.error, e?.cause?.[0]?.description].filter((p) => typeof p === 'string').join(' ');
+  return !/live credentials/i.test(text);
 }
 
 /**
