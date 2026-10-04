@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getRestaurantMember, MANAGER_ROLES } from '@/lib/auth/restaurant-role';
-import { createDocumentWithNextNumber } from '@/lib/nfe/numbering';
+import { emitStandaloneNFCe } from '@/lib/nfe/emit-standalone';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,114 +76,35 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST: Issue a new NFC-e/NF-e
- * In production, this would call Focus NFe / NFe.io API
- * For now: creates the document record and simulates submission
+ * POST: a stand-alone NFC-e typed on this page (lib/nfe/emit-standalone.ts: real fiscal data,
+ * atomic number, really sent to the provider). NF-e is not issued from here.
  */
 export async function POST(req: NextRequest) {
   const ctx = await getContext();
   if (!ctx) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
 
-  const config = await prisma.nFeConfig.findUnique({
-    where: { restaurantId: ctx.restaurantId },
-  });
-  if (!config || !config.active) {
-    return NextResponse.json({ error: 'Configuração fiscal não encontrada ou inativa' }, { status: 400 });
+  const body = await req.json().catch(() => ({}));
+  if (body.documentType && body.documentType !== 'NFCe') {
+    return NextResponse.json({ error: 'Aqui só é possível emitir NFC-e (consumidor). NF-e ainda não é emitida pelo Gastrux.' }, { status: 400 });
   }
 
-  const body = await req.json();
-  const documentType = body.documentType || 'NFCe';
-  const isNFCe = documentType === 'NFCe';
-
-  // Calculate totals
-  const items = body.items || [];
-  const totalAmount = items.reduce((sum: number, i: any) => sum + (Number(i.totalPrice) || 0), 0);
-
-  // Number reserved atomically with the insert (lib/nfe/numbering.ts): never shared, never skipped
-  const document = await createDocumentWithNextNumber({
-    configId: config.id,
-    documentType: isNFCe ? 'NFCe' : 'NFe',
-    data: {
-      customerName: body.customerName || null,
-      customerCPF: body.customerCPF || null,
-      customerCNPJ: body.customerCNPJ || null,
-      customerEmail: body.customerEmail || null,
-      totalAmount,
-      status: 'pending',
-      orderId: body.orderId || null,
-      orderSessionId: body.orderSessionId || null,
-      paymentId: body.paymentId || null,
-      dataSnapshot: body.dataSnapshot || null,
-      items: {
-        create: items.map((item: any, idx: number) => ({
-          description: item.description || item.name || 'Item',
-          quantity: Number(item.quantity) || 1,
-          unit: item.unit || 'UN',
-          unitPrice: Number(item.unitPrice) || 0,
-          totalPrice: Number(item.totalPrice) || 0,
-          ncm: item.ncm || '21069090',
-          cfop: item.cfop || (isNFCe ? '5102' : '5102'),
-          recipeId: item.recipeId || null,
-          position: idx,
-        })),
-      },
-    },
-    include: { items: true },
+  const outcome = await emitStandaloneNFCe({
+    restaurantId: ctx.restaurantId,
+    items: body.items,
+    customerCPF: body.customerCPF,
+    customerName: body.customerName,
+    customerEmail: body.customerEmail,
+    paymentMethod: body.paymentMethod,
   });
+  if (outcome.httpStatus >= 400) return NextResponse.json(outcome.body, { status: outcome.httpStatus });
 
-  const docNumber = document.documentNumber;
-  const docSeries = document.documentSeries;
-
-  // Log submission
-  await prisma.nFeLog.create({
-    data: {
-      configId: config.id,
-      documentId: document.id,
-      eventType: 'SUBMISSION',
-      description: `${documentType} #${docNumber} criado — enviando para ${config.nfeProvider}`,
-    },
-  });
-
-  // In production: call Focus NFe API here
-  // For sandbox/demo: simulate authorization
-  if (config.environment === 'sandbox') {
-    const fakeKey = `${config.uf.length === 2 ? config.uf : 'SP'}${new Date().getFullYear()}${config.cnpj}${docSeries.toString().padStart(3, '0')}${docNumber.toString().padStart(9, '0')}1${Math.random().toString().slice(2, 11)}`;
-
-    await prisma.nFeDocument.update({
-      where: { id: document.id },
-      data: {
-        status: 'authorized',
-        accessKey: fakeKey.slice(0, 44),
-        protocolNumber: Math.random().toString().slice(2, 17),
-        issueDate: new Date(),
-        authorizedAt: new Date(),
-        submittedAt: new Date(),
-        statusDescription: 'Autorizado (Sandbox)',
-      },
-    });
-
-    await prisma.nFeLog.create({
-      data: {
-        configId: config.id,
-        documentId: document.id,
-        eventType: 'AUTHORIZATION',
-        description: `${documentType} #${docNumber} autorizado (sandbox)`,
-        statusCode: 100,
-      },
-    });
-  }
-
-  // Fetch updated document
-  const final = await prisma.nFeDocument.findUnique({
-    where: { id: document.id },
-    include: { items: true },
-  });
-
+  const doc: any = outcome.body.document;
   return NextResponse.json({
+    ...outcome.body,
     document: {
-      ...final,
-      totalAmount: Number(final?.totalAmount),
-      items: final?.items.map((i: any) => ({
+      ...doc,
+      totalAmount: Number(doc.totalAmount),
+      items: doc.items.map((i: any) => ({
         ...i,
         quantity: Number(i.quantity),
         unitPrice: Number(i.unitPrice),

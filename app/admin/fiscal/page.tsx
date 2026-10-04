@@ -27,6 +27,14 @@ const NFE_PROVIDERS = [
   { value: 'taxgroup', label: 'TaxGroup', desc: 'Enterprise' },
 ];
 
+const EMPTY_ISSUE_FORM = { documentType: 'NFCe', paymentMethod: 'dinheiro', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
+const PAYMENT_OPTIONS = [
+  { value: 'dinheiro', label: 'Dinheiro' },
+  { value: 'pix', label: 'PIX' },
+  { value: 'cartao de credito', label: 'Cartão de crédito' },
+  { value: 'cartao de debito', label: 'Cartão de débito' },
+];
+
 function formatBRL(val: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 }
@@ -50,7 +58,7 @@ export default function FiscalPage() {
   // Products that could not go on a note today (lib/nfe/fiscal-data.ts)
   const [fiscalPending, setFiscalPending] = useState<any>(null);
   const [showIssueForm, setShowIssueForm] = useState(false);
-  const [issueForm, setIssueForm] = useState<any>({ documentType: 'NFCe', items: [{ description: '', quantity: 1, unitPrice: 0 }] });
+  const [issueForm, setIssueForm] = useState<any>(EMPTY_ISSUE_FORM);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -109,19 +117,21 @@ export default function FiscalPage() {
   const handleIssue = async () => {
     setIssuing(true);
     try {
-      const items = issueForm.items.map((i: any) => ({
-        ...i,
-        totalPrice: (Number(i.quantity) || 1) * (Number(i.unitPrice) || 0),
-      }));
+      // The server computes the totals and the fiscal data (lib/nfe/emit-standalone.ts)
       const res = await fetch('/api/admin/fiscal/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...issueForm, items }),
+        body: JSON.stringify({ ...issueForm, documentType: 'NFCe' }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      toast.success('Documento fiscal emitido!');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Erro ao emitir');
+      // The note was created: say what the SEFAZ (through the provider) actually answered
+      const number = data.document?.documentNumber;
+      if (data.status === 'authorized') toast.success(`NFC-e nº ${number} autorizada`);
+      else if (data.status === 'processing' || data.status === 'submitted') toast.warning(`NFC-e nº ${number} enviada, aguardando a SEFAZ. Confira o status na lista.`);
+      else toast.error(`NFC-e nº ${number} ${data.status === 'denied' ? 'denegada' : 'rejeitada'}: ${data.rejectionReason || 'veja o motivo na lista'}`);
       setShowIssueForm(false);
-      setIssueForm({ documentType: 'NFCe', items: [{ description: '', quantity: 1, unitPrice: 0 }] });
+      setIssueForm(EMPTY_ISSUE_FORM);
       await Promise.all([fetchDocs(), fetchLogs()]);
     } catch (err: any) { toast.error(err.message || 'Erro ao emitir'); }
     finally { setIssuing(false); }
@@ -461,18 +471,20 @@ export default function FiscalPage() {
                   {/* Issue Form */}
                   {showIssueForm && (
                     <Card className="shadow-md border-indigo-200">
-                      <CardHeader><CardTitle className="text-base">Emitir Documento Fiscal</CardTitle></CardHeader>
+                      <CardHeader>
+                        <CardTitle className="text-base">Emitir NFC-e avulsa</CardTitle>
+                        <p className="text-xs text-gray-500">Para uma venda feita fora da comanda. Os itens usam a tributação padrão do restaurante (aba Configuração); sem ela a nota não é emitida.</p>
+                      </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="grid sm:grid-cols-3 gap-3">
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">Tipo</label>
-                            <select className="w-full border rounded-lg px-3 py-2 text-sm" value={issueForm.documentType} onChange={e => setIssueForm({ ...issueForm, documentType: e.target.value })}>
-                              <option value="NFCe">NFC-e (Consumidor)</option>
-                              <option value="NFe">NF-e (Empresa)</option>
+                            <label htmlFor="issue-payment" className="text-xs font-medium text-gray-600 mb-1 block">Forma de pagamento</label>
+                            <select id="issue-payment" className="w-full border rounded-lg px-3 py-2 text-sm" value={issueForm.paymentMethod} onChange={e => setIssueForm({ ...issueForm, paymentMethod: e.target.value })}>
+                              {PAYMENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-600 mb-1 block">CPF/CNPJ do Cliente</label>
+                            <label className="text-xs font-medium text-gray-600 mb-1 block">CPF do Cliente</label>
                             <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Opcional" value={issueForm.customerCPF || ''} onChange={e => setIssueForm({ ...issueForm, customerCPF: e.target.value })} />
                           </div>
                           <div>
