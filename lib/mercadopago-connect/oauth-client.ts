@@ -80,15 +80,6 @@ function parseTokens(data: any): MpOAuthTokens {
 /** A hung Mercado Pago call must not stall the serial refresh sweep. */
 const TOKEN_TIMEOUT_MS = 10_000;
 
-/**
- * Homologation (MERCADO_PAGO_ENV=sandbox) asks for sandbox tokens (TEST-...): Mercado Pago refuses
- * payments from a test seller's live token with 401 "Unauthorized use of live credentials".
- * Opt-in on the exact value, so production (production, or unset) always gets live tokens.
- */
-function sandboxGrant(): Record<string, boolean> {
-  return process.env.MERCADO_PAGO_ENV === 'sandbox' ? { test_token: true } : {};
-}
-
 async function requestTokens(grant: Record<string, string>): Promise<MpOAuthTokens> {
   const { clientId, clientSecret } = credentials();
 
@@ -97,7 +88,7 @@ async function requestTokens(grant: Record<string, string>): Promise<MpOAuthToke
     res = await fetch(TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, ...grant, ...sandboxGrant() }),
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, ...grant }),
       signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
   } catch (error) {

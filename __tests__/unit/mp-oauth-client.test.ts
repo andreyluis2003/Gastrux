@@ -107,33 +107,6 @@ describe('mercadopago-connect/oauth-client', () => {
     });
   });
 
-  it('asks for sandbox tokens only when MERCADO_PAGO_ENV=sandbox (homologation)', async () => {
-    const savedEnv = process.env.MERCADO_PAGO_ENV;
-    try {
-      for (const [env, expected] of [
-        ['sandbox', true],
-        ['production', undefined],
-        [undefined, undefined],
-        ['test', undefined],
-      ]) {
-        if (env === undefined) delete process.env.MERCADO_PAGO_ENV;
-        else process.env.MERCADO_PAGO_ENV = env;
-        const fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => tokenResponse });
-        global.fetch = fetchMock;
-
-        await exchangeCodeForTokens('the-code');
-        await refreshTokens('old-refresh');
-
-        for (const call of fetchMock.mock.calls) {
-          expect(JSON.parse(call[1].body).test_token).toBe(expected);
-        }
-      }
-    } finally {
-      if (savedEnv === undefined) delete process.env.MERCADO_PAGO_ENV;
-      else process.env.MERCADO_PAGO_ENV = savedEnv;
-    }
-  });
-
   it('flags invalid_grant as a revoked connection', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
