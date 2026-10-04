@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
-import { cancelConnectPayment, createConnectPix, extractPixData, isUnauthorizedError, type PixData } from './payments';
+import { cancelConnectPayment, createConnectPix, extractPixData, isUnauthorizedError, unauthorizedReason, type PixData } from './payments';
 import type { ResolvedPixTarget } from './pix-target';
 
 /** PIX expires in 30 minutes; reuse a pending one only while it is surely valid. */
@@ -266,7 +266,7 @@ export async function createPixForTarget(
     }
 
     if (isUnauthorizedError(error)) {
-      await markNeedsReconnect(target.restaurantId, 'Mercado Pago rejeitou o token (401)');
+      await markNeedsReconnect(target.restaurantId, unauthorizedReason(error));
       return { ok: false, status: 409, code: 'ONLINE_PAYMENT_UNAVAILABLE', error: ONLINE_PAYMENT_UNAVAILABLE };
     }
 

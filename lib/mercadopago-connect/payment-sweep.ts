@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
-import { isUnauthorizedError, searchConnectPaymentsByReference } from './payments';
+import { isUnauthorizedError, unauthorizedReason, searchConnectPaymentsByReference } from './payments';
 import { syncRestaurantPayment } from './payment-sync';
 import {
   SWEEPABLE_STATUSES,
@@ -99,7 +99,7 @@ export async function sweepPendingPayments(options: SweepOptions = {}): Promise<
           ids = orderAttempts(await searchConnectPaymentsByReference(client, payment.id));
         } catch (error) {
           if (isUnauthorizedError(error)) {
-            await markNeedsReconnect(restaurantId, 'Mercado Pago rejeitou o token (401)');
+            await markNeedsReconnect(restaurantId, unauthorizedReason(error));
             summary.skippedNoConnection++;
             continue;
           }

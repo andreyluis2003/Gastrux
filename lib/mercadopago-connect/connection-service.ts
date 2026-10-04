@@ -77,7 +77,10 @@ export async function markNeedsReconnect(restaurantId: string, reason: string): 
     data: { status: 'NEEDS_RECONNECT', lastRefreshError: reason.slice(0, 500) },
   });
   // Only notify on the ACTIVE -> NEEDS_RECONNECT transition, not on every failed call.
-  if (result.count > 0) await notifyOwnerToReconnect(restaurantId);
+  if (result.count > 0) {
+    console.warn(`[mp-connect] restaurant ${restaurantId} needs reconnect: ${reason}`);
+    await notifyOwnerToReconnect(restaurantId);
+  }
 }
 
 export async function refreshConnection(restaurantId: string): Promise<RefreshOutcome> {

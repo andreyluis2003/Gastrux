@@ -164,3 +164,16 @@ describe('mercadopago-connect/payments', () => {
     expect(isUnauthorizedError(null)).toBe(false);
   });
 });
+
+describe('unauthorizedReason', () => {
+  const { unauthorizedReason } = require('../../lib/mercadopago-connect/payments');
+
+  it('keeps Mercado Pago message so a revoked token and a sandbox mismatch can be told apart', () => {
+    const err = { status: 401, message: 'Unauthorized use of live credentials', error: 'unauthorized', cause: [{ code: 7, description: 'Unauthorized use of live credentials' }] };
+    expect(unauthorizedReason(err)).toBe('Mercado Pago rejeitou o token (401): Unauthorized use of live credentials | unauthorized');
+  });
+
+  it('falls back to the fixed reason when there is no message', () => {
+    expect(unauthorizedReason({ status: 401 })).toBe('Mercado Pago rejeitou o token (401)');
+  });
+});

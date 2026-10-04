@@ -16,7 +16,7 @@ import {
 } from '@/lib/mercado-pago';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { getMpClientForRestaurant, markNeedsReconnect } from '@/lib/mercadopago-connect/connection-service';
-import { isUnauthorizedError, notificationUrlFor } from '@/lib/mercadopago-connect/payments';
+import { isUnauthorizedError, unauthorizedReason, notificationUrlFor } from '@/lib/mercadopago-connect/payments';
 import { captureException, trackApiCall } from '@/lib/sentry';
 
 export const dynamic = 'force-dynamic';
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       // the connection stayed ACTIVE, the UI kept showing "Conectado" and every
       // card checkout failed with a generic 500 forever.
       if (isUnauthorizedError(error)) {
-        await markNeedsReconnect(restaurantId, 'Mercado Pago rejeitou o token (401)');
+        await markNeedsReconnect(restaurantId, unauthorizedReason(error));
         await prisma.payment
           .update({ where: { id: payment.id }, data: { status: 'DECLINED' } })
           .catch(() => {});

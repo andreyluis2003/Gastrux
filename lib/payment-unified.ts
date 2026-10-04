@@ -16,7 +16,7 @@ import { prisma } from './prisma';
 import type { MercadoPagoConfig } from 'mercadopago';
 import { createCheckoutPreference, getPayment as getMPPayment } from './mercado-pago';
 import { getMpClientForRestaurant, markNeedsReconnect } from './mercadopago-connect/connection-service';
-import { isUnauthorizedError, notificationUrlFor, refundConnectPayment } from './mercadopago-connect/payments';
+import { isUnauthorizedError, unauthorizedReason, notificationUrlFor, refundConnectPayment } from './mercadopago-connect/payments';
 import { isStripeConnectConfigured, createPaymentIntent, retrievePaymentIntent, createRefund as createStripeRefund } from './stripe-connect';
 import { logPaymentEvent, PaymentEventType } from './payment-logger';
 import { captureException } from './sentry';
@@ -184,7 +184,7 @@ export async function createUnifiedPayment(input: CreatePaymentInput): Promise<P
     // usable. Without this the connection stayed ACTIVE, the UI kept showing
     // "Conectado" and every checkout failed with a generic 500 forever.
     if (input.gateway === 'MERCADO_PAGO' && isUnauthorizedError(error)) {
-      await markNeedsReconnect(input.restaurantId, 'Mercado Pago rejeitou o token (401)');
+      await markNeedsReconnect(input.restaurantId, unauthorizedReason(error));
       throw new OnlinePaymentUnavailableError();
     }
 

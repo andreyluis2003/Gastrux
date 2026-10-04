@@ -125,3 +125,17 @@ export function isUnauthorizedError(error: unknown): boolean {
   const e = error as any;
   return e?.status === 401 || e?.statusCode === 401;
 }
+
+/**
+ * Reason stored on the connection (lastRefreshError) and logged when a 401 marks it NEEDS_RECONNECT.
+ * Carries Mercado Pago's own message: a revoked token and a sandbox mismatch both answer 401, and
+ * without the message the two cannot be told apart.
+ */
+export function unauthorizedReason(error: unknown): string {
+  const e = error as any;
+  const parts = [e?.message, e?.error, e?.cause?.[0]?.description].filter(
+    (p, i, all) => typeof p === 'string' && p.trim() && all.indexOf(p) === i
+  );
+  const base = 'Mercado Pago rejeitou o token (401)';
+  return parts.length ? `${base}: ${parts.join(' | ')}` : base;
+}

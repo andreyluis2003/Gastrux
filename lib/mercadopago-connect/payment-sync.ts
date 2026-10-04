@@ -2,7 +2,7 @@ import type { PaymentStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { mapMPStatusToPaymentStatus } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
-import { getConnectPayment, isUnauthorizedError } from './payments';
+import { getConnectPayment, isUnauthorizedError, unauthorizedReason } from './payments';
 import { canTransition } from './payment-status';
 import { captureException } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
@@ -161,7 +161,7 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
     mp = await getConnectPayment(client, mpPaymentId);
   } catch (error) {
     if (isUnauthorizedError(error)) {
-      await markNeedsReconnect(restaurantId, 'Mercado Pago rejeitou o token (401)');
+      await markNeedsReconnect(restaurantId, unauthorizedReason(error));
       return { updated: false, reason: 'unauthorized' };
     }
     throw error;

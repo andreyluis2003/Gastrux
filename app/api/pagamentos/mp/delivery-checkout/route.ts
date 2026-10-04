@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createCheckoutPreference } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant, markNeedsReconnect } from '@/lib/mercadopago-connect/connection-service';
-import { isUnauthorizedError, notificationUrlFor, toMpDate } from '@/lib/mercadopago-connect/payments';
+import { isUnauthorizedError, unauthorizedReason, notificationUrlFor, toMpDate } from '@/lib/mercadopago-connect/payments';
 import { CARD_LINK_VALIDITY_MS, CHECKOUT_IN_PROGRESS, claimCardPayment } from '@/lib/mercadopago-connect/card-claim';
 import { resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
 import { isDefiniteRejection, normalizePayer, ONLINE_PAYMENT_UNAVAILABLE } from '@/lib/mercadopago-connect/pix-service';
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (isUnauthorizedError(error)) {
-        await markNeedsReconnect(target.restaurantId, 'Mercado Pago rejeitou o token (401)');
+        await markNeedsReconnect(target.restaurantId, unauthorizedReason(error));
         return NextResponse.json({ error: ONLINE_PAYMENT_UNAVAILABLE, code: 'ONLINE_PAYMENT_UNAVAILABLE' }, { status: 409 });
       }
       console.error('[delivery-checkout] preference creation failed:', error);
