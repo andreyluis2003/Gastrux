@@ -78,6 +78,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Legacy IPN notifications (?topic=&id=, no data.id) are not signed with the webhook secret
+    // template, so they can never be verified: answering 401 only made Mercado Pago retry them
+    // (seen in production 2026-10-04). Acknowledge and ignore them; the Webhooks notification for the
+    // same event (?type=&data.id=) is signed, verified and processed.
+    if (url.searchParams.has('topic') && !url.searchParams.has('data.id')) {
+      return NextResponse.json({ received: true, ignored: 'unsigned IPN' });
+    }
+
     // Signature verification - always enforced, in every environment.
     const sig = verifyMercadoPagoSignature(request, id, MP_WEBHOOK_SECRET);
     if (!sig.ok) {
