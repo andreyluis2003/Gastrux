@@ -41,6 +41,7 @@ const PUBLIC_PATHS = [
   '/lp',
   '/para',
   '/menu',
+  '/delivery', // pedido e pagamento do cliente final, sem conta no Gastrux
 ];
 
 function isPublicPage(pathname: string): boolean {
