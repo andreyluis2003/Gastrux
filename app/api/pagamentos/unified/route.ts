@@ -20,6 +20,7 @@ import {
 } from '@/lib/payment-unified';
 import { captureException, trackApiCall } from '@/lib/sentry';
 import { requireRestaurantManager } from '@/lib/mercadopago-connect/guard';
+import { summarizeReceipts } from '@/lib/payments/receipts-summary';
 
 export const dynamic = 'force-dynamic';
 
@@ -178,7 +179,23 @@ export async function GET(request: NextRequest) {
     // Same rule as POST /api/pagamentos/mp/refund, so the "Estornar" button only shows to who may use it.
     const refundAuth = await requireRestaurantManager(['OWNER', 'ADMIN', 'MANAGER'] as any);
 
-    return NextResponse.json({ payments, total, limit, offset, canRefund: refundAuth.ok });
+    // The screen cards: ALL of this restaurant's payments, whatever the filters or the page size.
+    const groups = await prisma.payment.groupBy({
+      by: ['status'],
+      where: { restaurantId },
+      _count: { _all: true },
+      _sum: { amount: true, amountRefunded: true },
+    });
+    const summary = summarizeReceipts(
+      groups.map((g: any) => ({
+        status: g.status,
+        count: g._count._all,
+        amount: g._sum.amount,
+        amountRefunded: g._sum.amountRefunded,
+      }))
+    );
+
+    return NextResponse.json({ payments, total, limit, offset, canRefund: refundAuth.ok, summary });
   } catch (error) {
     console.error('[Unified Payment] List error:', error);
     return NextResponse.json(

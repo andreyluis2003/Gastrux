@@ -29,17 +29,16 @@ interface Payment {
   refunds: Array<{ amount: number; status: string }>;
 }
 
-interface Analytics {
-  totalRevenue: number;
-  totalTransactions: number;
-  averageAmount: number;
-  byGateway: Array<{ gateway: string; amount: number; count: number }>;
-  byStatus: Array<{ status: string; count: number; amount: number }>;
+/** Computed on the server over ALL the restaurant's payments (lib/payments/receipts-summary.ts). */
+interface Summary {
+  revenue: number;
+  paidCount: number;
+  averageTicket: number;
 }
 
 export default function PagamentosDashboardPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedGateway, setSelectedGateway] = useState<string>('all');
@@ -52,33 +51,15 @@ export default function PagamentosDashboardPage() {
       const data = await res.json();
       setPayments(data.payments || []);
       setCanRefund(data.canRefund === true);
+      setSummary(data.summary ?? null);
     } catch (err) {
       toast.error('Erro ao carregar pagamentos');
-    }
-  };
-
-  const fetchAnalytics = async () => {
-    try {
-      // Placeholder - analytics endpoint to be created
-      setAnalytics({
-        totalRevenue: payments.reduce((sum, p) => sum + Number(p.amount), 0),
-        totalTransactions: payments.length,
-        averageAmount: payments.length > 0 ? payments.reduce((sum, p) => sum + Number(p.amount), 0) / payments.length : 0,
-        byGateway: [],
-        byStatus: [],
-      });
-    } catch (err) {
-      console.error('Analytics error:', err);
     }
   };
 
   useEffect(() => {
     fetchData().then(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [payments]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -149,15 +130,16 @@ export default function PagamentosDashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        {analytics && (
+        {summary && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-green-700 font-medium">Receita Total</p>
+                  <p className="text-sm text-green-700 font-medium">Receita recebida</p>
                   <p className="text-2xl font-bold text-green-900">
-                    {formatBRL(analytics.totalRevenue)}
+                    {formatBRL(summary.revenue)}
                   </p>
+                  <p className="text-xs text-green-700">Pagamentos aprovados, já descontados os estornos</p>
                 </div>
                 <ArrowUpRight className="w-8 h-8 text-green-600" />
               </div>
@@ -165,10 +147,11 @@ export default function PagamentosDashboardPage() {
             <Card className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-700 font-medium">Transações</p>
+                  <p className="text-sm text-blue-700 font-medium">Pagamentos recebidos</p>
                   <p className="text-2xl font-bold text-blue-900">
-                    {analytics.totalTransactions}
+                    {summary.paidCount}
                   </p>
+                  <p className="text-xs text-blue-700">Sem pendentes, recusados e estornados</p>
                 </div>
                 <Wallet className="w-8 h-8 text-blue-600" />
               </div>
@@ -176,10 +159,11 @@ export default function PagamentosDashboardPage() {
             <Card className="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-amber-700 font-medium">Ticket Médio</p>
+                  <p className="text-sm text-amber-700 font-medium">Ticket médio</p>
                   <p className="text-2xl font-bold text-amber-900">
-                    {formatBRL(analytics.averageAmount)}
+                    {formatBRL(summary.averageTicket)}
                   </p>
+                  <p className="text-xs text-amber-700">Receita recebida ÷ pagamentos recebidos</p>
                 </div>
                 <CircleDollarSign className="w-8 h-8 text-amber-600" />
               </div>
