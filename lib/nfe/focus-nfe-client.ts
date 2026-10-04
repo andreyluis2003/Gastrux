@@ -21,6 +21,16 @@ function unknownOutcome(cause: string, raw: any): NFeEmitResult {
 }
 
 /**
+ * Emission time as Brasília local time with its offset (Brazil has had no daylight saving time since
+ * 2019, so the offset is always -03:00). It used to send the UTC clock labelled -03:00, which put
+ * every note 3 hours in the future: SEFAZ refuses that (rejeição 703, data-hora de emissão posterior
+ * ao recebimento).
+ */
+export function brasiliaDateTime(now: Date = new Date()): string {
+  return new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 19) + '-03:00';
+}
+
+/**
  * Focus NFe REST API client.
  *
  * Docs: https://focusnfe.com.br/doc/
@@ -69,7 +79,7 @@ export class FocusNFeClient implements NFeProvider {
 
     return {
       natureza_operacao: p.naturezaOperacao || 'Venda ao consumidor',
-      data_emissao: new Date().toISOString().slice(0, 19) + '-03:00',
+      data_emissao: brasiliaDateTime(),
       presenca_comprador: '1', // Operação presencial
       cnpj_emitente: (p.cnpj || '').replace(/\D/g, ''),
       uf_emitente: p.uf,
