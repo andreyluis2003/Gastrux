@@ -12,6 +12,8 @@ import {
   FileText, Bell, ScanLine
 } from 'lucide-react';
 import { MpConnectBanner } from '@/components/payments/mp-connect-banner';
+import { RefundDialog } from '@/components/payments/refund-dialog';
+import { isRefundable, refundableAmount } from '@/lib/payments/refund-eligibility';
 
 interface Payment {
   id: string;
@@ -42,12 +44,14 @@ export default function PagamentosDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedGateway, setSelectedGateway] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [canRefund, setCanRefund] = useState(false);
 
   const fetchData = async () => {
     try {
       const res = await fetch('/api/pagamentos/unified?limit=20');
       const data = await res.json();
       setPayments(data.payments || []);
+      setCanRefund(data.canRefund === true);
     } catch (err) {
       toast.error('Erro ao carregar pagamentos');
     }
@@ -280,6 +284,7 @@ export default function PagamentosDashboardPage() {
             <option value="PROCESSING">Processando</option>
             <option value="DECLINED">Recusado</option>
             <option value="REFUNDED">Reembolsado</option>
+            <option value="PARTIALLY_REFUNDED">Parcialmente reembolsado</option>
           </select>
         </div>
 
@@ -338,11 +343,12 @@ export default function PagamentosDashboardPage() {
                         {new Date(payment.createdAt).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-4 py-3">
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={`/dashboard/pagamentos/${payment.id}`}>
-                            <ChevronRight className="w-4 h-4" />
-                          </a>
-                        </Button>
+                        {canRefund && isRefundable(payment) ? (
+                          <RefundDialog payment={payment} onDone={handleRefresh} />
+                        ) : null}
+                        {payment.status === 'PARTIALLY_REFUNDED' ? (
+                          <p className="mt-1 text-xs text-gray-500">Resta {formatBRL(refundableAmount(payment))}</p>
+                        ) : null}
                       </td>
                     </tr>
                   ))

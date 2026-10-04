@@ -19,6 +19,7 @@ import {
   UNIFIED_FILTER_GATEWAYS,
 } from '@/lib/payment-unified';
 import { captureException, trackApiCall } from '@/lib/sentry';
+import { requireRestaurantManager } from '@/lib/mercadopago-connect/guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -174,7 +175,10 @@ export async function GET(request: NextRequest) {
       offset,
     });
 
-    return NextResponse.json({ payments, total, limit, offset });
+    // Same rule as POST /api/pagamentos/mp/refund, so the "Estornar" button only shows to who may use it.
+    const refundAuth = await requireRestaurantManager(['OWNER', 'ADMIN', 'MANAGER'] as any);
+
+    return NextResponse.json({ payments, total, limit, offset, canRefund: refundAuth.ok });
   } catch (error) {
     console.error('[Unified Payment] List error:', error);
     return NextResponse.json(

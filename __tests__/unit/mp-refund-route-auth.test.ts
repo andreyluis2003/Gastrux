@@ -133,3 +133,80 @@ describe('refund route authorization', () => {
     expect(refundConnectPayment).not.toHaveBeenCalled();
   });
 });
+
+describe('refund route rules used by the "Estornar" button', () => {
+  let errSpy: jest.SpyInstance;
+  const base = {
+    id: 'pay-1',
+    restaurantId: RESTAURANT,
+    orderId: 'order-1',
+    status: 'APPROVED',
+    amount: 100,
+    currency: 'BRL',
+    gateway: 'MERCADO_PAGO_CONNECT',
+    gatewayPaymentId: '999',
+    refunds: [],
+    mercadoPagoData: null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    (getCurrentRestaurantId as jest.Mock).mockResolvedValue(RESTAURANT);
+    (requireAdminSession as jest.Mock).mockResolvedValue({
+      ok: true,
+      session: { user: { id: 'u1', email: 'u1@example.com', role: 'OWNER' } },
+    });
+    world({ owner: true });
+    (getMpClientForRestaurant as jest.Mock).mockResolvedValue({});
+    (refundConnectPayment as jest.Mock).mockResolvedValue({ id: 'rf-1' });
+    prismaMock.paymentRefund.create.mockResolvedValue({ id: 'refund-row' });
+    prismaMock.payment.update.mockResolvedValue({});
+    prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  afterEach(() => errSpy.mockRestore());
+
+  it('refunds the rest of a PARTIALLY_REFUNDED payment and ends REFUNDED', async () => {
+    prismaMock.payment.findFirst.mockResolvedValue({
+      ...base,
+      status: 'PARTIALLY_REFUNDED',
+      refunds: [{ amount: 60, status: 'completed' }],
+    });
+    const res = await post({ paymentId: 'pay-1', amount: 40 });
+    expect(res.status).toBe(200);
+    expect((await res.json()).status).toBe('REFUNDED');
+    expect(prismaMock.payment.update.mock.calls[0][0].data.amountRefunded).toBe(100);
+  });
+
+  it('refuses more than what is left, before calling Mercado Pago', async () => {
+    prismaMock.payment.findFirst.mockResolvedValue({
+      ...base,
+      status: 'PARTIALLY_REFUNDED',
+      refunds: [{ amount: 60, status: 'completed' }],
+    });
+    const res = await post({ paymentId: 'pay-1', amount: 40.01 });
+    expect(res.status).toBe(400);
+    expect(refundConnectPayment).not.toHaveBeenCalled();
+  });
+
+  it('refuses a non Mercado Pago payment', async () => {
+    prismaMock.payment.findFirst.mockResolvedValue({ ...base, gateway: 'STRIPE_CONNECT' });
+    expect((await post()).status).toBe(400);
+    expect(refundConnectPayment).not.toHaveBeenCalled();
+  });
+
+  it('shows Mercado Pago reason and writes nothing when Mercado Pago refuses', async () => {
+    prismaMock.payment.findFirst.mockResolvedValue(base);
+    (refundConnectPayment as jest.Mock).mockRejectedValue({
+      status: 400,
+      message: 'bad_request',
+      cause: [{ code: 4040, description: 'Insufficient balance' }],
+    });
+    const res = await post({ paymentId: 'pay-1', amount: 100 });
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatch(/Insufficient balance/);
+    expect(prismaMock.paymentRefund.create).not.toHaveBeenCalled();
+    expect(prismaMock.payment.update).not.toHaveBeenCalled();
+  });
+});

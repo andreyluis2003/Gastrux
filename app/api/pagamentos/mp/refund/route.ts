@@ -12,6 +12,7 @@ import { refundPayment } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
 import { refundConnectPayment } from '@/lib/mercadopago-connect/payments';
 import { captureException, trackApiCall } from '@/lib/sentry';
+import { REFUNDABLE_GATEWAYS, REFUNDABLE_STATUSES } from '@/lib/payments/refund-eligibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,12 +58,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!payment) {
-      return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Pagamento não encontrado' }, { status: 404 });
     }
 
-    if (payment.status !== 'APPROVED' && payment.status !== 'SETTLED') {
+    if (!(REFUNDABLE_GATEWAYS as readonly string[]).includes(payment.gateway)) {
+      return NextResponse.json({ error: 'Só pagamentos do Mercado Pago podem ser estornados por aqui' }, { status: 400 });
+    }
+
+    if (!(REFUNDABLE_STATUSES as readonly string[]).includes(payment.status)) {
       return NextResponse.json(
-        { error: `Cannot refund payment with status: ${payment.status}` },
+        { error: 'Este pagamento não pode ser estornado (só pagamentos aprovados)' },
         { status: 400 }
       );
     }
@@ -73,9 +78,10 @@ export async function POST(request: NextRequest) {
 
     const remainingAmount = Number(payment.amount) - totalRefunded;
 
-    if (amount && Number(amount) > remainingAmount) {
+    // Cents compared, so 0.1 + 0.2 style float residue never blocks refunding exactly what is left.
+    if (amount && Math.round(Number(amount) * 100) > Math.round(remainingAmount * 100)) {
       return NextResponse.json(
-        { error: `Refund amount exceeds remaining balance: ${remainingAmount}` },
+        { error: `O valor passa do que ainda pode ser estornado (R$ ${remainingAmount.toFixed(2).replace('.', ',')})` },
         { status: 400 }
       );
     }
@@ -104,29 +110,41 @@ export async function POST(request: NextRequest) {
     const mpPaymentId = isConnect ? payment.gatewayPaymentId : payment.mercadoPagoData?.mpPaymentId;
     if (!mpPaymentId) {
       return NextResponse.json(
-        { error: 'Mercado Pago payment ID not found' },
+        { error: 'Este pagamento não tem o número do Mercado Pago, então não pode ser estornado por aqui' },
         { status: 400 }
       );
     }
 
     // Process refund via MP API - with the restaurant's own token for Connect payments.
     let mpRefund;
-    if (isConnect) {
-      const client = await getMpClientForRestaurant(restaurantId);
-      if (!client) {
-        return NextResponse.json(
-          { error: 'Conexão com o Mercado Pago indisponível. Reconecte sua conta para reembolsar.' },
-          { status: 409 }
+    try {
+      if (isConnect) {
+        const client = await getMpClientForRestaurant(restaurantId);
+        if (!client) {
+          return NextResponse.json(
+            { error: 'Conexão com o Mercado Pago indisponível. Reconecte sua conta para reembolsar.' },
+            { status: 409 }
+          );
+        }
+        mpRefund = await refundConnectPayment(
+          client,
+          mpPaymentId,
+          amount ? Number(amount) : undefined,
+          idempotencyKey
         );
+      } else {
+        mpRefund = await refundPayment(mpPaymentId, amount ? Number(amount) : undefined);
       }
-      mpRefund = await refundConnectPayment(
-        client,
-        mpPaymentId,
-        amount ? Number(amount) : undefined,
-        idempotencyKey
+    } catch (mpError) {
+      // Mercado Pago said no (e.g. not enough balance, payment too old): the owner must see why.
+      // Nothing was written, so retrying later is safe.
+      const e = mpError as any;
+      const detail = e?.cause?.[0]?.description || e?.message;
+      console.error('[MP Refund] Mercado Pago refused the refund:', mpError);
+      return NextResponse.json(
+        { error: `O Mercado Pago não fez o estorno${detail ? `: ${detail}` : ''}. Nada foi alterado.` },
+        { status: 502 }
       );
-    } else {
-      mpRefund = await refundPayment(mpPaymentId, amount ? Number(amount) : undefined);
     }
 
     // Create refund record
@@ -185,7 +203,7 @@ export async function POST(request: NextRequest) {
     });
     console.error('[MP Refund] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to process refund' },
+      { error: 'Não foi possível concluir o estorno. Confira no Mercado Pago antes de tentar de novo.' },
       { status: 500 }
     );
   }
