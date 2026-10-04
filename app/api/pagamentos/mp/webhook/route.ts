@@ -81,7 +81,12 @@ export async function POST(request: NextRequest) {
     // Signature verification - always enforced, in every environment.
     const sig = verifyMercadoPagoSignature(request, id, MP_WEBHOOK_SECRET);
     if (!sig.ok) {
-      console.warn(`[MP Webhook] Invalid signature: ${sig.reason}`);
+      // Only ids, flags and the query KEYS: enough to tell a payment notification from a merchant_order
+      // or IPN one, never a secret or a signature value.
+      console.warn(
+        `[MP Webhook] Invalid signature: ${sig.reason} (topic=${topic} id=${id} rid=${url.searchParams.get('rid') ?? '-'} ` +
+          `query=${[...url.searchParams.keys()].join(',')} request-id=${request.headers.get('x-request-id') ? 'yes' : 'no'})`
+      );
       // Reported so a SYSTEMATIC rejection is visible - above all for the
       // per-restaurant notifications (?rid=), whose signing secret is an
       // unverified premise. rid, mpId and topic are plain ids: never secrets
