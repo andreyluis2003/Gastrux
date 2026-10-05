@@ -35,7 +35,7 @@ export function MobileHeaderContent() {
         <p className="font-semibold text-slate-900 dark:text-white truncate text-sm">
           {session?.user?.name || 'Usuário'}
         </p>
-        <p className="text-xs text-slate-500 dark:text-slate-400">Gestão de Produção</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">Gestão Integrada</p>
       </div>
 
       <div className="flex items-center gap-2">

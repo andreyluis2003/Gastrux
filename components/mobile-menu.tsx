@@ -67,7 +67,7 @@ export function MobileMenu() {
           {/* Logo/Title */}
           <div className="mt-8 mb-6 pb-4 border-b border-slate-200 dark:border-slate-700">
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">Gastrux</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Gestão de Produção</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Gestão Integrada</p>
           </div>
 
           {/* Menu Items */}

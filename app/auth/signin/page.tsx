@@ -70,7 +70,7 @@ export default function SignInPage() {
         <div className="flex flex-col items-center space-y-2">
           <ChefHat className="h-12 w-12 text-red-600" />
           <h1 className="text-2xl font-bold text-slate-900">Gastrux</h1>
-          <p className="text-sm text-slate-600">Gestão de Produção</p>
+          <p className="text-sm text-slate-600">Gestão Integrada</p>
         </div>
 
         <form onSubmit={handleSignIn} className="space-y-4">
