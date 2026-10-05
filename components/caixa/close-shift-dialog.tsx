@@ -37,9 +37,9 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { toast.error(data.error || 'Erro ao fechar o caixa'); return; }
+      // The screen refreshes on "Concluir": refreshing now would unmount this dialog before the result shows
       setResult(data.result);
       setStep(3);
-      onClosed();
     } finally {
       setSaving(false);
     }
@@ -96,7 +96,7 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
             {result.alertMethods?.length > 0 && <p className="text-sm text-red-700">Diferença acima do limite: o dono foi avisado.</p>}
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => printInHiddenFrame(`/imprimir/caixa/fechamento/${sessionId}`)}>Imprimir fechamento</Button>
-              <Button onClick={onClose}>Concluir</Button>
+              <Button onClick={() => { onClosed(); onClose(); }}>Concluir</Button>
             </div>
           </>
         )}
