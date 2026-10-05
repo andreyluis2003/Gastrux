@@ -220,14 +220,14 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
 
     it('a sale with an unknown item is refused and nothing is recorded', async () => {
       const clientId = `bal-${crypto.randomBytes(8).toString('hex')}`;
-      const res = await sale({ clientId, items: [{ recipeId: burger.id }, { recipeId: 'does-not-exist' }] });
+      const res = await sale({ clientId, items: [{ recipeId: burger.id }, { recipeId: 'does-not-exist' }], paymentMethod: 'pix' });
       expect(res.status).toBe(404);
       expect(await prisma.orderSession.count({ where: { id: clientId } })).toBe(0);
     });
 
     it('can send the sale to the kitchen', async () => {
       const clientId = `bal-${crypto.randomBytes(8).toString('hex')}`;
-      await sale({ clientId, items: [{ recipeId: burger.id }], sendToKitchen: true });
+      await sale({ clientId, items: [{ recipeId: burger.id }], sendToKitchen: true, paymentMethod: 'pix' });
       expect(await prisma.order.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
     });
   });
