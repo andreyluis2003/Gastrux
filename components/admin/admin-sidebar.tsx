@@ -35,7 +35,7 @@ import {
   Plug,
   Target,
   Package,
-  QrCode, UserCog } from 'lucide-react';
+  QrCode, UserCog, Wallet } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { signOutSafely } from '@/lib/offline/sign-out';
 import { cn } from '@/lib/utils';
@@ -55,6 +55,11 @@ const adminNavigation: NavItem[] = [
     label: 'Dashboard',
     href: '/admin',
     icon: <Home className="w-5 h-5" />,
+  },
+  {
+    label: 'Caixa',
+    href: '/caixa',
+    icon: <Wallet className="w-5 h-5" />,
   },
   {
     label: 'Platform',

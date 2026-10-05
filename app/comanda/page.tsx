@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -120,6 +121,7 @@ export default function ComandaPage() {
           <BackButton />
           <ChefHat className="w-8 h-8 text-blue-600" />
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Comanda Eletrônica</h1>
+          <Link href="/caixa" className="ml-auto text-sm font-semibold text-blue-700 underline">Caixa</Link>
         </div>
 
         <div className="flex flex-wrap gap-3 mb-8">

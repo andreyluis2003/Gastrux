@@ -81,6 +81,7 @@ export default async function DashboardPage() {
     { id: 'qr-codes', iconName: 'QrCode' as const, href: '/admin/tables/qrcodes', color: 'bg-yellow-50', accentColor: 'text-yellow-700' },
     { id: 'mesas', iconName: 'Armchair' as const, href: '/admin/tables', color: 'bg-teal-50', accentColor: 'text-teal-600' },
     { id: 'comanda', iconName: 'ClipboardList' as const, href: '/comanda', color: 'bg-rose-50', accentColor: 'text-rose-600' },
+    { id: 'caixa', iconName: 'Wallet' as const, href: '/caixa', color: 'bg-emerald-50', accentColor: 'text-emerald-600' },
     { id: 'whatsapp-bot', iconName: 'MessageSquare' as const, href: '/admin/integrations/whatsapp', color: 'bg-green-50', accentColor: 'text-green-600' },
     { id: 'voice-agent', iconName: 'Mic' as const, href: '/admin/integrations/voice', color: 'bg-rose-50', accentColor: 'text-rose-600' },
     { id: 'messaging-campaigns', iconName: 'Megaphone' as const, href: '/admin/messaging/campaigns', color: 'bg-indigo-50', accentColor: 'text-indigo-600' },

@@ -61,6 +61,7 @@ import {
   Target,
   Radio,
   Wrench,
+  Wallet,
 } from 'lucide-react';
 import { formatDate } from '@/lib/formatters';
 import type { DashboardStats, StatCard } from '@/lib/dashboard/stats';
@@ -74,7 +75,7 @@ const iconMap = {
   FileText, MessageSquare, BarChart3, Mail, Handshake, Users, Gift,
   ClipboardList, QrCode, ChefHat, Armchair, Mic, Megaphone, Bike,
   Globe, Trash2, Truck, BellRing, Building2, UserPlus, CalendarDays,
-  Activity, Clock, Bot, ShieldAlert,
+  Activity, Clock, Bot, ShieldAlert, Wallet,
 } as const;
 
 export interface DashboardContentProps {
@@ -129,6 +130,7 @@ const MODULE_CATEGORY: Record<string, CategoryId> = {
   'qr-codes': 'sales',
   'mesas': 'sales',
   'comanda': 'sales',
+  'caixa': 'sales',
   'kds': 'sales',
   'vendas-rapidas': 'sales',
 
