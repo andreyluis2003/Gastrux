@@ -20,6 +20,20 @@ function unknownOutcome(cause: string, raw: any): NFeEmitResult {
   };
 }
 
+export const HOMOLOGATION_DESCRIPTION = 'NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL';
+
+/**
+ * Focus answers a refusal with a generic `mensagem` ("verifique o detalhamento dos erros") and the
+ * actual causes in `erros`; both go to the screen, or the restaurant cannot tell what to fix.
+ */
+function refusalReason(json: any, httpStatus: number): string {
+  const details = (Array.isArray(json?.erros) ? json.erros : [])
+    .map((e: any) => e?.mensagem)
+    .filter((m: any) => m && m !== json?.mensagem);
+  const parts = [json?.mensagem, ...details].filter(Boolean);
+  return parts.length ? parts.join(' | ') : `HTTP ${httpStatus}`;
+}
+
 /**
  * Emission time as Brasília local time with its offset (Brazil has had no daylight saving time since
  * 2019, so the offset is always -03:00). It used to send the UTC clock labelled -03:00, which put
@@ -43,8 +57,11 @@ export class FocusNFeClient implements NFeProvider {
   baseUrl: string;
   apiKey: string;
 
+  environment: 'sandbox' | 'production';
+
   constructor(apiKey: string, environment: 'sandbox' | 'production' = 'sandbox') {
     this.apiKey = apiKey;
+    this.environment = environment;
     this.baseUrl = environment === 'production'
       ? 'https://api.focusnfe.com.br'
       : 'https://homologacao.focusnfe.com.br';
@@ -56,11 +73,15 @@ export class FocusNFeClient implements NFeProvider {
   }
 
   private buildNFCePayload(p: NFeEmitPayload): any {
-    // Natureza da operação + ambiente inferido por baseUrl
+    // Field names follow Focus (codigo_ncm, icms_origem): `ncm`/`origem` are not read, and the note
+    // went without NCM ("Erro na validação do Schema XML", first homologation test 2026-10-05).
     const items = p.items.map((item, idx) => ({
       numero_item: idx + 1,
       codigo_produto: `PROD-${idx + 1}`,
-      descricao: item.description?.slice(0, 120) || 'Produto',
+      // In homologation SEFAZ requires this text as the first item's description (rejeição 373)
+      descricao: this.environment === 'sandbox' && idx === 0
+        ? HOMOLOGATION_DESCRIPTION
+        : item.description?.slice(0, 120) || 'Produto',
       cfop: item.cfop || '5102',
       unidade_comercial: item.unit || 'UN',
       quantidade_comercial: Number(item.quantity).toFixed(4),
@@ -69,9 +90,9 @@ export class FocusNFeClient implements NFeProvider {
       unidade_tributavel: item.unit || 'UN',
       quantidade_tributavel: Number(item.quantity).toFixed(4),
       valor_unitario_tributavel: Number(item.unitPrice).toFixed(4),
-      ncm: item.ncm || '21069090',
+      codigo_ncm: item.ncm || '21069090',
       ...(item.cest ? { cest: item.cest } : {}),
-      origem: item.icmsOrigin || '0',
+      icms_origem: item.icmsOrigin || '0',
       icms_situacao_tributaria: item.icmsCST || '102', // Simples Nacional sem permissão de crédito
       pis_situacao_tributaria: p.pisCofinsCst || '07',
       cofins_situacao_tributaria: p.pisCofinsCst || '07',
@@ -81,9 +102,11 @@ export class FocusNFeClient implements NFeProvider {
       natureza_operacao: p.naturezaOperacao || 'Venda ao consumidor',
       data_emissao: brasiliaDateTime(),
       presenca_comprador: '1', // Operação presencial
+      consumidor_final: '1',
+      modalidade_frete: '9', // Sem frete
       cnpj_emitente: (p.cnpj || '').replace(/\D/g, ''),
       uf_emitente: p.uf,
-      municipio_emitente: '', // Focus NFe usa dados cadastrais do emitente
+      // Emitter address comes from the company registered in Focus
       cpf_destinatario: p.customerCPF ? p.customerCPF.replace(/\D/g, '') : undefined,
       nome_destinatario: p.customerName || undefined,
       items,
@@ -131,7 +154,7 @@ export class FocusNFeClient implements NFeProvider {
         return {
           ok: false,
           status: 'rejected',
-          rejectionReason: json?.mensagem || json?.erros?.[0]?.mensagem || `HTTP ${res.status}`,
+          rejectionReason: refusalReason(json, res.status),
           statusDescription: json?.status_sefaz || `Erro HTTP ${res.status}`,
           raw: json,
         };

@@ -259,7 +259,7 @@ describe('fiscal data per product (launch plan item 3)', () => {
         items: [{ description: 'Cerveja', quantity: 1, unit: 'UN', unitPrice: 12, totalPrice: 12, ncm: '22030000', cfop: '5405', cest: '0302100', icmsOrigin: '0', icmsCST: '500' }],
       });
       const sent = JSON.parse(global.fetch.mock.calls[0][1].body).items[0];
-      expect(sent).toMatchObject({ ncm: '22030000', cfop: '5405', cest: '0302100', origem: '0', icms_situacao_tributaria: '500', pis_situacao_tributaria: '49', cofins_situacao_tributaria: '49' });
+      expect(sent).toMatchObject({ codigo_ncm: '22030000', cfop: '5405', cest: '0302100', icms_origem: '0', icms_situacao_tributaria: '500', pis_situacao_tributaria: '49', cofins_situacao_tributaria: '49' });
     });
   });
 });
