@@ -20,6 +20,12 @@
 .print-ticket hr { border: 0; border-top: 1px dashed #000; margin: 2mm 0; }
 .print-ticket .muted { font-size: 11px; }
 .print-ticket .break { word-break: break-all; }
+.print-ticket .bold { font-weight: 700; }
+.print-ticket .small { font-size: 10px; }
+.print-ticket .left { text-align: left; }
+.print-ticket .right { text-align: right; }
+/* cash register receipts: a line to sign */
+.print-ticket .signature { margin-top: 10mm; border-top: 1px solid #000; text-align: center; }
 @media print {
   /* floating widgets fade in/out: no transition may leave one half visible on the paper */
   *, *::before, *::after { transition: none !important; animation: none !important; }
