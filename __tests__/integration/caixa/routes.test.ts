@@ -48,7 +48,8 @@ describe('cash register routes', () => {
 
   it('full cashier flow: list -> open -> sangria -> current hides expected -> close', async () => {
     as(cashierId, A.restaurantId);
-    const { body: { registers } } = await json(await listRegisters(req('http://x/api/caixa/registers')));
+    const { body: { registers, role } } = await json(await listRegisters(req('http://x/api/caixa/registers')));
+    expect(role).toBe('CASHIER'); // the screen hides manager-only buttons with it
     expect(registers[0]).toMatchObject({ name: 'Caixa principal', openSession: null });
     const reg = registers[0].id;
 

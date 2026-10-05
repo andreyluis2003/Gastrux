@@ -13,7 +13,8 @@ export async function GET() {
   const auth = await requireRestaurantRole(CASHIER_PLUS, 'Sem acesso ao caixa');
   if (!auth.ok) return auth.response;
   try {
-    return NextResponse.json({ registers: await listRegisters(auth.member.restaurantId) });
+    // The caller's role in this restaurant: the screen hides manager-only buttons (the server still checks)
+    return NextResponse.json({ registers: await listRegisters(auth.member.restaurantId), role: auth.member.role });
   } catch (error) {
     return cashErrorResponse(error, 'list registers');
   }
