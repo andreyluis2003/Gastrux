@@ -52,13 +52,21 @@ async function handlePOST(request: Request) {
     if (existing.restaurantId !== member.restaurantId) {
       return NextResponse.json({ error: 'clientId inválido' }, { status: 400 });
     }
+    // A sale interrupted after its payments were recorded (kitchen send or close failed) is finished
+    // here: left open and paid, closing it later would record its money a second time
+    if (existing.status === 'OPEN' && (await prisma.cashSessionEntry.count({ where: { orderSessionId: clientId } })) > 0) {
+      const closed = await prisma.orderSession.update({ where: { id: clientId }, data: { status: 'CLOSED', closedAt: new Date() } });
+      return NextResponse.json({ session: closed, alreadyRecorded: true });
+    }
     return NextResponse.json({ session: existing, alreadyRecorded: true });
   }
 
   const read = readPayments(body);
   if (!read) return NextResponse.json({ error: 'Informe as formas de pagamento' }, { status: 400 });
-  // A sale made offline and replayed by the device queue carries the time it was made
-  const replay = Boolean(body?.queuedAt);
+  // A sale made offline and replayed by the device queue carries the time it was made. Older devices
+  // send the legacy one-method body: for them the Idempotency-Key of their queue marks a replay (spec §6.1)
+  const replay = Boolean(body?.queuedAt) || (read.legacy && Boolean(request.headers.get('idempotency-key')));
+  if (read.legacy) console.warn('[caixa] legacy one-method counter sale body', { restaurantId: member.restaurantId, clientId });
   let target: SaleTarget | null = null;
   let changeCents = 0;
   let primaryMethod: string | undefined;

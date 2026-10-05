@@ -99,6 +99,13 @@ export async function recalcClosedSession(tx: Prisma.TransactionClient, sessionI
   return { expected, difference };
 }
 
+/** Locks a shift row until the transaction ends and returns its current status. */
+async function lockShiftForUpdate(tx: Prisma.TransactionClient, sessionId: string) {
+  const rows = await tx.$queryRaw<Array<{ status: string }>>`
+    SELECT "status"::text AS "status" FROM "cash_sessions" WHERE "id" = ${sessionId} FOR UPDATE`;
+  return rows[0]?.status ?? null;
+}
+
 type ManualType = 'WITHDRAWAL' | 'SUPPLY' | 'EXPENSE' | 'ADJUSTMENT';
 const MANUAL: ManualType[] = ['WITHDRAWAL', 'SUPPLY', 'EXPENSE', 'ADJUSTMENT'];
 const NEEDS_REASON: Record<ManualType, number> = { WITHDRAWAL: 1, SUPPLY: 0, EXPENSE: 1, ADJUSTMENT: 3 };
@@ -126,25 +133,27 @@ export async function addEntry(
   }
   if ((description?.length ?? 0) < NEEDS_REASON[input.type]) throw new CashRuleError('Informe o motivo do lançamento');
 
-  const session = await loadSession(member, sessionId);
-  if (session.status === 'CLOSED' && input.type !== 'ADJUSTMENT') throw new CashRuleError('Este caixa já foi fechado', 409);
+  const found = await loadSession(member, sessionId);
 
   let warning: string | undefined;
-  if (input.type === 'WITHDRAWAL' || input.type === 'EXPENSE') {
-    const cash = expectedByMethod(session.openingFloatCents, session.entries.map(asLike)).CASH;
-    if (amountCents > cash) {
-      if (!isManager(member.role) || !input.force) {
-        throw new CashRuleError('O caixa não tem esse valor em dinheiro. Um gerente pode confirmar mesmo assim.', 409, 'CASH_NOT_ENOUGH');
-      }
-      warning = 'Retirada maior que o dinheiro esperado no caixa';
-    }
-  }
-
+  // Status and cash checked under the shift lock: a close or another withdrawal cannot slip in between
   const entry = await prisma.$transaction(async (tx) => {
+    const status = await lockShiftForUpdate(tx, found.id);
+    if (status === 'CLOSED' && input.type !== 'ADJUSTMENT') throw new CashRuleError('Este caixa já foi fechado', 409);
+    if (input.type === 'WITHDRAWAL' || input.type === 'EXPENSE') {
+      const entries = await tx.cashSessionEntry.findMany({ where: { cashSessionId: found.id } });
+      const cash = expectedByMethod(found.openingFloatCents, entries.map(asLike)).CASH;
+      if (amountCents > cash) {
+        if (!isManager(member.role) || !input.force) {
+          throw new CashRuleError('O caixa não tem esse valor em dinheiro. Um gerente pode confirmar mesmo assim.', 409, 'CASH_NOT_ENOUGH');
+        }
+        warning = 'Retirada maior que o dinheiro esperado no caixa';
+      }
+    }
     const created = await tx.cashSessionEntry.create({
-      data: { restaurantId: member.restaurantId, cashSessionId: session.id, type: input.type, method, amountCents, direction, category, description, createdById: member.userId },
+      data: { restaurantId: member.restaurantId, cashSessionId: found.id, type: input.type, method, amountCents, direction, category, description, createdById: member.userId },
     });
-    if (session.status === 'CLOSED') await recalcClosedSession(tx, session.id);
+    if (status === 'CLOSED') await recalcClosedSession(tx, found.id);
     return created;
   });
   if (input.type === 'EXPENSE' || input.type === 'ADJUSTMENT' || warning) {
@@ -168,6 +177,8 @@ export async function closeSession(member: RestaurantMember, sessionId: string, 
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    // Waits for sales and entries holding this shift (FOR SHARE in lib/caixa/sale.ts), then counts them
+    await lockShiftForUpdate(tx, session.id);
     const entries = await tx.cashSessionEntry.findMany({ where: { cashSessionId: session.id } });
     const expected = expectedByMethod(session.openingFloatCents, entries.map(asLike));
     const difference = differenceByMethod(counted, expected);

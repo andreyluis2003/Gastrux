@@ -64,7 +64,7 @@ describe('counter sale records its payments in the shift', () => {
   it('refuses the whole sale without an open shift (no comanda left behind)', async () => {
     const clientId = `bal-${crypto.randomUUID()}`;
     const res = await sale({ clientId, items: [item()], payments: [{ method: 'pix', amount: 30 }] });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(422);
     expect((await res.json()).code).toBe('CASH_SESSION_REQUIRED');
     expect(await prisma.orderSession.findUnique({ where: { id: clientId } })).toBeNull();
   });
@@ -91,5 +91,16 @@ describe('counter sale records its payments in the shift', () => {
     const clientId = `bal-${crypto.randomUUID()}`;
     expect((await sale({ clientId, items: [item()], paymentMethod: 'pix' })).status).toBe(201);
     expect((await linesOf(clientId)).map((l) => [l.type, l.method, l.amountCents])).toEqual([['RECEIPT', 'PIX', 3000]]);
+  });
+
+  it('a counter sale interrupted after its payments were recorded is closed by the replay, never left open', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    const clientId = `bal-${crypto.randomUUID()}`;
+    await prisma.orderSession.create({ data: { id: clientId, restaurantId: A.restaurantId, userId: A.ownerId, status: 'OPEN', customerName: 'Balcão' } });
+    await prisma.cashSessionEntry.create({ data: { restaurantId: A.restaurantId, cashSessionId: session.id, type: 'RECEIPT', method: 'PIX', amountCents: 3000, orderSessionId: clientId, createdById: A.ownerId } });
+    const res = await sale({ clientId, items: [item()], cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] });
+    expect((await res.json()).alreadyRecorded).toBe(true);
+    expect((await prisma.orderSession.findUnique({ where: { id: clientId } })).status).toBe('CLOSED');
+    expect(await linesOf(clientId)).toHaveLength(1);
   });
 });

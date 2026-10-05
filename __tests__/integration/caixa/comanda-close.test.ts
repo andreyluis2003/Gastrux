@@ -79,10 +79,10 @@ describe('closing a comanda records the payments in the shift', () => {
     expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: '32.49' }] })).status).toBe(200);
   });
 
-  it('refused with 409 CASH_SESSION_REQUIRED when no shift is open; the comanda stays open', async () => {
+  it('refused with 422 CASH_SESSION_REQUIRED when no shift is open; the comanda stays open', async () => {
     const s = await comanda([[30, 1]]);
     const res = await put(s.id, { status: 'CLOSED', payments: [{ method: 'pix', amount: 30 }] });
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(422);
     expect((await res.json()).code).toBe('CASH_SESSION_REQUIRED');
     expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('OPEN');
   });
@@ -91,7 +91,7 @@ describe('closing a comanda records the payments in the shift', () => {
     const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
     await closeSession(owner, session.id, { counted: {} });
     const s = await comanda([[30, 1]]);
-    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] }, crypto.randomUUID())).status).toBe(409);
+    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] }, crypto.randomUUID())).status).toBe(422);
   });
 
   it('an OFFLINE replay lands late in the closed shift, recalculates and alerts', async () => {
@@ -122,7 +122,7 @@ describe('closing a comanda records the payments in the shift', () => {
     const s = await comanda([[30, 1]]);
     const body = { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] };
     const results = await Promise.all([put(s.id, body, crypto.randomUUID()), put(s.id, body, crypto.randomUUID())]);
-    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 422]);
     expect(await entriesOf(s.id)).toHaveLength(1);
   });
 
@@ -132,7 +132,7 @@ describe('closing a comanda records the payments in the shift', () => {
     const body = { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] };
     expect((await put(s.id, body)).status).toBe(200);
     const again = await put(s.id, body);
-    expect(again.status).toBe(409);
+    expect(again.status).toBe(422);
     expect((await again.json()).code).toBe('ALREADY_CLOSED');
     expect(await entriesOf(s.id)).toHaveLength(1);
   });
@@ -158,7 +158,7 @@ describe('closing a comanda records the payments in the shift', () => {
     const s = await comanda([[30, 1]]);
     await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] });
     const del = (body) => deleteComanda(new Request(`http://x/api/comanda/sessions/${s.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) as any, { params: { id: s.id } });
-    expect((await del({ reason: 'cliente desistiu' })).status).toBe(409);
+    expect((await del({ reason: 'cliente desistiu' })).status).toBe(422);
     expect((await del({ reason: 'cliente desistiu', cashSessionId: session.id })).status).toBe(200);
     expect((await entriesOf(s.id)).map((e) => [e.type, e.method, e.amountCents])).toEqual(expect.arrayContaining([['REFUND', 'PIX', 3000]]));
   });
@@ -167,6 +167,17 @@ describe('closing a comanda records the payments in the shift', () => {
     const regB = await ensureDefaultRegister(B.restaurantId);
     const { session } = await openSession({ userId: B.ownerId, restaurantId: B.restaurantId, role: 'OWNER' }, { cashRegisterId: regB.id, openingFloat: 0 });
     const s = await comanda([[30, 1]]);
-    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] })).status).toBe(409);
+    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] })).status).toBe(422);
+  });
+
+  it('a legacy body replayed by an old device queue (Idempotency-Key) lands late in the last default shift (spec 6.1)', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    await closeSession(owner, session.id, { counted: {} });
+    const s = await comanda([[30, 1]]);
+    const res = await put(s.id, { status: 'CLOSED', paymentMethod: 'pix' }, crypto.randomUUID());
+    expect(res.status).toBe(200);
+    const lines = await entriesOf(s.id);
+    expect(lines.map((e) => [e.type, e.method, e.amountCents, e.afterClose])).toEqual([['RECEIPT', 'PIX', 3000, true]]);
+    expect((await prisma.cashSession.findUnique({ where: { id: session.id } })).lateEntries).toBe(1);
   });
 });

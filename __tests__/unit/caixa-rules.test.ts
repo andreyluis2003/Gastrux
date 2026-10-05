@@ -114,3 +114,29 @@ describe('cash count and sales summary', () => {
     expect(s.averageTicketCents).toBe(3375);
   });
 });
+
+describe('sales summary after a reopen (final review 2026-10-05)', () => {
+  it('a sale reopened and closed again with the same change counts once, for its value', () => {
+    const s = salesSummary([
+      { type: 'RECEIPT', method: 'CASH', amountCents: 5000, orderSessionId: 's1' },
+      { type: 'CHANGE', method: 'CASH', amountCents: 2000, orderSessionId: 's1' },
+      // reopen: the receipt is refunded and the change comes back
+      { type: 'REFUND', method: 'CASH', amountCents: 5000, orderSessionId: 's1' },
+      { type: 'ADJUSTMENT', method: 'CASH', amountCents: 2000, direction: 'IN', orderSessionId: 's1' },
+      // closed again
+      { type: 'RECEIPT', method: 'CASH', amountCents: 5000, orderSessionId: 's1' },
+      { type: 'CHANGE', method: 'CASH', amountCents: 2000, orderSessionId: 's1' },
+    ] as any);
+    expect(s.totalCents).toBe(3000);
+    expect(s.salesCount).toBe(1);
+  });
+
+  it('a reopened bill not closed again is no sale', () => {
+    const s = salesSummary([
+      { type: 'RECEIPT', method: 'PIX', amountCents: 3000, orderSessionId: 's2' },
+      { type: 'REFUND', method: 'PIX', amountCents: 3000, orderSessionId: 's2' },
+    ] as any);
+    expect(s.totalCents).toBe(0);
+    expect(s.salesCount).toBe(0);
+  });
+});

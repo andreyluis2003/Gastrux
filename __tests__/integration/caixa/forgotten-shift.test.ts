@@ -29,4 +29,16 @@ describe('forgotten shift alert', () => {
     expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId, title: { contains: 'aberto há mais de 16 horas' } } })).toBe(1);
     expect(await prisma.notification.count({ where: { restaurantId: B.restaurantId, title: { contains: 'aberto há mais de' } } })).toBe(0);
   });
+  it('is not raised again after the manager read it (final review 2026-10-05)', async () => {
+    const reg = await ensureDefaultRegister(A.restaurantId);
+    await prisma.notification.deleteMany({ where: { restaurantId: A.restaurantId } });
+    await prisma.cashSession.deleteMany({ where: { restaurantId: A.restaurantId } });
+    await prisma.cashSession.create({ data: { restaurantId: A.restaurantId, cashRegisterId: reg.id, openedById: A.ownerId, openedAt: new Date(Date.now() - 20 * 3600_000) } });
+    const call = () => staleCheck(new Request('http://x/api/kds/stale-check', { method: 'POST', headers: { authorization: 'Bearer test-cron' } }) as any);
+    await call();
+    await prisma.notification.updateMany({ where: { restaurantId: A.restaurantId }, data: { read: true } });
+    await call();
+    expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId, title: { contains: 'aberto há mais de 16 horas' } } })).toBe(1);
+  });
 });
+

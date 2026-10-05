@@ -71,8 +71,14 @@ async function handlePUT(
 
     const body = await request.json().catch(() => ({}));
     const { notes, customerName, status, customerCPF } = body ?? {};
-    // A sale made offline and replayed by the device queue carries the time it was made
-    const replay = Boolean(body?.queuedAt);
+    // A sale made offline and replayed by the device queue carries the time it was made. Older devices
+    // send the legacy one-method body: for them the Idempotency-Key of their queue marks a replay (spec §6.1)
+    const legacyBody = !Array.isArray(body?.payments) && Boolean(body?.paymentMethod);
+    const replay = Boolean(body?.queuedAt) || (legacyBody && Boolean(request.headers.get('idempotency-key')));
+    if (legacyBody && status === 'CLOSED') {
+      // Logged so the compatibility can be removed once no device sends it (spec §6.1)
+      console.warn('[caixa] legacy one-method close body', { restaurantId, orderSessionId: params.id });
+    }
 
     // A cancelled comanda stays cancelled; a closed one is only closed once (the note is issued once)
     if (status !== undefined && ownedSession.status === 'CANCELLED') {
@@ -86,7 +92,8 @@ async function handlePUT(
     // Paying a bill that is already closed (a stale tab, another device): never "closed" again, since
     // nothing would be received. The legacy body without payments keeps answering 200 (older devices)
     if (status === 'CLOSED' && ownedSession.status === 'CLOSED' && Array.isArray(body?.payments)) {
-      return NextResponse.json({ error: 'Esta conta já foi fechada', code: 'ALREADY_CLOSED' }, { status: 409 });
+      // 422, not 409: the device outbox retries 409 forever, and this refusal is final
+      return NextResponse.json({ error: 'Esta conta já foi fechada', code: 'ALREADY_CLOSED' }, { status: 422 });
     }
 
     const reopening = status !== undefined && status !== 'CLOSED' && ownedSession.status === 'CLOSED';
@@ -125,7 +132,7 @@ async function handlePUT(
             where: { id: params.id, status: { not: 'CLOSED' } },
             data: { status: 'CLOSED', closedAt: new Date() },
           });
-          if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 409, 'ALREADY_CLOSED');
+          if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
           if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
           primaryMethod = toNfcePaymentMethod(settled.primaryMethod);
           changeCents = settled.changeCents;
@@ -133,8 +140,15 @@ async function handlePUT(
         if (reopening) {
           const reason = String(body?.reason ?? '').trim();
           if (reason.length < 3) throw new CashRuleError('Informe o motivo da reabertura');
-          // The money of this bill leaves the drawer until it is closed again
-          await reverseSaleEntries(tx, { restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member!.userId, reason });
+          // Only one reopen writes: two requests at once must not give the money back twice
+          const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: 'CLOSED' }, data: { status } });
+          if (guard.count === 0) throw new CashRuleError('Esta conta já foi reaberta', 422, 'ALREADY_REOPENED');
+          // The money of this bill leaves the drawer until it is closed again (a bill closed without
+          // cash lines, before the cash register or with no shift, reopens without one)
+          const paid = await tx.cashSessionEntry.count({ where: { orderSessionId: params.id, restaurantId } });
+          if (paid > 0) {
+            await reverseSaleEntries(tx, { restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member!.userId, reason });
+          }
         }
         return tx.orderSession.update({
           where: { id: params.id },
@@ -215,12 +229,14 @@ export async function DELETE(
     try {
       await prisma.$transaction(async (tx) => {
         // A paid bill gives its money back in the open shift of this device before it is cancelled
+        // Only one cancel writes: two requests at once must not give the money back twice
+        const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: ownedSession.status }, data: { status: 'CANCELLED' } });
+        if (guard.count === 0) throw new CashRuleError('Esta comanda mudou enquanto era cancelada. Atualize e tente de novo.', 422, 'CHANGED');
         const paid = ownedSession.status === 'CLOSED'
           && (await tx.cashSessionEntry.count({ where: { orderSessionId: params.id, restaurantId: member.restaurantId } })) > 0;
         if (paid) {
           await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason });
         }
-        await tx.orderSession.update({ where: { id: params.id }, data: { status: 'CANCELLED' } });
       });
     } catch (error) {
       if (error instanceof CashRuleError) {

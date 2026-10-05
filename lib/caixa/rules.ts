@@ -121,20 +121,22 @@ export function countCash(counts: Record<string, number>): number {
 
 export interface SalesSummary { byMethod: ByMethod; salesCount: number; totalCents: number; averageTicketCents: number }
 
-/** What the shift sold: receipts minus change and refunds of sales, per method; a sale is a comanda. */
+/**
+ * What the shift sold, per method: every money line of a sale (receipt, change, refund, and the change
+ * given back when a bill is reopened) with its effect. A sale is a comanda whose net is above zero, so a
+ * bill reopened and not closed again is no sale, and one closed again counts once.
+ */
 export function salesSummary(entries: EntryLike[]): SalesSummary {
   const byMethod = emptyByMethod();
-  const sales = new Set<string>();
+  const netBySale = new Map<string, number>();
   for (const e of entries) {
     if (!e.orderSessionId) continue;
-    if (e.type === 'RECEIPT') {
-      byMethod[e.method] += e.amountCents;
-      sales.add(e.orderSessionId);
-    } else if (e.type === 'CHANGE' || e.type === 'REFUND') {
-      byMethod[e.method] -= e.amountCents;
-    }
+    if (!['RECEIPT', 'CHANGE', 'REFUND', 'ADJUSTMENT'].includes(e.type)) continue;
+    const effect = entryEffect(e);
+    byMethod[e.method] += effect;
+    netBySale.set(e.orderSessionId, (netBySale.get(e.orderSessionId) ?? 0) + effect);
   }
   const totalCents = CASH_METHODS.reduce((s, m) => s + byMethod[m], 0);
-  const salesCount = sales.size;
+  const salesCount = [...netBySale.values()].filter((net) => net > 0).length;
   return { byMethod, salesCount, totalCents, averageTicketCents: salesCount ? Math.round(totalCents / salesCount) : 0 };
 }

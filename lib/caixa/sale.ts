@@ -6,7 +6,20 @@ import { ensureDefaultRegister, recalcClosedSession } from './sessions';
 
 /** Sales paid on the spot enter the cash shift (spec §6). Every function runs inside the caller's transaction. */
 
-const REQUIRED = () => new CashRuleError('Abra o caixa para receber', 409, 'CASH_SESSION_REQUIRED');
+// 422, not 409: the device outbox retries 409 forever ("still running"), and this refusal is final
+const REQUIRED = () => new CashRuleError('Abra o caixa para receber', 422, 'CASH_SESSION_REQUIRED');
+
+/**
+ * Reads a shift of the restaurant and holds it (FOR SHARE) until the caller's transaction ends: a
+ * close (FOR UPDATE in lib/caixa/sessions.ts) waits for this sale and counts it.
+ */
+async function lockShift(tx: Prisma.TransactionClient, restaurantId: string, cashSessionId: string) {
+  const rows = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+    SELECT "id", "status"::text AS "status" FROM "cash_sessions"
+    WHERE "id" = ${cashSessionId} AND "restaurantId" = ${restaurantId}
+    FOR SHARE`;
+  return rows[0] ?? null;
+}
 
 export async function comandaTotalCents(tx: Prisma.TransactionClient, orderSessionId: string) {
   const items = await tx.orderSessionItem.findMany({
@@ -29,20 +42,21 @@ export async function resolveSaleShift(
   input: { restaurantId: string; cashSessionId?: string | null; replay: boolean; legacy: boolean }
 ): Promise<SaleTarget | null> {
   const { restaurantId, replay } = input;
-  if (input.cashSessionId) {
-    const s = await tx.cashSession.findFirst({ where: { id: String(input.cashSessionId), restaurantId }, select: { id: true, status: true } });
+  const pick = async (id: string): Promise<SaleTarget> => {
+    const s = await lockShift(tx, restaurantId, id);
     if (!s) throw REQUIRED();
     if (s.status === 'OPEN') return { cashSessionId: s.id, late: false };
     if (replay) return { cashSessionId: s.id, late: true };
     throw REQUIRED();
-  }
+  };
+  if (input.cashSessionId) return pick(String(input.cashSessionId));
   if (!input.legacy) throw REQUIRED();
   const register = await ensureDefaultRegister(restaurantId);
   const open = await tx.cashSession.findFirst({ where: { cashRegisterId: register.id, status: 'OPEN' }, select: { id: true } });
-  if (open) return { cashSessionId: open.id, late: false };
+  if (open) return pick(open.id);
   if (!replay) throw REQUIRED();
   const last = await tx.cashSession.findFirst({ where: { cashRegisterId: register.id }, orderBy: { openedAt: 'desc' }, select: { id: true } });
-  return last ? { cashSessionId: last.id, late: true } : null;
+  return last ? pick(last.id) : null;
 }
 
 export async function recordSaleEntries(
@@ -66,8 +80,8 @@ export async function reverseSaleEntries(
   tx: Prisma.TransactionClient,
   input: { restaurantId: string; orderSessionId: string; cashSessionId: string; createdById: string; reason: string }
 ) {
-  const shift = await tx.cashSession.findFirst({ where: { id: input.cashSessionId, restaurantId: input.restaurantId, status: 'OPEN' }, select: { id: true } });
-  if (!shift) throw REQUIRED();
+  const shift = input.cashSessionId ? await lockShift(tx, input.restaurantId, input.cashSessionId) : null;
+  if (!shift || shift.status !== 'OPEN') throw REQUIRED();
   const lines = await tx.cashSessionEntry.findMany({ where: { orderSessionId: input.orderSessionId, restaurantId: input.restaurantId } });
   // Net what is still in the drawer for this comanda per method (an earlier reopen already reversed some)
   const net: Record<string, { receipt: number; change: number }> = {};
