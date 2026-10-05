@@ -1816,6 +1816,8 @@ model CashRegister {
   name            String
   description     String?
   active          Boolean           @default(true)
+  isDefault       Boolean           @default(false)
+  // Legacy shift fields, unused since the cash sessions (2026-10-05); dropped once the legacy tables are empty
   openingBalance  Decimal           @default(0)
   expectedBalance Decimal           @default(0)
   actualBalance   Decimal           @default(0)
@@ -1825,10 +1827,62 @@ model CashRegister {
   updatedAt       DateTime          @updatedAt
   movements       CashMovement[]
   transactions    CashTransaction[]
+  sessions        CashSession[]
   restaurantId    String?
 
   @@index([restaurantId])
   @@map("cash_registers")
+}
+
+/// A cash shift: from "Abrir caixa" to the blind close (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md).
+/// One OPEN shift per register, enforced by a partial unique index in migration 20261005120000_cash_sessions.
+model CashSession {
+  id                String             @id @default(cuid())
+  restaurantId      String
+  cashRegisterId    String
+  status            CashSessionStatus  @default(OPEN)
+  openedById        String
+  openedAt          DateTime           @default(now())
+  openingFloatCents Int                @default(0)
+  closedById        String?
+  closedAt          DateTime?
+  countedCents      Json?
+  expectedCents     Json?
+  differenceCents   Json?
+  closingNotes      String?
+  lateEntries       Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  cashRegister      CashRegister       @relation(fields: [cashRegisterId], references: [id])
+  entries           CashSessionEntry[]
+
+  @@index([restaurantId])
+  @@index([cashRegisterId])
+  @@index([openedAt])
+  @@map("cash_sessions")
+}
+
+/// One ledger line of a shift: a sale payment, change, sangria, suprimento, despesa, estorno or ajuste.
+model CashSessionEntry {
+  id             String          @id @default(cuid())
+  restaurantId   String
+  cashSessionId  String
+  type           CashEntryType
+  method         CashMethod
+  amountCents    Int
+  direction      CashDirection?
+  category       String?
+  description    String?
+  orderSessionId String?
+  createdById    String
+  afterClose     Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  cashSession    CashSession     @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+
+  @@index([cashSessionId])
+  @@index([restaurantId])
+  @@index([orderSessionId])
+  @@map("cash_session_entries")
 }
 
 model CashMovement {
@@ -4385,4 +4439,32 @@ model PasswordResetToken {
 
   @@index([userId, createdAt])
   @@map("password_reset_tokens")
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashEntryType {
+  RECEIPT
+  CHANGE
+  WITHDRAWAL
+  SUPPLY
+  EXPENSE
+  REFUND
+  ADJUSTMENT
+}
+
+enum CashMethod {
+  CASH
+  PIX
+  CREDIT
+  DEBIT
+  OTHER
+}
+
+enum CashDirection {
+  IN
+  OUT
 }
