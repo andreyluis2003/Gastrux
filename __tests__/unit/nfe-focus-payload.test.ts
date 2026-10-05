@@ -70,6 +70,30 @@ describe('Focus NFe NFC-e payload', () => {
     expect(sent.items[1].descricao).toBe('Café');
   });
 
+  /**
+   * The first cancellation in homologation (2026-10-05) was refused by Focus with "Recebida requisição
+   * vazia quando eram esperados dados": the reason went in the query string, Focus reads it from the
+   * JSON body.
+   */
+  it('cancels with the reason in a JSON body', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: 'cancelado', status_sefaz: '135', mensagem_sefaz: 'Evento registrado e vinculado a NF-e', numero_protocolo: '135260000000001' }) });
+    const r = await new FocusNFeClient('key', 'sandbox').cancelNFCe('nfce-avulsa-1', 'Teste de cancelamento em homologacao');
+    const [url, init] = global.fetch.mock.calls[0];
+    expect(url).toBe('https://homologacao.focusnfe.com.br/v2/nfce/nfce-avulsa-1');
+    expect(init.method).toBe('DELETE');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(JSON.parse(init.body)).toEqual({ justificativa: 'Teste de cancelamento em homologacao' });
+    expect(r).toMatchObject({ ok: true, status: 'cancelled', protocolNumber: '135260000000001' });
+  });
+
+  it('a cancellation SEFAZ refuses is not reported as cancelled', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: 'erro_cancelamento', status_sefaz: '501', mensagem_sefaz: 'Rejeicao: Prazo de cancelamento superior ao previsto na Legislacao' }) });
+    const r = await new FocusNFeClient('key', 'sandbox').cancelNFCe('nfce-avulsa-1', 'Teste de cancelamento em homologacao');
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe('rejected');
+    expect(r.rejectionReason).toContain('Prazo de cancelamento');
+  });
+
   it('a schema refusal shows every error Focus listed, not only the generic message', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false, status: 422,

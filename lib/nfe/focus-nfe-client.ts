@@ -208,19 +208,32 @@ export class FocusNFeClient implements NFeProvider {
         rejectionReason: 'Justificativa deve ter pelo menos 15 caracteres',
       };
     }
-    const url = `${this.baseUrl}/v2/nfce/${encodeURIComponent(providerRef)}?justificativa=${encodeURIComponent(justificativa)}`;
+    // Focus reads the reason from the JSON body; in the query string it answered "Recebida requisição
+    // vazia quando eram esperados dados" (first cancellation in homologation, 2026-10-05)
+    const url = `${this.baseUrl}/v2/nfce/${encodeURIComponent(providerRef)}`;
 
     try {
       const res = await fetch(url, {
         method: 'DELETE',
-        headers: { 'Authorization': this.authHeader() },
+        headers: { 'Authorization': this.authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ justificativa }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         return {
           ok: false,
           status: 'rejected',
-          rejectionReason: json?.mensagem || `HTTP ${res.status}`,
+          rejectionReason: refusalReason(json, res.status),
+          raw: json,
+        };
+      }
+      // A 200 can still carry SEFAZ's refusal of the event (e.g. 501, past the cancellation window)
+      if (json?.status && json.status !== 'cancelado') {
+        return {
+          ok: false,
+          status: 'rejected',
+          rejectionReason: json?.mensagem_sefaz || json?.mensagem || `Cancelamento não aceito (${json.status})`,
+          statusDescription: json?.status_sefaz,
           raw: json,
         };
       }
