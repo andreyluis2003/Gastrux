@@ -15,6 +15,7 @@ type TabType = 'dashboard' | 'config' | 'documents' | 'logs';
 
 const UF_LIST = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
 import { ORIGIN_LABELS, SUPPORTED_CSOSN } from '@/lib/nfe/fiscal-data';
+import { noteLabel, noteStatusLabel } from '@/lib/nfe/access-key';
 
 const CRT_OPTIONS = [
   { value: '1', label: '1 - Simples Nacional' },
@@ -126,10 +127,10 @@ export default function FiscalPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao emitir');
       // The note was created: say what the SEFAZ (through the provider) actually answered
-      const number = data.document?.documentNumber;
-      if (data.status === 'authorized') toast.success(`NFC-e nº ${number} autorizada`);
-      else if (data.status === 'processing' || data.status === 'submitted') toast.warning(`NFC-e nº ${number} enviada, aguardando a SEFAZ. Confira o status na lista.`);
-      else toast.error(`NFC-e nº ${number} ${data.status === 'denied' ? 'denegada' : 'rejeitada'}: ${data.rejectionReason || 'veja o motivo na lista'}`);
+      const label = data.document ? noteLabel(data.document) : 'NFC-e';
+      if (data.status === 'authorized') toast.success(`${label} autorizada`);
+      else if (data.status === 'processing' || data.status === 'submitted') toast.warning(`${label} enviada, aguardando a SEFAZ. Confira o status na lista.`);
+      else toast.error(`${label} ${data.status === 'denied' ? 'denegada' : 'rejeitada'}: ${data.rejectionReason || 'veja o motivo na lista'}`);
       setShowIssueForm(false);
       setIssueForm(EMPTY_ISSUE_FORM);
       await Promise.all([fetchDocs(), fetchLogs()]);
@@ -561,7 +562,7 @@ export default function FiscalPage() {
                                 </div>
                                 <div>
                                   <p className="font-medium text-sm">
-                                    {doc.documentType} #{doc.documentNumber} (Série {doc.documentSeries})
+                                    {noteLabel(doc)}
                                   </p>
                                   <p className="text-xs text-gray-500">
                                     {formatDate(doc.createdAt)}
@@ -577,9 +578,7 @@ export default function FiscalPage() {
                                   doc.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                                   doc.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {doc.status === 'authorized' ? 'Autorizada' :
-                                   doc.status === 'pending' ? 'Pendente' :
-                                   doc.status === 'rejected' ? 'Rejeitada' : doc.status}
+                                  {noteStatusLabel(doc.status)}
                                 </span>
                               </div>
                             </div>

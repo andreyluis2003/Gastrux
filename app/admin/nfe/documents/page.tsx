@@ -13,6 +13,7 @@ import {
 } from '@/components/ui';
 import { toast } from 'sonner';
 import { Eye, AlertCircle, QrCode } from 'lucide-react';
+import { noteLabel, sefazNumber } from '@/lib/nfe/access-key';
 
 interface NFeDocument {
   id: string;
@@ -102,7 +103,7 @@ export default function NFeDocumentsPage() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return true;
     return (
-      String(doc.documentNumber).includes(q) ||
+      String(sefazNumber(doc.accessKey)?.number ?? '').includes(q) ||
       (doc.accessKey || '').toLowerCase().includes(q) ||
       (doc.customerName || '').toLowerCase().includes(q)
     );
@@ -193,10 +194,7 @@ export default function NFeDocumentsPage() {
                   <div className="flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`font-mono font-semibold ${cfg.text}`}>
-                        #{String(doc.documentNumber).padStart(6, '0')}
-                      </span>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-background">
-                        {doc.documentType === 'NFCe' ? 'NFC-e' : 'NF-e'}
+                        {noteLabel(doc)}
                       </span>
                       <span className={`text-sm font-semibold ${cfg.text}`}>
                         {cfg.label}

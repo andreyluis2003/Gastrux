@@ -17,6 +17,7 @@ import {
   XCircle,
   AlertCircle,
 } from 'lucide-react';
+import { noteLabel } from '@/lib/nfe/access-key';
 
 const STATUS_CONFIG: Record<string, any> = {
   pending: { bg: 'bg-yellow-50', text: 'text-yellow-800', label: 'Pendente', icon: Clock },
@@ -153,9 +154,8 @@ export default function NFeDocumentDetailPage() {
         <BackButton />
         <div>
           <h1 className="text-xl sm:text-3xl font-bold">
-            {doc.documentType === 'NFCe' ? 'NFC-e' : 'NF-e'} #{String(doc.documentNumber).padStart(6, '0')}
+            {noteLabel(doc)}
           </h1>
-          <p className="text-sm text-muted-foreground">Série {doc.documentSeries}</p>
         </div>
       </div>
 
