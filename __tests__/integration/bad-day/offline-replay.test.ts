@@ -21,7 +21,7 @@ import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { POST as addItem } from '../../../app/api/comanda/sessions/[id]/items/route';
 import { POST as sendToKitchen } from '../../../app/api/comanda/sessions/[id]/send-to-kitchen/route';
 import { PUT as updateComanda } from '../../../app/api/comanda/sessions/[id]/route';
-import { POST as cashMovement } from '../../../app/api/caixa/movimentos/route';
+import { POST as cashEntry } from '../../../app/api/caixa/sessions/[id]/entries/route';
 import { POST as quickSale } from '../../../app/api/comanda/quick-sale/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -32,6 +32,7 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
   let burger: any;
   let cheese: any;
   let register: any;
+  let shift: any;
   let config: any;
   const tag = crypto.randomBytes(3).toString('hex');
 
@@ -59,8 +60,7 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
     await prisma.orderSession.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.orderItem.deleteMany({ where: { order: { restaurantId: { in: ids } } } });
     await prisma.order.deleteMany({ where: { restaurantId: { in: ids } } });
-    await prisma.cashMovement.deleteMany({ where: { cashRegisterId: register.id } });
-    await prisma.cashRegister.update({ where: { id: register.id }, data: { expectedBalance: 100 } });
+    await prisma.cashSessionEntry.deleteMany({ where: { cashSessionId: shift.id } });
     await prisma.notification.deleteMany({ where: { restaurantId: { in: ids } } });
   };
 
@@ -72,7 +72,8 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
       data: { restaurantId: A.restaurantId, code: `R-${tag}`, name: `Burger ${tag}`, baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 30 },
     });
     cheese = await prisma.itemModifier.create({ data: { restaurantId: A.restaurantId, name: `Queijo ${tag}`, priceAdjustment: 3 } });
-    register = await prisma.cashRegister.create({ data: { name: `Caixa ${tag}`, restaurantId: A.restaurantId, expectedBalance: 100 } });
+    register = await prisma.cashRegister.create({ data: { name: `Caixa ${tag}`, restaurantId: A.restaurantId } });
+    shift = await prisma.cashSession.create({ data: { restaurantId: A.restaurantId, cashRegisterId: register.id, openedById: A.ownerId, openingFloatCents: 10000 } });
     config = await prisma.nFeConfig.create({
       data: { // restaurant fiscal defaults (a sale needs fiscal data: lib/nfe/fiscal-data.ts)
         defaultNcm: '21069090', defaultCfop: '5102', defaultOrigin: '0', defaultCsosn: '102', restaurantId: A.restaurantId, cnpj: `8${Date.now()}`.slice(0, 14), nfeApiKey: 'k', environment: 'sandbox', autoIssueOnSale: true },
@@ -82,6 +83,8 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
   afterAll(async () => {
     await wipe();
     await prisma.nFeConfig.deleteMany({ where: { id: config.id } });
+    await prisma.cashSessionEntry.deleteMany({ where: { cashSessionId: shift.id } });
+    await prisma.cashSession.deleteMany({ where: { cashRegisterId: register.id } });
     await prisma.cashRegister.deleteMany({ where: { id: register.id } });
     await prisma.itemModifier.deleteMany({ where: { id: cheese.id } });
     await cleanupMultiTenantData([A.restaurantId, B.restaurantId]);
@@ -176,12 +179,11 @@ describe('bad day 1 (server): replaying what a device made offline', () => {
   describe('cash register', () => {
     it('a withdrawal replayed with the same key is recorded once', async () => {
       const k = key();
-      const move = () => cashMovement(req('http://localhost/api/caixa/movimentos', 'POST', { cashRegisterId: register.id, type: 'WITHDRAWAL', amount: 40 }, k));
+      const move = () => cashEntry(req(`http://localhost/api/caixa/sessions/${shift.id}/entries`, 'POST', { type: 'WITHDRAWAL', amount: 40, description: 'cofre' }, k), { params: { id: shift.id } });
 
       expect((await move()).status).toBe(201);
       expect((await move()).status).toBe(201);
-      expect(await prisma.cashMovement.count({ where: { cashRegisterId: register.id } })).toBe(1);
-      expect(Number((await prisma.cashRegister.findUnique({ where: { id: register.id } })).expectedBalance)).toBe(60);
+      expect(await prisma.cashSessionEntry.count({ where: { cashSessionId: shift.id } })).toBe(1);
     });
   });
 

@@ -8,7 +8,7 @@
  * a person's role is the role they have in the restaurant they are working in).
  * Real getCurrentRestaurantId / getRestaurantContext are used (only the session is simulated).
  * All gaps below were fixed 2026-09-24 (lib/auth/restaurant-role.ts, lib/auth/effective-role.ts):
- *   W9   /api/caixa/movimentos (and /reconciliacao) found the register by id only: anyone signed in
+ *   W9   (cash) the old /api/caixa/movimentos and /reconciliacao found the register by id only: anyone signed in
  *        could post a withdrawal to ANOTHER restaurant's cash register
  *   W8   a manager could create an OWNER or a platform ADMIN (or demote another manager); every new
  *        staff user got the fixed password "temp123" (now random, shown once)
@@ -25,7 +25,6 @@
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { NextRequest } from 'next/server';
 import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
@@ -40,11 +39,11 @@ import { POST as cancelNote } from '../../../app/api/nfe/documents/[id]/cancel/r
 import { PUT as setSellingPrice } from '../../../app/api/recipes/[id]/selling-price/route';
 import { POST as refund } from '../../../app/api/pagamentos/unified/refund/route';
 import { POST as createStaff } from '../../../app/api/admin/staff/route';
-import { POST as cashMovement } from '../../../app/api/caixa/movimentos/route';
+import { POST as cashEntry } from '../../../app/api/caixa/sessions/[id]/entries/route';
 import { POST as saveCount } from '../../../app/api/stock-count/route';
 import { POST as saveFiscalConfig } from '../../../app/api/admin/fiscal/config/route';
 import { PUT as updateComanda } from '../../../app/api/comanda/sessions/[id]/route';
-import { GET as reconciliation } from '../../../app/api/caixa/reconciliacao/route';
+import { GET as cashShift } from '../../../app/api/caixa/sessions/[id]/route';
 import { resolveEffectiveRole } from '../../../lib/auth/effective-role';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -58,6 +57,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
   let recipe: any;
   let ingredient: any;
   let registerA: any;
+  let shiftA: any;
   let configA: any;
   const tag = crypto.randomBytes(3).toString('hex');
   const createdUsers: string[] = [];
@@ -108,6 +108,7 @@ describe('bad day 9: a new operator makes a mistake', () => {
     });
     await prisma.stock.create({ data: { restaurantId: A.restaurantId, ingredientId: ingredient.id, currentQuantity: 10 } });
     registerA = await prisma.cashRegister.create({ data: { name: `Caixa ${tag}`, restaurantId: A.restaurantId } });
+    shiftA = await prisma.cashSession.create({ data: { restaurantId: A.restaurantId, cashRegisterId: registerA.id, openedById: A.ownerId, openingFloatCents: 10000 } });
     configA = await prisma.nFeConfig.create({
       data: { restaurantId: A.restaurantId, cnpj: `9${Date.now()}`.slice(0, 14), nfeApiKey: 'k', environment: 'sandbox' },
     });
@@ -115,7 +116,8 @@ describe('bad day 9: a new operator makes a mistake', () => {
 
   afterAll(async () => {
     const ids = [A.restaurantId, B.restaurantId];
-    await prisma.cashMovement.deleteMany({ where: { cashRegisterId: registerA.id } });
+    await prisma.cashSessionEntry.deleteMany({ where: { cashSessionId: shiftA.id } });
+    await prisma.cashSession.deleteMany({ where: { cashRegisterId: registerA.id } });
     await prisma.cashRegister.deleteMany({ where: { id: registerA.id } });
     await prisma.nFeLog.deleteMany({ where: { OR: [{ configId: configA.id }, { document: { configId: configA.id } }] } });
     await prisma.nFeDocument.deleteMany({ where: { configId: configA.id } });
@@ -364,36 +366,36 @@ describe('bad day 9: a new operator makes a mistake', () => {
   });
 
   describe('W9: cash register', () => {
-    const move = (registerId: string) =>
-      cashMovement(req('http://localhost/api/caixa/movimentos', 'POST', { cashRegisterId: registerId, type: 'WITHDRAWAL', amount: 50, description: 'sangria' }));
+    const move = (sessionId: string, amount: number = 50) =>
+      cashEntry(req(`http://localhost/api/caixa/sessions/${sessionId}/entries`, 'POST', { type: 'WITHDRAWAL', amount, description: 'sangria' }), { params: { id: sessionId } });
 
     it('a cashier withdrawal (sangria) in its own register records who made it', async () => {
       as(cashier);
-      const res = await move(registerA.id);
+      const res = await move(shiftA.id);
       expect(res.status).toBe(201);
-      expect((await res.json()).createdBy).toBe(cashier.id);
+      expect((await res.json()).entry.createdById).toBe(cashier.id);
     });
 
     it('a zero or negative amount is refused', async () => {
       as(cashier);
-      const res = await cashMovement(req('http://localhost/api/caixa/movimentos', 'POST', { cashRegisterId: registerA.id, type: 'WITHDRAWAL', amount: -50 }));
+      const res = await move(shiftA.id, -50);
       expect(res.status).toBe(400);
     });
 
-    it("a user of another restaurant cannot read this restaurant's register reconciliation", async () => {
+    it("a user of another restaurant cannot read this restaurant's cash shift", async () => {
       const outsider = await mkUser('OWNER', 'OWNER', B.restaurantId);
       as(outsider);
-      const res = await reconciliation(new NextRequest(`http://localhost/api/caixa/reconciliacao?cashRegisterId=${registerA.id}`));
+      const res = await cashShift(req(`http://localhost/api/caixa/sessions/${shiftA.id}`, 'GET'), { params: { id: shiftA.id } });
       expect(res.status).toBe(404);
     });
 
     it("a user of another restaurant cannot post to this restaurant's register", async () => {
-      const before = (await prisma.cashRegister.findUnique({ where: { id: registerA.id } })).expectedBalance;
+      const before = await prisma.cashSessionEntry.count({ where: { cashSessionId: shiftA.id } });
       const outsider = await mkUser('OWNER', 'OWNER', B.restaurantId);
       as(outsider);
-      const res = await move(registerA.id);
+      const res = await move(shiftA.id);
       expect(res.status).toBe(404);
-      expect(Number((await prisma.cashRegister.findUnique({ where: { id: registerA.id } })).expectedBalance)).toBe(Number(before));
+      expect(await prisma.cashSessionEntry.count({ where: { cashSessionId: shiftA.id } })).toBe(before);
     });
   });
 });
