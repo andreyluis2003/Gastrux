@@ -28,6 +28,7 @@
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
+import { ensureDefaultRegister } from '../../../lib/caixa/sessions';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
 jest.mock('../../../lib/whatsapp/get-restaurant', () => ({ getCurrentRestaurantId: jest.fn() }));
@@ -111,6 +112,9 @@ describe('bad day 7: fiscal rejection', () => {
     const scenario = await createMultiRestaurantScenario();
     A = scenario.restaurantA;
     B = scenario.restaurantB;
+    // Closing a bill needs an open cash shift (docs/superpowers/specs/2026-10-04-caixa-turnos-design.md)
+    const cashRegister = await ensureDefaultRegister(A.restaurantId);
+    await prisma.cashSession.create({ data: { restaurantId: A.restaurantId, cashRegisterId: cashRegister.id, openedById: A.ownerId } });
     configA = await prisma.nFeConfig.create({
       data: {
         // restaurant fiscal defaults (a sale needs fiscal data: lib/nfe/fiscal-data.ts)
@@ -130,6 +134,9 @@ describe('bad day 7: fiscal rejection', () => {
     await prisma.itemModifier.deleteMany({ where: { id: cheese.id } });
     await prisma.recipe.deleteMany({ where: { id: burger.id } });
     await prisma.nFeConfig.deleteMany({ where: { id: configA.id } });
+    await prisma.cashSessionEntry.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
+    await prisma.cashSession.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
+    await prisma.cashRegister.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
     await cleanupMultiTenantData([A.restaurantId, B.restaurantId]);
   });
 
@@ -410,9 +417,10 @@ describe('bad day 7: fiscal rejection', () => {
   });
 
   describe('closing the comanda issues the note (owner decision 2026-09-24)', () => {
+    // The legacy one-method body (paid in full, default register shift open in beforeAll)
     const close = (id: string, body: any = {}) =>
       updateComanda(
-        new Request(`http://localhost/api/comanda/sessions/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'CLOSED', ...body }) }) as any,
+        new Request(`http://localhost/api/comanda/sessions/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'CLOSED', paymentMethod: 'dinheiro', ...body }) }) as any,
         { params: { id } }
       );
     const openComanda = async () => {

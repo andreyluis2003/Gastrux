@@ -6,7 +6,12 @@ import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
-import { MANAGER_ROLES, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { MANAGER_ROLES, recordAudit, requireRestaurantRole, type RestaurantMember } from '@/lib/auth/restaurant-role';
+import { CASHIER_PLUS } from '@/lib/caixa/roles';
+import { CashRuleError, settlePayments } from '@/lib/caixa/rules';
+import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, reverseSaleEntries, type SaleTarget } from '@/lib/caixa/sale';
+import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
+import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +69,10 @@ async function handlePUT(
     });
     if (!ownedSession) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
 
-    const { notes, customerName, status, customerCPF, paymentMethod } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const { notes, customerName, status, customerCPF } = body ?? {};
+    // A sale made offline and replayed by the device queue carries the time it was made
+    const replay = Boolean(body?.queuedAt);
 
     // A cancelled comanda stays cancelled; a closed one is only closed once (the note is issued once)
     if (status !== undefined && ownedSession.status === 'CANCELLED') {
@@ -74,34 +82,86 @@ async function handlePUT(
     if (status === 'CANCELLED') {
       return NextResponse.json({ error: 'Para cancelar a comanda use o cancelamento (exige gerente e motivo)' }, { status: 400 });
     }
-    // Reopening a closed bill (its note may be issued) is a manager decision, and it is recorded
+
     const reopening = status !== undefined && status !== 'CLOSED' && ownedSession.status === 'CLOSED';
+    const closing = status === 'CLOSED' && ownedSession.status !== 'CLOSED';
+    let member: RestaurantMember | null = null;
+
+    // Reopening a closed bill (its note may be issued) is a manager decision, and it is recorded
     if (reopening) {
       const auth = await requireRestaurantRole(MANAGER_ROLES, 'Reabrir uma conta fechada exige um gerente');
       if (!auth.ok) return auth.response;
-      await recordAudit(auth.member, {
+      member = auth.member;
+    }
+    // Receiving the payment is the cashier's job (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md §6.1)
+    if (closing) {
+      const auth = await requireRestaurantRole(CASHIER_PLUS, 'Fechar a conta exige o caixa');
+      if (!auth.ok) return auth.response;
+      member = auth.member;
+    }
+
+    let saleTarget: SaleTarget | null = null;
+    let primaryMethod: string | undefined;
+    let changeCents = 0;
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        if (closing) {
+          const read = readPayments(body);
+          if (!read) throw new CashRuleError('Informe as formas de pagamento');
+          const total = await comandaTotalCents(tx, params.id);
+          // Legacy body (one paymentMethod, older devices): the whole total in that method
+          const payments = read.legacy ? [{ method: read.payments[0].method, amount: (total / 100).toFixed(2) }] : read.payments;
+          const settled = settlePayments(total, payments);
+          saleTarget = await resolveSaleShift(tx, { restaurantId, cashSessionId: body?.cashSessionId, replay, legacy: read.legacy });
+          // Only one close writes: a second device sees the comanda already closed
+          const guard = await tx.orderSession.updateMany({
+            where: { id: params.id, status: { not: 'CLOSED' } },
+            data: { status: 'CLOSED', closedAt: new Date() },
+          });
+          if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 409, 'ALREADY_CLOSED');
+          if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
+          primaryMethod = toNfcePaymentMethod(settled.primaryMethod);
+          changeCents = settled.changeCents;
+        }
+        if (reopening) {
+          const reason = String(body?.reason ?? '').trim();
+          if (reason.length < 3) throw new CashRuleError('Informe o motivo da reabertura');
+          // The money of this bill leaves the drawer until it is closed again
+          await reverseSaleEntries(tx, { restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member!.userId, reason });
+        }
+        return tx.orderSession.update({
+          where: { id: params.id },
+          data: {
+            notes: notes !== undefined ? notes : undefined,
+            customerName: customerName !== undefined ? customerName : undefined,
+            ...(status !== undefined && !closing ? { status } : {}),
+          },
+          include: {
+            items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
+          },
+        });
+      });
+    } catch (error) {
+      if (error instanceof CashRuleError) {
+        return NextResponse.json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status });
+      }
+      throw error;
+    }
+
+    if (reopening) {
+      await recordAudit(member!, {
         action: 'STATUS_CHANGE',
         entityType: 'OrderSession',
         entityId: params.id,
-        changes: { from: 'CLOSED', to: status },
+        changes: { from: 'CLOSED', to: status, reason: body?.reason },
       });
     }
-    const closing = status === 'CLOSED' && ownedSession.status !== 'CLOSED';
-
-    const updated = await prisma.orderSession.update({
-      where: { id: params.id },
-      data: {
-        notes: notes !== undefined ? notes : undefined,
-        customerName: customerName !== undefined ? customerName : undefined,
-        status: status !== undefined ? status : undefined,
-        ...(closing ? { closedAt: new Date() } : {}),
-      },
-      include: {
-        items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
-      },
-    });
 
     if (closing) {
+      const target = saleTarget as SaleTarget | null;
+      if (target?.late) await alertLateEntry(restaurantId, target.cashSessionId, params.id);
+      if (!target) await alertSaleWithoutShift(restaurantId, params.id);
       // Closing the bill issues the NFC-e when the restaurant enabled it (NFeConfig.autoIssueOnSale).
       // Never fails the close: a problem comes back as a message and leaves an alert for the manager.
       const nfce = await autoEmitNFCe({
@@ -109,10 +169,10 @@ async function handlePUT(
         orderSessionId: params.id,
         customerCPF,
         customerName: customerName || updated.customerName,
-        paymentMethod,
+        paymentMethod: primaryMethod,
         onlyIfEnabled: true,
       });
-      return NextResponse.json({ ...updated, nfce });
+      return NextResponse.json({ ...updated, changeCents, nfce });
     }
 
     return NextResponse.json(updated);
@@ -146,10 +206,22 @@ export async function DELETE(
     if (!ownedSession) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     if (ownedSession.status === 'CANCELLED') return NextResponse.json({ success: true, alreadyCancelled: true });
 
-    await prisma.orderSession.update({
-      where: { id: params.id },
-      data: { status: 'CANCELLED' },
-    });
+    try {
+      await prisma.$transaction(async (tx) => {
+        // A paid bill gives its money back in the open shift of this device before it is cancelled
+        const paid = ownedSession.status === 'CLOSED'
+          && (await tx.cashSessionEntry.count({ where: { orderSessionId: params.id, restaurantId: member.restaurantId } })) > 0;
+        if (paid) {
+          await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason });
+        }
+        await tx.orderSession.update({ where: { id: params.id }, data: { status: 'CANCELLED' } });
+      });
+    } catch (error) {
+      if (error instanceof CashRuleError) {
+        return NextResponse.json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status });
+      }
+      throw error;
+    }
 
     await recordAudit(member, {
       action: 'STATUS_CHANGE',

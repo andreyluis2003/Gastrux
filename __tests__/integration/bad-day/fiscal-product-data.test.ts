@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
+import { ensureDefaultRegister } from '../../../lib/caixa/sessions';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
 jest.mock('../../../lib/whatsapp/get-restaurant', () => ({ getCurrentRestaurantId: jest.fn() }));
@@ -64,6 +65,9 @@ describe('fiscal data per product (launch plan item 3)', () => {
     const scenario = await createMultiRestaurantScenario();
     A = scenario.restaurantA;
     B = scenario.restaurantB;
+    // Closing a bill needs an open cash shift (docs/superpowers/specs/2026-10-04-caixa-turnos-design.md)
+    const cashRegister = await ensureDefaultRegister(A.restaurantId);
+    await prisma.cashSession.create({ data: { restaurantId: A.restaurantId, cashRegisterId: cashRegister.id, openedById: A.ownerId } });
     config = await prisma.nFeConfig.create({
       data: { restaurantId: A.restaurantId, cnpj: `6${Date.now()}`.slice(0, 14), nfeApiKey: 'k', environment: 'sandbox', autoIssueOnSale: true, ...DEFAULTS },
     });
@@ -85,6 +89,9 @@ describe('fiscal data per product (launch plan item 3)', () => {
     await prisma.auditLog.deleteMany({ where: { OR: [{ restaurantId: { in: ids } }, { userId: { in: users } }] } });
     await prisma.restaurantUser.deleteMany({ where: { userId: { in: users } } });
     await prisma.user.deleteMany({ where: { id: { in: users } } });
+    await prisma.cashSessionEntry.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
+    await prisma.cashSession.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
+    await prisma.cashRegister.deleteMany({ where: { restaurantId: { in: [A.restaurantId, B.restaurantId] } } });
     await cleanupMultiTenantData(ids);
   });
 
