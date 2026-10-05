@@ -83,6 +83,12 @@ async function handlePUT(
       return NextResponse.json({ error: 'Para cancelar a comanda use o cancelamento (exige gerente e motivo)' }, { status: 400 });
     }
 
+    // Paying a bill that is already closed (a stale tab, another device): never "closed" again, since
+    // nothing would be received. The legacy body without payments keeps answering 200 (older devices)
+    if (status === 'CLOSED' && ownedSession.status === 'CLOSED' && Array.isArray(body?.payments)) {
+      return NextResponse.json({ error: 'Esta conta já foi fechada', code: 'ALREADY_CLOSED' }, { status: 409 });
+    }
+
     const reopening = status !== undefined && status !== 'CLOSED' && ownedSession.status === 'CLOSED';
     const closing = status === 'CLOSED' && ownedSession.status !== 'CLOSED';
     let member: RestaurantMember | null = null;

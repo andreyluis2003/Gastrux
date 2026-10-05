@@ -126,6 +126,17 @@ describe('closing a comanda records the payments in the shift', () => {
     expect(await entriesOf(s.id)).toHaveLength(1);
   });
 
+  it('paying a bill that is already closed (stale tab) says so instead of "closed" (browser check 2026-10-05)', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    const s = await comanda([[30, 1]]);
+    const body = { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 30 }] };
+    expect((await put(s.id, body)).status).toBe(200);
+    const again = await put(s.id, body);
+    expect(again.status).toBe(409);
+    expect((await again.json()).code).toBe('ALREADY_CLOSED');
+    expect(await entriesOf(s.id)).toHaveLength(1);
+  });
+
   it('legacy body (single paymentMethod) records one receipt in the default register shift', async () => {
     await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
     const s = await comanda([[30, 1]]);
