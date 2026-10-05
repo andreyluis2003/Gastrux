@@ -47,14 +47,14 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://gastrux.com'),
   title: 'Gastrux - Gestão Integrada',
-  description: 'Plataforma de gestão de produção e inventário para restaurantes',
+  description: 'Plataforma de gestão integrada para restaurantes',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
   },
   openGraph: {
     title: 'Gastrux - Gestão Integrada',
-    description: 'Plataforma de gestão de produção e inventário para restaurantes',
+    description: 'Plataforma de gestão integrada para restaurantes',
     images: [{
       url: '/og-image.png',
       width: 1200,
