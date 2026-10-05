@@ -10,6 +10,11 @@ import { toast } from 'sonner';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { OfflineUnavailableError } from '@/lib/offline/outbox';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
+import { PaymentPanel, panelState, type PanelPayment } from '@/components/caixa/payment-panel';
+import { toApiAmount } from '@/components/caixa/panel-state';
+import { OpenShiftCard } from '@/components/caixa/open-shift-card';
+import { brl } from '@/components/caixa/money';
+import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 import { ArrowLeft, Trash2, Plus, Send, Receipt, FileText, CheckCircle2, Printer } from 'lucide-react';
 
 interface MenuItemEntry {
@@ -73,7 +78,9 @@ export default function ComandaDetailPage() {
   const [emittedDoc, setEmittedDoc] = useState<any>(null);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeCpf, setCloseCpf] = useState('');
-  const [closePayment, setClosePayment] = useState('dinheiro');
+  // Payments of the bill (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md §8.3) and this device's cash shift
+  const [payments, setPayments] = useState<PanelPayment[]>([]);
+  const shift = useDeviceShift();
   const [closingBill, setClosingBill] = useState(false);
   const { send, pendingFor, online } = useOutbox();
   // When the comanda shown is the copy kept on this device (no internet), since when
@@ -174,7 +181,14 @@ export default function ComandaDetailPage() {
       const res = await mutate(
         'PUT',
         `/api/comanda/sessions/${sessionId}`,
-        { status: 'CLOSED', customerCPF: closeCpf.replace(/\D/g, '') || undefined, paymentMethod: closePayment },
+        {
+          status: 'CLOSED',
+          customerCPF: closeCpf.replace(/\D/g, '') || undefined,
+          cashSessionId: shift.shiftId,
+          payments: payments.map((p) => ({ method: p.method, amount: toApiAmount(p.amount) })),
+          // Made without internet: the server records it in this shift even if it closes before the sale arrives
+          ...(typeof navigator !== 'undefined' && !navigator.onLine ? { queuedAt: new Date().toISOString() } : {}),
+        },
         'Fechar conta'
       );
       if (!res) {
@@ -185,9 +199,12 @@ export default function ComandaDetailPage() {
       }
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === 'CASH_SESSION_REQUIRED') shift.refresh();
         toast.error(data.error || 'Erro ao fechar a conta');
         return;
       }
+      if (data.changeCents > 0) toast.success(`Troco: ${brl(data.changeCents)}`, { duration: 15000 });
+      setPayments([]);
       toast.success('Conta fechada', {
         action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${sessionId}`) },
         duration: 15000,
@@ -671,27 +688,26 @@ export default function ComandaDetailPage() {
                     disabled={closingBill}
                   />
                 </div>
-                <div>
-                  <label htmlFor="close-payment" className="text-sm font-semibold block mb-1">Forma de pagamento</label>
-                  <select
-                    id="close-payment"
-                    className="w-full border rounded-md h-10 px-3 bg-background"
-                    value={closePayment}
-                    onChange={(e) => setClosePayment(e.target.value)}
-                    disabled={closingBill}
-                  >
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="cartao de credito">Cartão de crédito</option>
-                    <option value="cartao de debito">Cartão de débito</option>
-                    <option value="pix">PIX</option>
-                  </select>
-                </div>
+                {shift.loading ? (
+                  <p className="text-sm">Carregando caixa...</p>
+                ) : !shift.shiftId && shift.register ? (
+                  <div className="rounded-md bg-amber-50 p-3 space-y-2">
+                    <p className="text-sm font-semibold">Abra o caixa para receber</p>
+                    <OpenShiftCard registerId={shift.register.id} registerName={shift.register.name} onOpened={() => shift.refresh()} />
+                  </div>
+                ) : (
+                  <PaymentPanel totalCents={Math.round(totalPrice * 100)} payments={payments} onChange={setPayments} disabled={closingBill} />
+                )}
               </div>
               <div className="flex gap-2 mt-4 justify-end">
-                <Button variant="outline" onClick={() => setShowCloseModal(false)} disabled={closingBill}>
+                <Button variant="outline" onClick={() => { setShowCloseModal(false); setPayments([]); }} disabled={closingBill}>
                   Voltar
                 </Button>
-                <Button onClick={handleCloseBill} disabled={closingBill} className="bg-green-600">
+                <Button
+                  onClick={handleCloseBill}
+                  disabled={closingBill || !shift.shiftId || !panelState(Math.round(totalPrice * 100), payments).valid}
+                  className="bg-green-600"
+                >
                   {closingBill ? 'Fechando...' : 'Fechar conta'}
                 </Button>
               </div>

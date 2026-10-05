@@ -8,6 +8,11 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
+import { PaymentPanel, panelState, type PanelPayment } from '@/components/caixa/payment-panel';
+import { toApiAmount } from '@/components/caixa/panel-state';
+import { OpenShiftCard } from '@/components/caixa/open-shift-card';
+import { brl } from '@/components/caixa/money';
+import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 
 interface MenuEntry {
   id: string;
@@ -31,7 +36,9 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
   const [cpf, setCpf] = useState('');
-  const [payment, setPayment] = useState('dinheiro');
+  // Payments of the sale and this device's cash shift (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md §8.3)
+  const [payments, setPayments] = useState<PanelPayment[]>([]);
+  const shift = useDeviceShift();
   const [toKitchen, setToKitchen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -57,6 +64,14 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       toast.error('Adicione itens à venda');
       return;
     }
+    if (!shift.shiftId) {
+      toast.error('Abra o caixa para receber');
+      return;
+    }
+    if (!panelState(Math.round(total * 100), payments).valid) {
+      toast.error('Confira as formas de pagamento');
+      return;
+    }
     setSaving(true);
     try {
       const clientId = `bal-${crypto.randomUUID()}`;
@@ -70,7 +85,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           clientId,
           items: lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
           customerCPF: cpf.replace(/\D/g, '') || undefined,
-          paymentMethod: payment,
+          cashSessionId: shift.shiftId,
+          payments: payments.map((p) => ({ method: p.method, amount: toApiAmount(p.amount) })),
+          // Made without internet: the server records it in this shift even if it closes before the sale arrives
+          ...(typeof navigator !== 'undefined' && !navigator.onLine ? { queuedAt: new Date().toISOString() } : {}),
           sendToKitchen: toKitchen,
         },
       });
@@ -79,9 +97,11 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       } else {
         const data = await result.response.json().catch(() => ({}));
         if (!result.response.ok) {
+          if (data.code === 'CASH_SESSION_REQUIRED') shift.refresh();
           toast.error(data.error || 'Erro ao registrar a venda');
           return;
         }
+        if (data.changeCents > 0) toast.success(`Troco: ${brl(data.changeCents)}`, { duration: 15000 });
         toast.success('Venda registrada', {
           action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${clientId}`) },
           duration: 15000,
@@ -92,6 +112,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       }
       setCart({});
       setCpf('');
+      setPayments([]);
       onDone?.();
     } finally {
       setSaving(false);
@@ -126,27 +147,30 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           </div>
         ))}
       </div>
-      <div className="grid sm:grid-cols-3 gap-3 items-end">
+      <div className="grid sm:grid-cols-2 gap-3 items-end">
         <div>
           <label htmlFor="counter-cpf" className="text-sm font-semibold block mb-1">CPF na nota?</label>
           <Input id="counter-cpf" placeholder="Opcional" value={cpf} onChange={(e) => setCpf(e.target.value)} />
-        </div>
-        <div>
-          <label htmlFor="counter-payment" className="text-sm font-semibold block mb-1">Pagamento</label>
-          <select id="counter-payment" className="w-full border rounded-md h-10 px-3 bg-background" value={payment} onChange={(e) => setPayment(e.target.value)}>
-            <option value="dinheiro">Dinheiro</option>
-            <option value="cartao de credito">Cartão de crédito</option>
-            <option value="cartao de debito">Cartão de débito</option>
-            <option value="pix">PIX (maquininha)</option>
-          </select>
         </div>
         <label className="flex items-center gap-2 text-sm h-10">
           <input type="checkbox" checked={toKitchen} onChange={(e) => setToKitchen(e.target.checked)} /> Enviar para a cozinha
         </label>
       </div>
+      <div className="mt-4">
+        {shift.loading ? (
+          <p className="text-sm">Carregando caixa...</p>
+        ) : !shift.shiftId && shift.register ? (
+          <div className="rounded-md bg-amber-50 p-3 space-y-2">
+            <p className="text-sm font-semibold">Abra o caixa para receber</p>
+            <OpenShiftCard registerId={shift.register.id} registerName={shift.register.name} onOpened={() => shift.refresh()} />
+          </div>
+        ) : (
+          lines.length > 0 && <PaymentPanel totalCents={Math.round(total * 100)} payments={payments} onChange={setPayments} disabled={saving} />
+        )}
+      </div>
       <div className="flex items-center justify-between mt-4">
         <span className="text-2xl font-bold text-green-700">R$ {total.toFixed(2)}</span>
-        <Button onClick={finish} disabled={saving || lines.length === 0} className="bg-green-600">
+        <Button onClick={finish} disabled={saving || lines.length === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
           {saving ? 'Registrando...' : 'Finalizar venda'}
         </Button>
       </div>

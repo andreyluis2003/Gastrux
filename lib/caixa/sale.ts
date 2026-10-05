@@ -51,8 +51,10 @@ export async function recordSaleEntries(
 ) {
   const { restaurantId, target, orderSessionId, settled, createdById } = input;
   const base = { restaurantId, cashSessionId: target.cashSessionId, orderSessionId, createdById, afterClose: target.late };
-  const rows = CASH_METHODS.filter((m) => settled.receipts[m] > 0).map((m) => ({ ...base, type: 'RECEIPT' as const, method: m, amountCents: settled.receipts[m] }));
-  if (settled.changeCents > 0) rows.push({ ...base, type: 'CHANGE' as const, method: 'CASH', amountCents: settled.changeCents });
+  const rows: Prisma.CashSessionEntryCreateManyInput[] = CASH_METHODS
+    .filter((m) => settled.receipts[m] > 0)
+    .map((m) => ({ ...base, type: 'RECEIPT', method: m, amountCents: settled.receipts[m] }));
+  if (settled.changeCents > 0) rows.push({ ...base, type: 'CHANGE', method: 'CASH', amountCents: settled.changeCents });
   if (rows.length) await tx.cashSessionEntry.createMany({ data: rows });
   if (target.late) {
     await tx.cashSession.update({ where: { id: target.cashSessionId }, data: { lateEntries: { increment: 1 } } });
