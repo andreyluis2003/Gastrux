@@ -226,8 +226,12 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Request-Time', new Date().toISOString());
 
   // No page may be shown inside another site's frame (clickjacking: invisible Gastrux under fake
-  // buttons, with the user logged in). Only the public menu can be embedded by a restaurant's site.
-  if (!(pathname === '/menu' || pathname.startsWith('/menu/'))) {
+  // buttons, with the user logged in). Only the public menu can be embedded by a restaurant's site,
+  // and the print pages by Gastrux itself (lib/print/print-frame.ts prints them in a hidden frame).
+  if (pathname.startsWith('/imprimir/')) {
+    response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+    response.headers.set('Content-Security-Policy', "frame-ancestors 'self'");
+  } else if (!(pathname === '/menu' || pathname.startsWith('/menu/'))) {
     response.headers.set('X-Frame-Options', 'DENY');
     response.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
   }
