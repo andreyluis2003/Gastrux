@@ -16,6 +16,11 @@ describe('logged-in people go straight to work (lib/navigation/entry.ts)', () =>
     expect(entryRedirect('/auth/signin', '//evil.com', true)).toBe('/dashboard');
     expect(entryRedirect('/auth/signin', 'https://evil.com', true)).toBe('/dashboard');
     expect(safeCallback('/\\evil.com')).toBeNull();
+    // Browsers drop tabs and newlines: these would become //evil.com
+    expect(safeCallback('/\t/evil.com')).toBeNull();
+    expect(safeCallback('/\n/evil.com')).toBeNull();
+    expect(safeCallback('/%2F/evil.com')).not.toMatch(/^\/\//);
+    expect(safeCallback('javascript:alert(1)')).toBeNull();
   });
 
   it('logged out, or any other page: no redirect', () => {

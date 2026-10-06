@@ -118,7 +118,8 @@ export async function middleware(request: NextRequest) {
     try {
       const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
       const to = entryRedirect(pathname, request.nextUrl.searchParams.get('callbackUrl'), !!token);
-      if (to) return NextResponse.redirect(new URL(to, request.url));
+      const target = to ? new URL(to, request.url) : null;
+      if (target && target.origin === request.nextUrl.origin) return NextResponse.redirect(target);
     } catch {
       // Without a readable session the page shows as usual
     }
