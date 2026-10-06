@@ -6,9 +6,7 @@ import { Toaster } from 'sonner';
 import { SessionProvider } from '@/components/providers';
 import { I18nProvider } from '@/lib/i18n';
 import { QueryProvider } from '@/components/providers/query-provider';
-import { MobileMenu } from '@/components/mobile-menu';
-import { MobileHeader } from '@/components/mobile-header';
-import { NotificationCenter } from '@/components/notification-center';
+import { AppShell } from '@/components/app-shell/app-shell';
 import { WebVitalsTracker } from '@/components/web-vitals-tracker';
 import { OfflineIndicator } from '@/components/offline-indicator';
 import { OutboxProvider } from '@/components/offline/outbox-provider';
@@ -98,13 +96,8 @@ export default function RootLayout({
                 <PerformanceOptimizations />
                 <ServiceWorkerRegister />
                 <WebVitalsTracker />
-                <MobileMenu />
-                <MobileHeader />
-                <NotificationCenter />
                 <OfflineIndicator />
-                <div className="md:pt-0 pt-14">
-                  {children}
-                </div>
+                <AppShell>{children}</AppShell>
                 <FeedbackWidget />
                 <GastruxChat />
                 </OutboxProvider>

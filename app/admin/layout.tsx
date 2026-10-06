@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { UserRole } from '@prisma/client';
-import { AdminSidebar } from '@/components/admin/admin-sidebar';
 
 export const metadata = {
   title: 'Admin - Gastrux',
@@ -26,15 +25,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     redirect('/dashboard');
   }
 
+  // The menu comes from the app shell (components/app-shell), the same on every screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Sidebar (fixed, 256px wide on md+) */}
-      <AdminSidebar />
-
-      {/* Main content - offset for sidebar on desktop, top padding for mobile toggle button */}
-      <main className="md:ml-64 pt-16 md:pt-0 min-h-screen">
-        {children}
-      </main>
+      <main className="min-h-screen">{children}</main>
     </div>
   );
 }

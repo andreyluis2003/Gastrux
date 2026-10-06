@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCacheHeaders, getCacheTypeForRoute } from '@/lib/cache-strategy';
 import { detectRegionFromCountry } from '@/lib/regional-config';
 import { getToken } from 'next-auth/jwt';
+import { entryRedirect } from '@/lib/navigation/entry';
 
 export const config = {
   matcher: [
@@ -111,6 +112,17 @@ const CHANGE_PASSWORD_PAGE = '/conta/trocar-senha';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // Logged in on the site, login or sign-up: straight to work (lib/navigation/entry.ts)
+  if (pathname === '/' || pathname === '/auth/signin' || pathname === '/auth/signup') {
+    try {
+      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+      const to = entryRedirect(pathname, request.nextUrl.searchParams.get('callbackUrl'), !!token);
+      if (to) return NextResponse.redirect(new URL(to, request.url));
+    } catch {
+      // Without a readable session the page shows as usual
+    }
+  }
 
   // ============================================
   // PARTE 0: AUTH PROTECTION FOR PAGES

@@ -2,7 +2,7 @@
   "name": "Gastrux - Gestão Inteligente",
   "short_name": "Gastrux",
   "description": "Plataforma completa de gestão para restaurantes com offline-first, controle de estoque, receitas, fornecedores e análises inteligentes",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

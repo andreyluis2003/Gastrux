@@ -10,6 +10,13 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { ChefHat, Chrome } from 'lucide-react';
 import { useAnalytics } from '@/hooks/use-analytics';
+import { HOME_AFTER_LOGIN, safeCallback } from '@/lib/navigation/entry';
+
+/** The page the person was trying to open before being asked to log in, or the dashboard */
+function destinationAfterLogin(): string {
+  if (typeof window === 'undefined') return HOME_AFTER_LOGIN;
+  return safeCallback(new URLSearchParams(window.location.search).get('callbackUrl')) || HOME_AFTER_LOGIN;
+}
 
 export default function SignInPage() {
   const router = useRouter();
@@ -41,7 +48,7 @@ export default function SignInPage() {
         // Track successful login
         trackLogin('email');
         toast.success('Login realizado com sucesso!');
-        router.replace('/dashboard');
+        router.replace(destinationAfterLogin());
       }
     } catch (error) {
       toast.error('Erro ao fazer login');
@@ -56,7 +63,7 @@ export default function SignInPage() {
     try {
       await signIn('google', {
         redirect: true,
-        callbackUrl: '/dashboard',
+        callbackUrl: destinationAfterLogin(),
       });
     } catch (error) {
       toast.error('Erro ao fazer login com Google');

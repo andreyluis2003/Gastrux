@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import {
   Rocket,
   Filter,
@@ -95,8 +94,7 @@ export default function AdminRoadmapPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-      <main className="flex-1 p-4 sm:p-6 md:p-8 md:ml-64">
+      <main className="flex-1 p-4 sm:p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2">

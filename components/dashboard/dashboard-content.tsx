@@ -387,7 +387,8 @@ export function DashboardContent({
 
       {/* Mode Toggle + Modules Section */}
       <FadeIn delay={0.2}>
-        <div className="mb-8">
+        {/* id: "Todos os recursos" in the menu (lib/navigation/app-nav.ts) lands here */}
+        <div id="modulos" className="mb-8 scroll-mt-20">
           {/* Section header with mode toggle */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
