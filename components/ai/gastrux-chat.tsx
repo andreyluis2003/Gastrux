@@ -202,11 +202,11 @@ export function GastruxChat() {
       <button
         onClick={() => setIsOpen(prev => !prev)}
         className={cn(
-          'fixed bottom-20 right-4 z-[59] w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105',
+          // The only floating button: feedback moved into the menu (components/app-shell)
+          'fixed bottom-4 right-4 z-[59] w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105',
           isOpen
             ? 'bg-muted text-muted-foreground'
             : 'bg-primary text-primary-foreground',
-          'md:bottom-4 md:right-20',
         )}
         title="Pergunte ao Gastrux"
       >

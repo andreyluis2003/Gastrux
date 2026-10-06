@@ -173,7 +173,9 @@ async function seedDemoData(restaurantId: string, categoryMap: Record<string, st
         standardUnit: def.unit,
         purchaseUnit: def.unit,
         conversionFactor: 1.0,
-        minimumStock: 1,
+        // No minimum: with no stock counted yet, a minimum of 1 made every new account open on
+        // "Estoque Baixo: 12". The alert starts when the owner sets a real minimum.
+        minimumStock: 0,
         referenceCost: def.cost,
       },
     });

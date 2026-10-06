@@ -3,11 +3,21 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { MessageCircle, X, Star, Send, CheckCircle2, Lightbulb } from 'lucide-react';
+import { X, Star, Send, CheckCircle2, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type Tab = 'nps' | 'comment' | 'idea';
+
+/**
+ * Opened from "Enviar sugestão" in the menu (components/app-shell). It used to be a floating button in
+ * the bottom-right corner, on top of the "Pergunte ao Gastrux" chat button.
+ */
+export const OPEN_FEEDBACK_EVENT = 'gastrux:open-feedback';
+
+export function openFeedback() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(OPEN_FEEDBACK_EVENT));
+}
 
 export function FeedbackWidget() {
   const { data: session, status } = useSession() || {};
@@ -21,13 +31,11 @@ export function FeedbackWidget() {
   const [category, setCategory] = useState('GERAL');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
 
-  // Hide widget on admin/auth routes and on public marketing pages (no
-  // account/data to give feedback about there, and it clutters the CTA area)
+
+  // Not on auth routes and public marketing pages (no account/data to give feedback about there)
   const isHidden =
     !pathname ||
-    pathname.startsWith('/admin') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/signin') ||
     pathname.startsWith('/signup') ||
@@ -37,15 +45,15 @@ export function FeedbackWidget() {
     pathname.startsWith('/para/');
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const d = localStorage.getItem('feedback_widget_dismissed_until');
-    if (d) {
-      const until = parseInt(d, 10);
-      if (Date.now() < until) setDismissed(true);
-    }
+    const onOpen = () => {
+
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_FEEDBACK_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_FEEDBACK_EVENT, onOpen);
   }, []);
 
-  if (isHidden || dismissed || status !== 'authenticated') return null;
+  if (isHidden || status !== 'authenticated') return null;
 
   const reset = () => {
     setTab('nps');
@@ -62,16 +70,8 @@ export function FeedbackWidget() {
     setTimeout(reset, 300);
   };
 
-  const remindLater = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        'feedback_widget_dismissed_until',
-        String(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      );
-    }
-    setDismissed(true);
-    setOpen(false);
-  };
+  // Nothing floats on screen any more, so "Depois" just closes; the menu opens it again
+  const remindLater = handleClose;
 
   const submitNps = async () => {
     if (npsScore == null) {
@@ -157,17 +157,6 @@ export function FeedbackWidget() {
 
   return (
     <>
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Enviar feedback"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all hover:scale-105"
-        >
-          <MessageCircle className="h-5 w-5" />
-          <span className="hidden sm:inline">Feedback</span>
-        </button>
-      )}
-
       {open && (
         <div className="fixed bottom-6 right-6 z-50 w-[92vw] max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-3 text-white">

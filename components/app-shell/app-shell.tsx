@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ChefHat, ChevronDown, LogOut, Menu, UserCog, X } from 'lucide-react';
+import { ChefHat, ChevronDown, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
+import { openFeedback } from '@/components/feedback/feedback-widget';
 import { signOutSafely } from '@/lib/offline/sign-out';
 import { activeHref, navFor, shellMode, type NavGroup } from '@/lib/navigation/app-nav';
 import { cn } from '@/lib/utils';
@@ -95,6 +96,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-3 border-t border-slate-700 space-y-1 shrink-0">
+          <button
+            onClick={() => {
+              setOpen(false);
+              openFeedback();
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700"
+          >
+            <Lightbulb className="h-4 w-4" /> Enviar sugestão
+          </button>
           <Link href="/conta" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700">
             <UserCog className="h-4 w-4" /> Minha conta e senha
           </Link>
