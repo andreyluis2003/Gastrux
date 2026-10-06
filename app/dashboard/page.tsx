@@ -118,7 +118,7 @@ export default async function DashboardPage() {
     { id: 'partnerships', iconName: 'Handshake' as const, href: '/partnerships', color: 'bg-amber-50', accentColor: 'text-amber-600' },
     { id: 'beta-testers', iconName: 'Users' as const, href: '/beta-testers', color: 'bg-violet-50', accentColor: 'text-violet-600' },
     { id: 'monitoring', iconName: 'BarChart3' as const, href: '/dashboard/monitoring', color: 'bg-cyan-50', accentColor: 'text-cyan-600' },
-    { id: 'kds', iconName: 'Zap' as const, href: '/admin/kds', color: 'bg-red-50', accentColor: 'text-red-600' },
+    { id: 'kds', iconName: 'Zap' as const, href: '/cozinha', color: 'bg-red-50', accentColor: 'text-red-600' },
     { id: 'financeiro', iconName: 'TrendingUp' as const, href: '/dashboard/financeiro', color: 'bg-cyan-50', accentColor: 'text-cyan-600' },
     { id: 'dre', iconName: 'FileText' as const, href: '/dashboard/financeiro/dre', color: 'bg-emerald-50', accentColor: 'text-emerald-600' },
     { id: 'desperdicio-relatorio', iconName: 'Trash2' as const, href: '/admin/desperdicio-relatorio', color: 'bg-red-50', accentColor: 'text-red-600' },

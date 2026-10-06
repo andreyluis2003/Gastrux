@@ -38,7 +38,7 @@ export async function alertStaleKitchenOrders(now = new Date(), afterMinutes = S
         title: `Pedido ${order.orderNumber} sem início na cozinha há ${minutes} min`,
         message:
           'A cozinha ainda não começou este pedido. Confira se a tela da cozinha está ligada e atualizada (ou se a impressora imprimiu) e avise a cozinha.',
-        actionUrl: '/admin/kds',
+        actionUrl: '/cozinha',
         actionLabel: 'Abrir cozinha',
         data: { kind: 'kitchen_stale_order', dedupeKey, orderId: order.id, minutes },
       },

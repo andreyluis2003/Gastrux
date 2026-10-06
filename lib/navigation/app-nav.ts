@@ -41,8 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Comandas e balcão', href: '/comanda', roles: FRONT },
       { label: 'Mesas', href: '/admin/tables', roles: MANAGERS },
       { label: 'Pedidos de delivery', href: '/admin/integrations/orders', roles: FRONT },
-      // /admin/kds sits under the admin layout (owner, manager, admin)
-      { label: 'Cozinha (KDS)', href: '/admin/kds', roles: MANAGERS },
+      { label: 'Cozinha (KDS)', href: '/cozinha', roles: [...MANAGERS, 'COOK'] },
     ],
   },
   {
@@ -179,7 +178,7 @@ const NO_SHELL_PREFIXES = [
   '/survey', '/termos', '/privacidade', '/billing/success', '/lp', '/para', '/menu', '/delivery', '/imprimir',
   '/conta/trocar-senha',
 ];
-const DRAWER_PREFIXES = ['/comanda', '/admin/kds'];
+const DRAWER_PREFIXES = ['/comanda', '/cozinha'];
 
 function matches(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(prefix + '/');

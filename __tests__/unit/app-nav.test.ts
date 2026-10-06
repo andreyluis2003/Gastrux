@@ -24,7 +24,7 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
 
   it('a cook sees recipes and stock, not money', () => {
     const h = hrefs(navFor('COOK', false));
-    expect(h).toEqual(expect.arrayContaining(['/receitas', '/estoque', '/contagem']));
+    expect(h).toEqual(expect.arrayContaining(['/cozinha', '/receitas', '/estoque', '/contagem']));
     expect(h).not.toContain('/caixa');
     expect(h).not.toContain('/admin/fiscal');
     expect(h).not.toContain('/dashboard/pagamentos');
@@ -48,7 +48,7 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
       expect([p, shellMode(p)]).toEqual([p, 'none']);
     }
     expect(shellMode('/comanda')).toBe('drawer');
-    expect(shellMode('/admin/kds')).toBe('drawer');
+    expect(shellMode('/cozinha')).toBe('drawer');
     for (const p of ['/dashboard', '/caixa', '/caixa/historico', '/admin/fiscal', '/insumos', '/estoque']) {
       expect([p, shellMode(p)]).toEqual([p, 'sidebar']);
     }
