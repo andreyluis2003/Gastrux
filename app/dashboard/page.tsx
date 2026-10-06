@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { DashboardContent, type DashboardContentProps } from '@/components/dashboard/dashboard-content';
@@ -76,6 +77,13 @@ export default async function DashboardPage() {
 
   const restaurantId = await getCurrentRestaurantId();
 
+  // Reminder for an address left for later (only for who can fill it in /admin/settings)
+  const canEditRestaurant = ['OWNER', 'MANAGER', 'ADMIN'].includes(String(user.role));
+  const missingAddress =
+    !!restaurantId &&
+    canEditRestaurant &&
+    !(await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { address: true } }))?.address;
+
   const modules = [
     { id: 'cardapio-digital', iconName: 'ChefHat' as const, href: '/admin/cardapio', color: 'bg-amber-50', accentColor: 'text-amber-600' },
     { id: 'qr-codes', iconName: 'QrCode' as const, href: '/admin/tables/qrcodes', color: 'bg-yellow-50', accentColor: 'text-yellow-700' },
@@ -145,6 +153,18 @@ export default async function DashboardPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-6xl px-4 py-8 space-y-8">
         <AlertsBanner />
+        {missingAddress && (
+          // Left for later in the sign-up questions: the NFC-e and the delivery fee need it
+          <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium text-amber-900">Complete o endereço do restaurante</p>
+              <p className="text-sm text-amber-800">Ele é usado na nota fiscal e no cálculo da taxa de entrega.</p>
+            </div>
+            <Link href="/admin/settings" className="inline-flex shrink-0 items-center justify-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+              Preencher endereço
+            </Link>
+          </div>
+        )}
         <Suspense fallback={<DashboardAlertsLoadingSkeleton />}>
           {restaurantId ? (
             <DashboardFullContent modules={visibleModules} restaurantId={restaurantId} />
