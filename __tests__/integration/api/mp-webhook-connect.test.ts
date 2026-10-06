@@ -110,14 +110,14 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   });
 
   it('rejects an invalid signature even when rid is present', async () => {
-    const res = await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`, 'wrong-secret') as any);
+    const res = await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`, 'wrong-secret') as any);
     expect(res.status).toBe(401);
     expect(getConnectPayment).not.toHaveBeenCalled();
     expect((await state()).payment.status).toBe('PENDING');
   });
 
   it('reports a rejected signature to Sentry with rid, mpId and topic, and no secrets (I13)', async () => {
-    await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`, 'wrong-secret') as any);
+    await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`, 'wrong-secret') as any);
 
     expect(captureException).toHaveBeenCalledTimes(1);
     const [error, context] = (captureException as jest.Mock).mock.calls[0];
@@ -134,13 +134,13 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   });
 
   it('does not report anything to Sentry for a valid signature', async () => {
-    const res = await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`) as any);
+    const res = await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`) as any);
     expect(res.status).toBe(200);
     expect(captureException).not.toHaveBeenCalled();
   });
 
   it('applies the payment with the restaurant token: approves it and marks the order paid', async () => {
-    const res = await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`) as any);
+    const res = await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`) as any);
 
     expect(res.status).toBe(200);
     expect(getConnectPayment).toHaveBeenCalledTimes(1);
@@ -152,15 +152,15 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   });
 
   it('never calls the platform-billing lookup for a rid notification', async () => {
-    await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`) as any);
+    await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`) as any);
     expect(getPayment).not.toHaveBeenCalled();
   });
 
   it('is idempotent when Mercado Pago repeats the notification', async () => {
-    await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`) as any);
+    await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`) as any);
     const first = (await state()).payment;
 
-    const res = await POST(signed('555', `topic=payment&id=555&rid=${A.restaurantId}`) as any);
+    const res = await POST(signed('555', `type=payment&data.id=555&rid=${A.restaurantId}`) as any);
 
     expect(res.status).toBe(200);
     const second = (await state()).payment;
@@ -171,7 +171,7 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   it("does not let another restaurant's rid approve this restaurant's payment", async () => {
     await saveConnection(B.restaurantId, TOKENS);
 
-    await POST(signed('555', `topic=payment&id=555&rid=${B.restaurantId}`) as any);
+    await POST(signed('555', `type=payment&data.id=555&rid=${B.restaurantId}`) as any);
 
     const { payment: p, order: o } = await state();
     expect(p.status).toBe('PENDING');
@@ -179,7 +179,7 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   });
 
   it('ignores non-payment topics that carry a rid', async () => {
-    const res = await POST(signed('555', `topic=merchant_order&id=555&rid=${A.restaurantId}`) as any);
+    const res = await POST(signed('555', `type=merchant_order&data.id=555&rid=${A.restaurantId}`) as any);
     expect(res.status).toBe(200);
     expect(getConnectPayment).not.toHaveBeenCalled();
     expect(getPayment).not.toHaveBeenCalled();
@@ -187,7 +187,7 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   });
 
   it('ignores preapproval notifications that carry a rid (never reach the platform-billing handlers)', async () => {
-    const res = await POST(signed('555', `topic=preapproval&id=555&rid=${A.restaurantId}`) as any);
+    const res = await POST(signed('555', `type=preapproval&data.id=555&rid=${A.restaurantId}`) as any);
     expect(res.status).toBe(200);
     expect(getPreApproval).not.toHaveBeenCalled();
     expect(getMerchantOrder).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe('POST /api/pagamentos/mp/webhook - restaurant (rid) branch', () => {
   });
 
   it('keeps the platform-billing path for notifications WITHOUT rid', async () => {
-    const res = await POST(signed('777', 'topic=payment&id=777') as any);
+    const res = await POST(signed('777', 'type=payment&data.id=777') as any);
 
     expect(res.status).toBe(200);
     expect(getPayment).toHaveBeenCalledTimes(1);
