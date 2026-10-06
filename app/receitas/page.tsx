@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { Suspense } from 'react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { I18nPageHeader, I18nButton } from '@/components/ui/i18n-page-header';
@@ -46,12 +47,19 @@ async function ReceitasContent({ search, page }: { search?: string; page?: strin
     redirect('/auth/signin');
   }
 
+  // Only this restaurant's recipes: the page used to list every restaurant's (found 2026-10-06)
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    redirect('/dashboard');
+  }
+
   const pageNum = parseInt(page || '1', 10);
   const pageSize = 20;
   const skip = (pageNum - 1) * pageSize;
 
   // Build filter
   const whereClause = {
+    restaurantId,
     active: true,
     ...(search && {
       OR: [

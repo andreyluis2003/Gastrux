@@ -21,14 +21,17 @@ export function getCacheHeader(strategy: CacheStrategy): Record<string, string> 
       'Pragma': 'no-cache',
       'Expires': '0',
     },
+    // Every caller of short/medium/long answers one restaurant's data (recipes, ingredients, stock,
+    // alerts, metrics). "public, max-age=3600" let a browser or proxy keep them, so on a shared device
+    // the next person to log in could get the previous account's list (found 2026-10-06): never cached.
     'short': {
-      'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+      'Cache-Control': 'private, no-store, max-age=0',
     },
     'medium': {
-      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=7200',
+      'Cache-Control': 'private, no-store, max-age=0',
     },
     'long': {
-      'Cache-Control': 'public, max-age=86400, stale-while-revalidate=172800',
+      'Cache-Control': 'private, no-store, max-age=0',
     },
     'immutable': {
       'Cache-Control': 'public, max-age=31536000, immutable',

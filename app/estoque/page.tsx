@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { Suspense } from 'react';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { I18nPageHeader, I18nButton } from '@/components/ui/i18n-page-header';
@@ -65,7 +66,14 @@ async function EstoqueContent({
     redirect('/auth/signin');
   }
 
+  // Only this restaurant's stock and categories: the page used to list every restaurant's (found 2026-10-06)
+  const restaurantId = await getCurrentRestaurantId();
+  if (!restaurantId) {
+    redirect('/dashboard');
+  }
+
   const stocks = await prisma.stock.findMany({
+    where: { restaurantId },
     include: {
       ingredient: {
         include: { category: true },
@@ -75,6 +83,7 @@ async function EstoqueContent({
   });
 
   const categories = await prisma.ingredientCategory.findMany({
+    where: { restaurantId },
     orderBy: { name: 'asc' },
   });
 
