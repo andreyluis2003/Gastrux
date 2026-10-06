@@ -158,7 +158,7 @@ export function FeedbackWidget() {
   return (
     <>
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 w-[92vw] max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="fixed bottom-20 right-4 z-[61] w-[92vw] max-w-md rounded-xl bg-white shadow-2xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-3 text-white">
             <div className="font-semibold text-sm">Seu feedback importa</div>
             <button
