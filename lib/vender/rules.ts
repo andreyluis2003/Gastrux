@@ -35,18 +35,6 @@ export function entryRecipeId(entry: MenuEntry): string | null {
   return entry.recipeId || entry.recipe?.id || null;
 }
 
-export interface LineLike {
-  id: string;
-  recipeId: string;
-  price: number | string;
-  quantity: number;
-  addedAt?: string;
-  specialInstructions?: string | null;
-  modifiers?: unknown[];
-  /** Made offline, still in this device's outbox */
-  pending?: boolean;
-}
-
 /** Same rule as lib/kds/send-session.ts: new = added after the last send (or never sent) */
 export function isUnsent(line: { addedAt?: string; pending?: boolean }, sentToKitchenAt: string | null | undefined): boolean {
   if (line.pending) return true;
@@ -56,25 +44,6 @@ export function isUnsent(line: { addedAt?: string; pending?: boolean }, sentToKi
 
 export function unsentCount(lines: Array<{ addedAt?: string; pending?: boolean }>, sentToKitchenAt: string | null | undefined): number {
   return lines.filter((l) => isUnsent(l, sentToKitchenAt)).length;
-}
-
-/**
- * The line a one-tap add goes into: a new (not sent), plain (no modifiers, no note) line of the same
- * recipe and price, already on the server. None: the tap creates a new line.
- */
-export function mergeTarget(lines: LineLike[], sentToKitchenAt: string | null | undefined, entry: MenuEntry): LineLike | null {
-  const recipeId = entryRecipeId(entry);
-  const candidates = lines.filter(
-    (l) =>
-      !l.pending &&
-      l.recipeId === recipeId &&
-      Number(l.price) === Number(entry.price) &&
-      !(l.modifiers?.length) &&
-      !l.specialInstructions &&
-      isUnsent(l, sentToKitchenAt)
-  );
-  if (!candidates.length) return null;
-  return candidates.reduce((a, b) => (new Date(b.addedAt ?? 0) > new Date(a.addedAt ?? 0) ? b : a));
 }
 
 /** "agora", "47 min", "1 h 05" */

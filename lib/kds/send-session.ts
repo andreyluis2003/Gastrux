@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withKdsOrderNumber } from '@/lib/kds/order-number';
+import { lockComanda } from '@/lib/comanda/add-item';
 
 /**
  * Sends to the kitchen what a comanda has that the kitchen does not have yet (market practice:
@@ -8,7 +9,19 @@ import { withKdsOrderNumber } from '@/lib/kds/order-number';
  * to send EVERY line again, so the kitchen made them twice; the modifiers ("sem cebola") were lost.
  * Shared by POST /api/comanda/sessions/[id]/send-to-kitchen and the counter sale.
  */
+/**
+ * Under the comanda lock (lib/comanda/add-item.ts): a one-tap add never lands on a line while it is
+ * being sent, which would mark the extra unit as sent without the kitchen getting it. The lock is held
+ * by this transaction while the send itself runs as before.
+ */
 export async function sendSessionToKitchen(restaurantId: string, sessionId: string): Promise<Response> {
+  return prisma.$transaction(async (tx) => {
+    await lockComanda(tx, sessionId);
+    return sendUnlocked(restaurantId, sessionId);
+  }, { timeout: 20_000, maxWait: 10_000 });
+}
+
+async function sendUnlocked(restaurantId: string, sessionId: string): Promise<Response> {
   const orderSession = await prisma.orderSession.findFirst({
     where: { id: sessionId, restaurantId },
     include: {

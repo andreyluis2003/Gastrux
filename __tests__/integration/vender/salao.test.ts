@@ -65,6 +65,14 @@ describe('GET /api/vender/salao', () => {
     expect(text).toContain('João');
   });
 
+  it('a second open comanda on a table is never hidden: it shows with the comandas, labelled with the table', async () => {
+    const extra = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: t1, status: 'OPEN', customerName: 'QR' } });
+    const salao = await loadSalao(rid);
+    expect(salao.tables[0].session.label).toBe('Mesa 1');
+    expect(salao.others.find((o) => o.id === extra.id)?.label).toBe('Mesa 1');
+    await prisma.orderSession.delete({ where: { id: extra.id } });
+  });
+
   it('a restaurant without tables still lists its comandas', async () => {
     const salao = await loadSalao(otherRid);
     expect(salao.tables).toEqual([]);

@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
-import { addComandaItem, AddItemError } from '@/lib/comanda/add-item';
+import { addComandaItem, addOrMergeComandaItem, AddItemError } from '@/lib/comanda/add-item';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +36,11 @@ async function handlePOST(
       return NextResponse.json({ error: 'Comanda fechada ou cancelada' }, { status: 409 });
     }
 
+    // merge: a one-tap add from the Vender screen (one unit more on the same new plain line, decided here)
+    if (body?.merge === true) {
+      const { item, merged } = await addOrMergeComandaItem(restaurantId, params.id, body);
+      return NextResponse.json({ ...item, merged }, { status: merged ? 200 : 201 });
+    }
     const item = await addComandaItem(prisma, restaurantId, params.id, body);
     return NextResponse.json(item, { status: 201 });
   } catch (error) {

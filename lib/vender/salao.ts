@@ -60,12 +60,14 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
     };
   };
 
-  // The oldest open comanda of a table wins (there should be one: opening a table returns the open one)
+  // The oldest open comanda of a table is the table's tile. Another one on the same table (from before
+  // the per-table lock, or a QR order) goes with the comandas, labelled with the table: a comanda that
+  // is not on the screen is never charged (final review, 2026-10-07)
   const byTable = new Map<string, SalaoSession>();
   const others: SalaoSession[] = [];
   for (const s of sessions) {
     if (s.tableId && !byTable.has(s.tableId)) byTable.set(s.tableId, toSession(s));
-    else if (!s.tableId) others.push(toSession(s));
+    else others.push(toSession(s));
   }
 
   const sections = new Map<string, string>();

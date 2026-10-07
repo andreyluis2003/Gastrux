@@ -142,7 +142,8 @@ export default function ComandaRapidaPage() {
         <CloseBillDialog
           sessionId={sessionId}
           totalCents={c.totalCents}
-          status={s.status}
+          // A close made offline counts as closed here too: the dialog must not offer to close (and charge) again
+          status={c.isClosed ? 'CLOSED' : s.status}
           hasItems={c.lines.length > 0}
           mutate={c.mutate}
           onClosed={() => { c.refresh(); }}

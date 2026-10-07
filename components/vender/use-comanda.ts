@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { lineTotalCents } from '@/lib/comanda/line-total';
-import { entryRecipeId, groupByCategory, isUnsent, mergeTarget, unsentCount, type LineLike, type MenuEntry } from '@/lib/vender/rules';
+import { entryRecipeId, groupByCategory, isUnsent, unsentCount, type MenuEntry } from '@/lib/vender/rules';
 
 export interface ComandaLine {
   id: string;
@@ -108,12 +108,12 @@ export function useComanda(sessionId: string) {
   const newCount = unsentCount(lines, sent);
   const groups = useMemo(() => groupByCategory(menu), [menu]);
 
-  function postLine(entry: MenuEntry, d: LineDetails): Promise<Response | null> {
+  function postLine(entry: MenuEntry, d: LineDetails, merge = false): Promise<Response | null> {
     const chosen = modifiers.filter((m) => d.modifierIds.includes(m.id));
     return mutate(
       'POST',
       `/api/comanda/sessions/${sessionId}/items`,
-      { menuItemId: entry.id, recipeId: entryRecipeId(entry), quantity: d.quantity, modifierIds: d.modifierIds, specialInstructions: d.notes.trim() || null },
+      { menuItemId: entry.id, recipeId: entryRecipeId(entry), quantity: d.quantity, modifierIds: d.modifierIds, specialInstructions: d.notes.trim() || null, merge },
       `${d.quantity}x ${entry.name}`,
       {
         name: entry.name, recipeId: entryRecipeId(entry), quantity: d.quantity, unitPrice: Number(entry.price), notes: d.notes.trim(),
@@ -122,43 +122,27 @@ export function useComanda(sessionId: string) {
     );
   }
 
-  /** Undo of a tap: back to the previous quantity, or remove the line. A line the kitchen got in the
-   *  meantime follows the normal removal (a manager, with a reason), never a silent removal. */
-  async function undo(line: ComandaLine, previousQuantity: number) {
-    const fresh = await fetch(`/api/comanda/sessions/${sessionId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const sentNow = fresh?.sentToKitchenAt ?? sent;
-    if (!isUnsent({ addedAt: line.addedAt }, sentNow)) {
-      toast.warning('A cozinha já recebeu este item: para tirar, toque nele e use "Remover com motivo".');
-      return;
-    }
-    const res = previousQuantity > 0
-      ? await mutate('PUT', `/api/comanda/sessions/${sessionId}/items/${line.id}`, { quantity: previousQuantity }, 'Desfazer')
-      : await mutate('DELETE', `/api/comanda/sessions/${sessionId}/items/${line.id}`, {}, 'Desfazer');
-    if (res && !res.ok) toast.error(await errorOf(res, 'Não foi possível desfazer'));
+  /** Undo of a tap: one unit back on that line (the server removes the line at the last unit). A line
+   *  the kitchen got in the meantime is refused by the server: it follows the normal removal (a manager,
+   *  with a reason), never a silent one. Relative, so it never wipes the taps made after it. */
+  async function undo(itemId: string, name: string) {
+    const res = await mutate('PUT', `/api/comanda/sessions/${sessionId}/items/${itemId}`, { quantityDelta: -1 }, `Desfazer ${name}`);
+    if (res && res.status === 409) toast.warning('A cozinha já recebeu este item: para tirar, toque nele e use "Remover com motivo".');
+    else if (res && !res.ok) toast.error(await errorOf(res, 'Não foi possível desfazer'));
     await refresh();
   }
 
-  /** One tap = one unit (spec 4.2): into the same new plain line when there is one, with Desfazer */
+  /** One tap = one unit (spec 4.2). The server decides whether it goes on the same new plain line
+   *  (under the comanda lock), so quick taps and other devices never lose a unit nor duplicate a line. */
   async function quickAdd(entry: MenuEntry) {
     if (isClosed) return;
-    const target = online ? (mergeTarget(lines as LineLike[], sent, entry) as ComandaLine | null) : null;
-    if (target) {
-      const res = await mutate('PUT', `/api/comanda/sessions/${sessionId}/items/${target.id}`, { quantity: target.quantity + 1 }, `+1 ${entry.name}`);
-      if (res && !res.ok) { toast.error(await errorOf(res, 'Erro ao lançar')); return; }
-      await refresh();
-      toast.success(`${entry.name} +1`, {
-        duration: 5000,
-        action: { label: 'Desfazer', onClick: () => undo(target, target.quantity) },
-      });
-      return;
-    }
-    const res = await postLine(entry, { quantity: 1, modifierIds: [], notes: '' });
+    const res = await postLine(entry, { quantity: 1, modifierIds: [], notes: '' }, true);
     if (res && !res.ok) { toast.error(await errorOf(res, 'Erro ao lançar')); return; }
-    const created = res ? await res.json().catch(() => null) : null;
+    const line = res ? await res.json().catch(() => null) : null;
     await refresh();
     toast.success(`${entry.name} +1`, {
       duration: 5000,
-      ...(created?.id ? { action: { label: 'Desfazer', onClick: () => undo({ ...created, addedAt: created.addedAt } as ComandaLine, 0) } } : {}),
+      ...(line?.id ? { action: { label: 'Desfazer', onClick: () => undo(line.id, entry.name) } } : {}),
     });
   }
 

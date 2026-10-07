@@ -1,4 +1,4 @@
-import { groupByCategory, isUnsent, unsentCount, mergeTarget, openFor, sessionLabel, entryRecipeId, type MenuEntry, type LineLike } from '../../lib/vender/rules';
+import { groupByCategory, isUnsent, unsentCount, openFor, sessionLabel, entryRecipeId, type MenuEntry } from '../../lib/vender/rules';
 
 const cat = (id: string, name: string, position: number) => ({ id, name, position, emoji: null });
 const entry = (id: string, over: Partial<MenuEntry> = {}): MenuEntry => ({ id, name: id, price: 10, recipeId: 'r-a', available: true, category: cat('c1', 'Pizzas', 0), ...over });
@@ -28,19 +28,7 @@ describe('new and sent lines', () => {
   });
 });
 
-describe('mergeTarget: a tap adds to the same new line', () => {
-  const sent = '2026-10-07T20:00:00.000Z';
-  const line = (id: string, over: Partial<LineLike> = {}): LineLike => ({ id, recipeId: 'r-a', price: '10', quantity: 1, addedAt: '2026-10-07T20:05:00.000Z', modifiers: [], specialInstructions: null, ...over });
-  it('same recipe and price, new, plain: merge into the latest one', () => {
-    expect(mergeTarget([line('1'), line('2', { addedAt: '2026-10-07T20:06:00.000Z' })], sent, entry('a'))?.id).toBe('2');
-  });
-  it('never into a sent line, a line with modifiers or a note, a pending line, or another price', () => {
-    expect(mergeTarget([line('1', { addedAt: '2026-10-07T19:00:00.000Z' })], sent, entry('a'))).toBeNull();
-    expect(mergeTarget([line('1', { modifiers: [{}] })], sent, entry('a'))).toBeNull();
-    expect(mergeTarget([line('1', { specialInstructions: 'sem cebola' })], sent, entry('a'))).toBeNull();
-    expect(mergeTarget([line('1', { pending: true })], sent, entry('a'))).toBeNull();
-    expect(mergeTarget([line('1', { price: '12' })], sent, entry('a'))).toBeNull();
-  });
+describe('entryRecipeId', () => {
   it('uses the recipe of the menu item (recipeId, else recipe.id)', () => {
     expect(entryRecipeId(entry('a', { recipeId: null, recipe: { id: 'r-x' } }))).toBe('r-x');
   });

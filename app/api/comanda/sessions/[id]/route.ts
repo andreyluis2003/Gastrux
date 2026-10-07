@@ -36,6 +36,8 @@ export async function GET(
             recipe: { select: { name: true, sellingPrice: true } },
             modifiers: { include: { modifier: { select: { name: true } } } },
           },
+          // In the order they were added: an edit must not move a line on the waiter's screen
+          orderBy: { addedAt: 'asc' },
         },
         order: { select: { orderNumber: true, status: true } },
       },

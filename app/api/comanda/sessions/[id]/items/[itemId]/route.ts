@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { isManager, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { lockComanda } from '@/lib/comanda/add-item';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,11 @@ async function loadLine(params: { id: string; itemId: string }, restaurantId: st
 const kitchenHasIt = (line: { addedAt: Date; session: { sentToKitchenAt: Date | null } }) =>
   !!line.session.sentToKitchenAt && line.addedAt <= line.session.sentToKitchenAt;
 
+// A closed (paid, maybe with its NFC-e) or cancelled comanda is not changed by a stale screen;
+// reopening it is a manager flow of its own
+const closedComanda = (line: { session: { status: string } }) => line.session.status === 'CLOSED' || line.session.status === 'CANCELLED';
+const CLOSED_ANSWER = { error: 'Comanda fechada ou cancelada' };
+
 const snapshot = (line: any) => ({
   itemId: line.id,
   recipe: line.recipe?.name,
@@ -46,8 +52,43 @@ async function handlePUT(
 
     const line = await loadLine(params, member.restaurantId);
     if (!line) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+    if (closedComanda(line)) return NextResponse.json(CLOSED_ANSWER, { status: 409 });
 
-    const { quantity, specialInstructions, modifierIds, reason } = await request.json();
+    const { quantity, quantityDelta, specialInstructions, modifierIds, reason } = await request.json();
+
+    // Undo of a one-tap add (spec 2026-10-07, 4.2): one unit back, relative, under the comanda lock, so
+    // it never wipes the taps made after it; the last unit removes the line. Only before the kitchen has it.
+    if (quantityDelta !== undefined) {
+      if (!Number.isInteger(quantityDelta) || quantityDelta === 0) {
+        return NextResponse.json({ error: 'Variação de quantidade inválida' }, { status: 400 });
+      }
+      if (kitchenHasIt(line)) {
+        return NextResponse.json({ error: 'A cozinha já recebeu este item: para tirar, use Remover com motivo' }, { status: 409 });
+      }
+      const outcome = await prisma.$transaction(async (tx) => {
+        await lockComanda(tx, params.id);
+        const current = await tx.orderSessionItem.findUnique({ where: { id: params.itemId }, select: { quantity: true } });
+        if (!current) return { gone: true as const };
+        if (current.quantity + quantityDelta < 1) {
+          await tx.orderSessionItem.delete({ where: { id: params.itemId } });
+          return { deleted: true as const };
+        }
+        const item = await tx.orderSessionItem.update({
+          where: { id: params.itemId },
+          data: { quantity: { increment: quantityDelta } },
+          include: { recipe: { select: { name: true, sellingPrice: true } }, modifiers: { include: { modifier: { select: { name: true } } } } },
+        });
+        return { item };
+      });
+      if ('gone' in outcome) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+      await recordAudit(member, {
+        action: 'UPDATE',
+        entityType: 'OrderSessionItem',
+        entityId: line.id,
+        changes: { sessionId: params.id, before: snapshot(line), quantityDelta, removed: 'deleted' in outcome },
+      });
+      return NextResponse.json('deleted' in outcome ? { deleted: true } : outcome.item);
+    }
 
     if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
       return NextResponse.json({ error: 'Quantidade inválida: use um número inteiro a partir de 1' }, { status: 400 });
@@ -129,6 +170,8 @@ async function handleDELETE(
 
     const line = await loadLine(params, member.restaurantId);
     if (!line) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
+
+    if (closedComanda(line)) return NextResponse.json(CLOSED_ANSWER, { status: 409 });
 
     const body = await request.json().catch(() => ({}));
     const reason = String(body?.reason ?? '').trim();

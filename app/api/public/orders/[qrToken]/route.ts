@@ -71,7 +71,8 @@ export async function POST(
     // Load menu items to get price + recipeId mapping
     const menuItemIds = items.map((i: any) => i.menuItemId).filter(Boolean);
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds }, active: true, available: true },
+      // Only this table's restaurant: a QR order took any restaurant's item, price and recipe (2026-10-07)
+      where: { id: { in: menuItemIds }, restaurantId: table.restaurantId, active: true, available: true },
     });
 
     const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));
@@ -89,17 +90,17 @@ export async function POST(
       }
     }
 
-    // Check if there's already an open session for this table
-    let orderSession = await prisma.orderSession.findFirst({
-      where: {
-        tableId: table.id,
-        status: 'OPEN',
-      },
-    });
-
-    // Create new session if none exists
-    if (!orderSession) {
-      orderSession = await prisma.orderSession.create({
+    // The table's open comanda, whatever its stage (it looked only for OPEN, so once the comanda went to
+    // the kitchen a QR order opened a second one the room never saw), under the same per-table lock as
+    // opening a table from Vender (app/api/comanda/sessions/route.ts)
+    const orderSession = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-table:' + table.id}))`;
+      const open = await tx.orderSession.findFirst({
+        where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: ['OPEN', 'SENT_TO_KITCHEN', 'READY'] } },
+        orderBy: { openedAt: 'asc' },
+      });
+      if (open) return open;
+      return tx.orderSession.create({
         data: {
           restaurantId: table.restaurantId,
           userId: ownerId,
@@ -109,7 +110,7 @@ export async function POST(
           status: 'OPEN',
         },
       });
-    }
+    });
 
     // Add items to the session
     const createdItems = [];

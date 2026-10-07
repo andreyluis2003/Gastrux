@@ -74,3 +74,55 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
     },
   });
 }
+
+/** Serialises the writes of one comanda that must see each other: one-tap adds and the send to the kitchen */
+export async function lockComanda(tx: Prisma.TransactionClient, sessionId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-session:' + sessionId}))`;
+}
+
+/**
+ * A one-tap add (spec 2026-10-07, 4.2): one unit more on the same new plain line (same recipe and
+ * price, no modifiers, no note, not sent to the kitchen) or a new line. Decided on the server, under
+ * the comanda lock: the screen used to send the new quantity computed from what it showed, so two
+ * quick taps (or two devices) both sent "3" and a unit was lost, or both created a line.
+ */
+export async function addOrMergeComandaItem(restaurantId: string, sessionId: string, input: AddItemInput) {
+  return prisma.$transaction(async (tx) => {
+    await lockComanda(tx, sessionId);
+    const plain = !(input.modifierIds ?? []).length && !String(input.specialInstructions ?? '').trim();
+    if (plain && input.menuItemId) {
+      const menuItem = await tx.menuItem.findFirst({ where: { id: input.menuItemId, restaurantId }, select: { recipeId: true, price: true } });
+      const session = await tx.orderSession.findFirst({ where: { id: sessionId, restaurantId }, select: { sentToKitchenAt: true } });
+      if (menuItem?.recipeId && session) {
+        const target = await tx.orderSessionItem.findFirst({
+          where: {
+            sessionId,
+            recipeId: menuItem.recipeId,
+            price: menuItem.price,
+            specialInstructions: null,
+            modifiers: { none: {} },
+            ...(session.sentToKitchenAt ? { addedAt: { gt: session.sentToKitchenAt } } : {}),
+          },
+          orderBy: { addedAt: 'desc' },
+          select: { id: true },
+        });
+        if (target) {
+          const quantity = input.quantity ?? 1;
+          if (!Number.isInteger(quantity) || quantity < 1) {
+            throw new AddItemError('Quantidade inválida: use um número inteiro a partir de 1', 400);
+          }
+          const item = await tx.orderSessionItem.update({
+            where: { id: target.id },
+            data: { quantity: { increment: quantity } },
+            include: {
+              recipe: { select: { name: true, sellingPrice: true } },
+              modifiers: { include: { modifier: { select: { name: true } } } },
+            },
+          });
+          return { item, merged: true };
+        }
+      }
+    }
+    return { item: await addComandaItem(tx, restaurantId, sessionId, input), merged: false };
+  });
+}
