@@ -1781,6 +1781,8 @@ model OrderSession {
   serviceChargeCents   Int                   @default(0)
   /// The customer declined the service charge (every device and the pre-bill agree while the bill is open)
   serviceChargeWaived  Boolean               @default(false)
+  /// Opened as a table or a named comanda (Vender, QR): only these get the service charge, never WhatsApp, delivery or the counter
+  serviceChargeEligible Boolean              @default(false)
   /// Pre-bill printed: the table asked for the bill; cleared when a new item is added
   preBillPrintedAt     DateTime?
   createdAt            DateTime              @default(now())

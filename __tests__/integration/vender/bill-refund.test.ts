@@ -33,7 +33,7 @@ describe('refunding a partial payment', () => {
       await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: uid, role, permissions: [], acceptedAt: new Date() } });
     }
     const recipe = await prisma.recipe.create({ data: { restaurantId: rid, code: `E${tag}`, name: 'Prato', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 100 } });
-    sid = (await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, customerName: 'João', status: 'OPEN' } })).id;
+    sid = (await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, customerName: 'João', status: 'OPEN', serviceChargeEligible: true } })).id;
     await prisma.orderSessionItem.create({ data: { sessionId: sid, recipeId: recipe.id, price: 100, quantity: 1 } });
     const reg = await prisma.cashRegister.create({ data: { restaurantId: rid, name: 'Caixa', isDefault: true } });
     shiftId = (await prisma.cashSession.create({ data: { restaurantId: rid, cashRegisterId: reg.id, openedById: ownerId, openingFloatCents: 0, status: 'OPEN' } })).id;

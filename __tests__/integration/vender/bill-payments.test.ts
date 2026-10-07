@@ -20,7 +20,7 @@ describe('partial payments', () => {
     PAY(new NextRequest('http://x', { method: 'POST', body: JSON.stringify({ payments, cashSessionId: shiftId, ...extra }) }), { params: { id: sid } });
   // 2 x 50,00 = 100,00 + 10% = 110,00
   const newBill = async () => {
-    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId, status: 'OPEN' } });
+    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId, status: 'OPEN', serviceChargeEligible: true } });
     await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId, price: 50, quantity: 2 } });
     return s.id;
   };

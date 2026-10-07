@@ -86,6 +86,25 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
   return created;
 }
 
+/** Under the comanda lock: a bill that a payment just closed takes no more items (they would never be charged) */
+async function assertOpen(db: Db, restaurantId: string, sessionId: string) {
+  const s = await db.orderSession.findFirst({ where: { id: sessionId, restaurantId }, select: { status: true } });
+  if (!s) throw new AddItemError('Session not found', 404);
+  if (s.status === 'CLOSED' || s.status === 'CANCELLED') throw new AddItemError('Comanda fechada ou cancelada', 409);
+}
+
+/**
+ * A plain add (with modifiers or a note, or from the old screen) under the comanda lock, so it never
+ * lands on a bill that a payment is closing at the same moment (review of tela Vender stage 2)
+ */
+export async function addComandaItemLocked(restaurantId: string, sessionId: string, input: AddItemInput) {
+  return prisma.$transaction(async (tx) => {
+    await lockComanda(tx, sessionId);
+    await assertOpen(tx, restaurantId, sessionId);
+    return addComandaItem(tx, restaurantId, sessionId, input);
+  });
+}
+
 /** Serialises the writes of one comanda that must see each other: one-tap adds and the send to the kitchen */
 export async function lockComanda(tx: Prisma.TransactionClient, sessionId: string) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-session:' + sessionId}))`;
@@ -100,6 +119,7 @@ export async function lockComanda(tx: Prisma.TransactionClient, sessionId: strin
 export async function addOrMergeComandaItem(restaurantId: string, sessionId: string, input: AddItemInput) {
   return prisma.$transaction(async (tx) => {
     await lockComanda(tx, sessionId);
+    await assertOpen(tx, restaurantId, sessionId);
     const plain = !(input.modifierIds ?? []).length && !String(input.specialInstructions ?? '').trim();
     if (plain && input.menuItemId) {
       const menuItem = await tx.menuItem.findFirst({ where: { id: input.menuItemId, restaurantId }, select: { recipeId: true, price: true } });

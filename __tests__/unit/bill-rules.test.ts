@@ -1,10 +1,9 @@
 import { billTotals, paidNetCents, serviceApplies, settlePartial, shareForItems, splitEqually } from '../../lib/comanda/bill';
 
 describe('service charge', () => {
-  it('tables and named comandas only', () => {
-    expect(serviceApplies({ tableId: 't1' })).toBe(true);
-    expect(serviceApplies({ tableNumber: 4 })).toBe(true);
-    expect(serviceApplies({ customerName: 'João' })).toBe(true);
+  it('only comandas opened as a table or a named comanda (never WhatsApp, delivery, counter)', () => {
+    expect(serviceApplies({ serviceChargeEligible: true })).toBe(true);
+    expect(serviceApplies({ serviceChargeEligible: false })).toBe(false);
     expect(serviceApplies({})).toBe(false);
   });
   it('10% rounded to the cent; waived, off (0%) or not applicable = no charge', () => {
@@ -54,5 +53,15 @@ describe('settlePartial: one payment towards what is left', () => {
   it('nothing left to pay, or no amount, is refused', () => {
     expect(() => settlePartial(0, [{ method: 'pix', amount: '1,00' }])).toThrow('já está paga');
     expect(() => settlePartial(1_000, [])).toThrow('Informe as formas de pagamento');
+  });
+});
+
+describe('I-2: the equal share to receive next', () => {
+  it('the last person pays what is left (the extra cent), never leaving R$ 0,01 open', () => {
+    const { nextEqualShare } = require('../../lib/comanda/bill');
+    expect(nextEqualShare(10_000, 10_000, 3)).toBe(3_333);
+    expect(nextEqualShare(10_000, 6_667, 3)).toBe(3_333);
+    expect(nextEqualShare(10_000, 3_334, 3)).toBe(3_334);
+    expect(nextEqualShare(10_000, 1_000, 3)).toBe(1_000);
   });
 });

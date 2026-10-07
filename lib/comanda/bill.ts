@@ -8,9 +8,12 @@ import { CashRuleError, entryEffect, parseAmountCents, type PaymentInput, type S
 // Plain space after "R$" (toLocaleString uses a non-breaking one)
 const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ');
 
-/** Service charge only for tables and named comandas: the counter and delivery never have it */
-export function serviceApplies(s: { tableId?: string | null; tableNumber?: number | null; customerName?: string | null }): boolean {
-  return !!(s.tableId || s.tableNumber || s.customerName);
+/**
+ * Service charge only for comandas opened as a table or a named comanda (Vender, QR): never WhatsApp,
+ * delivery or the counter, which may also carry a customer name (review of stage 2, 2026-10-08)
+ */
+export function serviceApplies(s: { serviceChargeEligible?: boolean | null }): boolean {
+  return !!s.serviceChargeEligible;
 }
 
 export function billTotals(subtotalCents: number, percent: number, opts: { applies: boolean; waived: boolean }) {
@@ -27,6 +30,16 @@ export function splitEqually(totalCents: number, people: number): number[] {
   if (!Number.isInteger(people) || people < 2 || people > 20) throw new CashRuleError('Divida entre 2 e 20 pessoas');
   const base = Math.floor(totalCents / people);
   return Array.from({ length: people }, (_, i) => (i === people - 1 ? totalCents - base * (people - 1) : base));
+}
+
+/**
+ * The next equal share to receive: one share, or what is left when it is the last one (it carries the
+ * leftover cent), so a split never leaves R$ 0,01 open (review of stage 2)
+ */
+export function nextEqualShare(totalCents: number, remainingCents: number, people: number): number {
+  const shares = splitEqually(totalCents, people);
+  if (remainingCents <= shares[shares.length - 1]) return remainingCents;
+  return Math.min(remainingCents, shares[0]);
 }
 
 /** One person's part when splitting by item: their items plus the same share of the service charge */

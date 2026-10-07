@@ -108,6 +108,7 @@ export async function POST(
           tableNumber: table.number,
           customerName: customerName?.trim() || null,
           status: 'OPEN',
+          serviceChargeEligible: true,
         },
       });
     });

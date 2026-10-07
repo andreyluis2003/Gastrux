@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
           tableNumber: tableNumber || null,
           notes: notes || null,
           status: 'OPEN',
+          // A table or a named comanda gets the service charge (the counter and WhatsApp never do)
+          serviceChargeEligible: !!(tableId || customerName),
         },
         include,
       });

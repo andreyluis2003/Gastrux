@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
-import { addComandaItem, addOrMergeComandaItem, AddItemError } from '@/lib/comanda/add-item';
+import { addComandaItemLocked, addOrMergeComandaItem, AddItemError } from '@/lib/comanda/add-item';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +41,7 @@ async function handlePOST(
       const { item, merged } = await addOrMergeComandaItem(restaurantId, params.id, body);
       return NextResponse.json({ ...item, merged }, { status: merged ? 200 : 201 });
     }
-    const item = await addComandaItem(prisma, restaurantId, params.id, body);
+    const item = await addComandaItemLocked(restaurantId, params.id, body);
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
     if (error instanceof AddItemError) {

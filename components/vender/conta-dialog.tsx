@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { FileText, Printer, Receipt, Undo2 } from 'lucide-react';
@@ -13,7 +13,7 @@ import { brl, reaisToCents } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
-import { shareForItems, splitEqually } from '@/lib/comanda/bill';
+import { nextEqualShare, shareForItems, splitEqually } from '@/lib/comanda/bill';
 import type { Bill } from '@/lib/comanda/bill-service';
 
 const METHOD: Record<string, string> = { CASH: 'Dinheiro', PIX: 'PIX', CREDIT: 'Crédito', DEBIT: 'Débito', OTHER: 'Outro' };
@@ -39,6 +39,14 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
   const [busy, setBusy] = useState(false);
   const [emittedDoc, setEmittedDoc] = useState<{ id: string; documentNumber: number } | null>(null);
   const [nfceOpen, setNfceOpen] = useState(false);
+  // One key per payment as typed: a second tap after a lost answer sends the same key and the server
+  // records it once; any change to the amount or the methods is a new payment with a new key
+  const attemptKey = useRef('');
+  const dueKey = `${mode}|${people}|${picked.join(',')}|${amountText}|${bill?.remainingCents ?? ''}`;
+  // The methods typed were for the amount shown: when that amount changes they no longer apply (the
+  // change they showed would be wrong)
+  useEffect(() => { setPayments([]); }, [dueKey]);
+  useEffect(() => { attemptKey.current = crypto.randomUUID(); }, [dueKey, JSON.stringify(payments)]);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/comanda/sessions/${sessionId}/bill`, { cache: 'no-store' });
@@ -52,7 +60,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
 
   // What to receive now: the whole remainder, one person's equal share, or the picked items' share
   const suggested = mode === 'equal'
-    ? Math.min(bill.remainingCents, splitEqually(bill.totalCents, people)[0])
+    ? nextEqualShare(bill.totalCents, bill.remainingCents, people)
     : mode === 'items'
       ? Math.min(bill.remainingCents, shareForItems(bill.items.filter((i) => picked.includes(i.id)).reduce((n, i) => n + i.totalCents, 0), bill.subtotalCents, bill.serviceCents))
       : bill.remainingCents;
@@ -75,17 +83,21 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
     try {
       const res = await fetch(`/api/comanda/sessions/${sessionId}/payments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attemptKey.current },
         body: JSON.stringify({
           payments: payments.map((p) => ({ method: p.method, amount: toApiAmount(p.amount) })),
           cashSessionId: shift.shiftId,
           customerCPF: cpf.replace(/\D/g, '') || undefined,
+          // The share being paid now: the change shown on screen is counted against it
+          dueCents: dueNow,
         }),
       });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (out.code === 'CASH_SESSION_REQUIRED') shift.refresh();
         toast.error(out.error || 'Não foi possível receber');
+        // Another device may have received meanwhile: show the bill as it is now
+        load();
         return;
       }
       if (out.changeCents > 0) toast.success(`Troco: ${brl(out.changeCents)}`, { duration: 15000 });
@@ -101,6 +113,11 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       } else {
         toast.success(`Recebido. Falta ${brl(out.bill.remainingCents)}`);
       }
+    } catch {
+      // No answer (the connection dropped): the payment may have gone through. Show the bill as the
+      // server has it before anyone charges again; the same tap resends the same key, recorded once
+      toast.error('Sem resposta do servidor: confira a conta antes de cobrar de novo.');
+      load();
     } finally {
       setBusy(false);
     }

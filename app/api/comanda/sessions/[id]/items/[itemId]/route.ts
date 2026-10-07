@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { isManager, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { lockComanda } from '@/lib/comanda/add-item';
+import { paidNetCents } from '@/lib/comanda/bill';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,14 @@ const kitchenHasIt = (line: { addedAt: Date; session: { sentToKitchenAt: Date | 
 const closedComanda = (line: { session: { status: string } }) => line.session.status === 'CLOSED' || line.session.status === 'CANCELLED';
 const CLOSED_ANSWER = { error: 'Comanda fechada ou cancelada' };
 
+// Once the bill has payments, what was charged must not shrink under them: give a payment back first
+// (review of tela Vender stage 2). Adding more (a higher quantity) is still fine.
+const PAID_ANSWER = { error: 'Esta conta já tem pagamentos: estorne um pagamento antes de tirar ou mudar itens' };
+async function hasPayments(sessionId: string, restaurantId: string) {
+  const lines = await prisma.cashSessionEntry.findMany({ where: { orderSessionId: sessionId, restaurantId }, select: { type: true, method: true, amountCents: true, direction: true } });
+  return paidNetCents(lines) > 0;
+}
+
 const snapshot = (line: any) => ({
   itemId: line.id,
   recipe: line.recipe?.name,
@@ -55,6 +64,9 @@ async function handlePUT(
     if (closedComanda(line)) return NextResponse.json(CLOSED_ANSWER, { status: 409 });
 
     const { quantity, quantityDelta, specialInstructions, modifierIds, reason } = await request.json();
+    const onlyMore = modifierIds === undefined && specialInstructions === undefined
+      && (quantityDelta !== undefined ? quantityDelta > 0 : quantity !== undefined && quantity > line.quantity);
+    if (!onlyMore && (await hasPayments(params.id, member.restaurantId))) return NextResponse.json(PAID_ANSWER, { status: 409 });
 
     // Undo of a one-tap add (spec 2026-10-07, 4.2): one unit back, relative, under the comanda lock, so
     // it never wipes the taps made after it; the last unit removes the line. Only before the kitchen has it.
@@ -172,6 +184,7 @@ async function handleDELETE(
     if (!line) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
 
     if (closedComanda(line)) return NextResponse.json(CLOSED_ANSWER, { status: 409 });
+    if (await hasPayments(params.id, member.restaurantId)) return NextResponse.json(PAID_ANSWER, { status: 409 });
 
     const body = await request.json().catch(() => ({}));
     const reason = String(body?.reason ?? '').trim();

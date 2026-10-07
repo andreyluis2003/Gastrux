@@ -44,7 +44,7 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
     where: { id: sessionId, restaurantId },
     select: {
       id: true, status: true, tableId: true, tableNumber: true, customerName: true,
-      serviceChargeCents: true, serviceChargeWaived: true, preBillPrintedAt: true,
+      serviceChargeCents: true, serviceChargeWaived: true, serviceChargeEligible: true, preBillPrintedAt: true,
       table: { select: { number: true } },
       restaurant: { select: { serviceChargePercent: true } },
       items: {
@@ -76,18 +76,23 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
   const paidCents = paidNetCents(entries);
 
   const refunds = entries.filter((e) => e.type === 'REFUND').map((e) => e.description ?? '');
+  // A manager's reopening gives every payment made until then back (lib/caixa/sale.ts reverseSaleEntries)
+  const lastReopen = entries
+    .filter((e) => e.type === 'REFUND' && (e.description ?? '').startsWith('Reabertura da comanda'))
+    .reduce((t, e) => Math.max(t, e.createdAt.getTime()), 0);
   const payments: BillPayment[] = entries
     .filter((e) => e.type === 'RECEIPT')
     .map((e) => ({
       id: e.id,
       method: e.method,
       amountCents: e.amountCents,
-      // Change given back in the same payment (same transaction time, cash)
-      changeCents: entries
+      // Change given back in the same payment (same transaction time) comes out of its cash: card,
+      // PIX and others never have change
+      changeCents: e.method !== 'CASH' ? 0 : entries
         .filter((c) => c.type === 'CHANGE' && c.createdAt.getTime() === e.createdAt.getTime())
         .reduce((n, c) => n + c.amountCents, 0),
       createdAt: e.createdAt.toISOString(),
-      refunded: refunds.some((d) => d.startsWith(REFUND_TAG(e.id))),
+      refunded: refunds.some((d) => d.startsWith(REFUND_TAG(e.id))) || e.createdAt.getTime() <= lastReopen,
     }));
 
   return {
@@ -109,7 +114,7 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
 
 /** The customer declines (or accepts again) the service charge, for every device (spec 4.3) */
 export async function setServiceWaived(member: RestaurantMember, sessionId: string, waived: boolean): Promise<Bill> {
-  return prisma.$transaction(async (tx) => {
+  const bill = await prisma.$transaction(async (tx) => {
     await lockComanda(tx, sessionId);
     const bill = await loadBill(tx, member.restaurantId, sessionId);
     if (!bill) throw new CashRuleError('Comanda não encontrada', 404);
@@ -119,7 +124,41 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
     }
     await tx.orderSession.update({ where: { id: sessionId }, data: { serviceChargeWaived: waived } });
     await recordAudit(member, { action: 'UPDATE', entityType: 'OrderSession', entityId: sessionId, changes: { serviceChargeWaived: waived } });
-    return (await loadBill(tx, member.restaurantId, sessionId))!;
+    const after = (await loadBill(tx, member.restaurantId, sessionId))!;
+    // What was already paid covers the new total: the bill closes now (it would be stuck open with
+    // nothing left to receive — review of stage 2)
+    if (after.paidCents > 0 && after.remainingCents === 0) {
+      await tx.orderSession.updateMany({
+        where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
+        data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents },
+      });
+      return (await loadBill(tx, member.restaurantId, sessionId))!;
+    }
+    return after;
+  });
+  if (bill.status === 'CLOSED') await emitClosedBill(member, sessionId, null, bill.customerName);
+  return bill;
+}
+
+/**
+ * The NFC-e of a bill that just closed, when the restaurant turned it on: the method that paid the most
+ * goes on the note (same rule as the old close). The note never fails the close.
+ */
+async function emitClosedBill(member: RestaurantMember, sessionId: string, cpf?: string | null, customerName?: string | null) {
+  const entries = await prisma.cashSessionEntry.findMany({
+    where: { orderSessionId: sessionId, restaurantId: member.restaurantId, type: 'RECEIPT' },
+    select: { method: true, amountCents: true },
+  });
+  const byMethod = new Map<CashMethod, number>();
+  for (const e of entries) byMethod.set(e.method as CashMethod, (byMethod.get(e.method as CashMethod) ?? 0) + e.amountCents);
+  const primary = CASH_METHODS.reduce((best, m) => ((byMethod.get(m) ?? 0) > (byMethod.get(best) ?? 0) ? m : best), 'CASH' as CashMethod);
+  return autoEmitNFCe({
+    restaurantId: member.restaurantId,
+    orderSessionId: sessionId,
+    customerCPF: cpf ? String(cpf).replace(/\D/g, '') || undefined : undefined,
+    customerName: customerName ?? undefined,
+    paymentMethod: toNfcePaymentMethod(primary),
+    onlyIfEnabled: true,
   });
 }
 
@@ -132,7 +171,7 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
 export async function recordBillPayment(
   member: RestaurantMember,
   sessionId: string,
-  input: { payments: PaymentInput[]; cashSessionId?: string | null; customerCPF?: string | null },
+  input: { payments: PaymentInput[]; cashSessionId?: string | null; customerCPF?: string | null; dueCents?: number | null },
 ) {
   const result = await prisma.$transaction(async (tx) => {
     await lockComanda(tx, sessionId);
@@ -140,7 +179,10 @@ export async function recordBillPayment(
     if (!bill) throw new CashRuleError('Comanda não encontrada', 404);
     if (bill.status === 'CANCELLED') throw new CashRuleError('Comanda cancelada', 409);
     if (bill.status === 'CLOSED') throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
-    const settled = settlePartial(bill.remainingCents, input.payments);
+    // The amount being paid now (one person's share) is what the change is counted against: the screen
+    // showed change for that share, so the server must agree (review of stage 2)
+    const due = Number.isInteger(input.dueCents) && (input.dueCents as number) > 0 ? Math.min(input.dueCents as number, bill.remainingCents) : bill.remainingCents;
+    const settled = settlePartial(due, input.payments);
     const target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: input.cashSessionId, replay: false, legacy: false });
     await recordSaleEntries(tx, { restaurantId: member.restaurantId, target: target!, orderSessionId: sessionId, settled, createdById: member.userId });
     const paidNow = settled.paidCents - settled.changeCents;
@@ -157,22 +199,7 @@ export async function recordBillPayment(
 
   let nfce: unknown = null;
   if (result.closed) {
-    // The method that paid the most goes on the note (same rule as the old close)
-    const entries = await prisma.cashSessionEntry.findMany({
-      where: { orderSessionId: sessionId, restaurantId: member.restaurantId, type: 'RECEIPT' },
-      select: { method: true, amountCents: true },
-    });
-    const byMethod = new Map<CashMethod, number>();
-    for (const e of entries) byMethod.set(e.method as CashMethod, (byMethod.get(e.method as CashMethod) ?? 0) + e.amountCents);
-    const primary = CASH_METHODS.reduce((best, m) => ((byMethod.get(m) ?? 0) > (byMethod.get(best) ?? 0) ? m : best), 'CASH' as CashMethod);
-    nfce = await autoEmitNFCe({
-      restaurantId: member.restaurantId,
-      orderSessionId: sessionId,
-      customerCPF: input.customerCPF ? String(input.customerCPF).replace(/\D/g, '') || undefined : undefined,
-      customerName: result.customerName ?? undefined,
-      paymentMethod: toNfcePaymentMethod(primary),
-      onlyIfEnabled: true,
-    });
+    nfce = await emitClosedBill(member, sessionId, input.customerCPF, result.customerName);
   }
   const bill = (await loadBill(prisma, member.restaurantId, sessionId))!;
   return { bill, changeCents: result.changeCents, closed: result.closed, nfce };

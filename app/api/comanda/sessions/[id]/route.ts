@@ -13,6 +13,7 @@ import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, r
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 import { billTotals, paidNetCents, serviceApplies } from '@/lib/comanda/bill';
+import { lockComanda } from '@/lib/comanda/add-item';
 
 export const dynamic = 'force-dynamic';
 
@@ -123,6 +124,8 @@ async function handlePUT(
     try {
       updated = await prisma.$transaction(async (tx) => {
         if (closing) {
+          // Same lock as the bill screen's payments: a partial payment and this close never both count
+          await lockComanda(tx, params.id);
           const read = readPayments(body);
           if (!read) throw new CashRuleError('Informe as formas de pagamento');
           // The bill screen pays in parts (POST .../payments); an old close from a device queue must
@@ -133,7 +136,7 @@ async function handlePUT(
           const itemsTotal = await comandaTotalCents(tx, params.id);
           const bill = await tx.orderSession.findUnique({
             where: { id: params.id },
-            select: { tableId: true, tableNumber: true, customerName: true, restaurant: { select: { serviceChargePercent: true } } },
+            select: { serviceChargeEligible: true, restaurant: { select: { serviceChargePercent: true } } },
           });
           const { serviceCents } = billTotals(itemsTotal, bill?.restaurant.serviceChargePercent ?? 0, {
             applies: serviceApplies(bill ?? {}),
@@ -245,12 +248,14 @@ export async function DELETE(
 
     try {
       await prisma.$transaction(async (tx) => {
-        // A paid bill gives its money back in the open shift of this device before it is cancelled
-        // Only one cancel writes: two requests at once must not give the money back twice
+        // A paid bill (closed, or with partial payments) gives its money back in the open shift of this
+        // device before it is cancelled. Only one cancel writes: two requests at once must not give the
+        // money back twice
+        await lockComanda(tx, params.id);
         const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: ownedSession.status }, data: { status: 'CANCELLED' } });
         if (guard.count === 0) throw new CashRuleError('Esta comanda mudou enquanto era cancelada. Atualize e tente de novo.', 422, 'CHANGED');
-        const paid = ownedSession.status === 'CLOSED'
-          && (await tx.cashSessionEntry.count({ where: { orderSessionId: params.id, restaurantId: member.restaurantId } })) > 0;
+        const lines = await tx.cashSessionEntry.findMany({ where: { orderSessionId: params.id, restaurantId: member.restaurantId }, select: { type: true, method: true, amountCents: true, direction: true } });
+        const paid = paidNetCents(lines) > 0;
         if (paid) {
           await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason });
         }

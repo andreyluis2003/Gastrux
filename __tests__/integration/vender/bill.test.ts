@@ -28,7 +28,7 @@ describe('the bill', () => {
     recipeId = (await prisma.recipe.create({ data: { restaurantId: rid, code: `C${tag}`, name: 'Pizza', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 58 } })).id;
     const sec = await prisma.tableSection.create({ data: { restaurantId: rid, name: 'Salão', capacity: 10 } });
     const table = await prisma.table.create({ data: { restaurantId: rid, number: 7, sectionId: sec.id, capacity: 4, qrToken: `c${tag}` } });
-    sid = (await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: table.id, status: 'OPEN' } })).id;
+    sid = (await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: table.id, status: 'OPEN', serviceChargeEligible: true } })).id;
     await prisma.orderSessionItem.create({ data: { sessionId: sid, recipeId, price: 58, quantity: 2 } });
     const reg = await prisma.cashRegister.create({ data: { restaurantId: rid, name: 'Caixa', isDefault: true } });
     shiftId = (await prisma.cashSession.create({ data: { restaurantId: rid, cashRegisterId: reg.id, openedById: ownerId, openingFloatCents: 0, status: 'OPEN' } })).id;
