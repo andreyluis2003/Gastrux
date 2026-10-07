@@ -14,15 +14,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([], { headers: { 'Cache-Control': 'public, max-age=60' } });
     }
 
+    // The customer's QR-code menu: public on purpose, so only what the menu shows leaves here (no
+    // recipe link, timestamps or internal flags; the isolation sweep of 2026-10-06 lists it as public)
     const categories = await prisma.menuCategory.findMany({
       where: { active: true, restaurantId },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        emoji: true,
+        color: true,
+        position: true,
         items: {
           where: {
             active: true,
             displayOnQR: true,
           },
-          include: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            available: true,
+            position: true,
             images: {
               where: { isPublic: true },
             },

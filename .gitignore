@@ -89,3 +89,4 @@ Thumbs.db
 .kimi/
 .superpowers/
 .github/agents/
+__tests__/integration/multi-tenant/read-isolation-report*.json
