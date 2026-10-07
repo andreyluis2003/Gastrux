@@ -2702,13 +2702,16 @@ model StaffCommission {
   bonusEarned      Decimal          @default(0) @db.Decimal(12, 2)
   totalEarned      Decimal          @default(0) @db.Decimal(12, 2)
   status           CommissionStatus @default(PENDING)
+  periodType       CommissionPeriod @default(MONTHLY)
+  periodEnd        DateTime?        @db.Date
+  billsCount       Int              @default(0)
   paidAt           DateTime?
   notes            String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   staffMember      StaffMember      @relation(fields: [staffMemberId], references: [id], onDelete: Cascade)
 
-  @@unique([staffMemberId, period])
+  @@unique([staffMemberId, periodType, period])
   @@index([period])
   @@index([status])
   @@map("staff_commissions")
@@ -2822,6 +2825,8 @@ model Restaurant {
   language              String                    @default("pt-BR")
   status                RestaurantStatus          @default(ACTIVE)
   subscriptionTier      String                    @default("starter")
+  /// When commissions are closed for payment (2026-10-06); the screen also shows week and month views
+  commissionPayPeriod   CommissionPeriod          @default(MONTHLY)
   subscriptionStatus    String                    @default("active")
   billingCycleStart     DateTime?
   billingCycleEnd       DateTime?
@@ -4096,6 +4101,12 @@ enum CommissionType {
   PERCENTAGE
   FIXED
   HYBRID
+}
+
+enum CommissionPeriod {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
 }
 
 enum CommissionStatus {

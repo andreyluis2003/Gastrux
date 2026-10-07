@@ -145,12 +145,12 @@ export default function StaffPage() {
             <div>
               <label className="text-xs text-gray-600 block mb-1">Tipo Comissão</label>
               <select className="w-full border rounded-md px-3 py-2 text-sm" value={form.commissionType} onChange={(e) => setForm({ ...form, commissionType: e.target.value })}>
-                <option value="PERCENTAGE">Percentual</option>
-                <option value="FIXED">Fixo</option>
-                <option value="HYBRID">Híbrido</option>
+                {/* lib/staff/commission-rules.ts: % of the items of the bills the person closed, or a fixed amount per bill */}
+                <option value="PERCENTAGE">% das vendas</option>
+                <option value="FIXED">R$ por conta fechada</option>
               </select>
             </div>
-            <div><label className="text-xs text-gray-600 block mb-1">Valor Comissão</label><Input type="number" value={form.commissionValue} onChange={(e) => setForm({ ...form, commissionValue: e.target.value })} placeholder="Ex: 5 (%)" /></div>
+            <div><label className="text-xs text-gray-600 block mb-1">Valor Comissão</label><Input type="number" value={form.commissionValue} onChange={(e) => setForm({ ...form, commissionValue: e.target.value })} placeholder={form.commissionType === 'FIXED' ? 'Ex: 2,00 (R$ por conta)' : 'Ex: 5 (%)'} /></div>
             <div className="flex gap-2">
               <div className="flex-1"><label className="text-xs text-gray-600 block mb-1">Entrada</label><Input type="time" value={form.defaultStartTime} onChange={(e) => setForm({ ...form, defaultStartTime: e.target.value })} /></div>
               <div className="flex-1"><label className="text-xs text-gray-600 block mb-1">Saída</label><Input type="time" value={form.defaultEndTime} onChange={(e) => setForm({ ...form, defaultEndTime: e.target.value })} /></div>
