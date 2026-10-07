@@ -28,13 +28,23 @@ export async function GET(
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
     }
 
+    // Only what the ordering page shows (app/delivery/[restaurantId]/page.tsx): the whole rows used
+    // to go out, with the recipe link and internal flags (isolation sweep, 2026-10-07)
     const categories = await prisma.menuCategory.findMany({
       where: { active: true, restaurantId: params.restaurantId },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        emoji: true,
         items: {
           where: { active: true, available: true, displayOnWeb: true },
-          include: {
-            images: { where: { isPublic: true }, take: 1 },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            available: true,
+            images: { where: { isPublic: true }, take: 1, select: { id: true, imageUrl: true } },
           },
           orderBy: { position: 'asc' },
         },

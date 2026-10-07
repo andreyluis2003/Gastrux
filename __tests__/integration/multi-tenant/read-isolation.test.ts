@@ -122,9 +122,9 @@ describe('read isolation: restaurant A never sees restaurant B through any GET r
     const report: any[] = [];
     const leaks: string[] = [];
     const leaked = (text: string) => text.includes(MARK) || bIds.some((id) => text.includes(id));
-    // Public on purpose (the customer's QR-code menu, any restaurant by id): its dishes may show,
+    // Public on purpose (the customer's QR-code menu and the delivery ordering page, any restaurant by id): its dishes may show,
     // but never what is behind them (recipes, ingredients, suppliers, customers, money, alerts)
-    const PUBLIC_BY_DESIGN = ['cardapio/publico'];
+    const PUBLIC_BY_DESIGN = ['cardapio/publico', 'public/delivery/menu'];
     const PRIVATE_MARKS = ['Insumo', 'Receita', 'Fornecedor', 'Cliente', 'Pagamento', 'Alerta', 'Mensagem', 'Perda', 'Categoria'].map((w) => `${w} ${MARK}`);
     const leakedFromPublic = (text: string) => PRIVATE_MARKS.some((m) => text.includes(m));
 
