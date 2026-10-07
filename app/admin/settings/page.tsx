@@ -47,6 +47,7 @@ export default function SettingsPage() {
     zipCode: '',
     timezone: 'America/Sao_Paulo',
     logoUrl: '',
+    serviceChargePercent: '10',
   });
   const [hours, setHours] = useState(DEFAULT_HOURS);
 
@@ -74,6 +75,7 @@ export default function SettingsPage() {
         zipCode: r.zipCode || '',
         timezone: r.timezone || 'America/Sao_Paulo',
         logoUrl: r.logoUrl || '',
+        serviceChargePercent: String(r.serviceChargePercent ?? 10),
       });
       if (r.businessHours && typeof r.businessHours === 'object') {
         setHours({ ...DEFAULT_HOURS, ...r.businessHours });
@@ -106,7 +108,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/admin/restaurant/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, businessHours: hours }),
+        body: JSON.stringify({ ...form, serviceChargePercent: Number(form.serviceChargePercent), businessHours: hours }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -246,6 +248,16 @@ export default function SettingsPage() {
               {timezones.map(tz => <option key={tz} value={tz}>{tz.replace('America/', '')}</option>)}
             </select>
           </div>
+        </div>
+      </Card>
+
+      {/* Taxa de serviço (spec 2026-10-07, 4.3) */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-2">Taxa de serviço</h2>
+        <p className="text-sm text-gray-500 mb-3">Sugerida na conta das mesas e comandas por nome. O cliente pode recusar. 0 desliga. Não entra na nota fiscal nem na comissão.</p>
+        <div className="flex items-center gap-2 max-w-[10rem]">
+          <Input id="serviceChargePercent" type="number" min={0} max={30} step={1} value={form.serviceChargePercent} onChange={e => updateField('serviceChargePercent', e.target.value)} />
+          <span>%</span>
         </div>
       </Card>
 

@@ -52,6 +52,7 @@ export async function GET() {
       businessHours: true,
       status: true,
       subscriptionTier: true,
+      serviceChargePercent: true,
       createdAt: true,
     },
   });
@@ -74,7 +75,9 @@ export async function PATCH(request: NextRequest) {
   const allowedFields = [
     'name', 'cnpj', 'email', 'phone', 'website',
     'address', 'city', 'state', 'zipCode',
-    'timezone', 'currency', 'language', 'logoUrl', 'businessHours'
+    'timezone', 'currency', 'language', 'logoUrl', 'businessHours',
+    // Service charge on the bill (spec 2026-10-07, 4.3)
+    'serviceChargePercent',
   ];
 
   const updateData: Record<string, any> = {};
@@ -93,6 +96,13 @@ export async function PATCH(request: NextRequest) {
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 400 });
+  }
+
+  if (updateData.serviceChargePercent !== undefined) {
+    const p = updateData.serviceChargePercent;
+    if (!Number.isInteger(p) || p < 0 || p > 30) {
+      return NextResponse.json({ error: 'Taxa de serviço: um número inteiro de 0 a 30 (%)' }, { status: 400 });
+    }
   }
 
   // Validate CNPJ format if provided (basic)
@@ -128,6 +138,7 @@ export async function PATCH(request: NextRequest) {
         businessHours: true,
         status: true,
         subscriptionTier: true,
+      serviceChargePercent: true,
         createdAt: true,
       },
     });
