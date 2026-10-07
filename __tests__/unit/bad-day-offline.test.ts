@@ -175,7 +175,9 @@ describe('bad day 1: is the offline queue wired to anything?', () => {
   });
 
   it('the comanda and the counter sale send their changes through the outbox (O1)', () => {
-    expect(read('app/comanda/[sessionId]/page.tsx')).toMatch(/useOutbox\(\)/);
+    // The comanda moved to /vender/[sessionId] (spec 2026-10-07); its changes go through useComanda
+    expect(read('components/vender/use-comanda.ts')).toMatch(/useOutbox\(\)/);
+    expect(read('components/vender/use-comanda.ts')).toMatch(/queueable: true/);
     expect(read('components/comanda/counter-sale.tsx')).toMatch(/queueable: true/);
   });
 

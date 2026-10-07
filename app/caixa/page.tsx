@@ -112,7 +112,7 @@ export default function CaixaPage() {
                   <li key={e.id} className="py-2 flex flex-wrap justify-between gap-2">
                     <span>{time(e.createdAt)} · {ENTRY_TYPE_LABEL[e.type]} · {METHOD_LABEL[e.method]}{e.description ? ` · ${e.description}` : ''}{e.afterClose ? ' · após o fechamento' : ''}</span>
                     <span className="flex items-center gap-3">
-                      {e.orderSessionId && <Link className="underline" href={`/comanda/${e.orderSessionId}`}>venda</Link>}
+                      {e.orderSessionId && <Link className="underline" href={`/vender/${e.orderSessionId}`}>venda</Link>}
                       <span className="text-gray-500">{e.createdByName}</span>
                       <strong className={['CHANGE', 'WITHDRAWAL', 'EXPENSE', 'REFUND'].includes(e.type) || e.direction === 'OUT' ? 'text-red-700' : ''}>{brl(e.amountCents)}</strong>
                     </span>
