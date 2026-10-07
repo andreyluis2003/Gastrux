@@ -56,3 +56,19 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
     }
   });
 });
+
+describe('floating helpers on full-screen operation (homolog check of tela Vender, 2026-10-07)', () => {
+  const { showsAssistant, toastPosition } = require('../../lib/navigation/app-nav');
+  it('the assistant bubble stays off the sales, comanda and kitchen screens (it covered "Lançar")', () => {
+    expect(showsAssistant('/vender')).toBe(false);
+    expect(showsAssistant('/vender/abc')).toBe(false);
+    expect(showsAssistant('/cozinha')).toBe(false);
+    expect(showsAssistant('/dashboard')).toBe(true);
+    expect(showsAssistant('/')).toBe(false);
+    expect(showsAssistant('/pricing')).toBe(false);
+  });
+  it('toasts go to the top there, so they never cover the bottom bar', () => {
+    expect(toastPosition('/vender/abc')).toBe('top-center');
+    expect(toastPosition('/dashboard')).toBe('bottom-right');
+  });
+});

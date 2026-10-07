@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Poppins, DM_Sans, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
-import { Toaster } from 'sonner';
+import { AppToaster } from '@/components/app-shell/app-toaster';
 import { SessionProvider } from '@/components/providers';
 import { I18nProvider } from '@/lib/i18n';
 import { QueryProvider } from '@/components/providers/query-provider';
@@ -102,7 +102,7 @@ export default function RootLayout({
                 <GastruxChat />
                 </OutboxProvider>
               </SessionProvider>
-              <Toaster />
+              <AppToaster />
             </ThemeProvider>
           </QueryProvider>
         </I18nProvider>

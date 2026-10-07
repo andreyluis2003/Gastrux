@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
+import { showsAssistant } from '@/lib/navigation/app-nav';
 import { useSession } from 'next-auth/react';
 import { MessageCircle, X, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,8 +38,7 @@ export function GastruxChat() {
   }, [isOpen]);
 
   // Public marketing pages have no restaurant data to ask about
-  const isPublicMarketingPage = pathname === '/' || pathname === '/pricing' || !!pathname?.startsWith('/para/');
-  if (!session?.user || isPublicMarketingPage) return null;
+  if (!session?.user || !showsAssistant(pathname)) return null;
 
   const handleSend = async () => {
     const question = input.trim();

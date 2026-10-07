@@ -191,3 +191,18 @@ export function shellMode(pathname: string | null | undefined): ShellMode {
   if (DRAWER_PREFIXES.some((x) => matches(p, x))) return 'drawer';
   return 'sidebar';
 }
+
+/**
+ * The floating assistant bubble: not on public pages, and not on full-screen operation (Vender,
+ * comanda, kitchen), where it covered the bottom bar and the "Lançar" button on a phone (2026-10-07).
+ */
+export function showsAssistant(pathname: string | null | undefined): boolean {
+  const p = pathname || '/';
+  if (p === '/' || p === '/pricing' || p.startsWith('/para/')) return false;
+  return shellMode(p) !== 'drawer';
+}
+
+/** Toasts on full-screen operation go to the top: at the bottom they covered the phone's action bar */
+export function toastPosition(pathname: string | null | undefined): 'top-center' | 'bottom-right' {
+  return shellMode(pathname) === 'drawer' ? 'top-center' : 'bottom-right';
+}

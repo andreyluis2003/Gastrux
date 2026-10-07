@@ -59,3 +59,9 @@ export function sessionLabel(s: { table?: { number: number } | null; tableNumber
   if (n) return `Mesa ${n}`;
   return s.customerName || 'Balcão';
 }
+
+/** "aberta agora", "aberta há 47 min" */
+export function openedLabel(openedAt: string | Date, now: Date): string {
+  const t = openFor(openedAt, now);
+  return t === 'agora' ? 'aberta agora' : `aberta há ${t}`;
+}

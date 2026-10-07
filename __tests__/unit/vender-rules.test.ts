@@ -48,3 +48,12 @@ describe('labels', () => {
     expect(sessionLabel({})).toBe('Balcão');
   });
 });
+
+describe('openedLabel', () => {
+  it('"aberta agora", never "aberta há agora"', () => {
+    const { openedLabel } = require('../../lib/vender/rules');
+    const now = new Date('2026-10-07T21:00:00.000Z');
+    expect(openedLabel('2026-10-07T20:59:30.000Z', now)).toBe('aberta agora');
+    expect(openedLabel('2026-10-07T20:13:00.000Z', now)).toBe('aberta há 47 min');
+  });
+});

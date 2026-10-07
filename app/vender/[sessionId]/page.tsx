@@ -10,7 +10,7 @@ import { MenuPanel } from '@/components/vender/menu-panel';
 import { ItemSheet } from '@/components/vender/item-sheet';
 import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { CloseBillDialog } from '@/components/vender/close-bill-dialog';
-import { isUnsent, openFor, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
+import { isUnsent, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
 
@@ -71,7 +71,7 @@ export default function ComandaRapidaPage() {
         <div>
           <h1 className="text-2xl font-bold">{sessionLabel(s)}</h1>
           <p className="text-sm text-slate-500">
-            {s.openedAt ? `aberta há ${openFor(s.openedAt, new Date())}` : ''}{s.user?.name ? ` · ${s.user.name}` : ''}
+            {s.openedAt ? openedLabel(s.openedAt, new Date()) : ''}{s.user?.name ? ` · ${s.user.name}` : ''}
             {c.isClosed ? ' · conta fechada' : ''}
           </p>
         </div>
