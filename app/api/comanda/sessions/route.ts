@@ -58,24 +58,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const newSession = await prisma.orderSession.create({
-      data: {
-        restaurantId,
-        userId: session.user.id,
-        tableId: tableId || null,
-        customerName: customerName || null,
-        tableNumber: tableNumber || null,
-        notes: notes || null,
-        status: 'OPEN',
-      },
-      include: {
-        user: { select: { name: true } },
-        table: { include: { section: { select: { name: true } } } },
-        items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
-      },
+    const include = {
+      user: { select: { name: true } },
+      table: { include: { section: { select: { name: true } } } },
+      items: { include: { recipe: { select: { name: true, sellingPrice: true } } } },
+    };
+
+    // A table has one open comanda: tapping it opens that one. Two waiters tapping a free table at the
+    // same time must not open two (spec 2026-10-07, 7): a per-table lock serialises them.
+    const result = await prisma.$transaction(async (tx) => {
+      if (tableId) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-table:' + tableId}))`;
+        const existing = await tx.orderSession.findFirst({
+          where: { restaurantId, tableId, status: { in: ['OPEN', 'SENT_TO_KITCHEN', 'READY'] } },
+          include,
+          orderBy: { openedAt: 'asc' },
+        });
+        if (existing) return { session: existing, created: false };
+      }
+      const created = await tx.orderSession.create({
+        data: {
+          restaurantId,
+          userId: session.user.id,
+          tableId: tableId || null,
+          customerName: customerName || null,
+          tableNumber: tableNumber || null,
+          notes: notes || null,
+          status: 'OPEN',
+        },
+        include,
+      });
+      return { session: created, created: true };
     });
 
-    return NextResponse.json(newSession, { status: 201 });
+    return NextResponse.json(result.session, { status: result.created ? 201 : 200 });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });
