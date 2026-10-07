@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +14,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 403 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const ingredientId = searchParams.get('ingredientId');
     const enabledOnly = searchParams.get('enabledOnly') === 'true';
 
-    const where: any = {};
+    // Only this restaurant's alerts: the list used to show every restaurant's (isolation sweep, 2026-10-06)
+    const where: any = { restaurantId };
     if (ingredientId) {
       where.ingredientId = ingredientId;
     }
@@ -54,6 +61,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { ingredientId, supplierId, maxPrice, minPrice, alertType } = body;
 
@@ -65,8 +77,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify ingredient exists
-    const ingredient = await prisma.ingredient.findUnique({
-      where: { id: ingredientId },
+    // An ingredient of this restaurant only (another restaurant's is "not found")
+    const ingredient = await prisma.ingredient.findFirst({
+      where: { id: ingredientId, restaurantId },
     });
 
     if (!ingredient) {
@@ -78,8 +91,9 @@ export async function POST(request: NextRequest) {
 
     // Verify supplier exists if provided
     if (supplierId) {
-      const supplier = await prisma.ingredientSupplier.findUnique({
-        where: { id: supplierId },
+      // A supplier link of that same ingredient only
+      const supplier = await prisma.ingredientSupplier.findFirst({
+        where: { id: supplierId, ingredientId },
       });
       if (!supplier) {
         return NextResponse.json(
@@ -99,6 +113,7 @@ export async function POST(request: NextRequest) {
         },
       },
       create: {
+        restaurantId,
         ingredientId,
         supplierId,
         maxPrice,

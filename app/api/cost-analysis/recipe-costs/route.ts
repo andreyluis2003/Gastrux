@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,11 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const restaurantId = await getCurrentRestaurantId();
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 403 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -23,7 +29,8 @@ export async function GET(request: NextRequest) {
 
     // Get all recipes (or specific ones if provided)
     const recipes = await prisma.recipe.findMany({
-      where: recipeIds.length > 0 ? { id: { in: recipeIds } } : {},
+      // Only this restaurant's recipes: the route used to cost every restaurant's (isolation sweep, 2026-10-06)
+      where: { restaurantId, ...(recipeIds.length > 0 ? { id: { in: recipeIds } } : {}) },
       include: {
         ingredients: {
           include: { ingredient: true },
@@ -42,6 +49,7 @@ export async function GET(request: NextRequest) {
           // Get latest price trend for this ingredient
           const latestPriceTrend = await prisma.priceTrend.findFirst({
             where: {
+              restaurantId,
               ingredientId: recipeIng.ingredientId,
               recordedDate: {
                 lte: endDate,
@@ -67,6 +75,7 @@ export async function GET(request: NextRequest) {
         // Get all historical costs for this recipe from price trends
         const allInvoiceItems = await prisma.priceTrend.findMany({
           where: {
+            restaurantId,
             recordedDate: {
               gte: startDate,
               lte: endDate,

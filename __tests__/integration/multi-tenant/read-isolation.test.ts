@@ -82,6 +82,9 @@ describe('read isolation: restaurant A never sees restaurant B through any GET r
     }));
     keep(await prisma.stock.create({ data: { restaurantId: rid, ingredientId: ing.id, currentQuantity: 1 } }));
     keep(await prisma.supplier.create({ data: { restaurantId: rid, code: `SUP-${MARK}`, name: `Fornecedor ${MARK}` } }));
+    // Price history and a price alert: /api/cost-analysis/price-alerts listed every restaurant's (2026-10-06)
+    keep(await prisma.priceTrend.create({ data: { restaurantId: rid, ingredientId: ing.id, price: 12.34, recordedDate: new Date() } }));
+    keep(await prisma.priceAlert.create({ data: { restaurantId: rid, ingredientId: ing.id, maxPrice: 99, alertType: 'ABOVE_MAX' } }));
     const recipe = keep(await prisma.recipe.create({
       data: { restaurantId: rid, code: `REC-${MARK}`, name: `Receita ${MARK}`, baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 30,
         ingredients: { create: [{ ingredientId: ing.id, quantity: 0.2, unit: 'kg' }] } },
@@ -153,6 +156,9 @@ describe('read isolation: restaurant A never sees restaurant B through any GET r
     for (const file of mine) {
       const rel = path.relative(API_DIR, path.dirname(file)).replace(/\\/g, '/');
       current = `/api/${rel}`;
+      // Only routes that answer GET: loading the others is wasted time, and some (Twilio voice
+      // webhooks) never finish loading under Jest
+      if (!/export\s+(const|async\s+function|function)\s+GET\b/.test(fs.readFileSync(file, 'utf8'))) continue;
       save();
       let mod: any;
       try {
