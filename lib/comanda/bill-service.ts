@@ -177,3 +177,43 @@ export async function recordBillPayment(
   const bill = (await loadBill(prisma, member.restaurantId, sessionId))!;
   return { bill, changeCents: result.changeCents, closed: result.closed, nfce };
 }
+
+/**
+ * Gives back one partial payment (a PIX typed by mistake) while the bill is open (spec 4.3): a manager,
+ * with a reason; a REFUND line in the open shift for what that payment left in the drawer (what was
+ * handed over minus its change); once. A closed bill is reopened instead (the existing manager flow).
+ */
+export async function refundBillPayment(
+  member: RestaurantMember,
+  sessionId: string,
+  entryId: string,
+  input: { reason: string; cashSessionId?: string | null },
+): Promise<Bill> {
+  const reason = String(input.reason ?? '').trim();
+  if (reason.length < 3) throw new CashRuleError('Informe o motivo do estorno');
+  return prisma.$transaction(async (tx) => {
+    await lockComanda(tx, sessionId);
+    const bill = await loadBill(tx, member.restaurantId, sessionId);
+    if (!bill) throw new CashRuleError('Comanda não encontrada', 404);
+    if (bill.status === 'CLOSED') throw new CashRuleError('Conta fechada: para devolver, reabra a conta (gerente)', 409);
+    const payment = bill.payments.find((p) => p.id === entryId);
+    if (!payment) throw new CashRuleError('Pagamento não encontrado', 404);
+    if (payment.refunded) throw new CashRuleError('Este pagamento já foi estornado', 422, 'ALREADY_REFUNDED');
+    const target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: input.cashSessionId, replay: false, legacy: false });
+    const amountCents = payment.amountCents - payment.changeCents;
+    await tx.cashSessionEntry.create({
+      data: {
+        restaurantId: member.restaurantId,
+        cashSessionId: target!.cashSessionId,
+        orderSessionId: sessionId,
+        type: 'REFUND',
+        method: payment.method as CashMethod,
+        amountCents,
+        description: `${REFUND_TAG(entryId)}: ${reason}`.slice(0, 200),
+        createdById: member.userId,
+      },
+    });
+    await recordAudit(member, { action: 'UPDATE', entityType: 'OrderSession', entityId: sessionId, changes: { refundedPayment: entryId, amountCents, reason } });
+    return (await loadBill(tx, member.restaurantId, sessionId))!;
+  });
+}
