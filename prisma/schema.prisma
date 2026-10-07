@@ -1,12 +1,12 @@
 generator client {
-    provider = "prisma-client-js"
-    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
-    provider  = "postgresql"
-    url       = env("DATABASE_URL")
-    directUrl = env("DIRECT_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -824,18 +824,18 @@ model POSTransaction {
 }
 
 model POSSaleItem {
-  id              String         @id @default(cuid())
-  transactionId   String
-  recipeId        String?
-  menuItemId      String?
-  name            String
-  quantity        Int            @default(1)
-  unitPrice       Decimal        @default(0)
-  totalPrice      Decimal        @default(0)
-  notes           String?
-  createdAt       DateTime       @default(now())
-  transaction     POSTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  recipe          Recipe?        @relation(fields: [recipeId], references: [id])
+  id            String         @id @default(cuid())
+  transactionId String
+  recipeId      String?
+  menuItemId    String?
+  name          String
+  quantity      Int            @default(1)
+  unitPrice     Decimal        @default(0)
+  totalPrice    Decimal        @default(0)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  transaction   POSTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  recipe        Recipe?        @relation(fields: [recipeId], references: [id])
 
   @@index([transactionId])
   @@index([recipeId])
@@ -1347,24 +1347,24 @@ model BetaTester {
 }
 
 model AISupportInteraction {
-  id              String   @id @default(cuid())
-  sessionId       String
-  userId          String?
-  userEmail       String?
-  question        String
-  answer          String
+  id                String   @id @default(cuid())
+  sessionId         String
+  userId            String?
+  userEmail         String?
+  question          String
+  answer            String
   // Quality metrics
-  rating          Int?     // 1-5 from user
-  thumbsUp        Boolean? // true=positive, false=negative
-  hallucinationFlag Boolean @default(false)  // detected by heuristics
-  confidenceScore Float?   // 0-1 from model
-  responseTimeMs  Int?
-  escalatedToHuman Boolean @default(false)
-  resolvedIssue   Boolean? // user marked as resolved
+  rating            Int? // 1-5 from user
+  thumbsUp          Boolean? // true=positive, false=negative
+  hallucinationFlag Boolean  @default(false) // detected by heuristics
+  confidenceScore   Float? // 0-1 from model
+  responseTimeMs    Int?
+  escalatedToHuman  Boolean  @default(false)
+  resolvedIssue     Boolean? // user marked as resolved
   // Categorization
-  topic           String?
-  feedbackText    String?
-  createdAt       DateTime @default(now())
+  topic             String?
+  feedbackText      String?
+  createdAt         DateTime @default(now())
 
   @@index([createdAt])
   @@index([rating])
@@ -1374,19 +1374,19 @@ model AISupportInteraction {
 }
 
 model AIQualityAlert {
-  id          String   @id @default(cuid())
-  alertType   String   // 'low_rating', 'hallucination_spike', 'high_escalation', 'response_time'
-  severity    String   // 'info', 'warning', 'critical'
+  id          String    @id @default(cuid())
+  alertType   String // 'low_rating', 'hallucination_spike', 'high_escalation', 'response_time'
+  severity    String // 'info', 'warning', 'critical'
   title       String
   description String
   metricValue Float?
   threshold   Float?
   windowStart DateTime
   windowEnd   DateTime
-  resolved    Boolean  @default(false)
+  resolved    Boolean   @default(false)
   resolvedAt  DateTime?
   notifiedAt  DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([createdAt])
   @@index([resolved])
@@ -1864,7 +1864,7 @@ model CashSession {
 
 /// One ledger line of a shift: a sale payment, change, sangria, suprimento, despesa, estorno or ajuste.
 model CashSessionEntry {
-  id             String          @id @default(cuid())
+  id             String         @id @default(cuid())
   restaurantId   String
   cashSessionId  String
   type           CashEntryType
@@ -1875,9 +1875,9 @@ model CashSessionEntry {
   description    String?
   orderSessionId String?
   createdById    String
-  afterClose     Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  cashSession    CashSession     @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  afterClose     Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  cashSession    CashSession    @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
 
   @@index([cashSessionId])
   @@index([restaurantId])
@@ -2136,6 +2136,7 @@ model Subscription {
   restaurant            Restaurant?    @relation(fields: [restaurantId], references: [id])
   user                  User?          @relation(fields: [userId], references: [id])
 
+  @@unique([gateway, gatewaySubscriptionId])
   @@index([restaurantId])
   @@index([userId])
   @@index([gatewaySubscriptionId])
@@ -2146,7 +2147,6 @@ model Subscription {
   @@index([gateway])
   @@index([cancelledAt])
   @@index([createdAt])
-  @@unique([gateway, gatewaySubscriptionId])
   @@map("subscriptions")
 }
 
@@ -2304,12 +2304,12 @@ model NFeDocument {
   items              NFeItem[]
   logs               NFeLog[]
 
+  // A number is used once per emitter, model and series (a rejected note is re-sent under its own number)
+  @@unique([configId, documentType, documentSeries, documentNumber], map: "nfe_documents_number_key")
   @@index([status])
   @@index([issueDate])
   @@index([orderId])
   @@index([orderSessionId])
-  // A number is used once per emitter, model and series (a rejected note is re-sent under its own number)
-  @@unique([configId, documentType, documentSeries, documentNumber], map: "nfe_documents_number_key")
   @@map("nfe_documents")
 }
 
@@ -2809,112 +2809,113 @@ model Notification {
 }
 
 model Restaurant {
-  id                    String                    @id @default(cuid())
-  name                  String
-  cnpj                  String?                   @unique
-  email                 String?
-  phone                 String?
-  website               String?
-  address               String?
-  city                  String?
-  state                 String?
-  country               String                    @default("BR")
-  zipCode               String?
-  timezone              String                    @default("America/Sao_Paulo")
-  currency              String                    @default("BRL")
-  language              String                    @default("pt-BR")
-  status                RestaurantStatus          @default(ACTIVE)
-  subscriptionTier      String                    @default("starter")
+  id                      String                    @id @default(cuid())
+  name                    String
+  cnpj                    String?                   @unique
+  email                   String?
+  phone                   String?
+  website                 String?
+  address                 String?
+  city                    String?
+  state                   String?
+  country                 String                    @default("BR")
+  zipCode                 String?
+  timezone                String                    @default("America/Sao_Paulo")
+  currency                String                    @default("BRL")
+  language                String                    @default("pt-BR")
+  status                  RestaurantStatus          @default(ACTIVE)
+  subscriptionTier        String                    @default("starter")
   /// When commissions are closed for payment (2026-10-06); the screen also shows week and month views
-  commissionPayPeriod   CommissionPeriod          @default(MONTHLY)
-  subscriptionStatus    String                    @default("active")
-  billingCycleStart     DateTime?
-  billingCycleEnd       DateTime?
-  trialEndsAt           DateTime?
-  accountingMethod      String                    @default("SIMPLIFIED")
-  stripeAccountId       String?
-  mercadoPagoAccountId  String?
-  mercadoPagoConnection MercadoPagoConnection?
+  commissionPayPeriod     CommissionPeriod          @default(MONTHLY)
+  subscriptionStatus      String                    @default("active")
+  billingCycleStart       DateTime?
+  billingCycleEnd         DateTime?
+  trialEndsAt             DateTime?
+  accountingMethod        String                    @default("SIMPLIFIED")
+  stripeAccountId         String?
+  mercadoPagoAccountId    String?
+  mercadoPagoConnection   MercadoPagoConnection?
   deliveryPaymentSettings DeliveryPaymentSettings?
-  ifoodIntegrationId    String?
-  rappiIntegrationId    String?
-  uberIntegrationId     String?
-  logoUrl               String?
-  businessHours         Json?
-  ownerId               String
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
-  deletedAt             DateTime?
-  adjustmentItems       AdjustmentItem[]
-  aiInsights            AIInsight[]               @relation("restaurantAIInsights")
-  alerts                Alert[]
-  auditLogs             AuditLog[]                @relation("AuditLogs")
-  billingInvoicesList   BillingInvoice[]          @relation("RestaurantBillingInvoices")
-  chartOfAccounts       ChartOfAccount[]
-  cmvSnapshots          CMVSnapshot[]             @relation("RestaurantCMVSnapshots")
-  consolidatedNeeds     ConsolidatedNeed[]
-  consumptionPatterns   ConsumptionPattern[]
-  deliveryIntegrations  DeliveryIntegration[]
-  demandForecasts       DemandForecast[]
-  expenseCategories     ExpenseCategory[]
-  externalOrders        ExternalOrder[]
-  feedbackEntries       Feedback[]                @relation("RestaurantFeedback")
-  guestProfiles         GuestProfile[]
-  incomeCategories      IncomeCategory[]
-  ingredientCategories  IngredientCategory[]
-  ingredients           Ingredient[]
-  inventoryAdjustments  InventoryAdjustment[]
-  invoices              Invoice[]
-  menuEngSnapshots      MenuEngineeringSnapshot[] @relation("RestaurantMenuEngSnapshots")
-  menuMappings          MenuItemMapping[]
-  messageCampaigns      MessageCampaign[]
-  messageTemplates      MessageTemplate[]
-  messagingProviders    MessagingProviderConfig[]
-  orderSessions         OrderSession[]
-  orders                Order[]
-  payments              Payment[]
-  priceAlerts           PriceAlert[]
-  priceTrends           PriceTrend[]
-  productionPlanItems   ProductionPlanItem[]
-  productionPlans       ProductionPlan[]
-  recipes               Recipe[]
-  reservations          Reservation[]
-  users                 RestaurantUser[]
-  settlements           Settlement[]
-  shoppingListItems     ShoppingListItem[]
-  shoppingLists         ShoppingList[]
-  smartAlerts           SmartAlert[]
-  staffMembers          StaffMember[]
-  stockForecasts        StockForecast[]
-  stockMovements        StockMovement[]
-  stocks                Stock[]
-  subscriptions         Subscription[]
-  suppliers             Supplier[]
-  supportTickets        SupportTicket[]           @relation("RestaurantSupportTickets")
-  tableSections         TableSection[]
-  tables                Table[]
-  voiceAgentConfig      VoiceAgentConfig?
-  voiceCalls            VoiceCall[]
-  wasteLogs             WasteLog[]
-  whatsappConfig        WhatsAppConfig?
-  whatsappConversations WhatsAppConversation[]
-  marketingLeads        MarketingLead[]
-  dailySummaryEnabled   Boolean                   @default(false)
-  dailySummaryHour      Int                       @default(22)
-  dailySummaryPhone     String?
-  alertsWhatsappEnabled Boolean                   @default(false)
-  alertsEmailEnabled    Boolean                   @default(true)
-  packagingQrEnabled    Boolean                   @default(false)
-  packagingQrDiscount   Int                       @default(10)
-  packagingQrMessage    String?
-  packagingQrScans      PackagingQRScan[]
-  posSettings           POSSettings[]
-  posTransactions       POSTransaction[]
-  nfeConfig             NFeConfig?
-  cashFlowRecords       CashFlowRecord[]
-  financialMetrics      FinancialMetric[]
-  financialForecasts    FinancialForecast[]
-  metricSnapshots       MetricSnapshot[]
+  ifoodIntegrationId      String?
+  rappiIntegrationId      String?
+  uberIntegrationId       String?
+  logoUrl                 String?
+  businessHours           Json?
+  ownerId                 String
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  deletedAt               DateTime?
+  adjustmentItems         AdjustmentItem[]
+  aiInsights              AIInsight[]               @relation("restaurantAIInsights")
+  alerts                  Alert[]
+  auditLogs               AuditLog[]                @relation("AuditLogs")
+  billingInvoicesList     BillingInvoice[]          @relation("RestaurantBillingInvoices")
+  chartOfAccounts         ChartOfAccount[]
+  cmvSnapshots            CMVSnapshot[]             @relation("RestaurantCMVSnapshots")
+  consolidatedNeeds       ConsolidatedNeed[]
+  consumptionPatterns     ConsumptionPattern[]
+  deliveryIntegrations    DeliveryIntegration[]
+  demandForecasts         DemandForecast[]
+  expenseCategories       ExpenseCategory[]
+  externalOrders          ExternalOrder[]
+  feedbackEntries         Feedback[]                @relation("RestaurantFeedback")
+  guestProfiles           GuestProfile[]
+  incomeCategories        IncomeCategory[]
+  ingredientCategories    IngredientCategory[]
+  ingredients             Ingredient[]
+  inventoryAdjustments    InventoryAdjustment[]
+  invoices                Invoice[]
+  menuEngSnapshots        MenuEngineeringSnapshot[] @relation("RestaurantMenuEngSnapshots")
+  menuMappings            MenuItemMapping[]
+  messageCampaigns        MessageCampaign[]
+  messageTemplates        MessageTemplate[]
+  messagingProviders      MessagingProviderConfig[]
+  orderSessions           OrderSession[]
+  orders                  Order[]
+  payments                Payment[]
+  priceAlerts             PriceAlert[]
+  priceTrends             PriceTrend[]
+  productionPlanItems     ProductionPlanItem[]
+  productionPlans         ProductionPlan[]
+  recipes                 Recipe[]
+  reservations            Reservation[]
+  users                   RestaurantUser[]
+  settlements             Settlement[]
+  shoppingListItems       ShoppingListItem[]
+  shoppingLists           ShoppingList[]
+  smartAlerts             SmartAlert[]
+  staffMembers            StaffMember[]
+  stockForecasts          StockForecast[]
+  stockMovements          StockMovement[]
+  stocks                  Stock[]
+  subscriptions           Subscription[]
+  suppliers               Supplier[]
+  supportTickets          SupportTicket[]           @relation("RestaurantSupportTickets")
+  platformNotes           PlatformClientNote[]
+  tableSections           TableSection[]
+  tables                  Table[]
+  voiceAgentConfig        VoiceAgentConfig?
+  voiceCalls              VoiceCall[]
+  wasteLogs               WasteLog[]
+  whatsappConfig          WhatsAppConfig?
+  whatsappConversations   WhatsAppConversation[]
+  marketingLeads          MarketingLead[]
+  dailySummaryEnabled     Boolean                   @default(false)
+  dailySummaryHour        Int                       @default(22)
+  dailySummaryPhone       String?
+  alertsWhatsappEnabled   Boolean                   @default(false)
+  alertsEmailEnabled      Boolean                   @default(true)
+  packagingQrEnabled      Boolean                   @default(false)
+  packagingQrDiscount     Int                       @default(10)
+  packagingQrMessage      String?
+  packagingQrScans        PackagingQRScan[]
+  posSettings             POSSettings[]
+  posTransactions         POSTransaction[]
+  nfeConfig               NFeConfig?
+  cashFlowRecords         CashFlowRecord[]
+  financialMetrics        FinancialMetric[]
+  financialForecasts      FinancialForecast[]
+  metricSnapshots         MetricSnapshot[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -3286,7 +3287,7 @@ model WhatsAppConfig {
   verifyToken         String?
   displayPhoneNumber  String?
   isActive            Boolean    @default(false)
-  greeting           String?    @default("Olá! 👋 Bem-vindo ao nosso restaurante. Digite *menu* para ver o cardápio ou *ajuda* para opções.")
+  greeting            String?    @default("Olá! 👋 Bem-vindo ao nosso restaurante. Digite *menu* para ver o cardápio ou *ajuda* para opções.")
   businessHours       String?
   outsideHoursMessage String?
   totalConversations  Int        @default(0)
@@ -3630,24 +3631,24 @@ model MessageCampaignRecipient {
 }
 
 model MarketingLead {
-  id              String            @id @default(cuid())
+  id              String           @id @default(cuid())
   restaurantId    String?
   source          LeadSource
-  sourceDetail    String?           // e.g., campaign name, landing page URL, segment slug
+  sourceDetail    String? // e.g., campaign name, landing page URL, segment slug
   phoneNumber     String?
   email           String?
   name            String?
   businessName    String?
-  segment         String?           // e.g., pizzaria, hamburgueria, delivery
-  status          LeadStatus        @default(NEW)
-  score           Int               @default(0)  // 0-100 lead score
-  tags            String[]          @default([])
-  notes           String?           @db.Text
+  segment         String? // e.g., pizzaria, hamburgueria, delivery
+  status          LeadStatus       @default(NEW)
+  score           Int              @default(0) // 0-100 lead score
+  tags            String[]         @default([])
+  notes           String?          @db.Text
   // Nurturing
-  stage           LeadNurtureStage  @default(CAPTURED)
+  stage           LeadNurtureStage @default(CAPTURED)
   lastContactAt   DateTime?
   nextFollowUpAt  DateTime?
-  contactAttempts Int               @default(0)
+  contactAttempts Int              @default(0)
   convertedAt     DateTime?
   convertedUserId String?
   // UTM tracking
@@ -3656,10 +3657,10 @@ model MarketingLead {
   utmCampaign     String?
   utmContent      String?
   // Metadata
-  metadata        Json?             @default("{}")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  restaurant      Restaurant?       @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
+  metadata        Json?            @default("{}")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  restaurant      Restaurant?      @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
 
   @@index([source])
   @@index([status])
@@ -4402,23 +4403,24 @@ enum MessageRecipientStatus {
 }
 
 model PackagingQRScan {
-  id            String     @id @default(cuid())
-  restaurantId  String
-  source        String     @default("qr_packaging")
-  ipAddress     String?
-  userAgent     String?
-  converted     Boolean    @default(false)
-  orderId       String?
-  discountUsed  Boolean    @default(false)
-  scannedAt     DateTime   @default(now())
-  convertedAt   DateTime?
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  restaurantId String
+  source       String     @default("qr_packaging")
+  ipAddress    String?
+  userAgent    String?
+  converted    Boolean    @default(false)
+  orderId      String?
+  discountUsed Boolean    @default(false)
+  scannedAt    DateTime   @default(now())
+  convertedAt  DateTime?
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@index([restaurantId])
   @@index([scannedAt])
   @@index([converted])
   @@map("packaging_qr_scans")
 }
+
 /// One row per Idempotency-Key a restaurant used: a request replayed by the offline queue (same
 /// key) gets the stored answer instead of running twice (lib/api/idempotency.ts).
 model IdempotencyRecord {
@@ -4478,4 +4480,17 @@ enum CashMethod {
 enum CashDirection {
   IN
   OUT
+}
+
+/// Notes of the Gastrux team about a client (calls, promises, context). Platform screens only.
+model PlatformClientNote {
+  id           String     @id @default(cuid())
+  restaurantId String
+  authorEmail  String
+  text         String
+  createdAt    DateTime   @default(now())
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@map("platform_client_notes")
 }

@@ -6,6 +6,8 @@ declare module 'next-auth' {
     user: {
       id: string;
       role?: string;
+      /** Gastrux team (sees the Plataforma menu); same rule as the middleware */
+      isPlatformAdmin?: boolean;
       // Add custom fields here
     } & DefaultSession['user']; // includes name, email, image
   }

@@ -97,6 +97,10 @@ export const authOptions: NextAuthOptions = {
         // The role in the restaurant being worked in, read fresh on every request (the JWT keeps the
         // global User.role from login): lib/auth/effective-role.ts
         (session.user as any).role = await resolveEffectiveRole(token.id as string | undefined, token.role as string | undefined);
+        // The Plataforma Gastrux menu: global role ADMIN or an e-mail in PLATFORM_ADMIN_EMAILS, the rule
+        // middleware.ts enforces (the menu used to show only for role ADMIN, hiding it from the team)
+        const allow = (process.env.PLATFORM_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+        (session.user as any).isPlatformAdmin = token.role === 'ADMIN' || (!!token.email && allow.includes(String(token.email).toLowerCase()));
       }
       return session;
     },

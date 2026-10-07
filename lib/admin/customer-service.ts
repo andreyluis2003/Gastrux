@@ -26,6 +26,8 @@ export interface CustomerListFilters {
   limit?: number;
   sortBy?: 'createdAt' | 'name' | 'subscriptionTier';
   sortOrder?: 'asc' | 'desc';
+  /** Only these restaurants (a funnel step or the ones needing attention) */
+  ids?: string[];
 }
 
 export async function listCustomers(filters: CustomerListFilters) {
@@ -37,14 +39,23 @@ export async function listCustomers(filters: CustomerListFilters) {
   if (filters.status) where.status = filters.status;
   if (filters.tier) where.subscriptionTier = filters.tier;
   if (filters.subscriptionStatus) where.subscriptionStatus = filters.subscriptionStatus;
+  if (filters.ids) where.id = { in: filters.ids };
 
   if (filters.search) {
     const q = filters.search.trim();
+    const owners = await prisma.user.findMany({
+      where: { OR: [{ name: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] },
+      select: { id: true },
+      take: 200,
+    });
+    const ownerIds = owners.map((o) => o.id);
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
       { email: { contains: q, mode: 'insensitive' } },
       { cnpj: { contains: q, mode: 'insensitive' } },
       { id: { equals: q } },
+      // The owner's name or e-mail too: the one people remember
+      { ownerId: { in: ownerIds } },
     ];
   }
 

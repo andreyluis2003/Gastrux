@@ -29,8 +29,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (mode === 'none' || status === 'unauthenticated') return <>{children}</>;
 
-  const user = session?.user as { name?: string | null; role?: string } | undefined;
-  const groups = navFor(user?.role, user?.role === 'ADMIN');
+  const user = session?.user as { name?: string | null; role?: string; isPlatformAdmin?: boolean } | undefined;
+  const groups = navFor(user?.role, !!user?.isPlatformAdmin);
   const active = activeHref(groups, pathname);
   const sidebar = mode === 'sidebar';
   // The bell polls: mount it once, in the pinned menu on a computer, in the top bar otherwise

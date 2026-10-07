@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { ClientProfilePanel, type ClientNote } from '@/components/admin/client-profile-panel';
+import type { ClientProfile } from '@/lib/admin/client-profile';
 import {
   ArrowLeft,
   Building2,
@@ -64,6 +66,8 @@ interface UserRow {
 }
 
 interface CustomerDetail {
+  profile: ClientProfile | null;
+  notes: ClientNote[];
   restaurant: {
     id: string;
     name: string;
@@ -134,7 +138,7 @@ export default function CustomerDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/customers/${id}`);
+      const res = await fetch(`/api/admin/customers/${id}`, { cache: 'no-store' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
@@ -227,6 +231,10 @@ export default function CustomerDetailPage() {
         </Button>
       </div>
 
+      {detail.profile && (
+        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} onChange={fetchDetail} />
+      )}
+
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -252,12 +260,12 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="pt-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Receita total
+              Vendas recebidas pelo restaurante
             </p>
             <p className="mt-1 text-2xl font-bold text-emerald-600">
               {formatCurrency(stats.lifetimeRevenue)}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">Pagamentos aprovados</p>
+            <p className="mt-1 text-xs text-muted-foreground">Pagamentos aprovados dos clientes dele (não é o que paga à Gastrux)</p>
           </CardContent>
         </Card>
         <Card>
