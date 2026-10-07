@@ -1777,6 +1777,12 @@ model OrderSession {
   customerName         String?
   tableNumber          Int?
   notes                String?
+  /// Service charge charged, written when the bill closes (0 = not charged)
+  serviceChargeCents   Int                   @default(0)
+  /// The customer declined the service charge (every device and the pre-bill agree while the bill is open)
+  serviceChargeWaived  Boolean               @default(false)
+  /// Pre-bill printed: the table asked for the bill; cleared when a new item is added
+  preBillPrintedAt     DateTime?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   items                OrderSessionItem[]
@@ -2827,6 +2833,8 @@ model Restaurant {
   subscriptionTier        String                    @default("starter")
   /// When commissions are closed for payment (2026-10-06); the screen also shows week and month views
   commissionPayPeriod     CommissionPeriod          @default(MONTHLY)
+  /// Service charge suggested on the bill (tables and named comandas); 0 turns it off (spec 2026-10-07, 4.3)
+  serviceChargePercent    Int                       @default(10)
   subscriptionStatus      String                    @default("active")
   billingCycleStart       DateTime?
   billingCycleEnd         DateTime?
