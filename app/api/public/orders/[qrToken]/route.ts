@@ -128,6 +128,8 @@ export async function POST(
       });
       createdItems.push(created);
     }
+    // A new order after the pre-bill: the table is ordering again (spec 2026-10-07, 4.3)
+    await prisma.orderSession.updateMany({ where: { id: orderSession.id, preBillPrintedAt: { not: null } }, data: { preBillPrintedAt: null } });
 
     return NextResponse.json({
       success: true,

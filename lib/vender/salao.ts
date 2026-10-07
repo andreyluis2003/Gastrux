@@ -18,6 +18,8 @@ export interface SalaoSession {
   itemCount: number;
   newCount: number;
   status: string;
+  /** Pre-bill printed: the table asked for the bill (yellow on the map) */
+  billRequested: boolean;
 }
 export interface SalaoTable { id: string; number: number; sectionId: string | null; sectionName: string | null; capacity: number | null; session: SalaoSession | null }
 export interface Salao { sections: Array<{ id: string; name: string }>; tables: SalaoTable[]; others: SalaoSession[]; deliveryNew: number }
@@ -34,7 +36,7 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
     prisma.orderSession.findMany({
       where: { restaurantId, status: { in: [...OPEN] } },
       select: {
-        id: true, tableId: true, tableNumber: true, customerName: true, openedAt: true, sentToKitchenAt: true, status: true,
+        id: true, tableId: true, tableNumber: true, customerName: true, openedAt: true, sentToKitchenAt: true, status: true, preBillPrintedAt: true,
         table: { select: { number: true } },
         user: { select: { name: true } },
         items: { select: { price: true, quantity: true, addedAt: true, modifiers: { select: { priceAdjustment: true } } } },
@@ -57,6 +59,7 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
       itemCount: s.items.length,
       newCount: s.items.filter((i) => isUnsent({ addedAt: i.addedAt.toISOString() }, sent)).length,
       status: s.status,
+      billRequested: !!s.preBillPrintedAt,
     };
   };
 

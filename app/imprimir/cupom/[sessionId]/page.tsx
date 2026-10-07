@@ -106,6 +106,12 @@ export default function ReceiptPage() {
           <span>TOTAL</span>
           <span>{money(receipt.total)}</span>
         </div>
+        {receipt.serviceCharge > 0 && (
+          <>
+            <div className="row"><span>Taxa de serviço (fora da nota)</span><span>{money(receipt.serviceCharge)}</span></div>
+            <div className="row big"><span>TOTAL PAGO</span><span>{money(receipt.grandTotal)}</span></div>
+          </>
+        )}
         {receipt.paymentMethod && (
           <div className="row">
             <span>Forma de pagamento</span>

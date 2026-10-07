@@ -217,3 +217,13 @@ export async function refundBillPayment(
     return (await loadBill(tx, member.restaurantId, sessionId))!;
   });
 }
+
+/** The pre-bill was printed: the table "asked for the bill" (yellow on the map) until a new item comes */
+export async function markPreBill(member: RestaurantMember, sessionId: string): Promise<Bill> {
+  const updated = await prisma.orderSession.updateMany({
+    where: { id: sessionId, restaurantId: member.restaurantId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
+    data: { preBillPrintedAt: new Date() },
+  });
+  if (updated.count === 0) throw new CashRuleError('Comanda não encontrada ou já fechada', 404);
+  return (await loadBill(prisma, member.restaurantId, sessionId))!;
+}

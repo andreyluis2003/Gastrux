@@ -76,6 +76,10 @@ export interface Receipt {
   status: string;
   lines: Array<{ quantity: number; name: string; unitPrice: number; total: number; modifiers: Array<{ name: string; price: number }> }>;
   total: number;
+  /** Service charge, outside the NFC-e (spec 2026-10-07, 4.5) */
+  serviceCharge: number;
+  /** Items plus service charge: what the customer paid */
+  grandTotal: number;
   customerCPF: string | null;
   paymentMethod: string | null;
   nfce: null | {
@@ -143,6 +147,8 @@ export async function buildReceipt(restaurantId: string, sessionId: string): Pro
     status: session.status,
     lines,
     total,
+    serviceCharge: session.serviceChargeCents / 100,
+    grandTotal: (Math.round(total * 100) + session.serviceChargeCents) / 100,
     customerCPF: doc?.customerCPF ?? null,
     paymentMethod: snapshot.paymentMethod ?? null,
     nfce: doc

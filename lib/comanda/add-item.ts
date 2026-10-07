@@ -25,6 +25,11 @@ export class AddItemError extends Error {
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
+/** A new item after the pre-bill: the table is ordering again, not waiting for the bill (spec 2026-10-07, 4.3) */
+async function clearPreBill(db: Db, sessionId: string) {
+  await db.orderSession.updateMany({ where: { id: sessionId, preBillPrintedAt: { not: null } }, data: { preBillPrintedAt: null } });
+}
+
 export async function addComandaItem(db: Db, restaurantId: string, sessionId: string, input: AddItemInput) {
   const quantity = input.quantity ?? 1;
   if (!Number.isInteger(quantity) || quantity < 1) {
@@ -57,7 +62,7 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
     : [];
   if (modifiers.length !== modifierIds.length) throw new AddItemError('Modificador não encontrado', 404);
 
-  return db.orderSessionItem.create({
+  const created = await db.orderSessionItem.create({
     data: {
       sessionId,
       recipeId,
@@ -73,6 +78,8 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
       modifiers: { include: { modifier: { select: { name: true } } } },
     },
   });
+  await clearPreBill(db, sessionId);
+  return created;
 }
 
 /** Serialises the writes of one comanda that must see each other: one-tap adds and the send to the kitchen */
@@ -119,6 +126,7 @@ export async function addOrMergeComandaItem(restaurantId: string, sessionId: str
               modifiers: { include: { modifier: { select: { name: true } } } },
             },
           });
+          await clearPreBill(tx, sessionId);
           return { item, merged: true };
         }
       }
