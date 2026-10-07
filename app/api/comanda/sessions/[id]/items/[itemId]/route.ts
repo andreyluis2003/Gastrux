@@ -47,10 +47,17 @@ async function handlePUT(
     const line = await loadLine(params, member.restaurantId);
     if (!line) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
 
-    const { quantity, specialInstructions, reason } = await request.json();
+    const { quantity, specialInstructions, modifierIds, reason } = await request.json();
 
     if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
       return NextResponse.json({ error: 'Quantidade inválida: use um número inteiro a partir de 1' }, { status: 400 });
+    }
+    if (specialInstructions !== undefined && specialInstructions !== null && String(specialInstructions).length > 140) {
+      return NextResponse.json({ error: 'Observação longa demais (máx. 140 caracteres)' }, { status: 400 });
+    }
+    // What the kitchen already has is not changed under it (spec 2026-10-07, 4.2): only the quantity rule below
+    if (kitchenHasIt(line) && (modifierIds !== undefined || specialInstructions !== undefined)) {
+      return NextResponse.json({ error: 'A cozinha já recebeu este item: não dá para mudar adicionais ou observação' }, { status: 409 });
     }
     const reducing = quantity !== undefined && quantity < line.quantity;
     if (reducing && kitchenHasIt(line)) {
@@ -62,15 +69,36 @@ async function handlePUT(
       }
     }
 
-    const item = await prisma.orderSessionItem.update({
-      where: { id: params.itemId },
-      data: {
-        quantity: quantity !== undefined ? quantity : undefined,
-        specialInstructions: specialInstructions !== undefined ? specialInstructions : undefined,
-      },
-      include: {
-        recipe: { select: { name: true, sellingPrice: true } },
-      },
+    // Modifiers are replaced as a whole list; each surcharge comes from the restaurant's own record
+    let modifiers: Array<{ id: string; priceAdjustment: any }> | null = null;
+    if (modifierIds !== undefined) {
+      const ids = [...new Set((Array.isArray(modifierIds) ? modifierIds : []).map(String))];
+      modifiers = ids.length
+        ? await prisma.itemModifier.findMany({ where: { id: { in: ids }, restaurantId: member.restaurantId }, select: { id: true, priceAdjustment: true } })
+        : [];
+      if (modifiers.length !== ids.length) return NextResponse.json({ error: 'Adicional não encontrado' }, { status: 404 });
+    }
+
+    const item = await prisma.$transaction(async (tx) => {
+      if (modifiers) {
+        await tx.orderSessionItemModifier.deleteMany({ where: { sessionItemId: params.itemId } });
+        if (modifiers.length) {
+          await tx.orderSessionItemModifier.createMany({
+            data: modifiers.map((m) => ({ sessionItemId: params.itemId, modifierId: m.id, priceAdjustment: m.priceAdjustment })),
+          });
+        }
+      }
+      return tx.orderSessionItem.update({
+        where: { id: params.itemId },
+        data: {
+          quantity: quantity !== undefined ? quantity : undefined,
+          specialInstructions: specialInstructions !== undefined ? (String(specialInstructions ?? '').trim() || null) : undefined,
+        },
+        include: {
+          recipe: { select: { name: true, sellingPrice: true } },
+          modifiers: { include: { modifier: { select: { name: true } } } },
+        },
+      });
     });
 
     if (quantity !== undefined && quantity !== line.quantity) {
