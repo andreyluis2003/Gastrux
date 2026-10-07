@@ -4,7 +4,11 @@ import { lineTotalCents } from '@/lib/comanda/line-total';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
-import { billTotals, paidNetCents, serviceApplies } from './bill';
+import { recordSaleEntries, resolveSaleShift } from '@/lib/caixa/sale';
+import { CASH_METHODS, toNfcePaymentMethod, type CashMethod } from '@/lib/caixa/payment-methods';
+import type { PaymentInput } from '@/lib/caixa/rules';
+import { autoEmitNFCe } from '@/lib/nfe/emit-session';
+import { billTotals, paidNetCents, serviceApplies, settlePartial } from './bill';
 
 /**
  * The bill of a comanda (spec 2026-10-07, 4.3): items, service charge, what the cash register already
@@ -117,4 +121,59 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
     await recordAudit(member, { action: 'UPDATE', entityType: 'OrderSession', entityId: sessionId, changes: { serviceChargeWaived: waived } });
     return (await loadBill(tx, member.restaurantId, sessionId))!;
   });
+}
+
+/**
+ * One payment towards the bill (spec 4.3): recorded at once in the open shift, linked to the comanda.
+ * When what was paid reaches the total, the bill closes in the same transaction (status, service charge
+ * written, table free) and the NFC-e is issued afterwards if the restaurant turned it on. Under the
+ * comanda lock: two devices paying the same remainder at once never both get in.
+ */
+export async function recordBillPayment(
+  member: RestaurantMember,
+  sessionId: string,
+  input: { payments: PaymentInput[]; cashSessionId?: string | null; customerCPF?: string | null },
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    await lockComanda(tx, sessionId);
+    const bill = await loadBill(tx, member.restaurantId, sessionId);
+    if (!bill) throw new CashRuleError('Comanda não encontrada', 404);
+    if (bill.status === 'CANCELLED') throw new CashRuleError('Comanda cancelada', 409);
+    if (bill.status === 'CLOSED') throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
+    const settled = settlePartial(bill.remainingCents, input.payments);
+    const target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: input.cashSessionId, replay: false, legacy: false });
+    await recordSaleEntries(tx, { restaurantId: member.restaurantId, target: target!, orderSessionId: sessionId, settled, createdById: member.userId });
+    const paidNow = settled.paidCents - settled.changeCents;
+    const closed = bill.paidCents + paidNow >= bill.totalCents;
+    if (closed) {
+      const guard = await tx.orderSession.updateMany({
+        where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
+        data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: bill.serviceCents },
+      });
+      if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
+    }
+    return { closed, changeCents: settled.changeCents, customerName: bill.customerName };
+  });
+
+  let nfce: unknown = null;
+  if (result.closed) {
+    // The method that paid the most goes on the note (same rule as the old close)
+    const entries = await prisma.cashSessionEntry.findMany({
+      where: { orderSessionId: sessionId, restaurantId: member.restaurantId, type: 'RECEIPT' },
+      select: { method: true, amountCents: true },
+    });
+    const byMethod = new Map<CashMethod, number>();
+    for (const e of entries) byMethod.set(e.method as CashMethod, (byMethod.get(e.method as CashMethod) ?? 0) + e.amountCents);
+    const primary = CASH_METHODS.reduce((best, m) => ((byMethod.get(m) ?? 0) > (byMethod.get(best) ?? 0) ? m : best), 'CASH' as CashMethod);
+    nfce = await autoEmitNFCe({
+      restaurantId: member.restaurantId,
+      orderSessionId: sessionId,
+      customerCPF: input.customerCPF ? String(input.customerCPF).replace(/\D/g, '') || undefined : undefined,
+      customerName: result.customerName ?? undefined,
+      paymentMethod: toNfcePaymentMethod(primary),
+      onlyIfEnabled: true,
+    });
+  }
+  const bill = (await loadBill(prisma, member.restaurantId, sessionId))!;
+  return { bill, changeCents: result.changeCents, closed: result.closed, nfce };
 }

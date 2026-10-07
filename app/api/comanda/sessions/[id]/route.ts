@@ -12,6 +12,7 @@ import { CashRuleError, settlePayments } from '@/lib/caixa/rules';
 import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, reverseSaleEntries, type SaleTarget } from '@/lib/caixa/sale';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
+import { billTotals, paidNetCents, serviceApplies } from '@/lib/comanda/bill';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,7 +125,21 @@ async function handlePUT(
         if (closing) {
           const read = readPayments(body);
           if (!read) throw new CashRuleError('Informe as formas de pagamento');
-          const total = await comandaTotalCents(tx, params.id);
+          // The bill screen pays in parts (POST .../payments); an old close from a device queue must
+          // never charge the whole total again over those parts (spec 2026-10-07, 4.3). Net paid, so a
+          // bill reopened by a manager (its money already given back) can still be closed here
+          const lines = await tx.cashSessionEntry.findMany({ where: { orderSessionId: params.id, restaurantId }, select: { type: true, method: true, amountCents: true, direction: true } });
+          if (paidNetCents(lines) > 0) throw new CashRuleError('Esta conta já tem pagamentos: feche pela tela Conta', 422, 'PARTIAL_PAYMENTS');
+          const itemsTotal = await comandaTotalCents(tx, params.id);
+          const bill = await tx.orderSession.findUnique({
+            where: { id: params.id },
+            select: { tableId: true, tableNumber: true, customerName: true, restaurant: { select: { serviceChargePercent: true } } },
+          });
+          const { serviceCents } = billTotals(itemsTotal, bill?.restaurant.serviceChargePercent ?? 0, {
+            applies: serviceApplies(bill ?? {}),
+            waived: body?.serviceCharge !== true,
+          });
+          const total = itemsTotal + serviceCents;
           // Legacy body (one paymentMethod, older devices): the whole total in that method
           const payments = read.legacy ? [{ method: read.payments[0].method, amount: (total / 100).toFixed(2) }] : read.payments;
           const settled = settlePayments(total, payments);
@@ -132,7 +147,7 @@ async function handlePUT(
           // Only one close writes: a second device sees the comanda already closed
           const guard = await tx.orderSession.updateMany({
             where: { id: params.id, status: { not: 'CLOSED' } },
-            data: { status: 'CLOSED', closedAt: new Date() },
+            data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: serviceCents },
           });
           if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
           if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
