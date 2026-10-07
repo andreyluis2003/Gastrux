@@ -41,7 +41,8 @@ export default function TrocarSenhaPage() {
       }
       await update(); // the session drops the "must change" flag
       toast.success('Senha trocada');
-      router.replace('/dashboard');
+      // The middleware sends each role to its start screen (a cashier to Vender)
+      router.replace('/');
     } finally {
       setSaving(false);
     }

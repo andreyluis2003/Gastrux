@@ -35,6 +35,10 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw new AddItemError('Quantidade inválida: use um número inteiro a partir de 1', 400);
   }
+  // Same limit as editing a line (app/api/comanda/sessions/[id]/items/[itemId])
+  if (input.specialInstructions && String(input.specialInstructions).length > 140) {
+    throw new AddItemError('Observação longa demais (máx. 140 caracteres)', 400);
+  }
 
   let recipeId = input.recipeId || null;
   let price: number | null = null;

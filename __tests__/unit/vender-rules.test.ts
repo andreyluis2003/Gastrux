@@ -57,3 +57,10 @@ describe('openedLabel', () => {
     expect(openedLabel('2026-10-07T20:13:00.000Z', now)).toBe('aberta há 47 min');
   });
 });
+
+describe('menu items without a recipe', () => {
+  it('are not offered (adding them fails on the server)', () => {
+    const groups = groupByCategory([entry('a'), entry('b', { recipeId: null, recipe: null })]);
+    expect(groups[0].items.map((i) => i.id)).toEqual(['a']);
+  });
+});
