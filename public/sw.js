@@ -31,6 +31,7 @@ const STATIC_ASSETS = [
 // Reads the offline screens need (offline option (a)): comanda, counter sale menu, cash register,
 // kitchen screen. Every other API answer is never cached: offline it is an honest 503.
 const OFFLINE_API_PREFIXES = [
+  '/api/vender/salao',
   '/api/comanda/sessions',
   '/api/comanda/tables',
   '/api/cardapio/itens',
