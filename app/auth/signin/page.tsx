@@ -10,12 +10,12 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { ChefHat, Chrome } from 'lucide-react';
 import { useAnalytics } from '@/hooks/use-analytics';
-import { HOME_AFTER_LOGIN, safeCallback } from '@/lib/navigation/entry';
+import { safeCallback } from '@/lib/navigation/entry';
 
-/** The page the person was trying to open before being asked to log in, or the dashboard */
+/** The page the person was trying to open, else "/" (the middleware sends each role to its start page) */
 function destinationAfterLogin(): string {
-  if (typeof window === 'undefined') return HOME_AFTER_LOGIN;
-  return safeCallback(new URLSearchParams(window.location.search).get('callbackUrl')) || HOME_AFTER_LOGIN;
+  if (typeof window === 'undefined') return '/';
+  return safeCallback(new URLSearchParams(window.location.search).get('callbackUrl')) || '/';
 }
 
 export default function SignInPage() {

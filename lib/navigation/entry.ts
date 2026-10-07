@@ -25,8 +25,13 @@ export function safeCallback(callbackUrl: string | null | undefined): string | n
   }
 }
 
+/** Where each person starts (spec 2026-10-07, 4.1): the counter goes straight to the sales screen */
+export function homeFor(role: string | null | undefined): string {
+  return role === 'CASHIER' ? '/vender' : HOME_AFTER_LOGIN;
+}
+
 /** Where a logged-in person on an entry page goes, or null to stay */
-export function entryRedirect(pathname: string, callbackUrl: string | null, loggedIn: boolean): string | null {
+export function entryRedirect(pathname: string, callbackUrl: string | null, loggedIn: boolean, role?: string | null): string | null {
   if (!loggedIn || !ENTRY_PAGES.has(pathname)) return null;
-  return safeCallback(callbackUrl) || HOME_AFTER_LOGIN;
+  return safeCallback(callbackUrl) || homeFor(role);
 }

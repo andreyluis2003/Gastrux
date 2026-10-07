@@ -7,6 +7,12 @@ describe('logged-in people go straight to work (lib/navigation/entry.ts)', () =>
     expect(entryRedirect('/auth/signup', null, true)).toBe('/dashboard');
   });
 
+  it('a cashier goes straight to the sales screen; the others to the dashboard', () => {
+    expect(entryRedirect('/', null, true, 'CASHIER')).toBe('/vender');
+    expect(entryRedirect('/auth/signin', null, true, 'OWNER')).toBe('/dashboard');
+    expect(entryRedirect('/auth/signin', '/caixa', true, 'CASHIER')).toBe('/caixa');
+  });
+
   it('the page they were trying to open wins', () => {
     expect(entryRedirect('/auth/signin', '/caixa', true)).toBe('/caixa');
     expect(entryRedirect('/auth/signin', '/admin/fiscal?tab=documents', true)).toBe('/admin/fiscal?tab=documents');

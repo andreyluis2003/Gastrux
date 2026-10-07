@@ -19,7 +19,7 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
   });
 
   it('a cashier sees only what the counter uses', () => {
-    expect(hrefs(navFor('CASHIER', false))).toEqual(['/dashboard', '/comanda', '/admin/integrations/orders', '/caixa']);
+    expect(hrefs(navFor('CASHIER', false))).toEqual(['/dashboard', '/vender', '/admin/integrations/orders', '/caixa']);
   });
 
   it('a cook sees recipes and stock, not money', () => {
@@ -48,6 +48,8 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
       expect([p, shellMode(p)]).toEqual([p, 'none']);
     }
     expect(shellMode('/comanda')).toBe('drawer');
+    expect(shellMode('/vender')).toBe('drawer');
+    expect(shellMode('/vender/abc')).toBe('drawer');
     expect(shellMode('/cozinha')).toBe('drawer');
     for (const p of ['/dashboard', '/caixa', '/caixa/historico', '/admin/fiscal', '/insumos', '/estoque']) {
       expect([p, shellMode(p)]).toEqual([p, 'sidebar']);

@@ -38,7 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'vender',
     label: 'Vender',
     links: [
-      { label: 'Comandas e balcão', href: '/comanda', roles: FRONT },
+      { label: 'Mesas e balcão', href: '/vender', roles: FRONT },
       { label: 'Mesas', href: '/admin/tables', roles: MANAGERS },
       { label: 'Pedidos de delivery', href: '/admin/integrations/orders', roles: FRONT },
       { label: 'Cozinha (KDS)', href: '/cozinha', roles: [...MANAGERS, 'COOK'] },
@@ -178,7 +178,7 @@ const NO_SHELL_PREFIXES = [
   '/survey', '/termos', '/privacidade', '/billing/success', '/lp', '/para', '/menu', '/delivery', '/imprimir',
   '/conta/trocar-senha',
 ];
-const DRAWER_PREFIXES = ['/comanda', '/cozinha'];
+const DRAWER_PREFIXES = ['/vender', '/comanda', '/cozinha'];
 
 function matches(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(prefix + '/');
