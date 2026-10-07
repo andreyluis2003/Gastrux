@@ -9,7 +9,7 @@ import { useComanda, type ComandaLine } from '@/components/vender/use-comanda';
 import { MenuPanel } from '@/components/vender/menu-panel';
 import { ItemSheet } from '@/components/vender/item-sheet';
 import { ComandaPanel } from '@/components/vender/comanda-panel';
-import { CloseBillDialog } from '@/components/vender/close-bill-dialog';
+import { ContaDialog } from '@/components/vender/conta-dialog';
 import { isUnsent, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
@@ -139,16 +139,7 @@ export default function ComandaRapidaPage() {
       )}
 
       {showConta && (
-        <CloseBillDialog
-          sessionId={sessionId}
-          totalCents={c.totalCents}
-          // A close made offline counts as closed here too: the dialog must not offer to close (and charge) again
-          status={c.isClosed ? 'CLOSED' : s.status}
-          hasItems={c.lines.length > 0}
-          mutate={c.mutate}
-          onClosed={() => { c.refresh(); }}
-          onCancel={() => setShowConta(false)}
-        />
+        <ContaDialog sessionId={sessionId} onClosed={() => { c.refresh(); }} onCancel={() => { setShowConta(false); c.refresh(); }} />
       )}
     </div>
   );
