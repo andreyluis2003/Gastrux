@@ -144,7 +144,7 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
  * The NFC-e of a bill that just closed, when the restaurant turned it on: the method that paid the most
  * goes on the note (same rule as the old close). The note never fails the close.
  */
-async function emitClosedBill(member: RestaurantMember, sessionId: string, cpf?: string | null, customerName?: string | null) {
+export async function emitClosedBill(member: RestaurantMember, sessionId: string, cpf?: string | null, customerName?: string | null) {
   const entries = await prisma.cashSessionEntry.findMany({
     where: { orderSessionId: sessionId, restaurantId: member.restaurantId, type: 'RECEIPT' },
     select: { method: true, amountCents: true },

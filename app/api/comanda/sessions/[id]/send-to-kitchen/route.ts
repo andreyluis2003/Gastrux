@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { sendSessionToKitchen } from '@/lib/kds/send-session';
+import { resolveMergedSession } from '@/lib/comanda/transfer';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,8 @@ async function handlePOST(
     const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
     if (tierBlock) return tierBlock;
 
-    return await sendSessionToKitchen(restaurantId, params.id);
+    // Queued offline on another phone for a comanda merged meanwhile: the lines are on the other one now
+    return await sendSessionToKitchen(restaurantId, await resolveMergedSession(prisma, restaurantId, params.id));
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 });

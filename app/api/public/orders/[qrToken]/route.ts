@@ -2,6 +2,10 @@
 // No authentication required - creates or appends items to an active OrderSession
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { lockComanda } from '@/lib/comanda/add-item';
+import { OPEN_STATUSES as OPEN } from '@/lib/comanda/transfer';
+
+const OPEN_STATUSES = [...OPEN];
 
 export const dynamic = 'force-dynamic';
 
@@ -92,15 +96,23 @@ export async function POST(
 
     // The table's open comanda, whatever its stage (it looked only for OPEN, so once the comanda went to
     // the kitchen a QR order opened a second one the room never saw), under the same per-table lock as
-    // opening a table from Vender (app/api/comanda/sessions/route.ts)
-    const orderSession = await prisma.$transaction(async (tx) => {
+    // opening a table from Vender (app/api/comanda/sessions/route.ts). The lines go in under the comanda
+    // lock too, checked open again: a merge or a close at that moment never leaves them on a comanda
+    // that is no longer billed (review of tela Vender stage 3)
+    const { orderSession, createdItems } = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-table:' + table.id}))`;
-      const open = await tx.orderSession.findFirst({
-        where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: ['OPEN', 'SENT_TO_KITCHEN', 'READY'] } },
-        orderBy: { openedAt: 'asc' },
-      });
-      if (open) return open;
-      return tx.orderSession.create({
+      let orderSession = null;
+      for (let attempt = 0; attempt < 3 && !orderSession; attempt++) {
+        const open = await tx.orderSession.findFirst({
+          where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: OPEN_STATUSES } },
+          orderBy: { openedAt: 'asc' },
+          select: { id: true },
+        });
+        if (!open) break;
+        await lockComanda(tx, open.id);
+        orderSession = await tx.orderSession.findFirst({ where: { id: open.id, status: { in: OPEN_STATUSES } } });
+      }
+      orderSession ??= await tx.orderSession.create({
         data: {
           restaurantId: table.restaurantId,
           userId: ownerId,
@@ -111,24 +123,23 @@ export async function POST(
           serviceChargeEligible: true,
         },
       });
-    });
 
-    // Add items to the session
-    const createdItems = [];
-    for (const it of items) {
-      const mi = menuItemMap.get(it.menuItemId)!;
-      const created = await prisma.orderSessionItem.create({
-        data: {
-          sessionId: orderSession.id,
-          recipeId: mi.recipeId!,
-          quantity: Math.max(1, parseInt(it.quantity) || 1),
-          price: mi.price,
-          specialInstructions: it.specialInstructions?.trim() || null,
-        },
-        include: { recipe: { select: { name: true } } },
-      });
-      createdItems.push(created);
-    }
+      const createdItems = [];
+      for (const it of items) {
+        const mi = menuItemMap.get(it.menuItemId)!;
+        createdItems.push(await tx.orderSessionItem.create({
+          data: {
+            sessionId: orderSession.id,
+            recipeId: mi.recipeId!,
+            quantity: Math.max(1, parseInt(it.quantity) || 1),
+            price: mi.price,
+            specialInstructions: it.specialInstructions?.trim() || null,
+          },
+          include: { recipe: { select: { name: true } } },
+        }));
+      }
+      return { orderSession, createdItems };
+    });
     // A new order after the pre-bill: the table is ordering again (spec 2026-10-07, 4.3)
     await prisma.orderSession.updateMany({ where: { id: orderSession.id, preBillPrintedAt: { not: null } }, data: { preBillPrintedAt: null } });
 

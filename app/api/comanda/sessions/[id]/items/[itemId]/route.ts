@@ -5,6 +5,7 @@ import { idempotent } from '@/lib/api/idempotency';
 import { isManager, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { paidNetCents } from '@/lib/comanda/bill';
+import { resolveMergedSession } from '@/lib/comanda/transfer';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,8 @@ async function handlePUT(
     if (!auth.ok) return auth.response;
     const { member } = auth;
 
+    // Queued offline on another phone for a comanda merged meanwhile: the line is on the other one now
+    params = { ...params, id: await resolveMergedSession(prisma, member.restaurantId, params.id) };
     const line = await loadLine(params, member.restaurantId);
     if (!line) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     if (closedComanda(line)) return NextResponse.json(CLOSED_ANSWER, { status: 409 });
@@ -180,6 +183,8 @@ async function handleDELETE(
     if (!auth.ok) return auth.response;
     const { member } = auth;
 
+    // Queued offline on another phone for a comanda merged meanwhile: the line is on the other one now
+    params = { ...params, id: await resolveMergedSession(prisma, member.restaurantId, params.id) };
     const line = await loadLine(params, member.restaurantId);
     if (!line) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
 

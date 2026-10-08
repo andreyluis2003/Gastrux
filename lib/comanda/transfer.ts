@@ -4,6 +4,7 @@ import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { paidNetCents } from './bill';
+import { emitClosedBill, loadBill } from './bill-service';
 
 /**
  * Moving comandas around the room (spec 2026-10-07, 4.4): transfer a comanda to another table, merge
@@ -32,6 +33,38 @@ async function openSession(tx: Prisma.TransactionClient, restaurantId: string, i
   return s;
 }
 
+/**
+ * A comanda merged into another (CANCELLED with mergedIntoId) is followed to the one it went into, so an
+ * action queued offline on another phone (add, edit, send) lands where its lines are now
+ */
+export async function resolveMergedSession(db: Prisma.TransactionClient | typeof prisma, restaurantId: string, sessionId: string) {
+  let id = sessionId;
+  for (let hop = 0; hop < 5; hop++) {
+    const s = await db.orderSession.findFirst({ where: { id, restaurantId }, select: { status: true, mergedIntoId: true } });
+    if (!s || s.status !== 'CANCELLED' || !s.mergedIntoId) return id;
+    id = s.mergedIntoId;
+  }
+  return id;
+}
+
+// A manager's reopening (lib/caixa/sale.ts reverseSaleEntries) marks every payment made before it as
+// given back by time (loadBill): mixed with another comanda's payments, it would mark those too
+const REOPEN_PREFIX = 'Reabertura da comanda';
+async function assertNotReopened(tx: Prisma.TransactionClient, restaurantId: string, ids: string[]) {
+  const reopened = await tx.cashSessionEntry.count({
+    where: { orderSessionId: { in: ids }, restaurantId, type: 'REFUND', description: { startsWith: REOPEN_PREFIX } },
+  });
+  if (reopened) throw new CashRuleError('Uma das comandas foi reaberta pelo gerente: feche-a antes de juntar', 409, 'REOPENED');
+}
+
+// One NFC-e per sale (lib/nfe/emit-session.ts): lines that already went on a note never go on another one
+async function assertNoNote(tx: Prisma.TransactionClient, sessionId: string) {
+  const note = await tx.nFeDocument.count({
+    where: { orderSessionId: sessionId, status: { in: ['authorized', 'submitted', 'processing', 'pending'] } },
+  });
+  if (note) throw new CashRuleError('Esta comanda já tem NFC-e: os itens dela não vão para outra conta', 409, 'HAS_NFCE');
+}
+
 /** The whole comanda (lines, payments, time open, pre-bill) goes to a free table; the old one is free */
 export async function transferTable(member: RestaurantMember, sessionId: string, tableId: string) {
   return prisma.$transaction(async (tx) => {
@@ -46,7 +79,7 @@ export async function transferTable(member: RestaurantMember, sessionId: string,
       select: { id: true },
     });
     if (busy) throw new TableBusyError(busy.id, table.number);
-    await tx.orderSession.update({ where: { id: sessionId }, data: { tableId: table.id, tableNumber: table.number, serviceChargeEligible: true } });
+    await tx.orderSession.update({ where: { id: sessionId }, data: { tableId: table.id, tableNumber: table.number } });
     await recordAudit(member, {
       action: 'UPDATE',
       entityType: 'OrderSession',
@@ -71,10 +104,12 @@ async function lockBoth(tx: Prisma.TransactionClient, a: string, b: string) {
  */
 export async function mergeSessions(member: RestaurantMember, targetSessionId: string, sourceSessionId: string) {
   if (targetSessionId === sourceSessionId) throw new CashRuleError('Escolha outra comanda para juntar', 400);
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await lockBoth(tx, targetSessionId, sourceSessionId);
     const target = await openSession(tx, member.restaurantId, targetSessionId);
     const source = await openSession(tx, member.restaurantId, sourceSessionId);
+    await assertNotReopened(tx, member.restaurantId, [target.id, source.id]);
+    await assertNoNote(tx, source.id);
     const items = await tx.orderSessionItem.updateMany({ where: { sessionId: source.id }, data: { sessionId: target.id } });
     const payments = await tx.cashSessionEntry.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
     await tx.order.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
@@ -87,8 +122,22 @@ export async function mergeSessions(member: RestaurantMember, targetSessionId: s
       entityId: target.id,
       changes: { merge: { from: source.id, fromTableNumber: source.tableNumber, items: items.count, payments: payments.count } },
     });
-    return { sessionId: target.id, movedItems: items.count, movedPayments: payments.count };
+    // What was paid on both may already cover the joined bill (it would be stuck open with nothing to
+    // receive), or go over it (the target had no service charge): same rule as removing the charge
+    const bill = (await loadBill(tx, member.restaurantId, target.id))!;
+    if (bill.paidCents > bill.totalCents) {
+      throw new CashRuleError('Juntas, as contas ficariam pagas a mais: estorne um pagamento antes de juntar', 409, 'OVERPAID');
+    }
+    let closed = false;
+    if (bill.paidCents > 0 && bill.remainingCents === 0) {
+      await tx.orderSession.update({ where: { id: target.id }, data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: bill.serviceCents } });
+      closed = true;
+    }
+    return { sessionId: target.id, movedItems: items.count, movedPayments: payments.count, closed, customerName: bill.customerName };
   });
+  if (result.closed) await emitClosedBill(member, result.sessionId, null, result.customerName);
+  const { customerName: _name, ...answer } = result;
+  return answer;
 }
 
 /**
@@ -125,6 +174,7 @@ export async function moveItems(
     await lockBoth(tx, sourceSessionId, targetId);
     await openSession(tx, member.restaurantId, sourceSessionId);
     await openSession(tx, member.restaurantId, targetId);
+    await assertNoNote(tx, sourceSessionId);
     const lines = await tx.cashSessionEntry.findMany({
       where: { orderSessionId: sourceSessionId, restaurantId: member.restaurantId },
       select: { type: true, method: true, amountCents: true, direction: true },

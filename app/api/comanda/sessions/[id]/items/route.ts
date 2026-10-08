@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { addComandaItemLocked, addOrMergeComandaItem, AddItemError } from '@/lib/comanda/add-item';
+import { resolveMergedSession } from '@/lib/comanda/transfer';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,8 @@ async function handlePOST(
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
 
     const body = await request.json();
+    // Queued offline on another phone for a comanda merged meanwhile: it goes where its lines went
+    params = { ...params, id: await resolveMergedSession(prisma, restaurantId, params.id) };
 
     const orderSession = await prisma.orderSession.findFirst({
       where: { id: params.id, restaurantId },
