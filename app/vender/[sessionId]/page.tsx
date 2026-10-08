@@ -10,6 +10,7 @@ import { MenuPanel } from '@/components/vender/menu-panel';
 import { ItemSheet } from '@/components/vender/item-sheet';
 import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
+import { MesaActions } from '@/components/vender/mesa-actions';
 import { isUnsent, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
@@ -74,6 +75,11 @@ export default function ComandaRapidaPage() {
             {c.isClosed ? ' · conta fechada' : ''}
           </p>
         </div>
+        {!c.isClosed && (
+          <div className="ml-auto">
+            <MesaActions sessionId={sessionId} lines={c.lines} onDone={(goTo) => (goTo ? router.push(goTo) : c.refresh())} />
+          </div>
+        )}
       </div>
 
       {(c.staleSince || !c.online) && (
