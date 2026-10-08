@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { lineTotalCents } from '@/lib/comanda/line-total';
-import { isUnsent, sessionLabel } from './rules';
+import { sessionLabel } from './rules';
 
 /**
  * Everything the Vender map shows, in one round trip (spec 2026-10-07, 4.1): tables with their open
@@ -36,10 +36,10 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
     prisma.orderSession.findMany({
       where: { restaurantId, status: { in: [...OPEN] } },
       select: {
-        id: true, tableId: true, tableNumber: true, customerName: true, openedAt: true, sentToKitchenAt: true, status: true, preBillPrintedAt: true,
+        id: true, tableId: true, tableNumber: true, customerName: true, openedAt: true, status: true, preBillPrintedAt: true,
         table: { select: { number: true } },
         user: { select: { name: true } },
-        items: { select: { price: true, quantity: true, addedAt: true, modifiers: { select: { priceAdjustment: true } } } },
+        items: { select: { price: true, quantity: true, sentAt: true, modifiers: { select: { priceAdjustment: true } } } },
       },
       orderBy: { openedAt: 'asc' },
     }),
@@ -47,7 +47,6 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
   ]);
 
   const toSession = (s: (typeof sessions)[number]): SalaoSession => {
-    const sent = s.sentToKitchenAt?.toISOString() ?? null;
     return {
       id: s.id,
       label: sessionLabel(s),
@@ -57,7 +56,7 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
       openedBy: s.user?.name ?? null,
       totalCents: s.items.reduce((sum, i) => sum + lineTotalCents(i.price, i.quantity, i.modifiers.map((m) => m.priceAdjustment)), 0),
       itemCount: s.items.length,
-      newCount: s.items.filter((i) => isUnsent({ addedAt: i.addedAt.toISOString() }, sent)).length,
+      newCount: s.items.filter((i) => !i.sentAt).length,
       status: s.status,
       billRequested: !!s.preBillPrintedAt,
     };

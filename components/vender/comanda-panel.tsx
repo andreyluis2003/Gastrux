@@ -8,9 +8,8 @@ import { isUnsent } from '@/lib/vender/rules';
 import type { ComandaLine } from '@/components/vender/use-comanda';
 
 /** The comanda list with total, "Enviar para cozinha (N)" and "Conta" (spec 2026-10-07, 4.2) */
-export function ComandaPanel({ lines, sentToKitchenAt, totalCents, newCount, isClosed, onLine, onSend, onConta }: {
+export function ComandaPanel({ lines, totalCents, newCount, isClosed, onLine, onSend, onConta }: {
   lines: ComandaLine[];
-  sentToKitchenAt: string | null | undefined;
   totalCents: number;
   newCount: number;
   isClosed: boolean;
@@ -25,7 +24,7 @@ export function ComandaPanel({ lines, sentToKitchenAt, totalCents, newCount, isC
       ) : (
         <ul className="space-y-2">
           {lines.map((l) => {
-            const fresh = isUnsent(l, sentToKitchenAt);
+            const fresh = isUnsent(l);
             return (
               <li key={l.id}>
                 <button

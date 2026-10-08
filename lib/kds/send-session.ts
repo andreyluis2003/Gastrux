@@ -42,9 +42,9 @@ async function sendUnlocked(restaurantId: string, sessionId: string): Promise<Re
     return NextResponse.json({ error: 'Comanda fechada ou cancelada' }, { status: 409 });
   }
 
-  // Only what the kitchen does not have yet (same rule as the item removal: addedAt <= sentToKitchenAt)
-  const lastSent = orderSession.sentToKitchenAt;
-  const newItems = orderSession.items.filter((item) => !lastSent || item.addedAt > lastSent);
+  // What the kitchen does not have yet: lines with no sentAt (each line keeps its own state, so a line
+  // moved from another comanda is never sent twice — spec 2026-10-07, 7)
+  const newItems = orderSession.items.filter((item) => !item.sentAt);
   if (newItems.length === 0) {
     return NextResponse.json(
       { error: orderSession.items.length === 0 ? 'No items in session' : 'Nada novo para enviar à cozinha' },
@@ -61,6 +61,8 @@ async function sendUnlocked(restaurantId: string, sessionId: string): Promise<Re
         restaurantId,
         orderNumber,
         orderType: 'DINE_IN',
+        // Every kitchen order points to its comanda (orderId on the comanda keeps only the latest)
+        orderSessionId: sessionId,
         status: 'PENDING',
         priority: 'NORMAL',
         estimatedPrepTime,
@@ -91,16 +93,12 @@ async function sendUnlocked(restaurantId: string, sessionId: string): Promise<Re
     })
   );
 
-  // The kitchen now has every line up to the newest one sent (a line added while this request ran
-  // has a later addedAt and stays "new" for the next send)
-  const sentUpTo = newItems[newItems.length - 1].addedAt;
+  // The kitchen now has exactly these lines (a line added meanwhile keeps sentAt null for the next send)
+  const sentAt = new Date();
+  await prisma.orderSessionItem.updateMany({ where: { id: { in: newItems.map((i) => i.id) } }, data: { sentAt } });
   await prisma.orderSession.update({
     where: { id: sessionId },
-    data: {
-      orderId: order.id,
-      status: 'SENT_TO_KITCHEN',
-      sentToKitchenAt: sentUpTo,
-    },
+    data: { orderId: order.id, status: 'SENT_TO_KITCHEN', sentToKitchenAt: sentAt },
   });
 
   return NextResponse.json({

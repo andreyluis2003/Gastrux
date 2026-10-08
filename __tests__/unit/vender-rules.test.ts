@@ -18,13 +18,12 @@ describe('groupByCategory', () => {
 });
 
 describe('new and sent lines', () => {
-  const sent = '2026-10-07T20:00:00.000Z';
-  it('a line added after the last send, or with no send yet, or pending offline, is new', () => {
-    expect(isUnsent({ addedAt: '2026-10-07T20:05:00.000Z' }, sent)).toBe(true);
-    expect(isUnsent({ addedAt: '2026-10-07T19:55:00.000Z' }, sent)).toBe(false);
-    expect(isUnsent({ addedAt: '2026-10-07T19:55:00.000Z' }, null)).toBe(true);
-    expect(isUnsent({ pending: true }, sent)).toBe(true);
-    expect(unsentCount([{ addedAt: '2026-10-07T20:05:00.000Z' }, { addedAt: '2026-10-07T19:00:00.000Z' }, { pending: true }], sent)).toBe(2);
+  it('a line without sentAt, or pending offline, is new; one the kitchen got is not', () => {
+    expect(isUnsent({ sentAt: null })).toBe(true);
+    expect(isUnsent({})).toBe(true);
+    expect(isUnsent({ sentAt: '2026-10-07T20:00:00.000Z' })).toBe(false);
+    expect(isUnsent({ pending: true, sentAt: '2026-10-07T20:00:00.000Z' })).toBe(true);
+    expect(unsentCount([{ sentAt: null }, { sentAt: '2026-10-07T20:00:00.000Z' }, { pending: true }])).toBe(2);
   });
 });
 

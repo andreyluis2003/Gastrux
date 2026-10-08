@@ -123,8 +123,7 @@ export async function addOrMergeComandaItem(restaurantId: string, sessionId: str
     const plain = !(input.modifierIds ?? []).length && !String(input.specialInstructions ?? '').trim();
     if (plain && input.menuItemId) {
       const menuItem = await tx.menuItem.findFirst({ where: { id: input.menuItemId, restaurantId }, select: { recipeId: true, price: true } });
-      const session = await tx.orderSession.findFirst({ where: { id: sessionId, restaurantId }, select: { sentToKitchenAt: true } });
-      if (menuItem?.recipeId && session) {
+      if (menuItem?.recipeId) {
         const target = await tx.orderSessionItem.findFirst({
           where: {
             sessionId,
@@ -132,7 +131,8 @@ export async function addOrMergeComandaItem(restaurantId: string, sessionId: str
             price: menuItem.price,
             specialInstructions: null,
             modifiers: { none: {} },
-            ...(session.sentToKitchenAt ? { addedAt: { gt: session.sentToKitchenAt } } : {}),
+            // Only a line the kitchen does not have yet
+            sentAt: null,
           },
           orderBy: { addedAt: 'desc' },
           select: { id: true },

@@ -10,6 +10,8 @@ export interface ComandaLine {
   id: string;
   recipeId: string;
   addedAt?: string;
+  /** When the kitchen got this line (null = new) */
+  sentAt?: string | null;
   pending?: boolean;
   quantity: number;
   price: string | number;
@@ -103,9 +105,8 @@ export function useComanda(sessionId: string) {
   const lines: ComandaLine[] = [...(session?.items ?? []).filter((i) => !pendingRemovals.has(i.id)), ...pendingLines];
   const closePending = pendingOps.some((e) => e.method === 'PUT' && (e.body as any)?.status === 'CLOSED');
   const isClosed = session?.status === 'CLOSED' || session?.status === 'CANCELLED' || closePending;
-  const sent = session?.sentToKitchenAt ?? null;
   const totalCents = lines.reduce((s, l) => s + lineTotalCents(l.price, l.quantity, (l.modifiers ?? []).map((m) => m.priceAdjustment)), 0);
-  const newCount = unsentCount(lines, sent);
+  const newCount = unsentCount(lines);
   const groups = useMemo(() => groupByCategory(menu), [menu]);
 
   function postLine(entry: MenuEntry, d: LineDetails, merge = false): Promise<Response | null> {
@@ -168,7 +169,7 @@ export function useComanda(sessionId: string) {
   // An item the kitchen already has is a cancellation: a manager, with a reason (rule of the API)
   async function removeLine(line: ComandaLine) {
     let reason: string | undefined;
-    if (!isUnsent(line, sent)) {
+    if (!isUnsent(line)) {
       const asked = window.prompt('A cozinha já recebeu este item (exige gerente). Motivo do cancelamento:');
       if (!asked || !asked.trim()) return;
       reason = asked.trim();

@@ -51,7 +51,6 @@ export default function ComandaRapidaPage() {
   const panel = (
     <ComandaPanel
       lines={c.lines}
-      sentToKitchenAt={s.sentToKitchenAt}
       totalCents={c.totalCents}
       newCount={c.newCount}
       isClosed={c.isClosed}
@@ -62,7 +61,7 @@ export default function ComandaRapidaPage() {
   );
 
   const sheetLine = sheet?.line;
-  const sheetSent = sheetLine ? !isUnsent(sheetLine, s.sentToKitchenAt) : false;
+  const sheetSent = sheetLine ? !isUnsent(sheetLine) : false;
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto pb-28 lg:pb-6">

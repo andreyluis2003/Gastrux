@@ -36,15 +36,13 @@ export function entryRecipeId(entry: MenuEntry): string | null {
   return entry.recipeId || entry.recipe?.id || null;
 }
 
-/** Same rule as lib/kds/send-session.ts: new = added after the last send (or never sent) */
-export function isUnsent(line: { addedAt?: string; pending?: boolean }, sentToKitchenAt: string | null | undefined): boolean {
-  if (line.pending) return true;
-  if (!sentToKitchenAt || !line.addedAt) return true;
-  return new Date(line.addedAt) > new Date(sentToKitchenAt);
+/** A line the kitchen does not have yet: no sentAt (each line keeps its own state), or made offline */
+export function isUnsent(line: { sentAt?: string | null; pending?: boolean }): boolean {
+  return !!line.pending || !line.sentAt;
 }
 
-export function unsentCount(lines: Array<{ addedAt?: string; pending?: boolean }>, sentToKitchenAt: string | null | undefined): number {
-  return lines.filter((l) => isUnsent(l, sentToKitchenAt)).length;
+export function unsentCount(lines: Array<{ sentAt?: string | null; pending?: boolean }>): number {
+  return lines.filter((l) => isUnsent(l)).length;
 }
 
 /** "agora", "47 min", "1 h 05" */

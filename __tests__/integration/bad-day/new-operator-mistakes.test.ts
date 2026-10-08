@@ -84,6 +84,8 @@ describe('bad day 9: a new operator makes a mistake', () => {
     const item = await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 30, quantity: 2 } });
     if (sentToKitchen) {
       await prisma.orderSession.update({ where: { id: s.id }, data: { sentToKitchenAt: new Date(Date.now() + 1000) } });
+      // Each line knows when the kitchen got it (tela Vender stage 3)
+      await prisma.orderSessionItem.update({ where: { id: item.id }, data: { sentAt: new Date() } });
     }
     return { s, item };
   };

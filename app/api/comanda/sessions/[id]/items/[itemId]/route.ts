@@ -19,14 +19,14 @@ async function loadLine(params: { id: string; itemId: string }, restaurantId: st
   return prisma.orderSessionItem.findFirst({
     where: { id: params.itemId, sessionId: params.id, session: { restaurantId } },
     include: {
-      session: { select: { status: true, sentToKitchenAt: true } },
+      session: { select: { status: true } },
       recipe: { select: { name: true } },
     },
   });
 }
 
-const kitchenHasIt = (line: { addedAt: Date; session: { sentToKitchenAt: Date | null } }) =>
-  !!line.session.sentToKitchenAt && line.addedAt <= line.session.sentToKitchenAt;
+// Each line knows when the kitchen got it (spec 2026-10-07, 7)
+const kitchenHasIt = (line: { sentAt: Date | null }) => !!line.sentAt;
 
 // A closed (paid, maybe with its NFC-e) or cancelled comanda is not changed by a stale screen;
 // reopening it is a manager flow of its own

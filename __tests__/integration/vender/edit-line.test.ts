@@ -33,7 +33,7 @@ describe('editing a comanda line', () => {
     foreign = (await prisma.itemModifier.create({ data: { restaurantId: otherRid, name: 'Alheio', priceAdjustment: 1 } })).id;
     const sent = new Date(Date.now() - 5 * 60_000);
     sid = (await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, status: 'SENT_TO_KITCHEN', sentToKitchenAt: sent } })).id;
-    sentLine = (await prisma.orderSessionItem.create({ data: { sessionId: sid, recipeId: recipe.id, price: 30, quantity: 1, addedAt: new Date(sent.getTime() - 60_000) } })).id;
+    sentLine = (await prisma.orderSessionItem.create({ data: { sessionId: sid, recipeId: recipe.id, price: 30, quantity: 1, addedAt: new Date(sent.getTime() - 60_000), sentAt: sent } })).id;
     newLine = (await prisma.orderSessionItem.create({ data: { sessionId: sid, recipeId: recipe.id, price: 30, quantity: 1, addedAt: new Date() } })).id;
     const session = { user: { id: ownerId, email: `linha-${tag}@gastrux.test` }, expires: '2099-01-01' };
     (getServerSession as jest.Mock).mockResolvedValue(session);

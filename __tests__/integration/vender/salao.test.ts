@@ -32,7 +32,7 @@ describe('GET /api/vender/salao', () => {
     t2 = (await prisma.table.create({ data: { restaurantId: rid, number: 2, sectionId: sec.id, capacity: 4, qrToken: `b${tag}` } })).id;
     const recipe = await prisma.recipe.create({ data: { restaurantId: rid, code: `R${tag}`, name: 'Pizza', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 50 } });
     const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: t1, status: 'SENT_TO_KITCHEN', openedAt: new Date(Date.now() - 30 * 60_000), sentToKitchenAt: new Date(Date.now() - 10 * 60_000) } });
-    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 50, quantity: 2, addedAt: new Date(Date.now() - 20 * 60_000) } });
+    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 50, quantity: 2, addedAt: new Date(Date.now() - 20 * 60_000), sentAt: new Date(Date.now() - 10 * 60_000) } });
     await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 7.5, quantity: 1, addedAt: new Date() } });
     await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, customerName: 'João', status: 'OPEN' } });
     await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: t2, status: 'CLOSED', closedAt: new Date() } });
