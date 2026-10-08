@@ -1,0 +1,57 @@
+import type { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { lockComanda } from '@/lib/comanda/add-item';
+import { CashRuleError } from '@/lib/caixa/rules';
+import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
+
+/**
+ * Moving comandas around the room (spec 2026-10-07, 4.4): transfer a comanda to another table, merge
+ * another comanda into this one, move some lines. Under the same locks as opening a table and as the
+ * bill, so a waiter, the cashier and the kitchen send never see half a move.
+ */
+
+export const OPEN_STATUSES = ['OPEN', 'SENT_TO_KITCHEN', 'READY'] as const;
+
+/** The same per-table lock as opening a table (app/api/comanda/sessions/route.ts) */
+export async function lockTable(tx: Prisma.TransactionClient, tableId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-table:' + tableId}))`;
+}
+
+/** The chosen table already has an open comanda: the screen offers to merge into it */
+export class TableBusyError extends CashRuleError {
+  constructor(readonly targetSessionId: string, tableNumber: number) {
+    super(`A mesa ${tableNumber} já tem comanda`, 409, 'TABLE_BUSY');
+  }
+}
+
+async function openSession(tx: Prisma.TransactionClient, restaurantId: string, id: string) {
+  const s = await tx.orderSession.findFirst({ where: { id, restaurantId }, select: { id: true, status: true, tableId: true, tableNumber: true } });
+  if (!s) throw new CashRuleError('Comanda não encontrada', 404);
+  if (!(OPEN_STATUSES as readonly string[]).includes(s.status)) throw new CashRuleError('Comanda fechada ou cancelada', 409, 'CLOSED');
+  return s;
+}
+
+/** The whole comanda (lines, payments, time open, pre-bill) goes to a free table; the old one is free */
+export async function transferTable(member: RestaurantMember, sessionId: string, tableId: string) {
+  return prisma.$transaction(async (tx) => {
+    const table = await tx.table.findFirst({ where: { id: tableId, restaurantId: member.restaurantId }, select: { id: true, number: true } });
+    if (!table) throw new CashRuleError('Mesa não encontrada', 404);
+    await lockTable(tx, table.id);
+    await lockComanda(tx, sessionId);
+    const s = await openSession(tx, member.restaurantId, sessionId);
+    if (s.tableId === table.id) throw new CashRuleError('A comanda já está nesta mesa', 400);
+    const busy = await tx.orderSession.findFirst({
+      where: { restaurantId: member.restaurantId, tableId: table.id, status: { in: [...OPEN_STATUSES] } },
+      select: { id: true },
+    });
+    if (busy) throw new TableBusyError(busy.id, table.number);
+    await tx.orderSession.update({ where: { id: sessionId }, data: { tableId: table.id, tableNumber: table.number, serviceChargeEligible: true } });
+    await recordAudit(member, {
+      action: 'UPDATE',
+      entityType: 'OrderSession',
+      entityId: sessionId,
+      changes: { transfer: { fromTableId: s.tableId, fromTableNumber: s.tableNumber, toTableId: table.id, toTableNumber: table.number } },
+    });
+    return { sessionId, tableNumber: table.number };
+  });
+}
