@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
+import { paidNetCents } from './bill';
 
 /**
  * Moving comandas around the room (spec 2026-10-07, 4.4): transfer a comanda to another table, merge
@@ -87,5 +88,53 @@ export async function mergeSessions(member: RestaurantMember, targetSessionId: s
       changes: { merge: { from: source.id, fromTableNumber: source.tableNumber, items: items.count, payments: payments.count } },
     });
     return { sessionId: target.id, movedItems: items.count, movedPayments: payments.count };
+  });
+}
+
+/**
+ * Moves some lines (spec 4.4): to an open comanda, or to a table (its open comanda, or a new one).
+ * Each line keeps its sentAt, so what the kitchen already has is never sent again (spec 7). Lines
+ * never leave a bill that already has payments: give a payment back first (stage 2 rule).
+ */
+export async function moveItems(
+  member: RestaurantMember,
+  sourceSessionId: string,
+  input: { itemIds: string[]; tableId?: string; targetSessionId?: string },
+) {
+  const itemIds = [...new Set((input.itemIds ?? []).map(String))];
+  if (!itemIds.length) throw new CashRuleError('Escolha os itens', 400);
+  return prisma.$transaction(async (tx) => {
+    let targetId = input.targetSessionId ?? null;
+    if (!targetId) {
+      const table = input.tableId
+        ? await tx.table.findFirst({ where: { id: input.tableId, restaurantId: member.restaurantId }, select: { id: true, number: true } })
+        : null;
+      if (!table) throw new CashRuleError('Mesa não encontrada', 404);
+      // The table lock is held from here: no other device opens this table meanwhile
+      await lockTable(tx, table.id);
+      const busy = await tx.orderSession.findFirst({
+        where: { restaurantId: member.restaurantId, tableId: table.id, status: { in: [...OPEN_STATUSES] } },
+        select: { id: true },
+      });
+      targetId = busy?.id ?? (await tx.orderSession.create({
+        data: { restaurantId: member.restaurantId, userId: member.userId, tableId: table.id, tableNumber: table.number, status: 'OPEN', serviceChargeEligible: true },
+        select: { id: true },
+      })).id;
+    }
+    if (targetId === sourceSessionId) throw new CashRuleError('Escolha outra mesa ou comanda', 400);
+    await lockBoth(tx, sourceSessionId, targetId);
+    await openSession(tx, member.restaurantId, sourceSessionId);
+    await openSession(tx, member.restaurantId, targetId);
+    const lines = await tx.cashSessionEntry.findMany({
+      where: { orderSessionId: sourceSessionId, restaurantId: member.restaurantId },
+      select: { type: true, method: true, amountCents: true, direction: true },
+    });
+    if (paidNetCents(lines) > 0) throw new CashRuleError('Esta conta já tem pagamentos: estorne um pagamento antes de tirar itens', 409);
+    const owned = await tx.orderSessionItem.count({ where: { id: { in: itemIds }, sessionId: sourceSessionId } });
+    if (owned !== itemIds.length) throw new CashRuleError('Item não encontrado nesta comanda', 404);
+    await tx.orderSessionItem.updateMany({ where: { id: { in: itemIds } }, data: { sessionId: targetId } });
+    await tx.orderSession.update({ where: { id: targetId }, data: { preBillPrintedAt: null } });
+    await recordAudit(member, { action: 'UPDATE', entityType: 'OrderSession', entityId: sourceSessionId, changes: { moveItems: { to: targetId, itemIds } } });
+    return { sessionId: targetId, moved: itemIds.length };
   });
 }
