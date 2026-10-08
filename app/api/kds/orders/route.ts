@@ -75,6 +75,8 @@ export async function GET(req: NextRequest) {
         externalOrder: true,
         reservation: true,
         orderSession: { select: { tableNumber: true, customerName: true, table: { select: { number: true } } } },
+        // The comanda of any send (orderSession above is only the latest one's): every card shows the table
+        comanda: { select: { tableNumber: true, customerName: true, table: { select: { number: true } } } },
       },
       orderBy: [
         { priority: 'desc' }, // URGENT first
@@ -86,8 +88,9 @@ export async function GET(req: NextRequest) {
 
     const total = await prisma.order.count({ where });
 
+    const withComanda = orders.map(({ comanda, ...o }: any) => ({ ...o, orderSession: comanda ?? o.orderSession ?? null }));
     return NextResponse.json({
-      orders,
+      orders: withComanda,
       total,
       limit,
       skip,

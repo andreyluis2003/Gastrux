@@ -32,12 +32,14 @@ export async function buildKitchenTicket(restaurantId: string, orderId: string):
         orderBy: { createdAt: 'asc' },
       },
       orderSession: { select: { tableNumber: true, customerName: true, table: { select: { number: true } } } },
+      comanda: { select: { tableNumber: true, customerName: true, table: { select: { number: true } } } },
       externalOrder: { select: { customerName: true, deliveryAddress: true } },
     },
   });
   if (!order) return null;
 
-  const session = order.orderSession;
+  // The comanda of any send (orderSession is only the latest send's), so every ticket has its table
+  const session = order.comanda ?? order.orderSession;
   const tableNumber = session?.table?.number ?? session?.tableNumber ?? null;
   let kind: KitchenTicket['kind'] = 'Pedido';
   let where: string | null = null;
