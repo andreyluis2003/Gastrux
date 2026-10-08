@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { MetaCloudClient, normalizePhone } from './meta-client';
+import { sendSessionToKitchen } from '@/lib/kds/send-session';
 import type { WhatsAppConversation, WhatsAppConfig } from '@prisma/client';
 
 type CartItem = {
@@ -588,8 +589,8 @@ async function handleConfirmOrder(ctx: BotContext) {
           ? `\nEndereço: ${ctx.conversation.deliveryAddress}`
           : ''
       }`,
-      status: 'SENT_TO_KITCHEN',
-      sentToKitchenAt: new Date(),
+      // Opened like any comanda, then sent below by the same send as the Vender screen
+      status: 'OPEN',
       items: {
         create: cart.map((c) => {
           const mi = menuItems.find((m) => m.id === c.menuItemId)!;
@@ -602,6 +603,17 @@ async function handleConfirmOrder(ctx: BotContext) {
       },
     },
   });
+
+  // The kitchen order (KDS card and ticket) and each line marked sent: saving the comanda as
+  // SENT_TO_KITCHEN alone never put the order on the kitchen screen (2026-10-08). If the send fails the
+  // comanda stays open on the Vender screen, so the room still sees the order.
+  let inKitchen = false;
+  try {
+    inKitchen = (await sendSessionToKitchen(ctx.restaurantId, session.id)).ok;
+    if (!inKitchen) console.error('[wa-bot] kitchen send refused for session', session.id);
+  } catch (err: any) {
+    console.error('[wa-bot] kitchen send failed:', err?.message || err);
+  }
 
   // Atualiza conversa
   await (prisma as any).whatsAppConversation.update({
@@ -622,7 +634,7 @@ async function handleConfirmOrder(ctx: BotContext) {
   const total = cartTotal(cart);
   await safeSendText(
     ctx,
-    `✅ *Pedido confirmado!*\n\nNº: ${session.id.slice(-6).toUpperCase()}\nTotal: ${fmtBRL(total)}\n\nSeu pedido foi enviado para a cozinha. Obrigado! 🙌\n\nDigite *menu* para fazer um novo pedido.`,
+    `✅ *Pedido confirmado!*\n\nNº: ${session.id.slice(-6).toUpperCase()}\nTotal: ${fmtBRL(total)}\n\n${inKitchen ? 'Seu pedido foi enviado para a cozinha.' : 'Seu pedido foi recebido pelo restaurante.'} Obrigado! 🙌\n\nDigite *menu* para fazer um novo pedido.`,
   );
 }
 
