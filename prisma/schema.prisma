@@ -1678,7 +1678,12 @@ model Order {
   reservation         Reservation?             @relation(fields: [reservationId], references: [id])
   restaurant          Restaurant               @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  /// The comanda this kitchen order came from (any send, not only the latest)
+  orderSessionId String?
+  comanda        OrderSession? @relation("OrderComanda", fields: [orderSessionId], references: [id], onDelete: SetNull)
+
   @@unique([restaurantId, orderNumber])
+  @@index([orderSessionId])
   @@index([restaurantId])
   @@index([status])
   @@index([priority])
@@ -1765,34 +1770,38 @@ model OrderPrepTime {
 }
 
 model OrderSession {
-  id                   String                @id @default(cuid())
-  restaurantId         String
-  userId               String
-  tableId              String?
-  orderId              String?               @unique
-  status               OrderSessionStatus    @default(OPEN)
-  openedAt             DateTime              @default(now())
-  sentToKitchenAt      DateTime?
-  closedAt             DateTime?
-  customerName         String?
-  tableNumber          Int?
-  notes                String?
+  id                    String                @id @default(cuid())
+  restaurantId          String
+  userId                String
+  tableId               String?
+  orderId               String?               @unique
+  status                OrderSessionStatus    @default(OPEN)
+  openedAt              DateTime              @default(now())
+  sentToKitchenAt       DateTime?
+  closedAt              DateTime?
+  customerName          String?
+  tableNumber           Int?
+  notes                 String?
   /// Service charge charged, written when the bill closes (0 = not charged)
-  serviceChargeCents   Int                   @default(0)
+  serviceChargeCents    Int                   @default(0)
   /// The customer declined the service charge (every device and the pre-bill agree while the bill is open)
-  serviceChargeWaived  Boolean               @default(false)
+  serviceChargeWaived   Boolean               @default(false)
   /// Opened as a table or a named comanda (Vender, QR): only these get the service charge, never WhatsApp, delivery or the counter
-  serviceChargeEligible Boolean              @default(false)
+  serviceChargeEligible Boolean               @default(false)
   /// Pre-bill printed: the table asked for the bill; cleared when a new item is added
-  preBillPrintedAt     DateTime?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  items                OrderSessionItem[]
-  order                Order?                @relation(fields: [orderId], references: [id])
-  restaurant           Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table                Table?                @relation("OrderSessionTable", fields: [tableId], references: [id])
-  user                 User                  @relation("OrderSessionUser", fields: [userId], references: [id])
-  whatsappConversation WhatsAppConversation? @relation("WhatsAppOrderSession")
+  preBillPrintedAt      DateTime?
+  /// Merged into another comanda (it stays CANCELLED, for the history)
+  mergedIntoId          String?
+  /// Every kitchen order of this comanda (orderId above keeps only the latest)
+  kitchenOrders         Order[]               @relation("OrderComanda")
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  items                 OrderSessionItem[]
+  order                 Order?                @relation(fields: [orderId], references: [id])
+  restaurant            Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table                 Table?                @relation("OrderSessionTable", fields: [tableId], references: [id])
+  user                  User                  @relation("OrderSessionUser", fields: [userId], references: [id])
+  whatsappConversation  WhatsAppConversation? @relation("WhatsAppOrderSession")
 
   @@index([restaurantId])
   @@index([status])
@@ -1810,6 +1819,8 @@ model OrderSessionItem {
   price               Decimal                    @default(0)
   specialInstructions String?
   addedAt             DateTime                   @default(now())
+  /// When the kitchen got this line (null = new, "a enviar"); moves with the line (spec 2026-10-07, 7)
+  sentAt              DateTime?
   modifiers           OrderSessionItemModifier[]
   recipe              Recipe                     @relation("OrderSessionItems", fields: [recipeId], references: [id])
   session             OrderSession               @relation(fields: [sessionId], references: [id], onDelete: Cascade)
