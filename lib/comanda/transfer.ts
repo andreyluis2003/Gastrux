@@ -55,3 +55,37 @@ export async function transferTable(member: RestaurantMember, sessionId: string,
     return { sessionId, tableNumber: table.number };
   });
 }
+
+/** Two comandas locked in id order, so A-into-B and B-into-A at once never wait on each other forever */
+async function lockBoth(tx: Prisma.TransactionClient, a: string, b: string) {
+  const [first, second] = [a, b].sort();
+  await lockComanda(tx, first);
+  await lockComanda(tx, second);
+}
+
+/**
+ * Merge (spec 4.4): the source's lines, payments and kitchen orders move to the target; the source is
+ * kept CANCELLED with mergedIntoId (history "juntada à mesa N") and its table is free. Payments keep
+ * their cash shift: only the comanda they belong to changes, so the shift totals do not move.
+ */
+export async function mergeSessions(member: RestaurantMember, targetSessionId: string, sourceSessionId: string) {
+  if (targetSessionId === sourceSessionId) throw new CashRuleError('Escolha outra comanda para juntar', 400);
+  return prisma.$transaction(async (tx) => {
+    await lockBoth(tx, targetSessionId, sourceSessionId);
+    const target = await openSession(tx, member.restaurantId, targetSessionId);
+    const source = await openSession(tx, member.restaurantId, sourceSessionId);
+    const items = await tx.orderSessionItem.updateMany({ where: { sessionId: source.id }, data: { sessionId: target.id } });
+    const payments = await tx.cashSessionEntry.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
+    await tx.order.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
+    await tx.orderSession.update({ where: { id: source.id }, data: { status: 'CANCELLED', mergedIntoId: target.id } });
+    // New lines on the target: it is ordering again, not waiting for the bill
+    await tx.orderSession.update({ where: { id: target.id }, data: { preBillPrintedAt: null } });
+    await recordAudit(member, {
+      action: 'UPDATE',
+      entityType: 'OrderSession',
+      entityId: target.id,
+      changes: { merge: { from: source.id, fromTableNumber: source.tableNumber, items: items.count, payments: payments.count } },
+    });
+    return { sessionId: target.id, movedItems: items.count, movedPayments: payments.count };
+  });
+}
