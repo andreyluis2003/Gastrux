@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { Truck, DollarSign, TrendingUp, TrendingDown, Users, Loader2, Package, ArrowUpDown } from 'lucide-react';
 import { formatBRL } from '@/lib/formatters';
@@ -63,6 +64,10 @@ export default function FornecedoresPainelPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2"><Truck className="h-6 w-6 text-indigo-600" /> Painel de Fornecedores</h1>
           <p className="text-sm text-gray-500">Cotações e comparativo de preços</p>
         </div>
+        {/* The menu used to open only this panel, which has no way to add a supplier (2026-10-09) */}
+        <Link href="/fornecedores" className="ml-auto inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          Cadastrar fornecedor
+        </Link>
       </div>
 
       {loading ? (

@@ -73,7 +73,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Compras', href: '/compras', roles: MANAGERS },
       { label: 'Desperdício', href: '/desperdicio', roles: [...MANAGERS, 'COOK'] },
       { label: 'Planejamento de produção', href: '/planejamento', roles: [...MANAGERS, 'COOK'] },
-      { label: 'Fornecedores', href: '/admin/fornecedores-painel', roles: MANAGERS },
+      // The register (add, edit); its price comparison panel is one click away from there
+      { label: 'Fornecedores', href: '/fornecedores', roles: MANAGERS },
       { label: 'Importar nota de compra', href: '/admin/nfe-import', roles: MANAGERS },
     ],
   },

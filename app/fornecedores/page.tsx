@@ -79,10 +79,15 @@ export default function FornecedoresPage() {
             <p className="text-slate-600">Gestão de fornecedores e integrações</p>
           </div>
         </div>
-        <Button onClick={() => setShowNewForm(!showNewForm)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Fornecedor
-        </Button>
+        <div className="flex items-center gap-3">
+          <Link href="/admin/fornecedores-painel" className="text-sm font-medium text-indigo-600 hover:underline">
+            Comparar preços
+          </Link>
+          <Button onClick={() => setShowNewForm(!showNewForm)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Fornecedor
+          </Button>
+        </div>
       </div>
 
       {showNewForm && (
@@ -171,7 +176,7 @@ export default function FornecedoresPage() {
                       ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                       : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                   }`}>
-                    {supplier.status}
+                    {supplier.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
                   </span>
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">{supplier.contactPerson || '-'}</p>

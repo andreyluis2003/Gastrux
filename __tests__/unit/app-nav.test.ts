@@ -12,6 +12,12 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
     expect(missing).toEqual([]);
   });
 
+  // The menu opened only the price panel, which cannot add a supplier (2026-10-09)
+  it('Fornecedores opens the supplier register', () => {
+    const link = NAV_GROUPS.flatMap((g) => g.links).find((l) => l.label === 'Fornecedores');
+    expect(link?.href).toBe('/fornecedores');
+  });
+
   it('the owner sees the cash register, fiscal and reports, grouped by task', () => {
     const groups = navFor('OWNER', false);
     expect(groups.map((g) => g.id)).toEqual(['inicio', 'vender', 'caixa', 'cardapio', 'estoque', 'fiscal', 'relatorios', 'clientes', 'equipe', 'config']);
