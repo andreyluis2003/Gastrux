@@ -83,6 +83,18 @@ describe('labels: expiry control', () => {
     expect(logs.every((l) => Number.isFinite(l.estimatedCost) && Number.isFinite(l.quantity))).toBe(true);
   });
 
+  // Recipe lines hold quantities in the ingredient's standard unit (as lib/kds-cancel-order.ts): the waste row says that unit
+  it('a recipe discard writes the waste in the ingredient standard unit, not the recipe line unit (review 2026-10-09)', async () => {
+    as(cook);
+    await prisma.wasteLog.deleteMany({ where: { restaurantId: rid } });
+    const r = await prisma.recipe.create({ data: { restaurantId: rid, code: `U${tag}`, name: 'Vinagrete', baseYield: 1, yieldUnit: 'kg', portionUnit: 'g', sellingPrice: 0,
+      ingredients: { create: [{ ingredientId: tomatoId, quantity: 0.5, unit: 'g' }] } } });
+    const l = await label({ itemType: 'RECIPE', recipeId: r.id, itemName: 'Vinagrete', expiresAt: new Date(Date.now() + 864e5), quantity: 1, unit: 'kg' });
+    await settle(l.id, 'DISCARDED');
+    const [w] = await prisma.wasteLog.findMany({ where: { restaurantId: rid } });
+    expect([w.ingredientId, w.quantity, w.unit]).toEqual([tomatoId, 0.5, 'kg']);
+  });
+
   it('the board groups expired, today and tomorrow; a cook of another restaurant sees nothing', async () => {
     as(cook);
     const used = await label({ itemType: 'INGREDIENT', ingredientId: oilId, itemName: 'Azeite', expiresAt: new Date(Date.now() + 864e5) });

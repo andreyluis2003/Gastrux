@@ -2,7 +2,7 @@
 /** Morning alert of expired / expiring labels (spec 2026-10-09 etiquetas, 6) */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { alertExpiringLabels } from '../../../lib/labels/morning-alert';
+import { alertExpiringLabels, labelAlertCandidates } from '../../../lib/labels/morning-alert';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -25,6 +25,13 @@ describe('labels: morning alert', () => {
   afterAll(async () => {
     try { await prisma.restaurant.deleteMany({ where: { id: { in: [pro, starter] } } }); } catch {}
     try { await prisma.user.delete({ where: { id: userId } }); } catch {}
+  });
+
+  // Starter labels can never be settled and stay ACTIVE: they must not cost the daily run (review 2026-10-09)
+  it('only Pro and up restaurants are candidates, filtered in the query', async () => {
+    const ids = await labelAlertCandidates();
+    expect(ids).toContain(pro);
+    expect(ids).not.toContain(starter);
   });
 
   it('one restaurant-wide alert per day, only for Pro and up', async () => {

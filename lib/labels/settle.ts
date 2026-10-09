@@ -42,14 +42,15 @@ export async function settleLabel(member: RestaurantMember, id: string, action: 
       } else if (label.itemType === 'RECIPE' && label.recipeId) {
         const recipe = await tx.recipe.findUnique({
           where: { id: label.recipeId },
-          select: { baseYield: true, ingredients: { select: { ingredientId: true, quantity: true, unit: true, ingredient: { select: { referenceCost: true } } } } },
+          select: { baseYield: true, ingredients: { select: { ingredientId: true, quantity: true, ingredient: { select: { referenceCost: true, standardUnit: true } } } } },
         });
         // A recipe with no yield cannot be split: the label is discarded without waste lines
         if (recipe && recipe.baseYield > 0) {
           const share = label.quantity / recipe.baseYield;
           for (const ri of recipe.ingredients) {
             const q = ri.quantity * share;
-            lines.push({ ingredientId: ri.ingredientId, quantity: q, unit: ri.unit, cost: q * ri.ingredient.referenceCost });
+            // Recipe lines hold the ingredient's standard unit (as lib/kds-cancel-order.ts), as does its cost
+            lines.push({ ingredientId: ri.ingredientId, quantity: q, unit: ri.ingredient.standardUnit, cost: q * ri.ingredient.referenceCost });
           }
         }
       }

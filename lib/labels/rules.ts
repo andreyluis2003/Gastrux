@@ -63,3 +63,19 @@ export function shelfLifeFromBody(body: Record<string, unknown>): Partial<ShelfL
   }
   return out;
 }
+
+// Labels follow Brasília time (UTC-3, no daylight saving since 2019), whatever the device's timezone:
+// a tablet set to Manaus time printed a typed 18:00 as 19:00 (review of etiquetas 2026-10-09)
+const BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** A <input type="datetime-local"> value ("2026-10-12T18:00") read as Brasília time; null when empty or invalid */
+export function brtInputToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value || '')) return null;
+  const t = Date.parse(`${value}:00.000Z`) + BRT_OFFSET_MS;
+  return Number.isNaN(t) ? null : new Date(t).toISOString();
+}
+
+/** An instant as the Brasília value of a <input type="datetime-local"> */
+export function isoToBrtInput(d: Date): string {
+  return new Date(d.getTime() - BRT_OFFSET_MS).toISOString().slice(0, 16);
+}

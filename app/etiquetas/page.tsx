@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
-import { computeExpiry, daysFor, STORAGE_LABEL, STORAGES, type ShelfLife, type Storage } from '@/lib/labels/rules';
+import { brtInputToIso, computeExpiry, daysFor, isoToBrtInput, STORAGE_LABEL, STORAGES, type ShelfLife, type Storage } from '@/lib/labels/rules';
+import { TapKey } from '@/lib/labels/tap-key';
 
 interface Item {
   type: 'RECIPE' | 'INGREDIENT';
@@ -32,8 +33,6 @@ interface Recent {
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const fmt = (d: Date | string) =>
   new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-// <input type="datetime-local"> works in local time: the value of a Date for it
-const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
 /**
  * Print food labels (spec 2026-10-09 etiquetas, 5.1): pick the item, the storage, print. The expiry
@@ -57,7 +56,9 @@ export default function LabelsPage() {
   const [defaultDays, setDefaultDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [online, setOnline] = useState(true);
-  const tapKey = useRef<string | null>(null);
+  const tapKey = useRef(new TapKey());
+  // Any change to the request makes the next tap a new attempt (lib/labels/tap-key.ts)
+  useEffect(() => { tapKey.current.reset(); }, [item, storage, manualExpiry, changing, quantity, copies, batchId, saveDefault, defaultDays]);
 
   const load = async () => {
     const [i, r] = await Promise.all([fetch('/api/labels/items'), fetch('/api/labels')]);
@@ -91,37 +92,38 @@ export default function LabelsPage() {
   const reset = () => {
     setItem(null); setStorage(null); setManualExpiry(''); setChanging(false);
     setQuantity(''); setCopies('1'); setBatchId(''); setSaveDefault(false); setDefaultDays('');
+    tapKey.current.reset();
   };
 
   const print = async () => {
     if (!item || !storage || busy) return;
-    if ((needsDate || changing) && !manualExpiry) { toast.error('Informe a validade'); return; }
+    const typedExpiry = needsDate || changing ? brtInputToIso(manualExpiry) : null;
+    if ((needsDate || changing) && !typedExpiry) { toast.error('Informe a validade'); return; }
     setBusy(true);
-    // One key per tap: a lost answer retried with the same key prints once (lib/api/idempotency.ts)
-    tapKey.current ??= crypto.randomUUID();
     try {
       const res = await fetch('/api/labels', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': tapKey.current },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': tapKey.current.get() },
         body: JSON.stringify({
           itemType: item.type,
           itemId: item.id,
           storage,
-          expiresAt: needsDate || changing ? new Date(manualExpiry).toISOString() : null,
+          expiresAt: typedExpiry,
           quantity: quantity || null,
           batchId: batchId || null,
           copies: Number(copies) || 1,
           saveAsDefaultDays: needsDate && saveDefault && defaultDays !== '' ? Number(defaultDays) : null,
         }),
       });
+      tapKey.current.answered();
       const body = await res.json().catch(() => ({}));
       if (!res.ok) { toast.error(body.error || 'Não foi possível imprimir'); return; }
-      tapKey.current = null;
       printInHiddenFrame(`/imprimir/etiquetas?ids=${body.ids.join(',')}`);
       toast.success(body.ids.length > 1 ? `${body.ids.length} etiquetas enviadas para a impressora` : 'Etiqueta enviada para a impressora');
       reset();
       load();
     } catch {
+      tapKey.current.lost();
       toast.error('Sem resposta do servidor: confira o histórico antes de imprimir de novo.');
     } finally {
       setBusy(false);
@@ -174,11 +176,11 @@ export default function LabelsPage() {
           {storage && (computed && !changing ? (
             <div className="flex items-center justify-between rounded-md bg-slate-50 p-3">
               <p className="text-lg font-bold">Validade: {fmt(computed)}</p>
-              <Button variant="outline" size="sm" onClick={() => { setChanging(true); setManualExpiry(toLocalInput(computed)); }}>Mudar</Button>
+              <Button variant="outline" size="sm" onClick={() => { setChanging(true); setManualExpiry(isoToBrtInput(computed)); }}>Mudar</Button>
             </div>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="expiry">Validade</Label>
+              <Label htmlFor="expiry">Validade (horário de Brasília)</Label>
               <Input id="expiry" type="datetime-local" value={manualExpiry} onChange={(e) => setManualExpiry(e.target.value)} />
               {needsDate && manager && (
                 <label className="flex items-center gap-2 text-sm">
