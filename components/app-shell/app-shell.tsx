@@ -76,9 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-slate-400 truncate">{user?.name || 'Gestão Integrada'}</p>
           </div>
           {bellInMenu && (
-            <div className="text-slate-200 [&_button]:text-slate-200">
-              <NotificationCenter />
-            </div>
+            <NotificationCenter inMenu />
           )}
           <button
             onClick={() => setOpen(false)}

@@ -32,7 +32,11 @@ const typeIcons: Record<string, string> = {
   SYSTEM_ERROR: '🔴',
 };
 
-export function NotificationCenter() {
+/**
+ * inMenu: the bell sits in the dark side menu. Its panel opens fixed below the menu header (anchored to
+ * the bell's right edge it went off the left of the screen) and only the bell itself is light.
+ */
+export function NotificationCenter({ inMenu = false }: { inMenu?: boolean } = {}) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +65,7 @@ export function NotificationCenter() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`relative p-2 rounded-lg transition-colors ${
-          isOpen ? 'bg-slate-200 text-slate-900' : 'text-slate-700 hover:text-slate-900'
+          isOpen ? 'bg-slate-200 text-slate-900' : inMenu ? 'text-slate-200 hover:text-white' : 'text-slate-700 hover:text-slate-900'
         }`}
         aria-label={`Notificações (${unreadCount} não lidas)`}
       >
@@ -74,7 +78,7 @@ export function NotificationCenter() {
       </button>
 
       {isOpen && (
-        <Card className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-16px)] bg-white border border-slate-200 shadow-lg z-50 max-h-96 overflow-hidden flex flex-col">
+        <Card className={`${inMenu ? 'fixed left-2 top-16' : 'absolute right-0 mt-2'} w-96 max-w-[calc(100vw-16px)] bg-white border border-slate-200 shadow-lg z-50 max-h-96 overflow-hidden flex flex-col`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
             <h3 className="font-semibold text-slate-900">Notificações</h3>
             <div className="flex items-center gap-2">
