@@ -12,7 +12,7 @@ export function OpenShiftCard({ registerId, registerName, onOpened }: { register
   const [float, setFloat] = useState('');
   const [saving, setSaving] = useState(false);
   const open = async () => {
-    const cents = float.trim() ? reaisToCents(float) : 0;
+    const cents = float.trim() ? reaisToCents(float, { allowZero: true }) : 0;
     if (cents === null) { toast.error('Troco inicial inválido'); return; }
     setSaving(true);
     try {

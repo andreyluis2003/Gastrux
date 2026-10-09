@@ -16,4 +16,7 @@ describe('pickRegister', () => {
 describe('reaisToCents', () => {
   it.each([['10', 1000], ['10,50', 1050], ['0,01', 1], ['1.234,56', 123456]])('%s', (t, c) => expect(reaisToCents(t)).toBe(c));
   it.each([['abc'], ['1,234'], ['-1'], ['']])('invalid %s', (t) => expect(reaisToCents(t)).toBeNull());
+  // Opening float: a register may open with no change at all (typing 0 was refused, 2026-10-09)
+  it.each([['0', 0], ['0,00', 0], ['50', 5000]])('zero allowed when asked: %s', (t, c) => expect(reaisToCents(t, { allowZero: true })).toBe(c));
+  it('a payment still refuses zero', () => expect(reaisToCents('0')).toBeNull());
 });
