@@ -182,7 +182,7 @@ export default function PricingPage() {
             Escolha o plano certo. Cresce com você.
           </h1>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
-            Comece gratís no Starter. Upgrade quando precisar. Sem letras miúdas, sem fidelização.
+            Comece grátis no Starter. Upgrade quando precisar. Sem letras miúdas, sem fidelização.
           </p>
 
           {/* Billing toggle */}
@@ -332,8 +332,8 @@ export default function PricingPage() {
           {/* Enterprise: consultation-only, not a self-serve card */}
           <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-8">
             Precisa de mais que o Business — mais lojas, mais usuários, requisitos específicos?{' '}
-            <a href="mailto:contato@helpflow.com.br?subject=Plano%20Enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-              Plano Enterprise, preço sob consulta: contato@helpflow.com.br
+            <a href="mailto:contato@gastrux.com?subject=Plano%20Enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+              Plano Enterprise, preço sob consulta: contato@gastrux.com
             </a>
           </p>
 

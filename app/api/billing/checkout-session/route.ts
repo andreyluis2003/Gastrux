@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
     if (tier.priceMonthly == null) {
       return NextResponse.json(
-        { error: 'O plano Enterprise é sob consulta. Fale com a gente: contato@helpflow.com.br' },
+        { error: 'O plano Enterprise é sob consulta. Fale com a gente: contato@gastrux.com' },
         { status: 400 }
       );
     }

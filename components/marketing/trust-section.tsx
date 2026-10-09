@@ -67,7 +67,7 @@ export function TrustSection() {
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               A Gastrux é desenvolvida pela Help Flow Ltda, empresa brasileira (CNPJ 61.639.918/0001-70). Antes de
               assinar, você pode criar a conta grátis e testar com os seus próprios pratos. Dúvidas? Escreva para{' '}
-              <a href="mailto:contato@helpflow.com.br" className="font-medium text-blue-600 hover:underline">contato@helpflow.com.br</a>.
+              <a href="mailto:contato@gastrux.com" className="font-medium text-blue-600 hover:underline">contato@gastrux.com</a>.
             </p>
           </div>
           <Link
