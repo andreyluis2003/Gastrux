@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ShelfLifeFields, shelfLifeToForm } from '@/components/labels/shelf-life-fields';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -20,6 +21,9 @@ export default function NovaReceitaPage() {
     name: '',
     description: '',
     baseYield: 1,
+    shelfLifeAmbientDays: '0',
+    shelfLifeChilledDays: '3',
+    shelfLifeFrozenDays: '30',
     yieldUnit: 'un',
     portionSize: 1,
     portionUnit: 'un',
@@ -149,6 +153,8 @@ export default function NovaReceitaPage() {
               onChange={(e) => setFormData({ ...formData, prepTimeMinutes: parseInt(e.target.value) })}
             />
           </div>
+
+          <ShelfLifeFields value={formData} onChange={(next) => setFormData({ ...formData, ...next })} />
 
           <div className="flex gap-4">
             <Button type="submit" disabled={isLoading} loading={isLoading}>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ShelfLifeFields, shelfLifeToForm } from '@/components/labels/shelf-life-fields';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FadeIn } from '@/components/ui/animate';
@@ -45,6 +46,9 @@ export default function EditIngredientPage() {
     standardUnit: 'kg',
     minimumStock: 0,
     referenceCost: 0,
+    shelfLifeAmbientDays: '',
+    shelfLifeChilledDays: '3',
+    shelfLifeFrozenDays: '',
   });
 
   const user = session?.user as any;
@@ -78,6 +82,7 @@ export default function EditIngredientPage() {
         standardUnit: ing.standardUnit,
         minimumStock: ing.minimumStock,
         referenceCost: ing.referenceCost,
+        ...shelfLifeToForm(ing),
       });
 
       try {
@@ -255,6 +260,8 @@ export default function EditIngredientPage() {
                 />
               </div>
             </div>
+
+            <ShelfLifeFields value={formData} onChange={(next) => setFormData({ ...formData, ...next })} />
 
             <div className="flex gap-3 pt-4">
               <Button

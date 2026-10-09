@@ -72,6 +72,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Contagem', href: '/contagem', roles: [...MANAGERS, 'COOK'] },
       { label: 'Compras', href: '/compras', roles: MANAGERS },
       { label: 'Desperdício', href: '/desperdicio', roles: [...MANAGERS, 'COOK'] },
+      // Food labels (spec 2026-10-09 etiquetas): print on every plan, the expiry control from Pro
+      { label: 'Etiquetas', href: '/etiquetas', roles: [...MANAGERS, 'COOK'] },
+      { label: 'Validades', href: '/etiquetas/validades', roles: [...MANAGERS, 'COOK'] },
       { label: 'Planejamento de produção', href: '/planejamento', roles: [...MANAGERS, 'COOK'] },
       // The register (add, edit); its price comparison panel is one click away from there
       // Owner decision 2026-10-09: the cook registers suppliers too (lib/suppliers/access.ts)

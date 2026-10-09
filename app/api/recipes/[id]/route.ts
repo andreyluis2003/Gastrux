@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { shelfLifeFromBody } from '@/lib/labels/rules';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,13 @@ export async function PUT(
     }
 
     const body = await req.json();
+    // Shelf life per storage for food labels (spec 2026-10-09 etiquetas, 4.1): only what was sent
+    let shelfLife;
+    try {
+      shelfLife = shelfLifeFromBody(body);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
     const existing = await prisma.recipe.findFirst({ where: { id: params.id, restaurantId } });
 
     if (!existing) {
@@ -87,6 +95,7 @@ export async function PUT(
     const recipe = await prisma.recipe.update({
       where: { id: params.id },
       data: {
+        ...shelfLife,
         name: body.name,
         description: body.description,
         baseYield: body.baseYield,

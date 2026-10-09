@@ -54,3 +54,12 @@ export function parseShelfLifeDays(value: unknown): number | null {
   if (!Number.isInteger(n) || n < 0 || n > 365) throw new Error('Validade em dias: número inteiro de 0 a 365');
   return n;
 }
+
+/** The shelf life fields sent by a recipe or ingredient form; only the ones present (throws on invalid) */
+export function shelfLifeFromBody(body: Record<string, unknown>): Partial<ShelfLife> {
+  const out: Partial<ShelfLife> = {};
+  for (const f of ['shelfLifeAmbientDays', 'shelfLifeChilledDays', 'shelfLifeFrozenDays'] as const) {
+    if (body[f] !== undefined) out[f] = parseShelfLifeDays(body[f]);
+  }
+  return out;
+}

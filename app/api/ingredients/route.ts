@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { shelfLifeFromBody } from '@/lib/labels/rules';
 import { getCacheHeader } from '@/lib/cache-headers';
 import { safeHandler } from '@/lib/api/safe-handler';
 import { ApiErrors } from '@/lib/api/api-response';
@@ -84,6 +85,13 @@ export const POST = safeHandler(async (req, context) => {
   if (tierBlock) return tierBlock;
 
   const body = await req.json();
+  // Shelf life per storage for food labels (spec 2026-10-09 etiquetas, 4.1): only what was sent
+  let shelfLife;
+  try {
+    shelfLife = shelfLifeFromBody(body);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 400 });
+  }
   
   // Validate required fields
   if (!body.code || !body.name) {
@@ -94,6 +102,7 @@ export const POST = safeHandler(async (req, context) => {
 
   const ingredient = await prisma.ingredient.create({
     data: {
+      ...shelfLife,
       code: body.code,
       name: body.name,
       description: body.description,
