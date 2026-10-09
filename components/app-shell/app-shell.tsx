@@ -39,9 +39,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      {/* z-[45]: above the pages' sticky z-40 headers (they hid the bell panel), below the z-50 menu/overlay */}
       <header
         className={cn(
-          'fixed top-0 inset-x-0 z-40 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 px-3',
+          'fixed top-0 inset-x-0 z-[45] h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3 px-3',
           sidebar && 'md:hidden'
         )}
       >
