@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { lineTotalCents } from '@/lib/comanda/line-total';
+import { sefazNumber } from '@/lib/nfe/access-key';
 
 /**
  * Printing phase 1 (owner decision 2026-09-24: no printer yet): the kitchen ticket and the customer
@@ -156,8 +157,9 @@ export async function buildReceipt(restaurantId: string, sessionId: string): Pro
     nfce: doc
       ? {
           status: doc.status,
-          number: doc.documentNumber,
-          series: doc.documentSeries,
+          // The number SEFAZ knows the note by (Focus numbers it): the internal sequence drifts from it
+          number: sefazNumber(doc.accessKey)?.number ?? doc.documentNumber,
+          series: sefazNumber(doc.accessKey)?.series ?? doc.documentSeries,
           accessKey: doc.accessKey,
           protocolNumber: doc.protocolNumber,
           authorizedAt: doc.authorizedAt?.toISOString() ?? null,

@@ -14,6 +14,7 @@ import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
 import { nextEqualShare, shareForItems, splitEqually } from '@/lib/comanda/bill';
+import { noteLabel } from '@/lib/nfe/access-key';
 import type { Bill } from '@/lib/comanda/bill-service';
 
 const METHOD: Record<string, string> = { CASH: 'Dinheiro', PIX: 'PIX', CREDIT: 'Crédito', DEBIT: 'Débito', OTHER: 'Outro' };
@@ -37,7 +38,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
   const [payments, setPayments] = useState<PanelPayment[]>([]);
   const [cpf, setCpf] = useState('');
   const [busy, setBusy] = useState(false);
-  const [emittedDoc, setEmittedDoc] = useState<{ id: string; documentNumber: number } | null>(null);
+  const [emittedDoc, setEmittedDoc] = useState<{ id: string; documentType?: string; documentNumber: number; accessKey?: string | null } | null>(null);
   const [nfceOpen, setNfceOpen] = useState(false);
   // What happened to the NFC-e, written on the closed bill: a toast alone was gone in seconds,
   // behind "Conta fechada", so the cashier never knew why there was no note (2026-10-09)
@@ -109,7 +110,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       if (out.closed) {
         toast.success('Conta fechada', { action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${sessionId}`) }, duration: 15000 });
         const n = out.nfce as any;
-        if (n?.nfce?.status === 'authorized') { toast.success(n.message); setEmittedDoc({ id: n.nfce.id, documentNumber: n.nfce.number }); }
+        if (n?.nfce?.status === 'authorized') { toast.success(n.message); setEmittedDoc({ id: n.nfce.id, documentNumber: n.nfce.number, accessKey: n.nfce.accessKey }); }
         else if (n?.nfce) toast.warning(n.message, { duration: 10000 });
         else if (n?.message) toast.info(n.message);
         if (n?.message) setNfceNote({ tone: n?.nfce?.status === 'authorized' ? 'ok' : 'warn', text: n.message });
@@ -225,7 +226,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
           </Button>
           {emittedDoc ? (
             <a href={`/admin/nfe/documents/${emittedDoc.id}`} target="_blank" rel="noopener" className="inline-flex items-center justify-center w-full text-sm font-semibold gap-1 underline">
-              <FileText className="w-4 h-4" /> Ver NFC-e #{String(emittedDoc.documentNumber).padStart(6, '0')}
+              <FileText className="w-4 h-4" /> Ver {noteLabel({ documentType: 'NFCe', ...emittedDoc })}
             </a>
           ) : nfceOpen ? (
             <div className="space-y-2 rounded-md border p-3">

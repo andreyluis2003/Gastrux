@@ -135,6 +135,17 @@ describe('printing phase 1: kitchen ticket and customer receipt', () => {
       expect(r.nfce).toBeNull();
     });
 
+    // Focus numbers the note: homologation 2026-10-08 had internal #6 authorised as SEFAZ nº 4
+    it('prints the number SEFAZ knows the note by, not the internal sequence', async () => {
+      const { s } = await comandaAtTable();
+      const key = 'NFe35261060957269000192650010000000041949348588';
+      await prisma.nFeDocument.create({
+        data: { configId: config.id, orderSessionId: s.id, documentType: 'NFCe', documentSeries: 1, documentNumber: 6, status: 'authorized', accessKey: key, authorizedAt: new Date() },
+      });
+      const r = await (await getReceipt(s.id)).json();
+      expect(r.nfce).toMatchObject({ number: 4, series: 1 });
+    });
+
     it('carries the NFC-e: number, series, key, protocol, QR data, CPF, payment and the homologation flag', async () => {
       const { s } = await comandaAtTable();
       const key = '35260911111111000111650010000000421234567890';

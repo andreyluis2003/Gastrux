@@ -4,6 +4,7 @@ import { getProvider } from '@/lib/nfe/provider';
 import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
 import { createDocumentWithNextNumber, findReusableRejected } from '@/lib/nfe/numbering';
 import { resolveItemsFiscalData } from '@/lib/nfe/fiscal-data';
+import { noteLabel } from './access-key';
 import type { NFeEmitPayload, NFeEmitResult } from '@/lib/nfe/types';
 
 /**
@@ -337,7 +338,7 @@ const ALERT_TEXT: Record<string, { title: string; message: string }> = {
 /** One alert per note and outcome. Never throws: the sale must not fail because of the alert. */
 async function alertFiscalProblem(
   restaurantId: string,
-  doc: { id: string; status: string; documentNumber: number; documentSeries: number; rejectionReason: string | null; orderSessionId: string | null }
+  doc: { id: string; status: string; documentType: string; documentNumber: number; documentSeries: number; accessKey: string | null; rejectionReason: string | null; orderSessionId: string | null }
 ) {
   const text = ALERT_TEXT[doc.status];
   if (!text) return;
@@ -353,7 +354,7 @@ async function alertFiscalProblem(
         restaurantId,
         type: 'SYSTEM_ERROR',
         severity: doc.status === 'processing' ? 'HIGH' : 'CRITICAL',
-        title: `${text.title} (nº ${doc.documentNumber}, série ${doc.documentSeries})`,
+        title: `${text.title}: ${noteLabel(doc)}`,
         message: doc.rejectionReason ? `${text.message} Motivo: ${doc.rejectionReason}` : text.message,
         actionUrl: `/admin/nfe/documents/${doc.id}`,
         actionLabel: 'Ver nota',
