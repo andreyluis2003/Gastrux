@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { safeHandler } from '@/lib/api/safe-handler';
 import { ApiErrors } from '@/lib/api/api-response';
+import { requireSupplierAccess } from '@/lib/suppliers/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,8 @@ export const dynamic = 'force-dynamic';
  * GET /api/suppliers - Retrieve all suppliers for current restaurant
  */
 export const GET = safeHandler(async (req, context) => {
+  const auth = await requireSupplierAccess();
+  if (!auth.ok) return auth.response;
   const suppliers = await prisma.supplier.findMany({
     where: { restaurantId: context.restaurantId },
     include: {
@@ -31,16 +34,15 @@ export const GET = safeHandler(async (req, context) => {
  * POST /api/suppliers - Create a new supplier
  */
 export const POST = safeHandler(async (req, context) => {
-  if (context.role === 'COOK') {
-    return ApiErrors.FORBIDDEN();
-  }
+  const auth = await requireSupplierAccess();
+  if (!auth.ok) return auth.response;
 
   const body = await req.json();
   const { code, name, cnpj, email, phone, address, city, state, country, contactPerson, notes } = body;
 
   if (!code || !name) {
     return ApiErrors.INVALID_REQUEST({
-      message: 'Code and name are required',
+      message: 'Código e nome são obrigatórios',
     });
   }
 

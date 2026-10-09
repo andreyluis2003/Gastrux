@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { requireSupplierAccess } from '@/lib/suppliers/access';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,8 @@ export async function GET(
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const auth = await requireSupplierAccess();
+    if (!auth.ok) return auth.response;
 
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
@@ -68,12 +71,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if ((session.user as any)?.role === 'COOK') {
-      return NextResponse.json(
-        { error: 'COOKs cannot update suppliers' },
-        { status: 403 }
-      );
-    }
+    const auth = await requireSupplierAccess();
+    if (!auth.ok) return auth.response;
 
     const body = await req.json();
     const { name, cnpj, email, phone, address, city, state, country, contactPerson, status, notes } = body;

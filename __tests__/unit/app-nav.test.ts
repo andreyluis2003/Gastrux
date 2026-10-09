@@ -16,6 +16,9 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
   it('Fornecedores opens the supplier register', () => {
     const link = NAV_GROUPS.flatMap((g) => g.links).find((l) => l.label === 'Fornecedores');
     expect(link?.href).toBe('/fornecedores');
+    // The cook registers suppliers too; the cashier does not (owner decision 2026-10-09)
+    expect(hrefs(navFor('COOK', false))).toContain('/fornecedores');
+    expect(hrefs(navFor('CASHIER', false))).not.toContain('/fornecedores');
   });
 
   it('the owner sees the cash register, fiscal and reports, grouped by task', () => {

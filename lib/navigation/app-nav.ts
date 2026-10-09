@@ -74,7 +74,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Desperdício', href: '/desperdicio', roles: [...MANAGERS, 'COOK'] },
       { label: 'Planejamento de produção', href: '/planejamento', roles: [...MANAGERS, 'COOK'] },
       // The register (add, edit); its price comparison panel is one click away from there
-      { label: 'Fornecedores', href: '/fornecedores', roles: MANAGERS },
+      // Owner decision 2026-10-09: the cook registers suppliers too (lib/suppliers/access.ts)
+      { label: 'Fornecedores', href: '/fornecedores', roles: [...MANAGERS, 'COOK'] },
       { label: 'Importar nota de compra', href: '/admin/nfe-import', roles: MANAGERS },
     ],
   },

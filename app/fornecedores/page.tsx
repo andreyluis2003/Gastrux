@@ -8,8 +8,11 @@ import { LoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { Plus, Search, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 
 export default function FornecedoresPage() {
+  const { data: session } = useSession();
+  const role = (session?.user as any)?.role as string | undefined;
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,9 +83,12 @@ export default function FornecedoresPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/admin/fornecedores-painel" className="text-sm font-medium text-indigo-600 hover:underline">
-            Comparar preços
-          </Link>
+          {/* The comparison panel is in the admin area, which a cook cannot open */}
+          {role !== 'COOK' && (
+            <Link href="/admin/fornecedores-painel" className="text-sm font-medium text-indigo-600 hover:underline">
+              Comparar preços
+            </Link>
+          )}
           <Button onClick={() => setShowNewForm(!showNewForm)}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Fornecedor
