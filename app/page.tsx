@@ -176,7 +176,7 @@ function HomePageContent() {
             ))}
           </div>
           <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-            * NFC-e nos planos Business e Enterprise, com certificado digital e dados fiscais preenchidos pelo seu contador.
+            * NFC-e em todos os planos, com certificado digital e dados fiscais preenchidos pelo seu contador.
           </p>
         </div>
       </section>

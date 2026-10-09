@@ -17,6 +17,7 @@ export const BASE_PRICING_TIERS = {
       '50 transações/dia',
       '100 ingredientes',
       '1 usuário',
+      'NFC-e (nota do consumidor)',
       'Dashboard básico',
       'Relatórios simples',
     ],
@@ -39,6 +40,7 @@ export const BASE_PRICING_TIERS = {
       'Transações ilimitadas',
       '500 ingredientes',
       '3 usuários',
+      'NFC-e (nota do consumidor)',
       'Analytics em tempo real',
       'Previsão de demanda (ML)',
       'Pedidos externos por webhook (1 conexão)',
@@ -68,7 +70,6 @@ export const BASE_PRICING_TIERS = {
       '5 usuários',
       'Pedidos externos por webhook (até 3 conexões)',
       'Relatórios avançados',
-      'NFC-e (nota do consumidor)',
       'Suporte pelo WhatsApp',
     ],
     limits: {

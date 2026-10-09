@@ -90,7 +90,8 @@ export function isTierFeatureEnabled(
     qrMenu: ['business', 'enterprise'],
     crm: ['business', 'enterprise'],
     loyalty: ['business', 'enterprise'],
-    nfe: ['business', 'enterprise'],
+    // Owner decision 2026-10-09: the NFC-e on every plan (a restaurant must issue the consumer note)
+    nfe: ['starter', 'pro', 'business', 'enterprise'],
     customApi: ['enterprise'],
     multiLocation: ['business', 'enterprise'],
     advancedReports: ['business', 'enterprise'],

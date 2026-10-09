@@ -32,7 +32,7 @@ const FEATURES_COMPARISON = [
   { category: 'Integrações', name: 'Multi-loja' },
   { category: 'Suporte', name: 'Suporte Email' },
   { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
-  { category: 'Premium', name: 'NFC-e (nota do consumidor)' },
+  { category: 'Fiscal', name: 'NFC-e (nota do consumidor)' },
 ];
 
 const getTierFeatureValue = (tierId: string, featureName: string) => {
@@ -62,7 +62,8 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
         : false,
     'Suporte Email': true,
     'Suporte pelo WhatsApp': ['business', 'enterprise'].includes(tierId),
-    'NFC-e (nota do consumidor)': ['business', 'enterprise'].includes(tierId),
+    // Every plan (owner decision 2026-10-09)
+    'NFC-e (nota do consumidor)': true,
   };
 
   return featureMap[featureName] ?? false;
