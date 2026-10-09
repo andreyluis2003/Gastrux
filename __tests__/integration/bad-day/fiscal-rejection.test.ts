@@ -478,7 +478,8 @@ describe('bad day 7: fiscal rejection', () => {
       expect(await docsOf(s.id)).toHaveLength(0);
     });
 
-    it('on a plan without NF-e, closing closes the bill and says so, without a note', async () => {
+    // Owner decision 2026-10-09: the NFC-e on every plan (it used to close with 'não disponível no plano')
+    it('on the free plan, closing issues the note too', async () => {
       await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'starter' } });
       try {
         const s = await openComanda();
@@ -486,9 +487,9 @@ describe('bad day 7: fiscal rejection', () => {
         const body = await (await close(s.id)).json();
 
         expect(body.status).toBe('CLOSED');
-        expect(body.nfce.message).toMatch(/não disponível no plano/);
-        expect(fakeProvider.emitNFCe).not.toHaveBeenCalled();
-        expect(await docsOf(s.id)).toHaveLength(0);
+        expect(body.nfce.message).not.toMatch(/não disponível no plano/);
+        expect(fakeProvider.emitNFCe).toHaveBeenCalledTimes(1);
+        expect(await docsOf(s.id)).toHaveLength(1);
       } finally {
         await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'business' } });
       }
