@@ -35,6 +35,7 @@ const FEATURES_COMPARISON = [
   { category: 'Fiscal', name: 'NFC-e (nota do consumidor)' },
   { category: 'Operação', name: 'Tela da cozinha (KDS)' },
   { category: 'Operação', name: 'Cardápio digital com QR Code' },
+  { category: 'Operação', name: 'Etiquetas de manipulação' },
   { category: 'Clientes', name: 'Clientes (CRM)' },
   { category: 'Clientes', name: 'Campanhas e fidelidade' },
 ];
@@ -72,6 +73,8 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     // Owner decision 2026-10-09: on every plan, with limits that grow with the plan
     'Tela da cozinha (KDS)': tier.limits.kitchenStations >= 999999 ? 'Estações ilimitadas' : `${tier.limits.kitchenStations} ${tier.limits.kitchenStations === 1 ? 'estação' : 'estações'}`,
     'Cardápio digital com QR Code': true,
+    // Owner decision 2026-10-09: printing on every plan, the expiry control from Pro
+    'Etiquetas de manipulação': tierId === 'starter' ? 'Imprimir' : 'Imprimir + validades',
     'Clientes (CRM)': tierId === 'starter' ? 'Lista e histórico' : 'Com anotações',
     'Campanhas e fidelidade': ['business', 'enterprise'].includes(tierId),
   };

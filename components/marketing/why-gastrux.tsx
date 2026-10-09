@@ -15,6 +15,7 @@ const FEATURES: FeatureRow[] = [
   { feature: 'Previsão de demanda', plan: 'Pro ou superior' },
   { feature: 'Tela da cozinha (KDS)', plan: 'Todos (Starter 1 estação, Pro 3, Business ilimitado)' },
   { feature: 'Cardápio digital com QR Code', plan: 'Todos' },
+  { feature: 'Etiquetas de manipulação (controle de validades no Pro)', plan: 'Todos' },
   { feature: 'Clientes: lista e histórico (anotações no Pro)', plan: 'Todos' },
   { feature: 'Campanhas e programa de fidelidade', plan: 'Business ou superior' },
   { feature: 'Multi-loja', plan: 'Business (2 lojas) ou Enterprise' },

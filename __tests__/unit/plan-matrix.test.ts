@@ -30,6 +30,11 @@ describe('plan matrix', () => {
     expect(BASE_PRICING_TIERS.BUSINESS.limits.monthlySales).toBe(2 * BASE_PRICING_TIERS.PRO.limits.monthlySales);
   });
 
+  it('the plans tell about labels: printing on every plan, expiry control from Pro', () => {
+    expect(BASE_PRICING_TIERS.STARTER.features).toContain('Etiquetas de manipulação');
+    expect(BASE_PRICING_TIERS.PRO.features).toContain('Etiquetas com controle de validades');
+  });
+
   it('label printing on every plan; the expiry control (labelExpiry) from Pro', () => {
     expect(['starter', 'pro', 'business', 'enterprise'].map((t) => on(t, 'labelExpiry'))).toEqual([false, true, true, true]);
   });
