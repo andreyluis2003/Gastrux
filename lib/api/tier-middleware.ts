@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkTierLimit, isTierFeatureEnabled, TierCheckResult } from '@/lib/tier-guard';
 
 type ResourceType = 'ingredients' | 'recipes' | 'users' | 'deliveryIntegrations' | 'locations' | 'kitchenStations';
-type FeatureType = 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast';
+type FeatureType = 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast';
 
 /**
  * Checks resource limits before allowing a CREATE operation
@@ -59,6 +59,7 @@ export async function enforceFeature(
       crm: 'CRM',
       crmNotes: 'Anotações de clientes (CRM)',
       crmCampaigns: 'Campanhas de marketing',
+      labelExpiry: 'Controle de validades',
       loyalty: 'Programa de Fidelidade',
       nfe: 'Nota Fiscal Eletr\u00f4nica',
       customApi: 'API Customizada',

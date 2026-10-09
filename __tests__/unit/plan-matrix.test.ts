@@ -30,6 +30,10 @@ describe('plan matrix', () => {
     expect(BASE_PRICING_TIERS.BUSINESS.limits.monthlySales).toBe(2 * BASE_PRICING_TIERS.PRO.limits.monthlySales);
   });
 
+  it('label printing on every plan; the expiry control (labelExpiry) from Pro', () => {
+    expect(['starter', 'pro', 'business', 'enterprise'].map((t) => on(t, 'labelExpiry'))).toEqual([false, true, true, true]);
+  });
+
   it('kitchen stations: Starter 1, Pro 3, Business and Enterprise unlimited', () => {
     expect([
       BASE_PRICING_TIERS.STARTER.limits.kitchenStations,

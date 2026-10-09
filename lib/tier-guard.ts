@@ -78,7 +78,7 @@ export async function checkTierLimit(
  */
 export function isTierFeatureEnabled(
   tier: string,
-  feature: 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
+  feature: 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
 ): boolean {
   const featureMap: Record<string, string[]> = {
     // Owner decision 2026-10-09: the KDS, the QR menu and the basic CRM (customer list and history) on
@@ -88,6 +88,8 @@ export function isTierFeatureEnabled(
     crm: ['starter', 'pro', 'business', 'enterprise'],
     crmNotes: ['pro', 'business', 'enterprise'],
     crmCampaigns: ['business', 'enterprise'],
+    // Owner decision 2026-10-09: label printing on every plan; the expiry control from Pro
+    labelExpiry: ['pro', 'business', 'enterprise'],
     loyalty: ['business', 'enterprise'],
     // Owner decision 2026-10-09: the NFC-e on every plan (a restaurant must issue the consumer note)
     nfe: ['starter', 'pro', 'business', 'enterprise'],

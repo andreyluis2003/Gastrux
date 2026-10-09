@@ -96,6 +96,9 @@ model User {
   referredByUser         User?                   @relation("ReferredBy", fields: [referredByUserId], references: [id])
   referrals              User[]                  @relation("ReferredBy")
 
+  printedFoodLabels FoodLabel[] @relation("FoodLabelPrintedBy")
+  settledFoodLabels FoodLabel[] @relation("FoodLabelSettledBy")
+
   @@index([role])
   @@index([active])
   @@index([subscriptionTier])
@@ -202,6 +205,12 @@ model Ingredient {
   currentStock        Stock?
   priceSyncs          SupplierPriceSync[]
   wasteLogs           WasteLog[]
+
+  /// Days an opened ingredient is valid per storage (spec 2026-10-09 etiquetas); null = not applicable
+  shelfLifeAmbientDays Int?
+  shelfLifeChilledDays Int?        @default(3)
+  shelfLifeFrozenDays  Int?
+  foodLabels           FoodLabel[]
 
   @@unique([restaurantId, code])
   @@index([restaurantId])
@@ -337,6 +346,12 @@ model Recipe {
   posSaleItems     POSSaleItem[]
   menuItems        MenuItem[]                @relation("MenuItemRecipe")
   restaurant       Restaurant                @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  /// Days a label of this preparation is valid per storage (spec 2026-10-09 etiquetas); null = not applicable
+  shelfLifeAmbientDays Int?        @default(0)
+  shelfLifeChilledDays Int?        @default(3)
+  shelfLifeFrozenDays  Int?        @default(30)
+  foodLabels           FoodLabel[]
 
   @@unique([restaurantId, code])
   @@index([restaurantId])
@@ -2395,6 +2410,8 @@ model IngredientBatch {
   traces            IngredientTrace[]
   orderTraces       OrderTrace[]
 
+  foodLabels FoodLabel[]
+
   @@index([ingredientId])
   @@index([expirationDate])
   @@index([batchNumber])
@@ -2937,6 +2954,10 @@ model Restaurant {
   financialMetrics        FinancialMetric[]
   financialForecasts      FinancialForecast[]
   metricSnapshots         MetricSnapshot[]
+
+  /// Thermal label size printed by the browser: '60x40' or '40x25' (spec 2026-10-09 etiquetas)
+  labelSize  String      @default("60x40")
+  foodLabels FoodLabel[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -4514,4 +4535,53 @@ model PlatformClientNote {
 
   @@index([restaurantId, createdAt])
   @@map("platform_client_notes")
+}
+
+enum LabelItemType {
+  RECIPE
+  INGREDIENT
+}
+
+enum LabelStorage {
+  AMBIENT
+  CHILLED
+  FROZEN
+}
+
+enum LabelStatus {
+  ACTIVE
+  USED
+  DISCARDED
+}
+
+/// One physical food label (RDC 216): what, prepared/opened when, valid until, who (spec 2026-10-09)
+model FoodLabel {
+  id           String           @id @default(cuid())
+  restaurantId String
+  itemType     LabelItemType
+  recipeId     String?
+  ingredientId String?
+  /// The item's name when printed: stays right if the item is renamed or deleted
+  itemName     String
+  storage      LabelStorage
+  preparedAt   DateTime
+  expiresAt    DateTime
+  quantity     Float?
+  unit         Unit?
+  batchId      String?
+  printedById  String
+  status       LabelStatus      @default(ACTIVE)
+  settledAt    DateTime?
+  settledById  String?
+  createdAt    DateTime         @default(now())
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  recipe       Recipe?          @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  ingredient   Ingredient?      @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  batch        IngredientBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  printedBy    User             @relation("FoodLabelPrintedBy", fields: [printedById], references: [id])
+  settledBy    User?            @relation("FoodLabelSettledBy", fields: [settledById], references: [id])
+
+  @@index([restaurantId, status, expiresAt])
+  @@index([restaurantId, createdAt])
+  @@map("food_labels")
 }
