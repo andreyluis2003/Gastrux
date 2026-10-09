@@ -63,8 +63,9 @@ export async function POST(req: NextRequest) {
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não identificado' }, { status: 400 });
 
-    const { enforceFeature } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceFeature(restaurantId, 'kds');
+    // Every plan has the KDS; the number of stations is what grows with the plan (2026-10-09)
+    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
+    const tierBlock = await enforceResourceLimit(restaurantId, 'kitchenStations');
     if (tierBlock) return tierBlock;
 
     const body = await req.json();

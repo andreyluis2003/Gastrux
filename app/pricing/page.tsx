@@ -33,6 +33,10 @@ const FEATURES_COMPARISON = [
   { category: 'Suporte', name: 'Suporte Email' },
   { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
   { category: 'Fiscal', name: 'NFC-e (nota do consumidor)' },
+  { category: 'Operação', name: 'Tela da cozinha (KDS)' },
+  { category: 'Operação', name: 'Cardápio digital com QR Code' },
+  { category: 'Clientes', name: 'Clientes (CRM)' },
+  { category: 'Clientes', name: 'Campanhas e fidelidade' },
 ];
 
 const getTierFeatureValue = (tierId: string, featureName: string) => {
@@ -64,6 +68,11 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Suporte pelo WhatsApp': ['business', 'enterprise'].includes(tierId),
     // Every plan (owner decision 2026-10-09)
     'NFC-e (nota do consumidor)': true,
+    // Owner decision 2026-10-09: on every plan, with limits that grow with the plan
+    'Tela da cozinha (KDS)': tier.limits.kitchenStations >= 999999 ? 'Estações ilimitadas' : `${tier.limits.kitchenStations} ${tier.limits.kitchenStations === 1 ? 'estação' : 'estações'}`,
+    'Cardápio digital com QR Code': true,
+    'Clientes (CRM)': tierId === 'starter' ? 'Lista e histórico' : 'Com anotações',
+    'Campanhas e fidelidade': ['business', 'enterprise'].includes(tierId),
   };
 
   return featureMap[featureName] ?? false;

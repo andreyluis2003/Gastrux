@@ -55,6 +55,8 @@ export async function GET(req: NextRequest) {
       kds: isTierFeatureEnabled(tier, 'kds'),
       qrMenu: isTierFeatureEnabled(tier, 'qrMenu'),
       crm: isTierFeatureEnabled(tier, 'crm'),
+      crmNotes: isTierFeatureEnabled(tier, 'crmNotes'),
+      crmCampaigns: isTierFeatureEnabled(tier, 'crmCampaigns'),
       loyalty: isTierFeatureEnabled(tier, 'loyalty'),
       nfe: isTierFeatureEnabled(tier, 'nfe'),
       multiLocation: isTierFeatureEnabled(tier, 'multiLocation'),

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId, requireAdminSession } from '@/lib/whatsapp/get-restaurant';
+import { enforceFeature } from '@/lib/api/tier-middleware';
 import { normalizePhone } from '@/lib/messaging/types';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const restaurantId = await getCurrentRestaurantId();
   if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
+  // Campaigns are a Business plan feature (owner decision 2026-10-09)
+  const tierBlock = await enforceFeature(restaurantId, 'crmCampaigns');
+  if (tierBlock) return tierBlock;
 
   const body = await req.json();
   const {

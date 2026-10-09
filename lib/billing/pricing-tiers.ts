@@ -18,6 +18,9 @@ export const BASE_PRICING_TIERS = {
       '100 ingredientes',
       '1 usuário',
       'NFC-e (nota do consumidor)',
+      'Tela da cozinha (KDS) com 1 estação',
+      'Cardápio digital com QR Code',
+      'Clientes: lista e histórico',
       'Dashboard básico',
       'Relatórios simples',
     ],
@@ -27,6 +30,7 @@ export const BASE_PRICING_TIERS = {
       users: 1,
       recipes: 10,
       deliveryIntegrations: 0,
+      kitchenStations: 1,
     },
   },
   PRO: {
@@ -41,6 +45,9 @@ export const BASE_PRICING_TIERS = {
       '500 ingredientes',
       '3 usuários',
       'NFC-e (nota do consumidor)',
+      'Tela da cozinha (KDS) com até 3 estações',
+      'Cardápio digital com QR Code',
+      'Clientes com anotações',
       'Analytics em tempo real',
       'Previsão de demanda (ML)',
       'Pedidos externos por webhook (1 conexão)',
@@ -52,6 +59,7 @@ export const BASE_PRICING_TIERS = {
       users: 3,
       recipes: 100,
       deliveryIntegrations: 1,
+      kitchenStations: 3,
     },
   },
   BUSINESS: {
@@ -63,9 +71,8 @@ export const BASE_PRICING_TIERS = {
     currency: 'brl',
     features: [
       'Tudo do Pro',
-      'Kitchen Display System (KDS)',
-      'Menu Digital + QR Code',
-      'CRM e Programa de Fidelidade',
+      'Tela da cozinha (KDS) com estações ilimitadas',
+      'Campanhas e programa de fidelidade',
       'Multi-loja (até 2 lojas)',
       '5 usuários',
       'Pedidos externos por webhook (até 3 conexões)',
@@ -79,6 +86,7 @@ export const BASE_PRICING_TIERS = {
       recipes: 500,
       locations: 2,
       deliveryIntegrations: 3,
+      kitchenStations: 999999,
     },
   },
   ENTERPRISE: {
@@ -103,6 +111,7 @@ export const BASE_PRICING_TIERS = {
       recipes: 999999,
       locations: 999999,
       deliveryIntegrations: 999999,
+      kitchenStations: 999999,
     },
   },
 };

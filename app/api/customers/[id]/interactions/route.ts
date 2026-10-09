@@ -74,7 +74,8 @@ export async function POST(
     }
 
     const { enforceFeature } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceFeature(restaurantId, 'crm');
+    // The customer list and history are on every plan; writing notes is from Pro (2026-10-09)
+    const tierBlock = await enforceFeature(restaurantId, 'crmNotes');
     if (tierBlock) return tierBlock;
 
     const interaction = await prisma.customerInteraction.create({

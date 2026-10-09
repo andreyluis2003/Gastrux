@@ -23,7 +23,7 @@ function nextTier(currentTier: string): string | null {
 
 export async function checkTierLimit(
   restaurantId: string,
-  resource: 'ingredients' | 'recipes' | 'users' | 'dailyTransactions' | 'deliveryIntegrations' | 'locations'
+  resource: 'ingredients' | 'recipes' | 'users' | 'dailyTransactions' | 'deliveryIntegrations' | 'locations' | 'kitchenStations'
 ): Promise<TierCheckResult> {
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
@@ -54,6 +54,9 @@ export async function checkTierLimit(
       });
       break;
     }
+    case 'kitchenStations':
+      current = await prisma.kitchenStation.count({ where: { restaurantId, active: true } });
+      break;
     case 'deliveryIntegrations':
       current = await prisma.deliveryIntegration.count({ where: { restaurantId, isActive: true } });
       break;
@@ -83,12 +86,16 @@ export async function checkTierLimit(
  */
 export function isTierFeatureEnabled(
   tier: string,
-  feature: 'kds' | 'qrMenu' | 'crm' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
+  feature: 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
 ): boolean {
   const featureMap: Record<string, string[]> = {
-    kds: ['business', 'enterprise'],
-    qrMenu: ['business', 'enterprise'],
-    crm: ['business', 'enterprise'],
+    // Owner decision 2026-10-09: the KDS, the QR menu and the basic CRM (customer list and history) on
+    // every plan; the paid plans keep more stations (limits.kitchenStations), notes and campaigns
+    kds: ['starter', 'pro', 'business', 'enterprise'],
+    qrMenu: ['starter', 'pro', 'business', 'enterprise'],
+    crm: ['starter', 'pro', 'business', 'enterprise'],
+    crmNotes: ['pro', 'business', 'enterprise'],
+    crmCampaigns: ['business', 'enterprise'],
     loyalty: ['business', 'enterprise'],
     // Owner decision 2026-10-09: the NFC-e on every plan (a restaurant must issue the consumer note)
     nfe: ['starter', 'pro', 'business', 'enterprise'],

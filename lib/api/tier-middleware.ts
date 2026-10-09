@@ -6,8 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkTierLimit, isTierFeatureEnabled, TierCheckResult } from '@/lib/tier-guard';
 
-type ResourceType = 'ingredients' | 'recipes' | 'users' | 'dailyTransactions' | 'deliveryIntegrations' | 'locations';
-type FeatureType = 'kds' | 'qrMenu' | 'crm' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast';
+type ResourceType = 'ingredients' | 'recipes' | 'users' | 'dailyTransactions' | 'deliveryIntegrations' | 'locations' | 'kitchenStations';
+type FeatureType = 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast';
 
 /**
  * Checks resource limits before allowing a CREATE operation
@@ -26,6 +26,7 @@ export async function enforceResourceLimit(
       dailyTransactions: 'transa\u00e7\u00f5es di\u00e1rias',
       deliveryIntegrations: 'integra\u00e7\u00f5es delivery',
       locations: 'unidades',
+      kitchenStations: 'estações da cozinha',
     };
     return NextResponse.json({
       error: `Limite de ${resourceNames[resource] || resource} atingido (${result.current}/${result.limit}).`,
@@ -57,6 +58,8 @@ export async function enforceFeature(
       kds: 'Kitchen Display System',
       qrMenu: 'Card\u00e1pio Digital QR',
       crm: 'CRM',
+      crmNotes: 'Anotações de clientes (CRM)',
+      crmCampaigns: 'Campanhas de marketing',
       loyalty: 'Programa de Fidelidade',
       nfe: 'Nota Fiscal Eletr\u00f4nica',
       customApi: 'API Customizada',
