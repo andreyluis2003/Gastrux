@@ -48,6 +48,7 @@ export default function SettingsPage() {
     timezone: 'America/Sao_Paulo',
     logoUrl: '',
     serviceChargePercent: '10',
+    labelSize: '60x40',
   });
   const [hours, setHours] = useState(DEFAULT_HOURS);
 
@@ -76,6 +77,7 @@ export default function SettingsPage() {
         timezone: r.timezone || 'America/Sao_Paulo',
         logoUrl: r.logoUrl || '',
         serviceChargePercent: String(r.serviceChargePercent ?? 10),
+        labelSize: r.labelSize || '60x40',
       });
       if (r.businessHours && typeof r.businessHours === 'object') {
         setHours({ ...DEFAULT_HOURS, ...r.businessHours });
@@ -259,6 +261,17 @@ export default function SettingsPage() {
           <Input id="serviceChargePercent" type="number" min={0} max={30} step={1} value={form.serviceChargePercent} onChange={e => updateField('serviceChargePercent', e.target.value)} />
           <span>%</span>
         </div>
+      </Card>
+
+      {/* Etiquetas de manipulação (spec 2026-10-09 etiquetas, 5.5) */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-2">Etiquetas</h2>
+        <p className="text-sm text-gray-500 mb-3">Tamanho da etiqueta da impressora térmica. A de 40 × 25 mm não mostra lote nem nome do restaurante.</p>
+        <Label htmlFor="labelSize">Tamanho da etiqueta</Label>
+        <select id="labelSize" className="mt-1 w-full max-w-xs border rounded-md px-3 py-2 text-sm" value={form.labelSize} onChange={e => updateField('labelSize', e.target.value)}>
+          <option value="60x40">60 × 40 mm (padrão)</option>
+          <option value="40x25">40 × 25 mm</option>
+        </select>
       </Card>
 
       {/* Horário de Funcionamento */}

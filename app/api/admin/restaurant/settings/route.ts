@@ -53,6 +53,7 @@ export async function GET() {
       status: true,
       subscriptionTier: true,
       serviceChargePercent: true,
+      labelSize: true,
       createdAt: true,
     },
   });
@@ -78,6 +79,8 @@ export async function PATCH(request: NextRequest) {
     'timezone', 'currency', 'language', 'logoUrl', 'businessHours',
     // Service charge on the bill (spec 2026-10-07, 4.3)
     'serviceChargePercent',
+    // Thermal label size (spec 2026-10-09 etiquetas, 5.5)
+    'labelSize',
   ];
 
   const updateData: Record<string, any> = {};
@@ -103,6 +106,10 @@ export async function PATCH(request: NextRequest) {
     if (!Number.isInteger(p) || p < 0 || p > 30) {
       return NextResponse.json({ error: 'Taxa de serviço: um número inteiro de 0 a 30 (%)' }, { status: 400 });
     }
+  }
+
+  if (updateData.labelSize !== undefined && !['60x40', '40x25'].includes(updateData.labelSize)) {
+    return NextResponse.json({ error: 'Tamanho da etiqueta: 60x40 ou 40x25' }, { status: 400 });
   }
 
   // Validate CNPJ format if provided (basic)
@@ -139,6 +146,7 @@ export async function PATCH(request: NextRequest) {
         status: true,
         subscriptionTier: true,
       serviceChargePercent: true,
+      labelSize: true,
         createdAt: true,
       },
     });
