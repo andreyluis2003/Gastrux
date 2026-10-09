@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { archiveNotification, archiveReadNotifications } from '@/lib/notification-utils';
+import { archiveNotification, archiveReadNotifications, notificationAudience } from '@/lib/notification-utils';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     // Verify the notification belongs to the user
     const notification = await prisma.notification.findFirst({
-      where: { restaurantId, id: notificationId, userId },
+      where: { ...(await notificationAudience(userId, restaurantId)), id: notificationId },
     });
 
     if (!notification) {

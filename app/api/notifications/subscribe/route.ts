@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { notificationAudience } from '@/lib/notification-utils';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -33,15 +34,16 @@ export async function GET(request: NextRequest) {
         // Send initial connection confirmation
         controller.enqueue(`data: ${JSON.stringify({ type: 'connected', userId })}\n\n`);
 
+        const audience = await notificationAudience(userId, restaurantId);
         // Send current unread count
         const unreadCount = await prisma.notification.count({
-          where: { restaurantId, userId, read: false, archived: false },
+          where: { ...audience, read: false, archived: false },
         });
         controller.enqueue(`data: ${JSON.stringify({ type: 'unreadCount', count: unreadCount })}\n\n`);
 
         // Get initial notifications
         const initialNotifications = await prisma.notification.findMany({
-          where: { restaurantId, userId, archived: false },
+          where: { ...audience, archived: false },
           orderBy: { createdAt: 'desc' },
           take: 10,
         });

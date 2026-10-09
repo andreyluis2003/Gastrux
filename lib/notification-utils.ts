@@ -1,6 +1,19 @@
 // @ts-nocheck
 import { prisma } from './prisma';
 import { NotificationType, NotificationSeverity } from '@prisma/client';
+import { resolveMember } from './auth/restaurant-role';
+
+/**
+ * Who sees which notifications: everyone their own; an owner, manager or admin also the restaurant's
+ * alerts that name no user (NFC-e rejected, cash close difference, kitchen order stuck). Those alerts
+ * used to be stored for the restaurant but every screen asked only for the user's own, so nobody saw
+ * them (2026-10-09). Read and archived are shared on the alert: one manager handles it for all.
+ */
+export async function notificationAudience(userId: string, restaurantId: string) {
+  const member = await resolveMember(userId, restaurantId);
+  const manager = !!member && ['OWNER', 'MANAGER', 'ADMIN'].includes(member.role);
+  return manager ? { restaurantId, OR: [{ userId }, { userId: null }] } : { restaurantId, userId };
+}
 
 export interface CreateNotificationInput {
   userId?: string;
@@ -328,7 +341,7 @@ export async function markAsRead(notificationId: string) {
  */
 export async function markAllAsRead(userId: string, restaurantId: string) {
   return prisma.notification.updateMany({
-    where: { userId, restaurantId, read: false },
+    where: { ...(await notificationAudience(userId, restaurantId)), read: false },
     data: {
       read: true,
       readAt: new Date(),
@@ -355,7 +368,7 @@ export async function archiveNotification(notificationId: string) {
  */
 export async function archiveReadNotifications(userId: string, restaurantId: string) {
   return prisma.notification.updateMany({
-    where: { userId, restaurantId, read: true, archived: false },
+    where: { ...(await notificationAudience(userId, restaurantId)), read: true, archived: false },
     data: {
       archived: true,
       archivedAt: new Date(),

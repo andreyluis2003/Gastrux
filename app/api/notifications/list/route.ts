@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { notificationAudience } from '@/lib/notification-utils';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -36,9 +37,9 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
+    const audience = await notificationAudience(userId, restaurantId);
     const where: any = {
-      userId,
-      restaurantId,
+      ...audience,
       archived: includeArchived ? undefined : false,
     };
 
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     const unreadCount = await prisma.notification.count({
-      where: { restaurantId, userId, read: false, archived: false },
+      where: { ...audience, read: false, archived: false },
     });
 
     return NextResponse.json({

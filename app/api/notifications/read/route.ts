@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { markAsRead, markAllAsRead } from '@/lib/notification-utils';
+import { markAsRead, markAllAsRead, notificationAudience } from '@/lib/notification-utils';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -30,11 +30,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { notificationId, markAll } = body;
+    const audience = await notificationAudience(userId, restaurantId);
 
     if (markAll) {
       await markAllAsRead(userId, restaurantId);
       const unreadCount = await prisma.notification.count({
-        where: { restaurantId, userId, read: false, archived: false },
+        where: { ...audience, read: false, archived: false },
       });
       return NextResponse.json({ success: true, unreadCount });
     }
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Verify the notification belongs to the user
     const notification = await prisma.notification.findFirst({
-      where: { restaurantId, id: notificationId, userId },
+      where: { ...audience, id: notificationId },
     });
 
     if (!notification) {
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const updated = await markAsRead(notificationId);
     const unreadCount = await prisma.notification.count({
-      where: { restaurantId, userId, read: false, archived: false },
+      where: { ...audience, read: false, archived: false },
     });
 
     return NextResponse.json({ success: true, notification: updated, unreadCount });
