@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkTierLimit, isTierFeatureEnabled } from '@/lib/tier-guard';
+import { monthlySalesUsage } from '@/lib/plans/monthly-sales';
 import { getTierLimits } from '@/lib/stripe-config';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,8 @@ export async function GET(req: NextRequest) {
     status: restaurant?.subscriptionStatus || 'inactive',
     trialEndsAt: restaurant?.trialEndsAt,
     limits,
+    // Sales of the month against the plan (warns, never blocks)
+    sales: await monthlySalesUsage(restaurantId).catch(() => null),
     features: {
       kds: isTierFeatureEnabled(tier, 'kds'),
       qrMenu: isTierFeatureEnabled(tier, 'qrMenu'),

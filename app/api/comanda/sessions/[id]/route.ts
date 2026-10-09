@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
+import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { MANAGER_ROLES, recordAudit, requireRestaurantRole, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { CASHIER_PLUS } from '@/lib/caixa/roles';
 import { CashRuleError, settlePayments } from '@/lib/caixa/rules';
@@ -202,6 +203,8 @@ async function handlePUT(
       const target = saleTarget as SaleTarget | null;
       if (target?.late) await alertLateEntry(restaurantId, target.cashSessionId, params.id);
       if (!target) await alertSaleWithoutShift(restaurantId, params.id);
+      // A sale of the month: the plan warns at 80% / 100% and never blocks (2026-10-09)
+      await noteSalesThresholds(restaurantId);
       // Closing the bill issues the NFC-e when the restaurant enabled it (NFeConfig.autoIssueOnSale).
       // Never fails the close: a problem comes back as a message and leaves an alert for the manager.
       const nfce = await autoEmitNFCe({

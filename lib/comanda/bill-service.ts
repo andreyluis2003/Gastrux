@@ -8,6 +8,7 @@ import { recordSaleEntries, resolveSaleShift } from '@/lib/caixa/sale';
 import { CASH_METHODS, toNfcePaymentMethod, type CashMethod } from '@/lib/caixa/payment-methods';
 import type { PaymentInput } from '@/lib/caixa/rules';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
+import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { billTotals, paidNetCents, serviceApplies, settlePartial } from './bill';
 
 /**
@@ -145,6 +146,8 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
  * goes on the note (same rule as the old close). The note never fails the close.
  */
 export async function emitClosedBill(member: RestaurantMember, sessionId: string, cpf?: string | null, customerName?: string | null) {
+  // A closed bill is a sale of the month: the plan warns at 80% / 100% and never blocks (2026-10-09)
+  await noteSalesThresholds(member.restaurantId);
   const entries = await prisma.cashSessionEntry.findMany({
     where: { orderSessionId: sessionId, restaurantId: member.restaurantId, type: 'RECEIPT' },
     select: { method: true, amountCents: true },

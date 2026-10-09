@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
-import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -89,22 +88,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-    // Check transaction limit BEFORE processing
-    const limitCheck = await checkTransactionLimit(session.user.id);
-    if (!limitCheck.allowed) {
-      return NextResponse.json(
-        {
-          error: 'Limite de transações atingido',
-          message: limitCheck.message,
-          tier: limitCheck.tier,
-          limit: limitCheck.limit,
-          remaining: limitCheck.remaining,
-          suggestUpgrade: limitCheck.tier === 'starter',
-        },
-        { status: 429 }
-      );
-    }
-
     const body = await req.json();
     const {
       transactionId,
@@ -148,18 +131,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Increment transaction counter ONLY after success
-    await incrementTransactionCount(session.user.id);
-
     return NextResponse.json(
       {
         success: true,
         transaction,
-        transactionLimit: {
-          limit: limitCheck.limit,
-          remaining: limitCheck.remaining - 1,
-          tier: limitCheck.tier,
-        },
       },
       { status: 201 }
     );

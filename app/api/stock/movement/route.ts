@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { safeHandler } from '@/lib/api/safe-handler';
 import { ApiErrors } from '@/lib/api/api-response';
-import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
 import { notifyLowStock } from '@/lib/notification-utils';
 
 export const dynamic = 'force-dynamic';
@@ -11,22 +10,6 @@ export const dynamic = 'force-dynamic';
 export const POST = safeHandler(async (req, context) => {
   if (context.role === 'COOK') {
     return ApiErrors.FORBIDDEN();
-  }
-
-  // Check transaction limit BEFORE processing
-  const limitCheck = await checkTransactionLimit(context.userId);
-  if (!limitCheck.allowed) {
-    return NextResponse.json(
-      {
-        error: 'Limite de transações atingido',
-        message: limitCheck.message,
-        tier: limitCheck.tier,
-        limit: limitCheck.limit,
-        remaining: limitCheck.remaining,
-        suggestUpgrade: limitCheck.tier === 'starter',
-      },
-      { status: 429 }
-    );
   }
 
   const body = await req.json();
@@ -121,17 +104,9 @@ export const POST = safeHandler(async (req, context) => {
     },
   });
 
-  // Increment transaction counter ONLY after success
-  await incrementTransactionCount(context.userId);
-
   return NextResponse.json(
     {
       ...movement,
-      _transactionLimit: {
-        limit: limitCheck.limit,
-        remaining: limitCheck.remaining - 1,
-        tier: limitCheck.tier,
-      },
     },
     { status: 201 }
   );

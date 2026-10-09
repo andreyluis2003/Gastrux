@@ -5,6 +5,8 @@
  * which imports and extends these base tiers.
  */
 
+// Sales per month (owner decision 2026-10-09, competitor research): Business doubles Pro; going over
+// warns and never blocks a sale (lib/plans/monthly-sales.ts)
 export const BASE_PRICING_TIERS = {
   STARTER: {
     id: 'starter',
@@ -14,7 +16,7 @@ export const BASE_PRICING_TIERS = {
     priceAnnual: 0,
     currency: 'brl',
     features: [
-      '50 transações/dia',
+      '300 vendas por mês',
       '100 ingredientes',
       '1 usuário',
       'NFC-e (nota do consumidor)',
@@ -25,7 +27,7 @@ export const BASE_PRICING_TIERS = {
       'Relatórios simples',
     ],
     limits: {
-      dailyTransactions: 50,
+      monthlySales: 300,
       ingredients: 100,
       users: 1,
       recipes: 10,
@@ -41,7 +43,7 @@ export const BASE_PRICING_TIERS = {
     priceAnnual: 1090,
     currency: 'brl',
     features: [
-      'Transações ilimitadas',
+      '1.500 vendas por mês',
       '500 ingredientes',
       '3 usuários',
       'NFC-e (nota do consumidor)',
@@ -54,7 +56,7 @@ export const BASE_PRICING_TIERS = {
       'Suporte por email',
     ],
     limits: {
-      dailyTransactions: 999999,
+      monthlySales: 1500,
       ingredients: 500,
       users: 3,
       recipes: 100,
@@ -71,6 +73,7 @@ export const BASE_PRICING_TIERS = {
     currency: 'brl',
     features: [
       'Tudo do Pro',
+      '3.000 vendas por mês',
       'Tela da cozinha (KDS) com estações ilimitadas',
       'Campanhas e programa de fidelidade',
       'Multi-loja (até 2 lojas)',
@@ -80,7 +83,7 @@ export const BASE_PRICING_TIERS = {
       'Suporte pelo WhatsApp',
     ],
     limits: {
-      dailyTransactions: 999999,
+      monthlySales: 3000,
       ingredients: 1000,
       users: 5,
       recipes: 500,
@@ -99,13 +102,14 @@ export const BASE_PRICING_TIERS = {
     currency: 'brl',
     features: [
       'Tudo do Business',
+      'Vendas ilimitadas',
       'Lojas ilimitadas',
       'Usuários ilimitados',
       // Owner decision 2026-09-25: no 24/7 support, custom implementation or SLA promised
       'Suporte e implementação: sob consulta',
     ],
     limits: {
-      dailyTransactions: 999999,
+      monthlySales: 999999,
       ingredients: 999999,
       users: 999999,
       recipes: 999999,

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { broadcastOrderCreated } from '@/lib/socket';
 import { notifyNewOrder } from '@/lib/notification-utils';
 import { restaurantStaffIds } from '@/lib/kds/order-status';
@@ -117,9 +118,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
-    if (tierBlock) return tierBlock;
 
     const body = await req.json();
     const {
@@ -190,6 +188,8 @@ export async function POST(req: NextRequest) {
       await notifyNewOrder(order.id, order.orderNumber, order.totalItems, kitchenStaffIds);
     }
 
+    // The plan counts sales per month and only warns (owner decision 2026-10-09)
+    await noteSalesThresholds(restaurantId);
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     console.error('Error creating order:', error);

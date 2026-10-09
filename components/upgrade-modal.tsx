@@ -15,7 +15,7 @@ interface UpgradeModalProps {
 }
 
 /**
- * Modal que aparece quando usuário Starter atinge limite de transações
+ * Modal que aparece quando o restaurante Starter atinge o limite de vendas do mês (nunca bloqueia a venda)
  * Sugere upgrade para plano Pro ou Business
  */
 export function UpgradeModal({
@@ -63,16 +63,16 @@ export function UpgradeModal({
               Seu plano <strong>{STRIPE_PRICING_TIERS.STARTER.name}</strong> permite:
             </p>
             <p className="text-2xl font-bold text-red-600">
-              {limit} transações/dia
+              {limit} vendas por mês
             </p>
             <p className="text-sm text-gray-600 mt-2">
               {isAtLimit ? (
                 <span className="text-red-600 font-semibold">
-                  Voce atingiu seu limite hoje!
+                  Você atingiu o limite do mês. As vendas continuam funcionando.
                 </span>
               ) : (
                 <span>
-                  Você tem apenas <strong>{remaining}</strong> transações restantes
+                  Faltam <strong>{remaining}</strong> vendas para o limite do mês
                 </span>
               )}
             </p>
@@ -84,7 +84,7 @@ export function UpgradeModal({
             <div className="space-y-2">
               <div className="flex items-start gap-2">
                 <ArrowRight className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
-                <span className="text-sm text-gray-700">Transações ilimitadas</span>
+                <span className="text-sm text-gray-700">Até 1.500 vendas por mês no Pro e 3.000 no Business</span>
               </div>
               <div className="flex items-start gap-2">
                 <ArrowRight className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />

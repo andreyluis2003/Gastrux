@@ -1,6 +1,7 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery-payments/choice';
 import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/delivery-payments/order-input';
@@ -48,9 +49,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
     }
 
-    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
-    if (tierBlock) return tierBlock;
 
     // Resolve menu items and compute totals (scoped to this restaurant - a
     // client could otherwise mix in another restaurant's menuItemIds/prices)
@@ -194,6 +192,8 @@ export async function POST(req: NextRequest) {
       },
       include: { items: true },
     });
+    // The plan counts sales per month and only warns (owner decision 2026-10-09)
+    await noteSalesThresholds(restaurantId);
 
     return NextResponse.json({
       success: true,

@@ -5,7 +5,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateProductionPlanReportHtml, type ProductionPlanReportData } from '@/lib/report-templates';
 import { generatePdfFromHtml, PDF_STYLES } from '@/lib/pdf-generator';
-import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -23,22 +22,6 @@ export async function POST(request: NextRequest) {
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
-    // Check transaction limit BEFORE processing
-    const limitCheck = await checkTransactionLimit(session.user.id);
-    if (!limitCheck.allowed) {
-      return NextResponse.json(
-        {
-          error: 'Limite de transações atingido',
-          message: limitCheck.message,
-          tier: limitCheck.tier,
-          limit: limitCheck.limit,
-          remaining: limitCheck.remaining,
-          suggestUpgrade: limitCheck.tier === 'starter',
-        },
-        { status: 429 }
-      );
     }
 
     // Fetch production plan data
@@ -76,9 +59,6 @@ export async function POST(request: NextRequest) {
         },
       },
     });
-
-    // Increment transaction counter ONLY after success
-    await incrementTransactionCount(session.user.id);
 
     return new NextResponse(pdfBuffer, {
       headers: {

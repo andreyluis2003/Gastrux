@@ -5,7 +5,6 @@ import { ApiErrors } from '@/lib/api/api-response';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { checkTransactionLimit, incrementTransactionCount } from '@/lib/transaction-limiter';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -46,22 +45,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  // Check transaction limit BEFORE processing
-  const limitCheck = await checkTransactionLimit(user.id);
-  if (!limitCheck.allowed) {
-    return NextResponse.json(
-      {
-        error: 'Limite de transações atingido',
-        message: limitCheck.message,
-        tier: limitCheck.tier,
-        limit: limitCheck.limit,
-        remaining: limitCheck.remaining,
-        suggestUpgrade: limitCheck.tier === 'starter',
-      },
-      { status: 429 }
-    );
-  }
-
   try {
     const body = await req.json();
     const restaurantId = await getCurrentRestaurantId();
@@ -87,17 +70,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Increment transaction counter ONLY after success
-    await incrementTransactionCount(user.id);
-
     return NextResponse.json(
       {
         ...plan,
-        _transactionLimit: {
-          limit: limitCheck.limit,
-          remaining: limitCheck.remaining - 1,
-          tier: limitCheck.tier,
-        },
       },
       { status: 201 }
     );

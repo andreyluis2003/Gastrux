@@ -23,7 +23,7 @@ function nextTier(currentTier: string): string | null {
 
 export async function checkTierLimit(
   restaurantId: string,
-  resource: 'ingredients' | 'recipes' | 'users' | 'dailyTransactions' | 'deliveryIntegrations' | 'locations' | 'kitchenStations'
+  resource: 'ingredients' | 'recipes' | 'users' | 'deliveryIntegrations' | 'locations' | 'kitchenStations'
 ): Promise<TierCheckResult> {
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
@@ -46,14 +46,6 @@ export async function checkTierLimit(
     case 'users':
       current = await prisma.restaurantUser.count({ where: { restaurantId, isActive: true } });
       break;
-    case 'dailyTransactions': {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      current = await prisma.order.count({
-        where: { restaurantId, createdAt: { gte: today } },
-      });
-      break;
-    }
     case 'kitchenStations':
       current = await prisma.kitchenStation.count({ where: { restaurantId, active: true } });
       break;

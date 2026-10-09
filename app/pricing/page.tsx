@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { ClarityScript } from '@/components/analytics/clarity-script';
 
 const FEATURES_COMPARISON = [
-  { category: 'Transações', name: 'Transações Diárias' },
+  { category: 'Vendas', name: 'Vendas por mês' },
   { category: 'Dados', name: 'Ingredientes' },
   { category: 'Dados', name: 'Receitas' },
   { category: 'Usuários', name: 'Usuários Simultâneos' },
@@ -44,7 +44,8 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
   if (!tier) return false;
 
   const featureMap: Record<string, any> = {
-    'Transações Diárias': tier.limits.dailyTransactions === 999999 ? '∞' : `${tier.limits.dailyTransactions}/dia`,
+    // Owner decision 2026-10-09: Business doubles Pro; going over warns, never blocks a sale
+    'Vendas por mês': tier.limits.monthlySales >= 999999 ? 'Ilimitado' : tier.limits.monthlySales.toLocaleString('pt-BR'),
     'Ingredientes': tier.limits.ingredients === 999999 ? '∞' : `${tier.limits.ingredients}`,
     'Receitas': tier.limits.recipes === 999999 ? '∞' : `${tier.limits.recipes}`,
     'Usuários Simultâneos': tier.limits.users === 999999 ? '∞' : tier.limits.users,

@@ -24,6 +24,12 @@ describe('plan matrix', () => {
     }
   });
 
+  it('sales per month: Starter 300, Pro 1.500, Business doubles Pro, Enterprise unlimited', () => {
+    expect([BASE_PRICING_TIERS.STARTER, BASE_PRICING_TIERS.PRO, BASE_PRICING_TIERS.BUSINESS, BASE_PRICING_TIERS.ENTERPRISE].map((t) => t.limits.monthlySales))
+      .toEqual([300, 1500, 3000, 999999]);
+    expect(BASE_PRICING_TIERS.BUSINESS.limits.monthlySales).toBe(2 * BASE_PRICING_TIERS.PRO.limits.monthlySales);
+  });
+
   it('kitchen stations: Starter 1, Pro 3, Business and Enterprise unlimited', () => {
     expect([
       BASE_PRICING_TIERS.STARTER.limits.kitchenStations,

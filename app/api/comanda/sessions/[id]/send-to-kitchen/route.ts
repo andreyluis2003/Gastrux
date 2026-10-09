@@ -24,10 +24,8 @@ async function handlePOST(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceResourceLimit(restaurantId, 'dailyTransactions');
-    if (tierBlock) return tierBlock;
-
+    // Sending to the kitchen is never blocked by the plan: sales are counted when the bill closes
+    // and going over the month only warns (lib/plans/monthly-sales.ts, owner decision 2026-10-09)
     // Queued offline on another phone for a comanda merged meanwhile: the lines are on the other one now
     return await sendSessionToKitchen(restaurantId, await resolveMergedSession(prisma, restaurantId, params.id));
   } catch (error) {

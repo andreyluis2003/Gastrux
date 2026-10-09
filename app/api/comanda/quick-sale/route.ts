@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { idempotent } from '@/lib/api/idempotency';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { addComandaItem, AddItemError, type AddItemInput } from '@/lib/comanda/add-item';
@@ -42,12 +43,6 @@ async function handlePOST(request: Request) {
   }
 
   const existing = await prisma.orderSession.findUnique({ where: { id: clientId } });
-  if (!existing) {
-    // A counter sale is a transaction of the plan, like a comanda sent to the kitchen
-    const { enforceResourceLimit } = await import('@/lib/api/tier-middleware');
-    const tierBlock = await enforceResourceLimit(member.restaurantId, 'dailyTransactions');
-    if (tierBlock) return tierBlock;
-  }
   if (existing) {
     if (existing.restaurantId !== member.restaurantId) {
       return NextResponse.json({ error: 'clientId inválido' }, { status: 400 });
@@ -124,6 +119,8 @@ async function handlePOST(request: Request) {
     onlyIfEnabled: true,
   });
 
+  // The plan counts sales per month and only warns (owner decision 2026-10-09)
+  await noteSalesThresholds(member.restaurantId);
   return NextResponse.json({ session, kitchen, nfce, changeCents }, { status: 201 });
 }
 

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkTierLimit, isTierFeatureEnabled, TierCheckResult } from '@/lib/tier-guard';
 
-type ResourceType = 'ingredients' | 'recipes' | 'users' | 'dailyTransactions' | 'deliveryIntegrations' | 'locations' | 'kitchenStations';
+type ResourceType = 'ingredients' | 'recipes' | 'users' | 'deliveryIntegrations' | 'locations' | 'kitchenStations';
 type FeatureType = 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast';
 
 /**
@@ -23,7 +23,6 @@ export async function enforceResourceLimit(
       ingredients: 'ingredientes',
       recipes: 'receitas',
       users: 'usu\u00e1rios',
-      dailyTransactions: 'transa\u00e7\u00f5es di\u00e1rias',
       deliveryIntegrations: 'integra\u00e7\u00f5es delivery',
       locations: 'unidades',
       kitchenStations: 'estações da cozinha',
