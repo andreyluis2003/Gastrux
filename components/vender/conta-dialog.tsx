@@ -39,6 +39,9 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
   const [busy, setBusy] = useState(false);
   const [emittedDoc, setEmittedDoc] = useState<{ id: string; documentNumber: number } | null>(null);
   const [nfceOpen, setNfceOpen] = useState(false);
+  // What happened to the NFC-e, written on the closed bill: a toast alone was gone in seconds,
+  // behind "Conta fechada", so the cashier never knew why there was no note (2026-10-09)
+  const [nfceNote, setNfceNote] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
   // One key per payment as typed: a second tap after a lost answer sends the same key and the server
   // records it once; any change to the amount or the methods is a new payment with a new key
   const attemptKey = useRef('');
@@ -109,6 +112,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         if (n?.nfce?.status === 'authorized') { toast.success(n.message); setEmittedDoc({ id: n.nfce.id, documentNumber: n.nfce.number }); }
         else if (n?.nfce) toast.warning(n.message, { duration: 10000 });
         else if (n?.message) toast.info(n.message);
+        if (n?.message) setNfceNote({ tone: n?.nfce?.status === 'authorized' ? 'ok' : 'warn', text: n.message });
         onClosed();
       } else {
         toast.success(`Recebido. Falta ${brl(out.bill.remainingCents)}`);
@@ -151,8 +155,11 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       const result = await send({ method: 'POST', url: '/api/nfe/emit', label: 'Emitir NFC-e', queueable: false, body: { orderSessionId: sessionId, customerCPF: cpf.replace(/\D/g, '') || undefined } });
       if (result.queued) return;
       const d = await result.response.json();
-      if (!result.response.ok || !d.success) toast.error(d.rejectionReason || d.error || 'Erro ao emitir NFC-e');
-      else { toast.success('NFC-e emitida!'); setEmittedDoc(d.document); setNfceOpen(false); }
+      if (!result.response.ok || !d.success) {
+        const text = d.rejectionReason || d.error || 'Erro ao emitir NFC-e';
+        toast.error(text);
+        setNfceNote({ tone: 'warn', text: `NFC-e não emitida: ${text}` });
+      } else { toast.success('NFC-e emitida!'); setEmittedDoc(d.document); setNfceOpen(false); setNfceNote(null); }
     } catch (e: any) {
       toast.error(e?.message || 'Erro');
     } finally {
@@ -210,6 +217,9 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       {closed ? (
         <div className="space-y-2">
           <p className="font-semibold text-emerald-700">Conta fechada.</p>
+          {nfceNote && (
+            <p role="status" className={`rounded-md p-3 text-sm ${nfceNote.tone === 'ok' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>{nfceNote.text}</p>
+          )}
           <Button variant="outline" className="w-full gap-2" onClick={() => printInHiddenFrame(`/imprimir/cupom/${sessionId}`)}>
             <Printer className="h-4 w-4" /> Imprimir cupom
           </Button>
