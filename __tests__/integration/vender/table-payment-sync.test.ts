@@ -19,6 +19,8 @@ import { createConnectPix, getConnectPayment } from '../../../lib/mercadopago-co
 import { syncRestaurantPayment } from '../../../lib/mercadopago-connect/payment-sync';
 import { POST as pixRoute } from '../../../app/api/pagamentos/mp/pix/route';
 import { loadBill } from '../../../lib/comanda/bill-service';
+import * as tablePayment from '../../../lib/comanda/table-payment';
+import { sweepPendingPayments } from '../../../lib/mercadopago-connect/payment-sweep';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -95,6 +97,35 @@ describe('table PIX on the bill', () => {
     expect((await loadBill(prisma, rid, sid)).paidCents).toBe(0);
     await settle(pix.body.paymentId, 110);
     expect((await loadBill(prisma, rid, sid)).status).toBe('CLOSED');
+  });
+
+  it('an approval whose apply failed is applied by the next sweep, without asking Mercado Pago', async () => {
+    const sid = await newBill();
+    const pix = await askPix();
+    const spy = jest.spyOn(tablePayment, 'applyTablePayment').mockRejectedValueOnce(new Error('db hiccup'));
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect((await settle(pix.body.paymentId, 110)).updated).toBe(true);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+      errSpy.mockRestore();
+    }
+    expect(await prisma.payment.findUnique({ where: { id: pix.body.paymentId } })).toMatchObject({ status: 'APPROVED', appliedToBillAt: null });
+    expect((await loadBill(prisma, rid, sid)).paidCents).toBe(0);
+    // The webhook gets its minimum time first
+    await prisma.payment.update({ where: { id: pix.body.paymentId }, data: { updatedAt: new Date(Date.now() - 5 * 60_000) } });
+    getConnectPayment.mockClear();
+
+    const summary = await sweepPendingPayments();
+
+    expect(summary.appliedToBills).toBeGreaterThanOrEqual(1);
+    expect(getConnectPayment).not.toHaveBeenCalled();
+    expect((await loadBill(prisma, rid, sid))).toMatchObject({ status: 'CLOSED', paidCents: 11_000 });
+    expect((await prisma.payment.findUnique({ where: { id: pix.body.paymentId } })).appliedToBillAt).toBeInstanceOf(Date);
+    // Applied once: the next sweep has nothing more for this bill
+    await sweepPendingPayments();
+    expect((await loadBill(prisma, rid, sid)).paidCents).toBe(11_000);
   });
 
   it('a table with nothing left to pay gets no PIX', async () => {

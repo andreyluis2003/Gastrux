@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
 import { isUnauthorizedError, unauthorizedReason, searchConnectPaymentsByReference } from './payments';
 import { syncRestaurantPayment } from './payment-sync';
+import { applyTablePayment } from '@/lib/comanda/table-payment';
 import {
   SWEEPABLE_STATUSES,
   SWEEP_FAST_INTERVAL_MS,
@@ -20,6 +21,8 @@ export interface SweepSummary {
   /** No active Mercado Pago connection for the restaurant: nothing could be asked. */
   skippedNoConnection: number;
   failed: number;
+  /** Approved table payments (pay at the table) that had not reached their bill and were applied now. */
+  appliedToBills: number;
   /** The time budget ran out before every due payment was looked at (the next run continues). */
   stoppedEarly: boolean;
 }
@@ -72,7 +75,7 @@ export async function sweepPendingPayments(options: SweepOptions = {}): Promise<
     select: { id: true, status: true, restaurantId: true, gatewayPaymentId: true, createdAt: true, updatedAt: true },
   });
 
-  const summary: SweepSummary = { examined: 0, resolved: 0, unchanged: 0, skippedNoConnection: 0, failed: 0, stoppedEarly: false };
+  const summary: SweepSummary = { examined: 0, resolved: 0, unchanged: 0, skippedNoConnection: 0, failed: 0, appliedToBills: 0, stoppedEarly: false };
 
   for (const payment of rows) {
     if (!isSweepDue(payment, now)) continue;
@@ -126,5 +129,44 @@ export async function sweepPendingPayments(options: SweepOptions = {}): Promise<
     }
   }
 
+  if (!summary.stoppedEarly) await applyPendingTablePayments(summary, { now, limit, deadline });
   return summary;
+}
+
+/**
+ * Pay at the table (spec 2026-10-10 §5.4): an online payment Mercado Pago already approved but that never
+ * reached its bill (the apply after the approval failed, and Mercado Pago will not notify again). No call to
+ * Mercado Pago: applyTablePayment only reads our own row and is idempotent under the comanda lock. The
+ * minimum age leaves the webhook that just approved it time to apply it first.
+ */
+async function applyPendingTablePayments(summary: SweepSummary, opts: { now: number; limit: number; deadline: number }) {
+  const ago = (ms: number) => new Date(opts.now - ms);
+  const rows = await prisma.payment.findMany({
+    where: {
+      gateway: 'MERCADO_PAGO_CONNECT',
+      status: 'APPROVED',
+      restaurantId: { not: null },
+      orderSessionId: { not: null },
+      appliedToBillAt: null,
+      createdAt: { gte: ago(SWEEP_MAX_AGE_MS) },
+      updatedAt: { lte: ago(SWEEP_MIN_AGE_MS) },
+    },
+    orderBy: { updatedAt: 'asc' },
+    take: opts.limit,
+    select: { id: true, restaurantId: true },
+  });
+  for (const payment of rows) {
+    if (Date.now() > opts.deadline) {
+      summary.stoppedEarly = true;
+      break;
+    }
+    try {
+      const result = await applyTablePayment(payment.restaurantId!, payment.id);
+      if (result.outcome !== 'already-applied' && result.outcome !== 'not-a-table-payment') summary.appliedToBills++;
+    } catch (error) {
+      // One bad payment must never abort the run: count it and move on (the next run tries again).
+      summary.failed++;
+      console.error(`[mp-connect] payment sweep could not apply table payment ${payment.id} to its bill:`, error);
+    }
+  }
 }
