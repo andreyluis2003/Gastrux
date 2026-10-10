@@ -7,6 +7,7 @@ import { logPaymentEvent, logSubscriptionEvent, logInvoiceEvent, logWebhookEvent
 import { queuePaymentForRetry } from '@/lib/dunning-flow';
 import { createInvoice } from '@/lib/billing/invoice-service';
 import { upsertSubscriptionFromGatewayEvent, NormalizedSubscriptionStatus } from '@/lib/billing/subscription-sync';
+import { stripeInvoiceSubscriptionId, stripeSubscriptionPeriod } from '@/lib/billing/stripe-period';
 import {
   alertPaymentSucceeded,
   alertPaymentFailed,
@@ -213,8 +214,7 @@ async function syncFromStripeSubscription(subscription: Stripe.Subscription) {
     currency: (price?.currency || 'brl').toUpperCase(),
     status: mapStripeSubscriptionStatus(subscription.status),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    currentPeriodStart: new Date((subscription.current_period_start as number) * 1000),
-    currentPeriodEnd: new Date((subscription.current_period_end as number) * 1000),
+    ...stripeSubscriptionPeriod(subscription),
     trialStart: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
     trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     metadata: { stripePriceId: price?.id },
@@ -296,7 +296,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventId: string) {
     const currency = (invoice.currency || 'usd').toUpperCase();
     const periodStart = invoice.period_start ? new Date(invoice.period_start * 1000) : null;
     const periodEnd = invoice.period_end ? new Date(invoice.period_end * 1000) : null;
-    const subscriptionId = (invoice.subscription as string) || user.subscriptionId || null;
+    const subscriptionId = stripeInvoiceSubscriptionId(invoice) || user.subscriptionId || null;
     const planName = getPlanNameFromTierId(user.subscriptionTier || 'starter');
     const description = `Assinatura ${planName}` +
       (periodStart && periodEnd
@@ -369,7 +369,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, eventId: stri
   );
 
   // Queue for retry using dunning flow
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = stripeInvoiceSubscriptionId(invoice);
   await queuePaymentForRetry(
     user.id,
     invoice.id,
