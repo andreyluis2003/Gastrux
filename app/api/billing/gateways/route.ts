@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json({
-    stripe: true,
+    // Offered only when configured: without the key the Stripe checkout can only fail
+    stripe: Boolean(process.env.STRIPE_SECRET_KEY),
     mercadoPago: process.env.BILLING_MP_ENABLED === 'true',
   });
 }

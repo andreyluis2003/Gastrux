@@ -21,6 +21,7 @@ interface GatewayChoiceDialogProps {
   tierName: string;
   billing: 'monthly' | 'annual';
   mercadoPagoEnabled: boolean;
+  stripeEnabled: boolean;
 }
 
 async function startCheckout(endpoint: string, tierId: string, billing: string) {
@@ -43,6 +44,7 @@ export function GatewayChoiceDialog({
   tierName,
   billing,
   mercadoPagoEnabled,
+  stripeEnabled,
 }: GatewayChoiceDialogProps) {
   const [loading, setLoading] = useState<'stripe' | 'mercadopago' | null>(null);
 
@@ -96,6 +98,7 @@ export function GatewayChoiceDialog({
               )}
             </button>
           )}
+          {stripeEnabled && (
           <button
             type="button"
             onClick={() => handleChoice('stripe')}
@@ -117,6 +120,7 @@ export function GatewayChoiceDialog({
               <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
             )}
           </button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

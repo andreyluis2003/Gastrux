@@ -89,6 +89,7 @@ export default function PricingPage() {
   const [showComparison, setShowComparison] = useState(false);
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly');
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
+  const [stripeEnabled, setStripeEnabled] = useState(false);
   const [gatewayDialogTier, setGatewayDialogTier] = useState<{ id: string; name: string } | null>(null);
 
   // Enterprise is consultation-only - not a self-serve card on this page.
@@ -97,8 +98,14 @@ export default function PricingPage() {
   useEffect(() => {
     fetch('/api/billing/gateways')
       .then((res) => res.json())
-      .then((data) => setMercadoPagoEnabled(!!data.mercadoPago))
-      .catch(() => setMercadoPagoEnabled(false));
+      .then((data) => {
+        setMercadoPagoEnabled(!!data.mercadoPago);
+        setStripeEnabled(!!data.stripe);
+      })
+      .catch(() => {
+        setMercadoPagoEnabled(false);
+        setStripeEnabled(false);
+      });
   }, []);
 
   const startStripeCheckout = async (tierId: string) => {
@@ -141,6 +148,11 @@ export default function PricingPage() {
 
     if (mercadoPagoEnabled) {
       setGatewayDialogTier(tier);
+      return;
+    }
+
+    if (!stripeEnabled) {
+      toast.error('A assinatura online está indisponível no momento. Fale com a gente: contato@gastrux.com');
       return;
     }
 
@@ -486,6 +498,7 @@ export default function PricingPage() {
           tierName={gatewayDialogTier.name}
           billing={billing}
           mercadoPagoEnabled={mercadoPagoEnabled}
+          stripeEnabled={stripeEnabled}
         />
       )}
     </div>
