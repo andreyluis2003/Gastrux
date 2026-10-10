@@ -1807,6 +1807,9 @@ model OrderSession {
   preBillPrintedAt      DateTime?
   /// Merged into another comanda (it stays CANCELLED, for the history)
   mergedIntoId          String?
+  /// The table asked to pay with the waiter (pay at the table); cleared by a payment or when the bill closes
+  payAtWaiterRequestedAt DateTime?
+  onlinePayments        Payment[]             @relation("OrderSessionOnlinePayments")
   /// Every kitchen order of this comanda (orderId above keeps only the latest)
   kitchenOrders         Order[]               @relation("OrderComanda")
   createdAt             DateTime              @default(now())
@@ -1889,6 +1892,7 @@ model CashSession {
   updatedAt         DateTime           @updatedAt
   cashRegister      CashRegister       @relation(fields: [cashRegisterId], references: [id])
   entries           CashSessionEntry[]
+  onlinePayments    Payment[]          @relation("CashSessionOnlinePayments")
 
   @@index([restaurantId])
   @@index([cashRegisterId])
@@ -2036,6 +2040,16 @@ model Payment {
   settledAt            DateTime?
   settlementStatus     String?
   subscriptionId       String?
+  /// Pay at the table (spec 2026-10-10): the comanda this online payment pays towards
+  orderSessionId       String?
+  orderSession         OrderSession?           @relation("OrderSessionOnlinePayments", fields: [orderSessionId], references: [id], onDelete: SetNull)
+  /// The cash shift open when the payment was applied to the bill (null: no shift was open). Never in the drawer.
+  cashSessionId        String?
+  cashSession          CashSession?            @relation("CashSessionOnlinePayments", fields: [cashSessionId], references: [id], onDelete: SetNull)
+  /// How the customer chose the amount: ALL, EQUAL:<n> or AMOUNT
+  tableShareMode       String?
+  /// When the payment was added to the bill: set once, under the comanda lock
+  appliedToBillAt      DateTime?
   cashFlowRecords      CashFlowRecord[]
   mercadoPagoData      MercadoPagoTransaction?
   refunds              PaymentRefund[]
@@ -2054,6 +2068,8 @@ model Payment {
   @@index([gateway, status])
   @@index([status, createdAt])
   @@index([subscriptionId])
+  @@index([orderSessionId])
+  @@index([cashSessionId])
   @@index([customerEmail])
   @@index([processedAt])
   @@index([gatewayPaymentId])
