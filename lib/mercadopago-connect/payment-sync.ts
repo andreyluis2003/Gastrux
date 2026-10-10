@@ -7,6 +7,7 @@ import { canTransition } from './payment-status';
 import { captureException } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
 import { reconcileTabPayment } from './tab-reconcile';
+import { applyTablePayment } from '@/lib/comanda/table-payment';
 
 export interface SyncResult {
   updated: boolean;
@@ -147,6 +148,16 @@ async function applyLinkedRecords(
   });
 }
 
+/** The bill write must never break the payment sync: a failure is reported and the next notification retries */
+async function applyTablePaymentSafely(restaurantId: string, paymentId: string): Promise<void> {
+  try {
+    await applyTablePayment(restaurantId, paymentId);
+  } catch (error) {
+    console.error('[mp-connect] could not apply the table payment to its bill:', error);
+    captureException(error instanceof Error ? error : new Error(String(error)), { endpoint: 'mp-connect/payment-sync', restaurantId, paymentId });
+  }
+}
+
 /**
  * Applies a Mercado Pago payment to OUR Payment (and Order) records, using the
  * restaurant's own token to fetch it. Used by the webhook and by the PIX
@@ -193,8 +204,10 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
     // the idempotent linked writes. Runs only for an APPROVED notification on
     // an already APPROVED Payment whose MP id was checked above and whose
     // amount matches; it never touches the Payment row.
-    if (mapped === 'APPROVED' && payment.status === 'APPROVED' && payment.orderId && amountMatches) {
-      await applyLinkedRecords(restaurantId, payment, mp, 'APPROVED');
+    if (mapped === 'APPROVED' && payment.status === 'APPROVED' && amountMatches) {
+      if (payment.orderId) await applyLinkedRecords(restaurantId, payment, mp, 'APPROVED');
+      // Pay at the table: an approval that never reached the bill (crash between the two writes) is applied now
+      if (payment.orderSessionId && !payment.appliedToBillAt) await applyTablePaymentSafely(restaurantId, payment.id);
     }
     return { updated: false, reason: 'no-transition' };
   }
@@ -241,8 +254,13 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
 
   await applyLinkedRecords(restaurantId, payment, mp, orderStatus);
   if (approved && payment.status === 'CANCELLED') await reportLatePayment(restaurantId, payment);
-  // A table PIX is not linked to its comanda: check that the approved ones still add up to the tab.
-  if (approved && !payment.orderId) await reconcileTabPayment(restaurantId, payment);
+  if (approved && payment.orderSessionId) {
+    // Pay at the table (spec 2026-10-10): the approval counts on the bill and may close it
+    await applyTablePaymentSafely(restaurantId, payment.id);
+  } else if (approved && !payment.orderId) {
+    // A table PIX made before pay at the table (metadata only): check that it still adds up to the tab
+    await reconcileTabPayment(restaurantId, payment);
+  }
 
   return { updated: true, status: mapped };
 }

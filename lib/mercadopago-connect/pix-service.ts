@@ -68,9 +68,7 @@ function lockKeyFor(target: ResolvedPixTarget): string | null {
 }
 
 function scopeFor(target: ResolvedPixTarget) {
-  return target.orderId
-    ? { orderId: target.orderId }
-    : { metadata: { contains: `"sessionId":"${target.sessionId}"` } };
+  return target.orderId ? { orderId: target.orderId } : { orderSessionId: target.sessionId };
 }
 
 function newPaymentData(target: ResolvedPixTarget, payer: { email: string; name?: string }) {
@@ -86,6 +84,9 @@ function newPaymentData(target: ResolvedPixTarget, payer: { email: string; name?
     customerEmail: payer.email,
     customerName: payer.name,
     metadata: JSON.stringify(target.metadata),
+    // Pay at the table (spec 2026-10-10): the PIX of a table pays towards its comanda
+    orderSessionId: target.sessionId ?? null,
+    tableShareMode: target.sessionId ? ('ALL' as const) : null,
   };
 }
 

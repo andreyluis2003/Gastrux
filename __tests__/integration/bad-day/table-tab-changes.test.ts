@@ -9,8 +9,10 @@
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { loadBill } from '../../../lib/comanda/bill-service';
 import { createMultiRestaurantScenario, cleanupMultiTenantData } from '../helpers/multi-tenant';
 
+jest.mock('../../../lib/nfe/emit-session', () => ({ autoEmitNFCe: jest.fn().mockResolvedValue({ ok: true }) }));
 jest.mock('../../../lib/mercadopago-connect/connection-service', () => ({
   ...jest.requireActual('../../../lib/mercadopago-connect/connection-service'),
   getMpClientForRestaurant: jest.fn().mockResolvedValue({ fake: 'client' }),
@@ -39,6 +41,7 @@ describe('bad day 5: the table tab changes around its PIX', () => {
   let mpSeq = 9000;
 
   const wipe = async () => {
+    await prisma.orderSession.update({ where: { id: session.id }, data: { status: 'OPEN', closedAt: null } }).catch(() => {});
     await prisma.payment.deleteMany({ where: { restaurantId: A.restaurantId } });
     await prisma.notification.deleteMany({ where: { OR: [{ restaurantId: A.restaurantId }, { userId: A.ownerId }] } });
     await prisma.orderSessionItem.deleteMany({ where: { sessionId: session.id } });
@@ -104,6 +107,7 @@ describe('bad day 5: the table tab changes around its PIX', () => {
   };
   const paymentsOfTab = () => prisma.payment.findMany({ where: { restaurantId: A.restaurantId }, orderBy: { createdAt: 'asc' } });
   const alerts = () => prisma.notification.findMany({ where: { restaurantId: A.restaurantId } });
+  const tableAlerts = (kind) => prisma.notification.findMany({ where: { restaurantId: A.restaurantId, data: { path: ['kind'], equals: kind } } });
 
   describe('the amount charged is what the tab costs', () => {
     it('charges (price + modifiers) x quantity for every line: the surcharge applies to EACH unit (owner rule)', async () => {
@@ -236,7 +240,7 @@ describe('bad day 5: the table tab changes around its PIX', () => {
 
     // S5-2 (fixed 2026-09-24): a PIX paid for an OLD total became APPROVED and nobody was told that the tab was
     // no longer covered (a table payment is not linked to its comanda).
-    it('a PIX paid for an OLD total raises ONE alert saying how much of the tab is still open (S5-2)', async () => {
+    it('a PIX paid for an OLD total counts on the bill and leaves the rest open (no alert: the rest is simply still to pay)', async () => {
       const line = await addLine(burger, 30);
       const first = await askPix();
       await prisma.orderSessionItemModifier.create({ data: { sessionItemId: line.id, modifierId: cheese.id, priceAdjustment: 3 } });
@@ -248,11 +252,9 @@ describe('bad day 5: the table tab changes around its PIX', () => {
       await settle(first.body.paymentId, 30); // a repeated notification raises nothing new
 
       expect((await prisma.payment.findUnique({ where: { id: first.body.paymentId } })).status).toBe('APPROVED');
-      const raised = await tabAlerts();
-      expect(raised).toHaveLength(1);
-      expect(raised[0].title).toBe('PIX da mesa aprovado não cobre a comanda');
-      expect(raised[0].message).toContain('Mesa 7');
-      expect(raised[0].message).toContain('faltam R$ 3.00');
+      const bill = await loadBill(prisma, A.restaurantId, session.id);
+      expect(bill).toMatchObject({ paidCents: 3_000, remainingCents: 300 });
+      expect(await tabAlerts()).toHaveLength(0);
     });
 
     it('a PIX that covers the tab exactly raises no alert', async () => {
@@ -263,6 +265,8 @@ describe('bad day 5: the table tab changes around its PIX', () => {
 
       expect((await prisma.payment.findUnique({ where: { id: pix.body.paymentId } })).status).toBe('APPROVED');
       expect(await tabAlerts()).toHaveLength(0);
+      expect((await prisma.orderSession.findUnique({ where: { id: session.id } })).status).toBe('CLOSED');
+      await prisma.orderSession.update({ where: { id: session.id }, data: { status: 'OPEN', closedAt: null } });
     });
 
     it('a PIX bigger than the tab (an item was removed after it was generated) says how much is left over', async () => {
@@ -275,10 +279,10 @@ describe('bad day 5: the table tab changes around its PIX', () => {
 
       await settle(pix.body.paymentId, 38);
 
-      const raised = await tabAlerts();
-      expect(raised).toHaveLength(1);
-      expect(raised[0].title).toBe('PIX da mesa maior que a comanda');
-      expect(raised[0].message).toContain('sobram R$ 30.00');
+      const over = await tableAlerts('table-overpaid');
+      expect(over).toHaveLength(1);
+      expect(over[0].message).toContain('R$ 30,00');
+      await prisma.orderSession.update({ where: { id: session.id }, data: { status: 'OPEN', closedAt: null } });
     });
 
     it('two approved PIX that together cover the tab raise no alert', async () => {
@@ -287,18 +291,21 @@ describe('bad day 5: the table tab changes around its PIX', () => {
         data: {
           restaurantId: A.restaurantId, amount: 10, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'APPROVED',
           gatewayPaymentId: '8001', metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+          orderSessionId: session.id, appliedToBillAt: new Date(),
         },
       });
       const rest = await prisma.payment.create({
         data: {
           restaurantId: A.restaurantId, amount: 20, method: 'PIX', gateway: 'MERCADO_PAGO_CONNECT', status: 'PENDING',
           gatewayPaymentId: '8002', metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+          orderSessionId: session.id,
         },
       });
 
       await settle(rest.id, 20);
 
-      expect(await tabAlerts()).toHaveLength(0);
+      expect(await tableAlerts('table-overpaid')).toHaveLength(0);
+      await prisma.orderSession.update({ where: { id: session.id }, data: { status: 'OPEN', closedAt: null } });
     });
 
     it('a stale PIX is not reused after the tab total changed (only the same amount is reused)', async () => {
@@ -314,10 +321,7 @@ describe('bad day 5: the table tab changes around its PIX', () => {
     });
   });
 
-  describe('paying the tab', () => {
-    it.todo('a table PIX approval marks the tab as paid or notifies the waiter (today the approval never reaches the OrderSession: it has no paid marker, so the waiter must find the payment by hand)');
-    it.todo('the tab shows "paid so far / remaining" when a payment covers only part of it');
-  });
+  // Covered by __tests__/integration/vender/table-payment-apply.test.ts and table-payment-sync.test.ts (pay at the table, 2026-10-10)
 
   describe('splitting the bill (a product gap: the feature does not exist)', () => {
     it.todo('equal split among N people: the parts add up to the total to the cent (largest-remainder rounding, never 3 x 33.33 for 100.00)');

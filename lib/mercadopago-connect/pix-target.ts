@@ -1,6 +1,6 @@
 import type { OrderSessionStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { lineTotalCents } from '@/lib/comanda/line-total';
+import { loadBill } from '@/lib/comanda/bill-service';
 
 /**
  * Turns "what is the customer paying for" into a restaurant plus an amount
@@ -90,36 +90,21 @@ async function resolveTable(qrToken: string): Promise<ResolveResult> {
   const session = await prisma.orderSession.findFirst({
     where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: OPEN_SESSION_STATUSES } },
     orderBy: { openedAt: 'desc' },
-    select: {
-      id: true,
-      items: {
-        select: {
-          price: true,
-          quantity: true,
-          // Paid modifiers are NOT included in OrderSessionItem.price (that is
-          // the base menu price); their surcharge lives here.
-          modifiers: { select: { priceAdjustment: true } },
-        },
-      },
-    },
+    select: { id: true },
   });
   if (!session) return { ok: false, status: 409, error: 'Nenhuma comanda aberta nesta mesa' };
 
-  // A comanda line costs (price + the adjustments of its modifiers) * quantity: a
-  // modifier's surcharge applies to EACH unit (owner's rule, 2026-09-24). The same
-  // function prices the comanda screen and the revenue reports.
-  const totalCents = session.items.reduce(
-    (sum, item) => sum + lineTotalCents(item.price, item.quantity, item.modifiers.map((m) => m.priceAdjustment)),
-    0
-  );
-  const amount = totalCents / 100;
-  if (!(amount > 0)) return { ok: false, status: 409, error: 'A comanda está vazia' };
+  // What is left on the bill (spec 2026-10-10 §5.4): items with their paid modifiers, the service
+  // charge, minus what the cash register and the table's online payments already hold.
+  const bill = await loadBill(prisma, table.restaurantId, session.id);
+  if (!bill || bill.items.length === 0) return { ok: false, status: 409, error: 'A comanda está vazia' };
+  if (bill.remainingCents <= 0) return { ok: false, status: 409, error: 'Esta conta já está paga' };
 
   return {
     ok: true,
     target: {
       restaurantId: table.restaurantId,
-      amount,
+      amount: bill.remainingCents / 100,
       description: `Mesa ${table.number}`,
       orderId: null,
       sessionId: session.id,

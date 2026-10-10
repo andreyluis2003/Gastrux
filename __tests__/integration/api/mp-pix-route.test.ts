@@ -355,6 +355,7 @@ describe('public PIX routes', () => {
           gateway: 'MERCADO_PAGO_CONNECT',
           status: 'PENDING',
           metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+          orderSessionId: session.id,
         },
       });
 
@@ -378,6 +379,7 @@ describe('public PIX routes', () => {
           gateway: 'MERCADO_PAGO_CONNECT',
           status: 'PENDING',
           metadata: JSON.stringify({ source: 'table', sessionId: session.id }),
+          orderSessionId: session.id,
           createdAt: new Date(Date.now() - 3 * 60 * 1000),
         },
       });
