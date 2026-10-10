@@ -237,7 +237,10 @@ export async function createPreApproval(input: CreatePreApprovalInput) {
       end_date: input.autoRecurring.endDate,
       billing_day: input.autoRecurring.billingDay,
       billing_day_proportional: input.autoRecurring.billingDayProportional,
-      free_trial: input.autoRecurring.freeTrial,
+      // The API takes snake_case: passing freeTrial as is sent frequencyType and the trial was dropped
+      free_trial: input.autoRecurring.freeTrial
+        ? { frequency: input.autoRecurring.freeTrial.frequency, frequency_type: input.autoRecurring.freeTrial.frequencyType }
+        : undefined,
     },
     card_token_id: input.cardTokenId,
   };
