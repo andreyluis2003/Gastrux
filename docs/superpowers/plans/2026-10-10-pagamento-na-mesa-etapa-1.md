@@ -19,7 +19,7 @@
 - The cash drawer and the blind close are unchanged: online payments never create `CashSessionEntry` rows (spec §5.3).
 - One NFC-e per bill, with the CPF of the last applied payment that carried one (spec §3.4). The CPF is stored in the existing `Payment.customerDocument` (no new `customerCpf` column: deviation from spec §5.3, same meaning).
 - Copy shown to people is Portuguese (pt-BR); code, comments and commit messages in English.
-- Migrations are additive and are applied by hand after Deploy: `npx prisma migrate deploy` in the Easypanel console (no auto-migrate).
+- Migrations are additive and idempotent; this one is applied by hand BEFORE Deploy (SQL pasted in the console of the old service) and recorded after Deploy with `npx prisma migrate deploy` (no auto-migrate). See Task 6 Step 3.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`; publish with `git push origin HEAD:main` using `GIT_SSH_COMMAND="ssh -i ~/.ssh/gastrux_github_deploy -o IdentitiesOnly=yes"` from `C:\Users\andre\gastrux-fix-delivery`.
 
 ## Review Focus
@@ -1133,7 +1133,37 @@ Expected: tsc silent; all listed suites PASS. These are not the 9 legacy suites 
 GIT_SSH_COMMAND="ssh -i ~/.ssh/gastrux_github_deploy -o IdentitiesOnly=yes" git push origin HEAD:main
 ```
 
-- [ ] **Step 3: Owner deploys (homolog first, then app)** — tell the owner, in this order: Easypanel `homolog` → Deploy → Console `npx prisma migrate deploy`; check; then `app` → Deploy → Console `npx prisma migrate deploy`. Until the migration runs, every bill read fails (the new columns are queried), so the console command must follow the deploy immediately, at a quiet hour.
+- [ ] **Step 3: Owner deploys (homolog first, then app)** — the columns must exist BEFORE the new code runs, because Prisma selects every column of a model by default, so new code on a database without them breaks every Payment and OrderSession read (bills, `/caixa`, payments). The migration is idempotent, so it is run by hand first and then recorded by `migrate deploy`. For each service, in this order (`homolog`, check, then `app`):
+
+  (a) In the Easypanel **Console of the service as it is now (old code, before Deploy)**, apply the SQL. `npx prisma db execute --file prisma/migrations/20261010120000_table_online_payments/migration.sql` is NOT possible there (the old container does not have the new file), so paste it through stdin:
+
+  ```bash
+  npx prisma db execute --stdin --schema prisma/schema.prisma <<'SQL'
+  ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "orderSessionId" TEXT;
+  ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "cashSessionId" TEXT;
+  ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "tableShareMode" TEXT;
+  ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "appliedToBillAt" TIMESTAMP(3);
+  ALTER TABLE "order_sessions" ADD COLUMN IF NOT EXISTS "payAtWaiterRequestedAt" TIMESTAMP(3);
+  CREATE INDEX IF NOT EXISTS "payments_orderSessionId_idx" ON "payments"("orderSessionId");
+  CREATE INDEX IF NOT EXISTS "payments_cashSessionId_idx" ON "payments"("cashSessionId");
+  DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_orderSessionId_fkey') THEN
+      ALTER TABLE "payments" ADD CONSTRAINT "payments_orderSessionId_fkey" FOREIGN KEY ("orderSessionId") REFERENCES "order_sessions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+  END $$;
+  DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_cashSessionId_fkey') THEN
+      ALTER TABLE "payments" ADD CONSTRAINT "payments_cashSessionId_fkey" FOREIGN KEY ("cashSessionId") REFERENCES "cash_sessions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+  END $$;
+  SQL
+  ```
+
+  Expected: `Script executed successfully.` The old code keeps working (it never reads the new columns).
+
+  (b) Click **Deploy**.
+
+  (c) In the Console of the new container: `npx prisma migrate deploy` — it re-runs the idempotent migration (no change) and records it, so later deploys stay in sync.
 
 - [ ] **Step 4: Homolog check (browser)** — on `https://homolog.gastrux.com` with the test restaurant: open a table with one item, open the bill dialog (Vender) and confirm it loads and shows "Falta" correctly; open `/caixa` and confirm the page loads. PIX itself is not testable in homolog (Mercado Pago test accounts, 2026-10-04).
 
