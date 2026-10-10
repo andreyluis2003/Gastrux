@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { idempotent } from '@/lib/api/idempotency';
 import { isManager, recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { lockComanda } from '@/lib/comanda/add-item';
-import { paidNetCents } from '@/lib/comanda/bill';
+import { billHasPayments } from '@/lib/comanda/bill-service';
 import { resolveMergedSession } from '@/lib/comanda/transfer';
 
 export const dynamic = 'force-dynamic';
@@ -37,9 +37,9 @@ const CLOSED_ANSWER = { error: 'Comanda fechada ou cancelada' };
 // Once the bill has payments, what was charged must not shrink under them: give a payment back first
 // (review of tela Vender stage 2). Adding more (a higher quantity) is still fine.
 const PAID_ANSWER = { error: 'Esta conta já tem pagamentos: estorne um pagamento antes de tirar ou mudar itens' };
+// Cash or online (pay at the table): both are money on the bill
 async function hasPayments(sessionId: string, restaurantId: string) {
-  const lines = await prisma.cashSessionEntry.findMany({ where: { orderSessionId: sessionId, restaurantId }, select: { type: true, method: true, amountCents: true, direction: true } });
-  return paidNetCents(lines) > 0;
+  return billHasPayments(prisma, restaurantId, sessionId);
 }
 
 const snapshot = (line: any) => ({

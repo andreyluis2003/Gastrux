@@ -136,6 +136,29 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
   };
 }
 
+/**
+ * What the bill holds, split by where the money is: net cash-register money (receipts minus change and
+ * refunds) and applied online payments of the table (minus their refunds). Pass the transaction to read
+ * under the comanda lock.
+ */
+export async function billPaidCents(db: Db, restaurantId: string, sessionId: string): Promise<{ cashCents: number; onlineCents: number }> {
+  const entries = await db.cashSessionEntry.findMany({
+    where: { orderSessionId: sessionId, restaurantId },
+    select: { type: true, method: true, amountCents: true, direction: true },
+  });
+  const online = await db.payment.findMany({
+    where: { restaurantId, orderSessionId: sessionId, gateway: 'MERCADO_PAGO_CONNECT', appliedToBillAt: { not: null } },
+    select: { amount: true, amountRefunded: true, status: true },
+  });
+  return { cashCents: paidNetCents(entries), onlineCents: online.reduce((sum, p) => sum + onlinePaidCents(p), 0) };
+}
+
+/** "This bill has payments" (cash or online): its items must not shrink or move under them */
+export async function billHasPayments(db: Db, restaurantId: string, sessionId: string): Promise<boolean> {
+  const { cashCents, onlineCents } = await billPaidCents(db, restaurantId, sessionId);
+  return cashCents > 0 || onlineCents > 0;
+}
+
 /** The customer declines (or accepts again) the service charge, for every device (spec 4.3) */
 export async function setServiceWaived(member: RestaurantMember, sessionId: string, waived: boolean): Promise<Bill> {
   const bill = await prisma.$transaction(async (tx) => {

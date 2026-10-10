@@ -13,7 +13,8 @@ import { CashRuleError, settlePayments } from '@/lib/caixa/rules';
 import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, reverseSaleEntries, type SaleTarget } from '@/lib/caixa/sale';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
-import { billTotals, paidNetCents, serviceApplies } from '@/lib/comanda/bill';
+import { billTotals, serviceApplies } from '@/lib/comanda/bill';
+import { billHasPayments, billPaidCents } from '@/lib/comanda/bill-service';
 import { lockComanda } from '@/lib/comanda/add-item';
 
 export const dynamic = 'force-dynamic';
@@ -132,8 +133,8 @@ async function handlePUT(
           // The bill screen pays in parts (POST .../payments); an old close from a device queue must
           // never charge the whole total again over those parts (spec 2026-10-07, 4.3). Net paid, so a
           // bill reopened by a manager (its money already given back) can still be closed here
-          const lines = await tx.cashSessionEntry.findMany({ where: { orderSessionId: params.id, restaurantId }, select: { type: true, method: true, amountCents: true, direction: true } });
-          if (paidNetCents(lines) > 0) throw new CashRuleError('Esta conta já tem pagamentos: feche pela tela Conta', 422, 'PARTIAL_PAYMENTS');
+          // Online payments of the table (pay at the table) count too
+          if (await billHasPayments(tx, restaurantId, params.id)) throw new CashRuleError('Esta conta já tem pagamentos: feche pela tela Conta', 422, 'PARTIAL_PAYMENTS');
           const itemsTotal = await comandaTotalCents(tx, params.id);
           const bill = await tx.orderSession.findUnique({
             where: { id: params.id },
@@ -257,9 +258,11 @@ export async function DELETE(
         await lockComanda(tx, params.id);
         const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: ownedSession.status }, data: { status: 'CANCELLED' } });
         if (guard.count === 0) throw new CashRuleError('Esta comanda mudou enquanto era cancelada. Atualize e tente de novo.', 422, 'CHANGED');
-        const lines = await tx.cashSessionEntry.findMany({ where: { orderSessionId: params.id, restaurantId: member.restaurantId }, select: { type: true, method: true, amountCents: true, direction: true } });
-        const paid = paidNetCents(lines) > 0;
-        if (paid) {
+        // Online money (pay at the table) cannot be given back from the drawer: it is refunded through
+        // Mercado Pago first, so the cancel is refused (and rolled back) while the bill still holds it
+        const { cashCents, onlineCents } = await billPaidCents(tx, member.restaurantId, params.id);
+        if (onlineCents > 0) throw new CashRuleError('Pagamento online: estorne pelo Mercado Pago antes de cancelar', 409, 'ONLINE_PAYMENTS');
+        if (cashCents > 0) {
           await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason });
         }
       });

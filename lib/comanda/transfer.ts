@@ -3,8 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
-import { paidNetCents } from './bill';
-import { emitClosedBill, loadBill } from './bill-service';
+import { billHasPayments, emitClosedBill, loadBill } from './bill-service';
 
 /**
  * Moving comandas around the room (spec 2026-10-07, 4.4): transfer a comanda to another table, merge
@@ -112,6 +111,9 @@ export async function mergeSessions(member: RestaurantMember, targetSessionId: s
     await assertNoNote(tx, source.id);
     const items = await tx.orderSessionItem.updateMany({ where: { sessionId: source.id }, data: { sessionId: target.id } });
     const payments = await tx.cashSessionEntry.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
+    // Online payments of the table (pay at the table) follow too, applied or still pending, so their money
+    // stays on the joined bill and a later approval lands on it
+    await tx.payment.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
     await tx.order.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
     await tx.orderSession.update({ where: { id: source.id }, data: { status: 'CANCELLED', mergedIntoId: target.id } });
     // New lines on the target: it is ordering again, not waiting for the bill
@@ -175,11 +177,7 @@ export async function moveItems(
     await openSession(tx, member.restaurantId, sourceSessionId);
     await openSession(tx, member.restaurantId, targetId);
     await assertNoNote(tx, sourceSessionId);
-    const lines = await tx.cashSessionEntry.findMany({
-      where: { orderSessionId: sourceSessionId, restaurantId: member.restaurantId },
-      select: { type: true, method: true, amountCents: true, direction: true },
-    });
-    if (paidNetCents(lines) > 0) throw new CashRuleError('Esta conta já tem pagamentos: estorne um pagamento antes de tirar itens', 409);
+    if (await billHasPayments(tx, member.restaurantId, sourceSessionId)) throw new CashRuleError('Esta conta já tem pagamentos: estorne um pagamento antes de tirar itens', 409);
     const owned = await tx.orderSessionItem.count({ where: { id: { in: itemIds }, sessionId: sourceSessionId } });
     if (owned !== itemIds.length) throw new CashRuleError('Item não encontrado nesta comanda', 404);
     await tx.orderSessionItem.updateMany({ where: { id: { in: itemIds } }, data: { sessionId: targetId } });
