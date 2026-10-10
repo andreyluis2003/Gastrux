@@ -1,4 +1,5 @@
 import { CASH_METHODS, emptyByMethod, toCashMethod, type CashMethod } from '@/lib/caixa/payment-methods';
+import { toCents } from './line-total';
 import { CashRuleError, entryEffect, parseAmountCents, type PaymentInput, type SettledPayment } from '@/lib/caixa/rules';
 
 /**
@@ -24,6 +25,12 @@ export function billTotals(subtotalCents: number, percent: number, opts: { appli
 /** What the cash register holds for this bill: receipts, minus change given back, minus refunds */
 export function paidNetCents(entries: Array<{ type: string; method: string; amountCents: number; direction?: 'IN' | 'OUT' | null }>): number {
   return entries.reduce((sum, e) => sum + entryEffect(e as Parameters<typeof entryEffect>[0]), 0);
+}
+
+/** What one online payment (pay at the table) puts on the bill: approved money minus what was refunded */
+export function onlinePaidCents(p: { amount: unknown; amountRefunded: unknown; status: string }): number {
+  if (p.status !== 'APPROVED' && p.status !== 'PARTIALLY_REFUNDED') return 0;
+  return Math.max(0, toCents(p.amount) - toCents(p.amountRefunded));
 }
 
 export function splitEqually(totalCents: number, people: number): number[] {

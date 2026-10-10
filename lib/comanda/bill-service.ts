@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { lineTotalCents } from '@/lib/comanda/line-total';
+import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
@@ -9,7 +9,7 @@ import { CASH_METHODS, toNfcePaymentMethod, type CashMethod } from '@/lib/caixa/
 import type { PaymentInput } from '@/lib/caixa/rules';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
-import { billTotals, paidNetCents, serviceApplies, settlePartial } from './bill';
+import { billTotals, onlinePaidCents, paidNetCents, serviceApplies, settlePartial } from './bill';
 
 /**
  * The bill of a comanda (spec 2026-10-07, 4.3): items, service charge, what the cash register already
@@ -18,7 +18,8 @@ import { billTotals, paidNetCents, serviceApplies, settlePartial } from './bill'
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
-export interface BillPayment { id: string; method: string; amountCents: number; changeCents: number; createdAt: string; refunded: boolean }
+/** A payment of the bill: a cash-register entry, or an online payment of the table (PIX_ONLINE / CARD_ONLINE) */
+export interface BillPayment { id: string; method: string; amountCents: number; changeCents: number; createdAt: string; refunded: boolean; online: boolean }
 export interface Bill {
   sessionId: string;
   status: string;
@@ -60,6 +61,15 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
     select: { id: true, type: true, method: true, amountCents: true, direction: true, description: true, createdAt: true },
     orderBy: { createdAt: 'asc' },
   });
+  // Pay at the table (spec 2026-10-10): online payments count once they were applied under the comanda lock
+  const onlineRows = await db.payment.findMany({
+    where: {
+      restaurantId, orderSessionId: sessionId, gateway: 'MERCADO_PAGO_CONNECT',
+      status: { in: ['APPROVED', 'PARTIALLY_REFUNDED', 'REFUNDED'] }, appliedToBillAt: { not: null },
+    },
+    select: { id: true, method: true, amount: true, amountRefunded: true, status: true, appliedToBillAt: true },
+    orderBy: { appliedToBillAt: 'asc' },
+  });
 
   const items = s.items.map((i) => ({
     id: i.id,
@@ -74,7 +84,7 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
   const totals = s.status === 'CLOSED'
     ? { subtotalCents, serviceCents: s.serviceChargeCents, totalCents: subtotalCents + s.serviceChargeCents }
     : billTotals(subtotalCents, percent, { applies, waived: s.serviceChargeWaived });
-  const paidCents = paidNetCents(entries);
+  const paidCents = paidNetCents(entries) + onlineRows.reduce((sum, p) => sum + onlinePaidCents(p), 0);
 
   const refunds = entries.filter((e) => e.type === 'REFUND').map((e) => e.description ?? '');
   // A manager's reopening gives every payment made until then back (lib/caixa/sale.ts reverseSaleEntries)
@@ -94,7 +104,20 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
         .reduce((n, c) => n + c.amountCents, 0),
       createdAt: e.createdAt.toISOString(),
       refunded: refunds.some((d) => d.startsWith(REFUND_TAG(e.id))) || e.createdAt.getTime() <= lastReopen,
+      online: false,
     }));
+  for (const p of onlineRows) {
+    payments.push({
+      id: p.id,
+      method: p.method === 'PIX' ? 'PIX_ONLINE' : 'CARD_ONLINE',
+      amountCents: toCents(p.amount),
+      changeCents: 0,
+      createdAt: p.appliedToBillAt!.toISOString(),
+      refunded: p.status === 'REFUNDED',
+      online: true,
+    });
+  }
+  payments.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   return {
     sessionId: s.id,
@@ -143,26 +166,37 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
 
 /**
  * The NFC-e of a bill that just closed, when the restaurant turned it on: the method that paid the most
- * goes on the note (same rule as the old close). The note never fails the close.
+ * goes on the note (same rule as the old close), online payments of the table included. The note never
+ * fails the close.
  */
-export async function emitClosedBill(member: RestaurantMember, sessionId: string, cpf?: string | null, customerName?: string | null) {
+export async function emitClosedBillFor(restaurantId: string, sessionId: string, cpf?: string | null, customerName?: string | null) {
   // A closed bill is a sale of the month: the plan warns at 80% / 100% and never blocks (2026-10-09)
-  await noteSalesThresholds(member.restaurantId);
+  await noteSalesThresholds(restaurantId);
   const entries = await prisma.cashSessionEntry.findMany({
-    where: { orderSessionId: sessionId, restaurantId: member.restaurantId, type: 'RECEIPT' },
+    where: { orderSessionId: sessionId, restaurantId, type: 'RECEIPT' },
     select: { method: true, amountCents: true },
   });
+  const onlineRows = await prisma.payment.findMany({
+    where: { orderSessionId: sessionId, restaurantId, gateway: 'MERCADO_PAGO_CONNECT', appliedToBillAt: { not: null } },
+    select: { method: true, amount: true, amountRefunded: true, status: true },
+  });
   const byMethod = new Map<CashMethod, number>();
-  for (const e of entries) byMethod.set(e.method as CashMethod, (byMethod.get(e.method as CashMethod) ?? 0) + e.amountCents);
+  const add = (m: CashMethod, cents: number) => byMethod.set(m, (byMethod.get(m) ?? 0) + cents);
+  for (const e of entries) add(e.method as CashMethod, e.amountCents);
+  for (const p of onlineRows) add(p.method === 'PIX' ? 'PIX' : 'CREDIT', onlinePaidCents(p));
   const primary = CASH_METHODS.reduce((best, m) => ((byMethod.get(m) ?? 0) > (byMethod.get(best) ?? 0) ? m : best), 'CASH' as CashMethod);
   return autoEmitNFCe({
-    restaurantId: member.restaurantId,
+    restaurantId,
     orderSessionId: sessionId,
     customerCPF: cpf ? String(cpf).replace(/\D/g, '') || undefined : undefined,
     customerName: customerName ?? undefined,
     paymentMethod: toNfcePaymentMethod(primary),
     onlyIfEnabled: true,
   });
+}
+
+export async function emitClosedBill(member: RestaurantMember, sessionId: string, cpf?: string | null, customerName?: string | null) {
+  return emitClosedBillFor(member.restaurantId, sessionId, cpf, customerName);
 }
 
 /**
