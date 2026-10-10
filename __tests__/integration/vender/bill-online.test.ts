@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 
 jest.mock('../../../lib/nfe/emit-session', () => ({ autoEmitNFCe: jest.fn().mockResolvedValue({ ok: true }) }));
 import { autoEmitNFCe } from '../../../lib/nfe/emit-session';
-import { loadBill, emitClosedBillFor } from '../../../lib/comanda/bill-service';
+import { loadBill, emitClosedBillFor, refundBillPayment } from '../../../lib/comanda/bill-service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -87,5 +87,15 @@ describe('bill with online payments', () => {
     (autoEmitNFCe as jest.Mock).mockClear();
     await emitClosedBillFor(rid, sid, '123.456.789-09', 'Maria');
     expect((autoEmitNFCe as jest.Mock).mock.calls[0][0]).toMatchObject({ restaurantId: rid, orderSessionId: sid, paymentMethod: 'pix', customerCPF: '12345678909', customerName: 'Maria' });
+  });
+
+  it('refusing to refund an online payment through the cash drawer', async () => {
+    const sid = await newBill();
+    const pay = await online(sid, 50);
+    const before = await prisma.cashSessionEntry.count({ where: { restaurantId: rid } });
+    await expect(refundBillPayment({ restaurantId: rid, userId: ownerId } as any, sid, pay.id, { reason: 'teste', cashSessionId: shiftId }))
+      .rejects.toMatchObject({ status: 409 });
+    expect(await prisma.cashSessionEntry.count({ where: { restaurantId: rid } })).toBe(before);
+    expect((await loadBill(prisma, rid, sid)).paidCents).toBe(5_000);
   });
 });

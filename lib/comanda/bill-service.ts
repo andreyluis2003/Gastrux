@@ -262,6 +262,8 @@ export async function refundBillPayment(
     if (bill.status === 'CLOSED') throw new CashRuleError('Conta fechada: para devolver, reabra a conta (gerente)', 409);
     const payment = bill.payments.find((p) => p.id === entryId);
     if (!payment) throw new CashRuleError('Pagamento não encontrado', 404);
+    // An online payment goes back through Mercado Pago, never through the cash drawer
+    if (payment.online) throw new CashRuleError('Pagamento online: devolva pelo Mercado Pago em Pagamentos, com o botão Estornar', 409);
     if (payment.refunded) throw new CashRuleError('Este pagamento já foi estornado', 422, 'ALREADY_REFUNDED');
     const target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: input.cashSessionId, replay: false, legacy: false });
     const amountCents = payment.amountCents - payment.changeCents;
