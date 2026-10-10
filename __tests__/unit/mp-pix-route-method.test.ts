@@ -15,8 +15,10 @@ jest.mock('@/lib/mercadopago-connect/pix-service', () => ({
   createPixForTarget: jest.fn(),
   normalizePayer: jest.fn(() => ({ email: null, name: null })),
 }));
+jest.mock('@/lib/comanda/bill-service', () => ({ loadBill: jest.fn() }));
 
 import { createPixForTarget } from '@/lib/mercadopago-connect/pix-service';
+import { loadBill } from '@/lib/comanda/bill-service';
 import { orderAcceptsPix, PIX_NOT_FOR_THIS_ORDER, resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
 import { POST } from '../../app/api/pagamentos/mp/pix/route';
 
@@ -94,15 +96,24 @@ describe('POST /api/pagamentos/mp/pix', () => {
     }
   );
 
-  it('the QR table flow (qrToken) is unaffected', async () => {
+  it('the QR table flow (qrToken) is unaffected: it charges what is left on the bill', async () => {
     prismaMock.table.findUnique.mockResolvedValue({ id: 't1', number: 4, restaurantId: 'rest-1' });
-    prismaMock.orderSession.findFirst.mockResolvedValue({
-      id: 's1',
-      items: [{ price: 10, quantity: 2, modifiers: [] }],
-    });
+    prismaMock.orderSession.findFirst.mockResolvedValue({ id: 's1' });
+    (loadBill as jest.Mock).mockResolvedValue({ items: [{}], remainingCents: 2000, serviceCents: 0, paidCents: 0 });
     const res = await post({ qrToken: 'qr-abc' });
     expect(res.status).toBe(200);
     expect(createPixForTarget).toHaveBeenCalledTimes(1);
-    expect((createPixForTarget as jest.Mock).mock.calls[0][0].orderId).toBeNull();
+    const target = (createPixForTarget as jest.Mock).mock.calls[0][0];
+    expect(target.orderId).toBeNull();
+    expect(target.amount).toBe(20);
+  });
+
+  it('a table with nothing left to pay is refused with 409 and nothing is written', async () => {
+    prismaMock.table.findUnique.mockResolvedValue({ id: 't1', number: 4, restaurantId: 'rest-1' });
+    prismaMock.orderSession.findFirst.mockResolvedValue({ id: 's1' });
+    (loadBill as jest.Mock).mockResolvedValue({ items: [{}], remainingCents: 0, serviceCents: 0, paidCents: 0 });
+    const res = await post({ qrToken: 'qr-abc' });
+    expect(res.status).toBe(409);
+    expect(createPixForTarget).not.toHaveBeenCalled();
   });
 });
