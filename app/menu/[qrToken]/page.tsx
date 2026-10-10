@@ -83,6 +83,8 @@ export default function PublicMenuPage() {
   const [pixData, setPixData] = useState<{ paymentId: string; qrCode: string; qrCodeBase64: string; ticketUrl: string } | null>(null);
   const [pixPaid, setPixPaid] = useState(false);
   const [pixPolling, setPixPolling] = useState(false);
+  // The service charge inside the table PIX (optional for the customer: staff removes it on request)
+  const [pixServiceCents, setPixServiceCents] = useState(0);
   const [orderTotal, setOrderTotal] = useState(0);
 
   // PIX polling lives in refs so it can always be cancelled (a new QR, leaving the screen, unmount), and a
@@ -216,6 +218,7 @@ export default function PublicMenuPage() {
         });
         setShowPixPayment(true);
         setOrderTotal(Number(data.amount) || 0);
+        setPixServiceCents(Number(data.serviceCents) || 0);
         // Start polling for payment status
         startPixPolling(data.paymentId);
       } else {
@@ -356,6 +359,11 @@ export default function PublicMenuPage() {
               </div>
               <h1 className="text-xl font-bold mb-1">Pagar com Pix</h1>
               <p className="text-2xl font-bold text-blue-700 mb-4">R$ {orderTotal.toFixed(2)}</p>
+              {pixServiceCents > 0 && (
+                <p className="text-sm text-gray-600 -mt-2 mb-4">
+                  Inclui taxa de serviço de R$ {(pixServiceCents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (opcional: para retirar, fale com o garçom)
+                </p>
+              )}
 
               {/* QR Code */}
               {pixData.qrCodeBase64 ? (

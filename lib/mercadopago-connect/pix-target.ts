@@ -21,6 +21,12 @@ export interface ResolvedPixTarget {
    * not created for the payment method it is being paid with.
    */
   orderPaymentMethod?: string | null;
+  /**
+   * Set only for a TABLE target (pay at the table): the bill's service charge and what was already paid, in
+   * cents, so the customer is told the amount includes the (optional) service charge.
+   */
+  serviceCents?: number;
+  paidCents?: number;
 }
 
 export type ResolveResult =
@@ -109,6 +115,8 @@ async function resolveTable(qrToken: string): Promise<ResolveResult> {
       orderId: null,
       sessionId: session.id,
       metadata: { source: 'table', sessionId: session.id, tableId: table.id, tableNumber: table.number },
+      serviceCents: bill.serviceCents,
+      paidCents: bill.paidCents,
     },
   };
 }

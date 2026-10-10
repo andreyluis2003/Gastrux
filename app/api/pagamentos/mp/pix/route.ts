@@ -33,7 +33,11 @@ export async function POST(request: NextRequest) {
       // the QR for this same order/tab, so no second live charge is created).
       return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
     }
-    return NextResponse.json({ success: true, ...result.pix });
+    // A table PIX also says how much of it is the (optional) service charge, and what was already paid
+    const table = resolved.target.sessionId
+      ? { serviceCents: resolved.target.serviceCents ?? 0, paidCents: resolved.target.paidCents ?? 0 }
+      : {};
+    return NextResponse.json({ success: true, ...result.pix, ...table });
   } catch (error) {
     console.error('[PIX] Erro ao criar pagamento:', error);
     return NextResponse.json({ error: 'Erro ao gerar PIX' }, { status: 500 });

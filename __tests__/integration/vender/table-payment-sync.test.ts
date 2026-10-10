@@ -76,6 +76,8 @@ describe('table PIX on the bill', () => {
     const pix = await askPix();
     expect(pix.status).toBe(200);
     expect(pix.body.amount).toBe(100);
+    // The customer is told the 10% service charge is inside the amount (owner decision: shown, optional)
+    expect(pix.body).toMatchObject({ serviceCents: 1_000, paidCents: 1_000 });
     const row = await prisma.payment.findUnique({ where: { id: pix.body.paymentId } });
     expect(row).toMatchObject({ orderSessionId: sid, tableShareMode: 'ALL' });
     await prisma.orderSession.update({ where: { id: sid }, data: { status: 'CANCELLED' } });

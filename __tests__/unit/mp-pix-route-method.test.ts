@@ -80,6 +80,7 @@ describe('POST /api/pagamentos/mp/pix', () => {
     prismaMock.order.findUnique.mockResolvedValue(orderRow(method));
     const res = await post({ orderId: 'order-1' });
     expect(res.status).toBe(200);
+    expect(await res.json()).not.toHaveProperty('serviceCents');
     expect(createPixForTarget).toHaveBeenCalledTimes(1);
   });
 
@@ -99,9 +100,10 @@ describe('POST /api/pagamentos/mp/pix', () => {
   it('the QR table flow (qrToken) is unaffected: it charges what is left on the bill', async () => {
     prismaMock.table.findUnique.mockResolvedValue({ id: 't1', number: 4, restaurantId: 'rest-1' });
     prismaMock.orderSession.findFirst.mockResolvedValue({ id: 's1' });
-    (loadBill as jest.Mock).mockResolvedValue({ items: [{}], remainingCents: 2000, serviceCents: 0, paidCents: 0 });
+    (loadBill as jest.Mock).mockResolvedValue({ items: [{}], remainingCents: 2000, serviceCents: 200, paidCents: 200 });
     const res = await post({ qrToken: 'qr-abc' });
     expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ serviceCents: 200, paidCents: 200 });
     expect(createPixForTarget).toHaveBeenCalledTimes(1);
     const target = (createPixForTarget as jest.Mock).mock.calls[0][0];
     expect(target.orderId).toBeNull();
