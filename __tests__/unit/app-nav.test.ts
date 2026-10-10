@@ -12,6 +12,16 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
     expect(missing).toEqual([]);
   });
 
+  it('the new links exist with their roles (billing for the owner, issued notes for managers)', () => {
+    const all = NAV_GROUPS.flatMap((g) => g.links);
+    expect(all.find((l) => l.href === '/dashboard/billing')).toEqual({ label: 'Minha assinatura', href: '/dashboard/billing', roles: ['OWNER', 'ADMIN'] });
+    expect(all.find((l) => l.href === '/admin/nfe/documents')?.label).toBe('Notas emitidas');
+    expect(NAV_GROUPS.find((g) => g.id === 'fiscal')?.links.map((l) => l.href)).toEqual(['/admin/fiscal', '/admin/nfe/documents']);
+    expect(hrefs(navFor('OWNER', false))).toContain('/dashboard/billing');
+    expect(hrefs(navFor('MANAGER', false))).not.toContain('/dashboard/billing');
+    expect(hrefs(navFor('MANAGER', false))).toContain('/admin/nfe/documents');
+  });
+
   it('Etiquetas and Validades: owner, manager and cook, not the cashier (spec 2026-10-09 etiquetas)', () => {
     for (const role of ['OWNER', 'MANAGER', 'COOK']) expect(hrefs(navFor(role, false))).toEqual(expect.arrayContaining(['/etiquetas', '/etiquetas/validades']));
     expect(hrefs(navFor('CASHIER', false))).not.toContain('/etiquetas');

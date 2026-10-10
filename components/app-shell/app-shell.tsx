@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ChefHat, ChevronDown, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
+import { ChefHat, ChevronDown, CreditCard, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
 import { openFeedback } from '@/components/feedback/feedback-widget';
 import { signOutSafely } from '@/lib/offline/sign-out';
@@ -33,6 +33,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const groups = navFor(user?.role, !!user?.isPlatformAdmin);
   const active = activeHref(groups, pathname);
   const sidebar = mode === 'sidebar';
+  // The subscription belongs to the restaurant owner (an empty role counts as owner, like navFor) and platform staff
+  const canSeeBilling = !user?.role || user.role === 'OWNER' || !!user.isPlatformAdmin;
   // The bell polls: mount it once, in the pinned menu on a computer, in the top bar otherwise
   const bellInMenu = sidebar && isDesktop === true;
   const bellInTopBar = isDesktop !== null && !bellInMenu;
@@ -104,6 +106,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Lightbulb className="h-4 w-4" /> Enviar sugestão
           </button>
+          {canSeeBilling && (
+            <Link href="/dashboard/billing" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700">
+              <CreditCard className="h-4 w-4" /> Minha assinatura
+            </Link>
+          )}
           <Link href="/conta" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700">
             <UserCog className="h-4 w-4" /> Minha conta e senha
           </Link>
@@ -128,7 +135,7 @@ function NavSection({ group, active }: { group: NavGroup; active: string | null 
     if (containsActive) setExpanded(true);
   }, [containsActive]);
 
-  // A group with a single link is just that link ("Início", "Fiscal")
+  // A group with a single link is just that link ("Início", or a role that sees one link of a group)
   if (group.links.length === 1) {
     const l = group.links[0];
     return <NavItem href={l.href} label={group.id === 'inicio' ? group.label : l.label} active={l.href === active} strong />;

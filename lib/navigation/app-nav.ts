@@ -85,7 +85,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'fiscal',
     label: 'Fiscal',
-    links: [{ label: 'Notas fiscais (NFC-e)', href: '/admin/fiscal', roles: MANAGERS }],
+    links: [
+      { label: 'Notas fiscais (NFC-e)', href: '/admin/fiscal', roles: MANAGERS },
+      { label: 'Notas emitidas', href: '/admin/nfe/documents', roles: MANAGERS },
+    ],
   },
   {
     id: 'relatorios',
@@ -124,6 +127,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Configurações',
     links: [
       { label: 'Configurações do restaurante', href: '/admin/settings', roles: MANAGERS },
+      // Only the owner subscribes; ADMIN is the platform admin
+      { label: 'Minha assinatura', href: '/dashboard/billing', roles: ['OWNER', 'ADMIN'] },
       { label: 'WhatsApp', href: '/admin/integrations/whatsapp', roles: MANAGERS },
       { label: 'Maquininha', href: '/admin/pdv', roles: MANAGERS },
       { label: 'Várias lojas', href: '/admin/multi-location', roles: MANAGERS },
