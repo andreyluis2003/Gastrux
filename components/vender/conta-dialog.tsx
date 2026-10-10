@@ -17,7 +17,7 @@ import { nextEqualShare, shareForItems, splitEqually } from '@/lib/comanda/bill'
 import { noteLabel } from '@/lib/nfe/access-key';
 import type { Bill } from '@/lib/comanda/bill-service';
 
-const METHOD: Record<string, string> = { CASH: 'Dinheiro', PIX: 'PIX', CREDIT: 'Crédito', DEBIT: 'Débito', OTHER: 'Outro' };
+const METHOD: Record<string, string> = { CASH: 'Dinheiro', PIX: 'PIX', CREDIT: 'Crédito', DEBIT: 'Débito', OTHER: 'Outro', PIX_ONLINE: 'PIX online', CARD_ONLINE: 'Cartão online' };
 
 /**
  * The Conta (spec 2026-10-07, 4.3): subtotal, service charge (suggested, removable), total, payments
@@ -206,7 +206,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
             </span>
             <span className="flex items-center gap-2">
               {brl(p.amountCents - p.changeCents)}
-              {manager && !closed && !p.refunded && (
+              {manager && !closed && !p.refunded && !p.online && (
                 <button aria-label="Estornar pagamento" onClick={() => refund(p.id)}><Undo2 className="h-4 w-4" /></button>
               )}
             </span>

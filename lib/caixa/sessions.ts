@@ -7,6 +7,7 @@ import {
   CashRuleError, EXPENSE_CATEGORIES, differenceByMethod, expectedByMethod, methodsOverAlert, parseAmountCents,
   parseCountedCents, salesSummary, type EntryLike, type EntryType, type SalesSummary,
 } from './rules';
+import { onlinePaidCents } from '@/lib/comanda/bill';
 import { isManager } from './roles';
 import { alertCashDifference } from './alerts';
 
@@ -209,6 +210,7 @@ export interface SessionView {
   entries: Array<{ id: string; type: EntryType; method: CashMethod; amountCents: number; direction: 'IN' | 'OUT' | null; category: string | null; description: string | null; orderSessionId: string | null; createdByName: string | null; afterClose: boolean; createdAt: string }>;
   sales: SalesSummary;
   online: { revenue: number; paidCount: number };
+  tableOnline: { pixCents: number; cardCents: number };
   expected: Keyed | null;
   counted: Keyed | null;
   difference: Keyed | null;
@@ -224,6 +226,21 @@ async function onlineDuring(restaurantId: string, from: Date, to: Date) {
   });
   const s = summarizeReceipts(groups.map((g: any) => ({ status: g.status, count: g._count._all, amount: g._sum.amount, amountRefunded: g._sum.amountRefunded })));
   return { revenue: s.revenue, paidCount: s.paidCount };
+}
+
+/** Pay at the table (spec 2026-10-10 §5.2): online payments applied to bills while this shift was open. Never in the drawer. */
+async function tableOnlineOf(restaurantId: string, cashSessionId: string) {
+  const rows = await prisma.payment.findMany({
+    where: { restaurantId, cashSessionId, appliedToBillAt: { not: null } },
+    select: { method: true, amount: true, amountRefunded: true, status: true },
+  });
+  let pixCents = 0;
+  let cardCents = 0;
+  for (const p of rows) {
+    const cents = onlinePaidCents(p);
+    if (p.method === 'PIX') pixCents += cents; else cardCents += cents;
+  }
+  return { pixCents, cardCents };
 }
 
 export async function getSessionView(member: RestaurantMember, sessionId: string): Promise<SessionView | null> {
@@ -247,6 +264,7 @@ export async function getSessionView(member: RestaurantMember, sessionId: string
     })),
     sales: salesSummary(likes),
     online: await onlineDuring(member.restaurantId, session.openedAt, end),
+    tableOnline: await tableOnlineOf(member.restaurantId, session.id),
     expected: showExpected ? (open ? toKeyed(expectedByMethod(session.openingFloatCents, likes)) : (session.expectedCents as Keyed)) : null,
     counted: (session.countedCents as Keyed) ?? null,
     difference: (session.differenceCents as Keyed) ?? null,

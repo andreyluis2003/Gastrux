@@ -124,4 +124,15 @@ describe('cash shift service', () => {
     expect(list.map((r) => r.id)).toContain(session.id);
     expect(await listSessions(B.restaurantId, {})).toEqual([]);
   });
+  it('lists the table online payments of the shift apart from the drawer', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: register.id, openingFloat: 0 });
+    const base = { restaurantId: A.restaurantId, gateway: 'MERCADO_PAGO_CONNECT', status: 'APPROVED', cashSessionId: session.id, appliedToBillAt: new Date() };
+    await prisma.payment.create({ data: { ...base, amount: 25, method: 'PIX' } });
+    await prisma.payment.create({ data: { ...base, amount: 40, method: 'CARD' } });
+    await prisma.payment.create({ data: { ...base, amount: 10, method: 'PIX', status: 'REFUNDED', amountRefunded: 10 } });
+    const view = await getSessionView(owner, session.id);
+    expect(view.tableOnline).toEqual({ pixCents: 2_500, cardCents: 4_000 });
+    expect(view.expected.pix).toBe(0); // never in the drawer
+    await prisma.payment.deleteMany({ where: { cashSessionId: session.id } });
+  });
 });

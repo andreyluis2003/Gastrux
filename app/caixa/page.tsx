@@ -102,6 +102,11 @@ export default function CaixaPage() {
               <p className="text-sm mt-3">Dinheiro esperado na gaveta: <strong>{brl(view.expected[METHOD_KEY.CASH])}</strong> <span className="text-gray-500">(visível só para gerente)</span></p>
             )}
             <p className="text-xs text-gray-500 mt-2">Recebido online no período (não entra na gaveta): {view.online.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            {(view.tableOnline.pixCents > 0 || view.tableOnline.cardCents > 0) && (
+              <p className="text-xs text-gray-500">
+                Pago na mesa pelo celular (fora da gaveta): PIX online {(view.tableOnline.pixCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · Cartão online {(view.tableOnline.cardCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </p>
+            )}
           </Card>
 
           <Card className="p-4">
