@@ -47,7 +47,7 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="close-title">
-      <Card className="max-w-lg w-full p-6 space-y-3 max-h-[90vh] overflow-y-auto">
+      <Card className="max-w-lg w-full p-6 space-y-3 max-h-[90dvh] overflow-y-auto">
         <h2 id="close-title" className="text-xl font-bold">Fechar {registerName}</h2>
         {step === 1 && (
           <>
@@ -64,7 +64,7 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
             ))}
             <label htmlFor="close-notes" className="text-sm font-semibold block">Observação (opcional)</label>
             <Input id="close-notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} />
-            <div className="flex gap-2 justify-end">
+            <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap gap-2 justify-end border-t bg-white px-6 py-3">
               <Button variant="outline" onClick={onClose}>Voltar</Button>
               <Button onClick={() => setStep(2)}>Continuar</Button>
             </div>
@@ -73,7 +73,7 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
         {step === 2 && (
           <>
             <p>Depois de confirmar, os valores não podem ser alterados.</p>
-            <div className="flex gap-2 justify-end">
+            <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap gap-2 justify-end border-t bg-white px-6 py-3">
               <Button variant="outline" onClick={() => setStep(1)} disabled={saving}>Corrigir</Button>
               <Button className="bg-red-600" onClick={confirm} disabled={saving}>{saving ? 'Fechando...' : 'Confirmar fechamento'}</Button>
             </div>
@@ -94,7 +94,7 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
             </table>
             {result.alreadyClosed && <p className="text-sm text-amber-700">Este caixa já tinha sido fechado; estes são os valores do primeiro fechamento.</p>}
             {result.alertMethods?.length > 0 && <p className="text-sm text-red-700">Diferença acima do limite: o dono foi avisado.</p>}
-            <div className="flex gap-2 justify-end">
+            <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap gap-2 justify-end border-t bg-white px-6 py-3">
               <Button variant="outline" onClick={() => printInHiddenFrame(`/imprimir/caixa/fechamento/${sessionId}`)}>Imprimir fechamento</Button>
               <Button onClick={() => { onClosed(); onClose(); }}>Concluir</Button>
             </div>

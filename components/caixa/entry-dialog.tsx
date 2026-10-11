@@ -61,7 +61,7 @@ export function EntryDialog({ sessionId, type, open, onClose, onDone }: { sessio
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="entry-title">
-      <Card className="max-w-sm w-full p-6 space-y-3">
+      <Card className="max-w-sm w-full p-6 space-y-3 max-h-[90dvh] overflow-y-auto">
         <h2 id="entry-title" className="text-xl font-bold">{TITLE[type]}</h2>
         <p className="text-sm text-gray-600">{HELP[type]}</p>
         <label htmlFor="entry-amount" className="text-sm font-semibold block">Valor (R$)</label>
@@ -79,7 +79,7 @@ export function EntryDialog({ sessionId, type, open, onClose, onDone }: { sessio
         <label htmlFor="entry-description" className="text-sm font-semibold block">{type === 'SUPPLY' ? 'Observação (opcional)' : 'Motivo'}</label>
         <Input id="entry-description" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200} disabled={saving} />
         {needsForce && <p className="text-sm text-amber-700">O caixa não tem esse valor em dinheiro. Só um gerente pode confirmar mesmo assim.</p>}
-        <div className="flex gap-2 justify-end pt-2">
+        <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap gap-2 justify-end border-t bg-white px-6 py-3">
           <Button variant="outline" onClick={onClose} disabled={saving}>Voltar</Button>
           {needsForce ? (
             <Button onClick={() => submit(true)} disabled={saving} className="bg-amber-600">Confirmar mesmo assim</Button>
