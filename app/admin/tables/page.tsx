@@ -270,7 +270,7 @@ export default function TablesPage() {
           <p className="text-xs text-muted-foreground mt-1">Clique em "+ Seção" para criar a primeira seção de mesas.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-4">
           {tablesBySection.map((section) => (
             <Card key={section.id} className="p-4">
               <h3 className="mb-3 font-semibold">{section.name}</h3>
@@ -293,7 +293,7 @@ export default function TablesPage() {
                 {section.tables.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhuma mesa</p>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-2">
                     {section.tables.map((table: any) => (
                       <div
                         key={table.id}
@@ -325,26 +325,26 @@ export default function TablesPage() {
                             <p className="mt-1 text-muted-foreground">{table.maintenanceNote}</p>
                           )}
                         </div>
-                        <div className="flex gap-1">
+                        <div className="mt-auto flex flex-wrap gap-1">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => openEdit(table)}
                             aria-label={`Editar mesa ${table.number}`}
-                            className="h-8 min-w-8 flex-1 gap-1 px-2 text-xs"
+                            className="h-8 min-w-[64px] flex-1 gap-1 px-2 text-xs"
                           >
                             <Edit2 size={12} />
-                            <span className="hidden sm:inline">Editar</span>
+                            <span>Editar</span>
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteTable(table.id)}
                             aria-label={`Excluir mesa ${table.number}`}
-                            className="h-8 min-w-8 flex-1 gap-1 px-2 text-xs text-red-600 hover:text-red-700"
+                            className="h-8 min-w-[64px] flex-1 gap-1 px-2 text-xs text-red-600 hover:text-red-700"
                           >
                             <Trash2 size={12} />
-                            <span className="hidden sm:inline">Excluir</span>
+                            <span>Excluir</span>
                           </Button>
                         </div>
                       </div>
