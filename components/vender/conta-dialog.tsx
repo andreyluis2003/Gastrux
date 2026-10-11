@@ -270,7 +270,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 justify-end">
+      {/* Always visible: on a short screen the bill scrolls under the buttons instead of pushing them off */}
+      <div className="sticky -bottom-5 -mx-5 -mb-5 flex flex-wrap gap-2 justify-end border-t bg-white px-5 py-3">
         {!closed && <Button variant="outline" className="gap-2 mr-auto" onClick={preBill}><Printer className="h-4 w-4" /> Pré-conta</Button>}
         <Button variant="ghost" onClick={onCancel}>Voltar</Button>
         {!closed && online && (
@@ -289,7 +290,7 @@ function Shell({ children, onCancel }: { children: React.ReactNode; onCancel: ()
       <div
         role="dialog"
         aria-label="Conta"
-        className="bg-white w-full lg:max-w-lg rounded-t-2xl lg:rounded-2xl p-5 max-h-[92vh] overflow-y-auto space-y-4"
+        className="bg-white w-full lg:max-w-lg rounded-t-2xl lg:rounded-2xl p-5 max-h-[92dvh] overflow-y-auto space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         {children}
