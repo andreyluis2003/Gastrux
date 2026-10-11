@@ -7,7 +7,7 @@ import { logPaymentEvent, logSubscriptionEvent, logInvoiceEvent, logWebhookEvent
 import { queuePaymentForRetry } from '@/lib/dunning-flow';
 import { createInvoice } from '@/lib/billing/invoice-service';
 import { upsertSubscriptionFromGatewayEvent, NormalizedSubscriptionStatus } from '@/lib/billing/subscription-sync';
-import { stripeInvoiceSubscriptionId, stripeSubscriptionPeriod } from '@/lib/billing/stripe-period';
+import { isChargedInvoice, stripeInvoiceSubscriptionId, stripeSubscriptionPeriod } from '@/lib/billing/stripe-period';
 import {
   alertPaymentSucceeded,
   alertPaymentFailed,
@@ -265,6 +265,10 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventId: string) {
 
   await logInvoiceEvent(user.id, invoice.id, 'paid', invoice.amount_paid);
 
+  // The R$ 0,00 invoice Stripe issues when a free trial starts is not a payment: no invoice in Gastrux and
+  // no "active" status over the trial (production 2026-10-10 listed "Assinatura Starter R$ 0,00")
+  if (!isChargedInvoice(invoice)) return;
+
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -297,7 +301,11 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventId: string) {
     const periodStart = invoice.period_start ? new Date(invoice.period_start * 1000) : null;
     const periodEnd = invoice.period_end ? new Date(invoice.period_end * 1000) : null;
     const subscriptionId = stripeInvoiceSubscriptionId(invoice) || user.subscriptionId || null;
-    const planName = getPlanNameFromTierId(user.subscriptionTier || 'starter');
+    // The plan of the subscription this invoice charges (the user's tier can still be the previous one)
+    const charged = subscriptionId
+      ? await prisma.subscription.findFirst({ where: { gateway: 'STRIPE', gatewaySubscriptionId: subscriptionId }, select: { planName: true, tier: true } })
+      : null;
+    const planName = charged?.planName || getPlanNameFromTierId(charged?.tier || user.subscriptionTier || 'starter');
     const description = `Assinatura ${planName}` +
       (periodStart && periodEnd
         ? ` — ${periodStart.toLocaleDateString('pt-BR')} a ${periodEnd.toLocaleDateString('pt-BR')}`

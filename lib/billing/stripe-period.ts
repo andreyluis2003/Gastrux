@@ -26,6 +26,11 @@ export function stripeInvoiceSubscriptionId(invoice: {
   return typeof ref === 'string' ? ref : ref.id ?? null;
 }
 
+/** An invoice that really charged money (a free trial starts with a paid R$ 0,00 invoice) */
+export function isChargedInvoice(invoice: { amount_paid?: number | null }): boolean {
+  return typeof invoice.amount_paid === 'number' && invoice.amount_paid > 0;
+}
+
 export function stripeSubscriptionPeriod(subscription: StripeSubscriptionLike): { currentPeriodStart: Date | null; currentPeriodEnd: Date | null } {
   const item = subscription.items?.data?.[0];
   return {

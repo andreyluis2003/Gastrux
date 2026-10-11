@@ -1,4 +1,12 @@
-import { stripeInvoiceSubscriptionId, stripeSubscriptionPeriod } from '../../lib/billing/stripe-period';
+import { isChargedInvoice, stripeInvoiceSubscriptionId, stripeSubscriptionPeriod } from '../../lib/billing/stripe-period';
+
+describe('isChargedInvoice', () => {
+  it('the R$ 0,00 invoice of a free trial is not a charge', () => {
+    expect(isChargedInvoice({ amount_paid: 0 })).toBe(false);
+    expect(isChargedInvoice({ amount_paid: null })).toBe(false);
+    expect(isChargedInvoice({ amount_paid: 9900 })).toBe(true);
+  });
+});
 
 describe('stripeInvoiceSubscriptionId', () => {
   it('reads the current API shape, the old field, or gives null', () => {
