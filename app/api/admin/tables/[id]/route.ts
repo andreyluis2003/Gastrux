@@ -84,6 +84,9 @@ export async function PUT(
     }
 
     if (sectionId !== undefined) {
+      if (typeof sectionId !== 'string') {
+        return NextResponse.json({ error: 'Seção inválida' }, { status: 400 });
+      }
       const section = await prisma.tableSection.findFirst({ where: { id: sectionId, restaurantId }, select: { id: true } });
       if (!section) {
         return NextResponse.json({ error: 'Seção inválida' }, { status: 400 });

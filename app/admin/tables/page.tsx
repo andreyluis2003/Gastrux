@@ -330,19 +330,21 @@ export default function TablesPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => openEdit(table)}
-                            className="h-7 flex-1 gap-1 px-2 text-xs"
+                            aria-label={`Editar mesa ${table.number}`}
+                            className="h-8 min-w-8 flex-1 gap-1 px-2 text-xs"
                           >
                             <Edit2 size={12} />
-                            Editar
+                            <span className="hidden sm:inline">Editar</span>
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleDeleteTable(table.id)}
-                            className="h-7 flex-1 gap-1 px-2 text-xs text-red-600 hover:text-red-700"
+                            aria-label={`Excluir mesa ${table.number}`}
+                            className="h-8 min-w-8 flex-1 gap-1 px-2 text-xs text-red-600 hover:text-red-700"
                           >
                             <Trash2 size={12} />
-                            Excluir
+                            <span className="hidden sm:inline">Excluir</span>
                           </Button>
                         </div>
                       </div>
@@ -471,7 +473,7 @@ export default function TablesPage() {
       {/* Edit Table Dialog */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-md space-y-4 p-6 sm:w-96">
+          <Card className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto p-6 sm:w-96">
             <h2 className="text-lg font-bold">Editar Mesa {editing.number}</h2>
 
             <div>

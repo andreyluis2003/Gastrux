@@ -78,6 +78,8 @@ describe('admin tables', () => {
 
   it('rejects a section of another restaurant (400) and a table of another restaurant (404)', async () => {
     expect((await put(t1, { sectionId: otherSec })).status).toBe(400);
+    expect((await put(t1, { sectionId: 123 })).status).toBe(400);
+    expect((await put(t1, { sectionId: null })).status).toBe(400);
     expect((await prisma.table.findUnique({ where: { id: t1 } })).sectionId).toBe(secA);
     expect((await put(otherTable, { capacity: 9 })).status).toBe(404);
     expect((await prisma.table.findUnique({ where: { id: otherTable } })).capacity).toBe(4);
