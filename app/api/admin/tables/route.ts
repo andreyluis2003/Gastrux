@@ -54,13 +54,25 @@ export async function GET(req: NextRequest) {
       ],
     });
 
+    // Tables with an open comanda are occupied (same statuses as the Pix target lookup)
+    const openSessions = await prisma.orderSession.findMany({
+      where: {
+        restaurantId,
+        tableId: { in: tables.map((t) => t.id) },
+        status: { in: ['OPEN', 'SENT_TO_KITCHEN', 'READY'] },
+      },
+      select: { tableId: true },
+    });
+    const occupiedIds = new Set(openSessions.map((s) => s.tableId));
+    const tablesWithStatus = tables.map((t) => ({ ...t, occupied: occupiedIds.has(t.id) }));
+
     const sections = await prisma.tableSection.findMany({
       where: { restaurantId },
       orderBy: { name: 'asc' },
     });
 
     return NextResponse.json({
-      tables,
+      tables: tablesWithStatus,
       sections,
       total: tables.length,
     });

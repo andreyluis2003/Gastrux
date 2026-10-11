@@ -26,6 +26,8 @@ interface Table {
   capacity: number;
   sectionId: string;
   isAvailable: boolean;
+  maintenanceNote?: string | null;
+  occupied?: boolean;
   section: { id: string; name: string };
   reservations: any[];
 }
@@ -45,6 +47,15 @@ export default function TablesPage() {
   const [loading, setLoading] = useState(true);
   const [showNewTableDialog, setShowNewTableDialog] = useState(false);
   const [showNewSectionDialog, setShowNewSectionDialog] = useState(false);
+  const [editing, setEditing] = useState<Table | null>(null);
+  const [editForm, setEditForm] = useState({
+    number: '',
+    capacity: '',
+    sectionId: '',
+    isAvailable: true,
+    maintenanceNote: '',
+  });
+  const [saving, setSaving] = useState(false);
   const [newSection, setNewSection] = useState({ name: '', capacity: '' });
   const [newTable, setNewTable] = useState({
     sectionId: '',
@@ -149,6 +160,56 @@ export default function TablesPage() {
     }
   };
 
+  const openEdit = (table: Table) => {
+    setEditing(table);
+    setEditForm({
+      number: String(table.number),
+      capacity: String(table.capacity),
+      sectionId: table.sectionId,
+      isAvailable: table.isAvailable,
+      maintenanceNote: table.maintenanceNote || '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    const number = Number(editForm.number);
+    const capacity = Number(editForm.capacity);
+    if (!Number.isInteger(number) || number < 1 || !Number.isInteger(capacity) || capacity < 1 || !editForm.sectionId) {
+      toast.error('Preencha número, lugares e seção');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/admin/tables/${editing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number,
+          capacity,
+          sectionId: editForm.sectionId,
+          isAvailable: editForm.isAvailable,
+          maintenanceNote: editForm.isAvailable ? null : editForm.maintenanceNote.trim() || null,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.error || 'Erro ao salvar mesa');
+        return;
+      }
+
+      toast.success('Mesa atualizada com sucesso');
+      setEditing(null);
+      fetchTables();
+    } catch (error) {
+      console.error('Error updating table:', error);
+      toast.error('Erro ao salvar mesa');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const tablesBySection = sections.map((section) => ({
     ...section,
     tables: tables.filter((t) => t.sectionId === section.id),
@@ -209,7 +270,7 @@ export default function TablesPage() {
           <p className="text-xs text-muted-foreground mt-1">Clique em "+ Seção" para criar a primeira seção de mesas.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-2">
           {tablesBySection.map((section) => (
             <Card key={section.id} className="p-4">
               <h3 className="mb-3 font-semibold">{section.name}</h3>
@@ -223,52 +284,70 @@ export default function TablesPage() {
                 </p>
                 <p>
                   <strong>Ocupadas:</strong>{' '}
-                  {section.tables.filter((t: any) => t.reservations.length > 0).length}
+                  {section.tables.filter((t: any) => t.occupied).length}
                 </p>
               </div>
 
               {/* Tables in Section */}
-              <div className="mb-4 space-y-2">
+              <div className="mb-2">
                 {section.tables.length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhuma mesa</p>
                 ) : (
-                  section.tables.map((table: any) => (
-                    <div
-                      key={table.id}
-                      className={`flex items-center justify-between rounded border p-2 text-xs ${
-                        table.isAvailable
-                          ? 'border-green-200 bg-green-50'
-                          : 'border-gray-200 bg-gray-50'
-                      }`}
-                    >
-                      <div>
-                        <span className="font-medium">Mesa {table.number}</span>
-                        <span className="ml-2 text-muted-foreground">
-                          ({table.capacity} lugares)
-                        </span>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                    {section.tables.map((table: any) => (
+                      <div
+                        key={table.id}
+                        className={`flex flex-col gap-2 rounded-lg border p-3 text-xs ${
+                          !table.isAvailable
+                            ? 'border-amber-200 bg-amber-50'
+                            : table.occupied
+                              ? 'border-red-200 bg-red-50'
+                              : 'border-green-200 bg-green-50'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold">Mesa {table.number}</p>
+                          <p className="text-muted-foreground">{table.capacity} lugares</p>
+                        </div>
+                        <div>
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                              !table.isAvailable
+                                ? 'bg-amber-200 text-amber-900'
+                                : table.occupied
+                                  ? 'bg-red-200 text-red-900'
+                                  : 'bg-green-200 text-green-900'
+                            }`}
+                          >
+                            {!table.isAvailable ? 'Em manutenção' : table.occupied ? 'Ocupada' : 'Livre'}
+                          </span>
+                          {!table.isAvailable && table.maintenanceNote && (
+                            <p className="mt-1 text-muted-foreground">{table.maintenanceNote}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEdit(table)}
+                            className="h-7 flex-1 gap-1 px-2 text-xs"
+                          >
+                            <Edit2 size={12} />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTable(table.id)}
+                            className="h-7 flex-1 gap-1 px-2 text-xs text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 size={12} />
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            router.push(`/admin/tables/${table.id}`)
-                          }
-                          className="h-6 w-6 p-0"
-                        >
-                          <Edit2 size={12} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteTable(table.id)}
-                          className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
             </Card>
@@ -383,6 +462,80 @@ export default function TablesPage() {
               </Button>
               <Button onClick={handleCreateTable} className="flex-1">
                 Criar
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Table Dialog */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md space-y-4 p-6 sm:w-96">
+            <h2 className="text-lg font-bold">Editar Mesa {editing.number}</h2>
+
+            <div>
+              <Label>Número</Label>
+              <Input
+                type="number"
+                value={editForm.number}
+                onChange={(e) => setEditForm({ ...editForm, number: e.target.value })}
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label>Lugares</Label>
+              <Input
+                type="number"
+                value={editForm.capacity}
+                onChange={(e) => setEditForm({ ...editForm, capacity: e.target.value })}
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label>Seção</Label>
+              <select
+                value={editForm.sectionId}
+                onChange={(e) => setEditForm({ ...editForm, sectionId: e.target.value })}
+                className="mt-2 w-full rounded border border-border bg-background px-3 py-2"
+              >
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!editForm.isAvailable}
+                onChange={(e) => setEditForm({ ...editForm, isAvailable: !e.target.checked })}
+              />
+              Em manutenção
+            </label>
+
+            {!editForm.isAvailable && (
+              <div>
+                <Label>Observação</Label>
+                <Input
+                  placeholder="ex: Perna quebrada"
+                  value={editForm.maintenanceNote}
+                  onChange={(e) => setEditForm({ ...editForm, maintenanceNote: e.target.value })}
+                  className="mt-2"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditing(null)} className="flex-1">
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveEdit} disabled={saving} className="flex-1">
+                Salvar
               </Button>
             </div>
           </Card>
