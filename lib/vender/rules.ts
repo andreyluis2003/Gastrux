@@ -21,8 +21,9 @@ const OTHERS = { id: '__outros', name: 'Outros', emoji: null };
 export function groupByCategory(items: MenuEntry[]): MenuGroup[] {
   const groups = new Map<string, MenuGroup>();
   for (const item of items) {
-    // Unavailable items, and items without a recipe (the server cannot add them), are not offered
-    if (item.available === false || !entryRecipeId(item)) continue;
+    // Unavailable items are not offered. An item without a ficha técnica is: the server gives it a ficha
+    // simples on the first sale (lib/cardapio/product-recipe.ts, 2026-10-12)
+    if (item.available === false) continue;
     const c = item.category ?? null;
     const key = c ? c.id : OTHERS.id;
     if (!groups.has(key)) groups.set(key, c ? { id: c.id, name: c.name, emoji: c.emoji ?? null, items: [] } : { ...OTHERS, items: [] });

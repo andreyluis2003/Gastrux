@@ -57,9 +57,9 @@ describe('openedLabel', () => {
   });
 });
 
-describe('menu items without a recipe', () => {
-  it('are not offered (adding them fails on the server)', () => {
+describe('menu items without a ficha técnica', () => {
+  it('are offered: the server gives them a ficha simples on the first sale (2026-10-12)', () => {
     const groups = groupByCategory([entry('a'), entry('b', { recipeId: null, recipe: null })]);
-    expect(groups[0].items.map((i) => i.id)).toEqual(['a']);
+    expect(groups[0].items.map((i) => i.id)).toEqual(['a', 'b']);
   });
 });

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
+import { brl } from '@/components/caixa/money';
 import { Plus, Trash2, Edit2, Eye, EyeOff, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -331,13 +332,13 @@ export default function AdminCardapioPage() {
                     onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                   />
                   <div>
-                    <Label className="text-xs">Vincular à receita (obrigatório para pedidos QR)</Label>
+                    <Label className="text-xs">Ficha técnica (opcional)</Label>
                     <select
                       className="w-full mt-1 px-3 py-2 border border-gray-300 rounded bg-white text-sm"
                       value={newItem.recipeId}
                       onChange={(e) => setNewItem({ ...newItem, recipeId: e.target.value })}
                     >
-                      <option value="">Nenhuma (não poderá ser pedido via QR)</option>
+                      <option value="">Sem ficha técnica: vende normalmente, sem baixa de estoque</option>
                       {recipes.map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.name}
@@ -390,13 +391,8 @@ export default function AdminCardapioPage() {
                         )}
                         <div className="flex items-center gap-2 mt-1 text-xs">
                           <span className="font-bold text-amber-700">
-                            R$ {Number(item.price).toFixed(2)}
+                            {brl(Math.round(Number(item.price) * 100))}
                           </span>
-                          {!item.recipeId && (
-                            <span className="bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">
-                              Sem receita
-                            </span>
-                          )}
                           {!item.displayOnQR && (
                             <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
                               Oculto no QR
@@ -483,13 +479,13 @@ export default function AdminCardapioPage() {
               </select>
             </div>
             <div>
-              <Label>Vincular à receita</Label>
+              <Label>Ficha técnica</Label>
               <select
                 className="w-full mt-1 px-3 py-2 border border-gray-300 rounded bg-white"
                 value={editingItem.recipeId || ''}
                 onChange={(e) => setEditingItem({ ...editingItem, recipeId: e.target.value || null })}
               >
-                <option value="">Nenhuma</option>
+                <option value="">Sem ficha técnica: vende normalmente, sem baixa de estoque</option>
                 {recipes.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
