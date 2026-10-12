@@ -9,10 +9,13 @@ import { Input } from '@/components/ui/input';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
 import { PaymentPanel, panelState, type PanelPayment } from '@/components/caixa/payment-panel';
-import { toApiAmount } from '@/components/caixa/panel-state';
+import { finishHint, toApiAmount } from '@/components/caixa/panel-state';
 import { OpenShiftCard } from '@/components/caixa/open-shift-card';
 import { brl } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
+
+/** The "Venda registrada" notice: a comanda screen dismisses it (it stayed over the next comanda, 2026-10-12) */
+export const SALE_TOAST = 'counter-sale-done';
 
 interface MenuEntry {
   id: string;
@@ -78,7 +81,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       const result = await send({
         method: 'POST',
         url: '/api/comanda/quick-sale',
-        label: `Venda balcão R$ ${total.toFixed(2)}`,
+        label: `Venda balcão ${brl(Math.round(total * 100))}`,
         scope: 'counter-sale',
         queueable: true,
         body: {
@@ -105,6 +108,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         toast.success('Venda registrada', {
           action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${clientId}`) },
           duration: 15000,
+          id: SALE_TOAST,
         });
         if (data.nfce?.message) {
           (data.nfce.nfce?.status === 'authorized' ? toast.success : toast.warning)(data.nfce.message);
@@ -133,7 +137,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           <div key={entry.id} className="flex items-center justify-between gap-2 border rounded-md p-2">
             <div>
               <div className="font-semibold text-sm">{entry.name}</div>
-              <div className="text-xs text-green-700">R$ {priceOf(entry).toFixed(2)}</div>
+              <div className="text-xs text-green-700">{brl(Math.round(priceOf(entry) * 100))}</div>
             </div>
             <div className="flex items-center gap-1">
               <Button size="icon" variant="outline" aria-label={`Menos ${entry.name}`} onClick={() => change(entry.id, -1)}>
@@ -168,8 +172,12 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           lines.length > 0 && <PaymentPanel totalCents={Math.round(total * 100)} payments={payments} onChange={setPayments} disabled={saving} />
         )}
       </div>
+      {/* Why the button is still grey (2026-10-12: it stayed disabled with no reason on screen) */}
+      {lines.length > 0 && shift.shiftId && finishHint(Math.round(total * 100), payments) && (
+        <p className="text-sm text-amber-700 mt-3 text-right">{finishHint(Math.round(total * 100), payments)}</p>
+      )}
       <div className="flex items-center justify-between mt-4">
-        <span className="text-2xl font-bold text-green-700">R$ {total.toFixed(2)}</span>
+        <span className="text-2xl font-bold text-green-700">{brl(Math.round(total * 100))}</span>
         <Button onClick={finish} disabled={saving || lines.length === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
           {saving ? 'Registrando...' : 'Finalizar venda'}
         </Button>

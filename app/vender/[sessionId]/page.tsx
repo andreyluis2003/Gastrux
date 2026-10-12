@@ -13,6 +13,7 @@ import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
 import { MesaActions } from '@/components/vender/mesa-actions';
 import { ReopenBill } from '@/components/vender/reopen-bill';
+import { SALE_TOAST } from '@/components/comanda/counter-sale';
 import { isUnsent, openFor, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
@@ -27,6 +28,9 @@ export default function ComandaRapidaPage() {
   const [showConta, setShowConta] = useState(false);
   const [desktop, setDesktop] = useState(true);
   const [attending, setAttending] = useState(false);
+
+  // The balcão's "Venda registrada" notice does not cover this comanda (2026-10-12)
+  useEffect(() => { toast.dismiss(SALE_TOAST); }, []);
 
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP);
@@ -157,7 +161,8 @@ export default function ComandaRapidaPage() {
           <div className="text-lg font-bold">{brl(c.totalCents)}</div>
         </button>
         <Button disabled={c.newCount === 0 || c.isClosed} onClick={onSend}>Enviar{c.newCount ? ` (${c.newCount})` : ''}</Button>
-        <Button variant="outline" onClick={() => setShowList(true)}>Ver comanda</Button>
+        {/* Conta straight from the bar (2026-10-12: it took "Ver comanda" first); the left side opens the list */}
+        <Button variant="outline" disabled={c.lines.length === 0} onClick={() => setShowConta(true)}>Conta</Button>
       </div>
 
       {showList && (

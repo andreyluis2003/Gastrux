@@ -1,4 +1,4 @@
-import { reaisToCents } from './money';
+import { brl, reaisToCents } from './money';
 
 /** One payment typed in the payment panel (Portuguese amount, e.g. "12,50"). */
 export interface PanelPayment { method: 'dinheiro' | 'pix' | 'cartao de credito' | 'cartao de debito'; amount: string }
@@ -31,3 +31,15 @@ export function panelState(totalCents: number, payments: PanelPayment[]) {
 
 /** "1.234,50" -> "1234.50", the amount format the API reads. */
 export const toApiAmount = (amount: string) => (amount.includes(',') ? amount.replace(/\./g, '').replace(',', '.') : amount.trim());
+
+/**
+ * Why "Finalizar venda" is still disabled, said on screen (2026-10-12: the button stayed grey with no
+ * reason until a payment method was picked). Null when the sale can be finished.
+ */
+export function finishHint(totalCents: number, payments: PanelPayment[]): string | null {
+  if (payments.length === 0) return totalCents > 0 ? 'Escolha a forma de pagamento' : null;
+  const state = panelState(totalCents, payments);
+  if (state.valid) return null;
+  if (state.error) return state.error;
+  return `Falta ${brl(state.remainingCents)}`;
+}
