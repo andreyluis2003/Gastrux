@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { lineTotalCents } from '@/lib/comanda/line-total';
 import { sessionLabel } from './rules';
+import { loadBill } from '@/lib/comanda/bill-service';
 
 /**
  * Everything the Vender map shows, in one round trip (spec 2026-10-07, 4.1): tables with their open
@@ -20,6 +21,12 @@ export interface SalaoSession {
   status: string;
   /** Pre-bill printed: the table asked for the bill (yellow on the map) */
   billRequested: boolean;
+  /** When the table tapped "Pagar com o garçom" (pay at the table); cleared by a payment or when the bill closes */
+  waiterCalledAt: string | null;
+  /** Paid so far, cash register and phone together, net of refunds (0 without payments) */
+  paidCents: number;
+  /** The bill total with the service charge, only for a comanda with payments (null otherwise) */
+  billTotalCents: number | null;
 }
 export interface SalaoTable { id: string; number: number; sectionId: string | null; sectionName: string | null; capacity: number | null; session: SalaoSession | null }
 export interface Salao { sections: Array<{ id: string; name: string }>; tables: SalaoTable[]; others: SalaoSession[]; deliveryNew: number }
@@ -36,7 +43,7 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
     prisma.orderSession.findMany({
       where: { restaurantId, status: { in: [...OPEN] } },
       select: {
-        id: true, tableId: true, tableNumber: true, customerName: true, openedAt: true, status: true, preBillPrintedAt: true,
+        id: true, tableId: true, tableNumber: true, customerName: true, openedAt: true, status: true, preBillPrintedAt: true, payAtWaiterRequestedAt: true,
         table: { select: { number: true } },
         user: { select: { name: true } },
         items: { select: { price: true, quantity: true, sentAt: true, modifiers: { select: { priceAdjustment: true } } } },
@@ -45,6 +52,22 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
     }),
     prisma.externalOrder.count({ where: { restaurantId, status: 'PENDING' } }),
   ]);
+
+  // Paid so far (spec 2026-10-10 §5.2): the bill's own numbers, computed only for the comandas that have a
+  // payment (cash register or applied phone payment), so a full room without payments costs nothing more
+  const ids = sessions.map((s) => s.id);
+  const [withCash, withOnline] = ids.length
+    ? await Promise.all([
+        prisma.cashSessionEntry.findMany({ where: { restaurantId, orderSessionId: { in: ids } }, select: { orderSessionId: true }, distinct: ['orderSessionId'] }),
+        prisma.payment.findMany({ where: { restaurantId, orderSessionId: { in: ids }, appliedToBillAt: { not: null } }, select: { orderSessionId: true }, distinct: ['orderSessionId'] }),
+      ])
+    : [[], []];
+  const paidIds = [...new Set([...withCash, ...withOnline].map((r) => r.orderSessionId).filter((id): id is string => !!id))];
+  const bills = new Map<string, { paidCents: number; totalCents: number }>();
+  await Promise.all(paidIds.map(async (id) => {
+    const bill = await loadBill(prisma, restaurantId, id);
+    if (bill) bills.set(id, { paidCents: bill.paidCents, totalCents: bill.totalCents });
+  }));
 
   const toSession = (s: (typeof sessions)[number]): SalaoSession => {
     return {
@@ -59,6 +82,9 @@ export async function loadSalao(restaurantId: string): Promise<Salao> {
       newCount: s.items.filter((i) => !i.sentAt).length,
       status: s.status,
       billRequested: !!s.preBillPrintedAt,
+      waiterCalledAt: s.payAtWaiterRequestedAt?.toISOString() ?? null,
+      paidCents: bills.get(s.id)?.paidCents ?? 0,
+      billTotalCents: bills.get(s.id)?.totalCents ?? null,
     };
   };
 
