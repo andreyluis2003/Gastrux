@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes, syncProductRecipe } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
@@ -81,7 +82,7 @@ export async function PUT(
       }
     }
 
-    const item = await prisma.menuItem.update({
+    await prisma.menuItem.update({
       where: { id: params.id },
       data: {
         ...(name && { name }),
@@ -94,11 +95,12 @@ export async function PUT(
         ...(recipeId !== undefined && { recipeId: recipeId || null }),
         ...(categoryId !== undefined && { categoryId }),
       },
-      include: {
-        category: true,
-        images: true,
-      },
     });
+    // Unlinked from its ficha técnica, it keeps selling on a ficha simples; a ficha simples follows the
+    // item's name and price (the comanda, the kitchen and the cupom show the ficha's name) (2026-10-12)
+    await ensureMenuItemRecipes(prisma, restaurantId, [params.id]);
+    await syncProductRecipe(prisma, restaurantId, params.id);
+    const item = await prisma.menuItem.findUnique({ where: { id: params.id }, include: { category: true, images: true } });
 
     return NextResponse.json(item);
   } catch (error) {

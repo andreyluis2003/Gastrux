@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { templateFor, type IngredientCategoryKey } from './starter-templates';
 
 /**
@@ -86,6 +87,9 @@ export async function seedStarterTemplate(restaurantId: string, businessType: st
         })),
       ],
     });
+
+    // The drinks (sold as bought) get a ficha simples: without one they could not be sold (2026-10-12)
+    await ensureMenuItemRecipes(tx, restaurantId);
 
     // Two tables with a QR code, so the digital menu and the comanda have something to show
     const section = await tx.tableSection.create({

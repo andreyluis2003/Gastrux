@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const item = await prisma.menuItem.create({
+    const created = await prisma.menuItem.create({
       data: {
         categoryId,
         name,
@@ -90,11 +91,11 @@ export async function POST(req: NextRequest) {
         position: position || 0,
         restaurantId,
       },
-      include: {
-        category: true,
-        images: true,
-      },
+      select: { id: true },
     });
+    // Without a ficha técnica it sells all the same: it gets a ficha simples (2026-10-12)
+    await ensureMenuItemRecipes(prisma, restaurantId, [created.id]);
+    const item = await prisma.menuItem.findUnique({ where: { id: created.id }, include: { category: true, images: true } });
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {

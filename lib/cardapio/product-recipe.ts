@@ -56,3 +56,20 @@ export async function ensureMenuItemRecipes(db: Db, restaurantId: string, menuIt
   };
   return '$transaction' in db ? (db as typeof prisma).$transaction(run) : run(db as Prisma.TransactionClient);
 }
+
+/**
+ * A renamed or repriced menu item: its ficha simples follows (the comanda, the kitchen and the cupom
+ * show the ficha's name). A real ficha técnica (one with ingredients, or not made here) is the
+ * kitchen's own and is never touched.
+ */
+export async function syncProductRecipe(db: Db, restaurantId: string, menuItemId: string) {
+  const mi = await db.menuItem.findFirst({
+    where: { id: menuItemId, restaurantId },
+    select: { name: true, description: true, price: true, recipe: { select: { id: true, code: true, _count: { select: { ingredients: true } } } } },
+  });
+  if (!mi?.recipe || !mi.recipe.code.startsWith('PROD-') || mi.recipe._count.ingredients > 0) return;
+  await db.recipe.update({
+    where: { id: mi.recipe.id },
+    data: { name: mi.name, description: mi.description, sellingPrice: Number(mi.price) || 0 },
+  });
+}
