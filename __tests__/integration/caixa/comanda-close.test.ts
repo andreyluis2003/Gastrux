@@ -163,6 +163,20 @@ describe('closing a comanda records the payments in the shift', () => {
     expect((await entriesOf(s.id)).map((e) => [e.type, e.method, e.amountCents])).toEqual(expect.arrayContaining([['REFUND', 'PIX', 3000]]));
   });
 
+  it('cancelling a comanda the kitchen is still working on is refused; once the kitchen is done it goes (2026-10-12)', async () => {
+    const s = await comanda([[30, 1]]);
+    const order = await prisma.order.create({ data: { restaurantId: A.restaurantId, orderNumber: `K-${tag}-${Date.now()}`, orderSessionId: s.id, status: 'PREPARING' } });
+    const del = () => deleteComanda(new Request(`http://x/api/comanda/sessions/${s.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'mesa foi embora' }) }) as any, { params: { id: s.id } });
+    const refused = await del();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ code: 'KITCHEN_OPEN' });
+    expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('OPEN');
+    await prisma.order.update({ where: { id: order.id }, data: { status: 'COMPLETED' } });
+    expect((await del()).status).toBe(200);
+    expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).status).toBe('CANCELLED');
+    await prisma.order.delete({ where: { id: order.id } });
+  });
+
   it("another restaurant's shift is refused", async () => {
     const regB = await ensureDefaultRegister(B.restaurantId);
     const { session } = await openSession({ userId: B.ownerId, restaurantId: B.restaurantId, role: 'OWNER' }, { cashRegisterId: regB.id, openingFloat: 0 });

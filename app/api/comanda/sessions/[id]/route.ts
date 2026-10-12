@@ -16,6 +16,7 @@ import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 import { billTotals, serviceApplies } from '@/lib/comanda/bill';
 import { billHasPayments, billPaidCents } from '@/lib/comanda/bill-service';
 import { lockComanda } from '@/lib/comanda/add-item';
+import { OPEN_STATUSES as KITCHEN_OPEN_STATUSES } from '@/lib/kds/order-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -256,6 +257,10 @@ export async function DELETE(
         // device before it is cancelled. Only one cancel writes: two requests at once must not give the
         // money back twice
         await lockComanda(tx, params.id);
+        // The kitchen would keep cooking a cancelled comanda (2026-10-12): its open orders are cancelled
+        // first (KDS, or the sent items one by one, which record the loss). Served orders do not block.
+        const cooking = await tx.order.count({ where: { orderSessionId: params.id, status: { in: KITCHEN_OPEN_STATUSES as any } } });
+        if (cooking) throw new CashRuleError('A cozinha ainda tem pedidos desta comanda. Cancele esses pedidos na cozinha (ou os itens enviados) antes de cancelar a comanda.', 409, 'KITCHEN_OPEN');
         const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: ownedSession.status }, data: { status: 'CANCELLED' } });
         if (guard.count === 0) throw new CashRuleError('Esta comanda mudou enquanto era cancelada. Atualize e tente de novo.', 422, 'CHANGED');
         // Online money (pay at the table) cannot be given back from the drawer: it is refunded through

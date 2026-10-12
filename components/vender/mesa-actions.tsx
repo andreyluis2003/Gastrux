@@ -6,18 +6,20 @@ import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Salao } from '@/lib/vender/salao';
 import type { ComandaLine } from '@/components/vender/use-comanda';
+import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 
 type Mode = 'menu' | 'transfer' | 'merge' | 'move';
 
 /**
  * The comanda's ⋯ menu (spec 2026-10-07, 4.4): transfer the table, merge another comanda here, move
- * some lines. Needs the internet (a move is never queued).
+ * some lines, cancel the comanda. Needs the internet (a move is never queued).
  */
 export function MesaActions({ sessionId, lines, onDone }: { sessionId: string; lines: ComandaLine[]; onDone: (goTo?: string) => void }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const [salao, setSalao] = useState<Salao | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const shift = useDeviceShift();
 
   async function openMode(m: Mode) {
     setMode(m);
@@ -69,6 +71,31 @@ export function MesaActions({ sessionId, lines, onDone }: { sessionId: string; l
     toast.error(out.error || 'Não foi possível transferir os itens');
   }
 
+  // A manager, with a reason (rule of the API): money received in the drawer goes back in this device's
+  // shift; online money and orders the kitchen is still making are refused with the reason
+  async function cancelComanda() {
+    const reason = window.prompt('Cancelar esta comanda (exige gerente). Motivo do cancelamento:');
+    if (reason === null) return;
+    if (reason.trim().length < 3) { toast.error('Informe o motivo do cancelamento'); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/comanda/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim(), cashSessionId: shift.shiftId ?? undefined }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(out.error || 'Não foi possível cancelar a comanda'); return; }
+      toast.success('Comanda cancelada');
+      setMode(null);
+      onDone('/vender');
+    } catch {
+      toast.error('Sem conexão: tente de novo');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const others = salao
     ? [...salao.tables.filter((t) => t.session && t.session.id !== sessionId).map((t) => t.session!), ...salao.others.filter((s) => s.id !== sessionId)]
     : [];
@@ -85,6 +112,7 @@ export function MesaActions({ sessionId, lines, onDone }: { sessionId: string; l
                 <Button variant="outline" className="w-full justify-start" onClick={() => openMode('transfer')}>Transferir mesa</Button>
                 <Button variant="outline" className="w-full justify-start" onClick={() => openMode('merge')}>Juntar outra mesa ou comanda aqui</Button>
                 <Button variant="outline" className="w-full justify-start" disabled={!lines.length} onClick={() => openMode('move')}>Transferir itens</Button>
+                <Button variant="outline" className="w-full justify-start text-red-700 border-red-200 hover:bg-red-50" disabled={busy} onClick={cancelComanda}>Cancelar comanda</Button>
               </>
             )}
             {mode === 'transfer' && (
