@@ -119,4 +119,41 @@ describe('one-tap adds and undo on the server', () => {
     const body = await (await GET_SESSION(new NextRequest('http://x'), { params: { id: sid } })).json();
     expect(body.items.map((i) => i.specialInstructions)).toEqual(['primeiro', 'segundo', 'terceiro']);
   });
+
+  describe('an item without a ficha técnica (2026-10-12)', () => {
+    const unlinked = async (name: string) => {
+      const cat = await prisma.menuCategory.findFirst({ where: { restaurantId: rid } });
+      return (await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat!.id, name, price: 5, position: 9 } })).id;
+    };
+    const tapItem = (sid: string, id: string) => ADD(req('POST', { menuItemId: id, quantity: 1, merge: true }), { params: { id: sid } });
+
+    it('two taps on the same comanda: one line with 2 on its ficha simples', async () => {
+      const id = await unlinked(`Agua ${tag}`);
+      const sid = await newSession();
+      const res = await Promise.all([tapItem(sid, id), tapItem(sid, id)]);
+      expect(res.every((r) => r.status === 201 || r.status === 200)).toBe(true);
+      const ls = await lines(sid);
+      expect(ls.map((l) => l.quantity)).toEqual([2]);
+      expect((await prisma.menuItem.findUnique({ where: { id } }))!.recipeId).toBe(ls[0].recipeId);
+    });
+
+    it('two comandas at the same instant: one ficha simples, both lines on it', async () => {
+      const id = await unlinked(`Suco ${tag}`);
+      const [s1, s2] = [await newSession(), await newSession()];
+      await Promise.all([tapItem(s1, id), tapItem(s2, id)]);
+      const [l1, l2] = [await lines(s1), await lines(s2)];
+      expect(l1).toHaveLength(1);
+      expect(l2).toHaveLength(1);
+      expect(l1[0].recipeId).toBe(l2[0].recipeId);
+      expect(await prisma.recipe.count({ where: { restaurantId: rid, name: `Suco ${tag}` } })).toBe(1);
+    });
+
+    it('a line made offline (no recipeId, a note) replays and is added', async () => {
+      const id = await unlinked(`Cha ${tag}`);
+      const sid = await newSession();
+      const res = await ADD(req('POST', { menuItemId: id, recipeId: null, quantity: 1, specialInstructions: 'sem gelo' }), { params: { id: sid } });
+      expect(res.status).toBeLessThan(300);
+      expect((await lines(sid)).map((l) => l.specialInstructions)).toEqual(['sem gelo']);
+    });
+  });
 });
