@@ -16,6 +16,8 @@ jest.mock('@/lib/mercadopago-connect/pix-service', () => ({
   normalizePayer: jest.fn(() => ({ email: null, name: null })),
 }));
 jest.mock('@/lib/comanda/bill-service', () => ({ loadBill: jest.fn() }));
+// The plan rule (Pro and up) is covered by the integration tests; here the table always may pay
+jest.mock('@/lib/mercadopago-connect/table-payment-access', () => ({ tablePaymentPlanAllows: jest.fn(async () => true), TABLE_PAYMENT_UNAVAILABLE: 'x' }));
 
 import { createPixForTarget } from '@/lib/mercadopago-connect/pix-service';
 import { loadBill } from '@/lib/comanda/bill-service';
