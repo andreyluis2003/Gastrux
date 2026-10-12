@@ -73,7 +73,9 @@ describe('new account: "Comece com" and address in the sign-up questions', () =>
     const recipes = await prisma.recipe.findMany({ where: { restaurantId: a.restaurantId }, select: { name: true } });
     expect(recipes.map((r) => r.name)).toEqual(expect.arrayContaining(['Pizza muçarela', 'Pizza calabresa']));
     const menu = await prisma.menuItem.count({ where: { restaurantId: a.restaurantId } });
-    expect(menu).toBeGreaterThan(recipes.length);
+    // Every item has a ficha: the drinks get a ficha simples (2026-10-12; they used to have none and could not be sold)
+    expect(menu).toBe(recipes.length);
+    expect(await prisma.menuItem.count({ where: { restaurantId: a.restaurantId, recipeId: null } })).toBe(0);
     const stats = await getDashboardStats(a.restaurantId);
     expect(stats.lowStock.value).toBe(0);
     expect(stats.recipes.value).toBe(recipes.length);
