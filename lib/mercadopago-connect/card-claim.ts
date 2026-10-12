@@ -33,7 +33,14 @@ export type CardClaim =
   | { kind: 'created'; payment: { id: string } };
 
 export function cardLockKey(target: ResolvedPixTarget): string {
-  return `card:${target.restaurantId}:order:${target.orderId}`;
+  // A table part (stage 3) is claimed per comanda: the phones of one table queue on the same lock
+  return target.orderId ? `card:${target.restaurantId}:order:${target.orderId}` : `card:${target.restaurantId}:session:${target.sessionId}`;
+}
+
+/** Same payer as this target: the order, or the phone at the table (payerKey checked by isValidPayerKey: no LIKE wildcards) */
+function cardScope(target: ResolvedPixTarget) {
+  if (target.orderId) return { orderId: target.orderId };
+  return { orderSessionId: target.sessionId, metadata: { contains: `"payerKey":"${target.payerKey}"` } };
 }
 
 export async function claimCardPayment(
@@ -52,7 +59,7 @@ export async function claimCardPayment(
     const existing = await tx.payment.findFirst({
       where: {
         restaurantId: target.restaurantId,
-        orderId: target.orderId,
+        ...cardScope(target),
         gateway: 'MERCADO_PAGO_CONNECT',
         method: 'MERCADO_PAGO',
         status: 'PENDING',
@@ -86,7 +93,11 @@ export async function claimCardPayment(
         description: target.description,
         customerEmail: payer.email,
         customerName: payer.name,
-        metadata: JSON.stringify({ ...target.metadata, source: 'delivery-card' }),
+        // Pay at the table (stage 3): the card part pays towards its comanda, like the table PIX
+        orderSessionId: target.sessionId ?? null,
+        tableShareMode: target.sessionId ? (target.shareMode ?? 'ALL') : null,
+        customerDocument: target.customerDocument ?? null,
+        metadata: JSON.stringify({ ...target.metadata, source: target.sessionId ? 'table-card' : 'delivery-card' }),
       },
     });
     return { kind: 'created' as const, payment };

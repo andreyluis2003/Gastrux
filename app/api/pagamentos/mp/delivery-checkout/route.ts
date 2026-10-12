@@ -1,33 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createCheckoutPreference } from '@/lib/mercado-pago';
-import { getMpClientForRestaurant, markNeedsReconnect } from '@/lib/mercadopago-connect/connection-service';
-import { isUnauthorizedError, unauthorizedReason, notificationUrlFor, toMpDate } from '@/lib/mercadopago-connect/payments';
-import { CARD_LINK_VALIDITY_MS, CHECKOUT_IN_PROGRESS, claimCardPayment } from '@/lib/mercadopago-connect/card-claim';
+import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
+import { createCardCheckout, resolveBaseUrl } from '@/lib/mercadopago-connect/card-checkout';
 import { resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
-import { isDefiniteRejection, normalizePayer, ONLINE_PAYMENT_UNAVAILABLE } from '@/lib/mercadopago-connect/pix-service';
-import { MP_FAILED_STATUS } from '@/lib/mercadopago-connect/http-status';
+import { normalizePayer, ONLINE_PAYMENT_UNAVAILABLE } from '@/lib/mercadopago-connect/pix-service';
 
 export const dynamic = 'force-dynamic';
 
 /** Boleto and ATM/bank-slip payments take days to clear: unsuitable for a delivery order. */
 const EXCLUDED_PAYMENT_TYPES = ['ticket', 'atm'];
-
-/**
- * The customer comes back to this origin from Mercado Pago, so it must be an
- * absolute http(s) URL. Checked BEFORE anything is written: a missing or
- * malformed NEXTAUTH_URL would otherwise leave a Payment row and a failed
- * preference behind for a problem the customer cannot fix.
- */
-function resolveBaseUrl(): string | null {
-  const base = (process.env.NEXTAUTH_URL || '').trim().replace(/\/+$/, '');
-  try {
-    const { protocol } = new URL(base);
-    return protocol === 'http:' || protocol === 'https:' ? base : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * POST /api/pagamentos/mp/delivery-checkout
@@ -68,80 +49,16 @@ export async function POST(request: NextRequest) {
 
     const payer = normalizePayer({ payerEmail: body.payerEmail, payerName: body.payerName });
 
-    // One live checkout per order: find-or-create under a per-order lock, so a
-    // double tap cannot create two payable links (see card-claim.ts).
-    const claim = await claimCardPayment(target, payer);
-    if (claim.kind === 'in-progress') {
-      return NextResponse.json({ error: CHECKOUT_IN_PROGRESS, code: 'CHECKOUT_IN_PROGRESS' }, { status: 409 });
-    }
-    if (claim.kind === 'reuse') {
-      return NextResponse.json({ success: true, paymentId: claim.payment.id, initPoint: claim.initPoint });
-    }
-    const payment = claim.payment;
-
-    const back = (result: string) =>
-      `${base}/delivery/${target.restaurantId}?payment=${payment.id}&n=${encodeURIComponent(order.orderNumber)}&result=${result}`;
-
-    let preference: any;
-    try {
-      preference = await createCheckoutPreference(
-        {
-          orderId: target.orderId,
-          items: [{ id: order.orderNumber, title: target.description, quantity: 1, unitPrice: target.amount }],
-          payer: { email: payer.email, name: payer.name },
-          backUrls: { success: back('success'), failure: back('failure'), pending: back('pending') },
-          notificationUrl: notificationUrlFor(target.restaurantId),
-          externalReference: payment.id,
-          autoReturn: 'approved',
-          excludedPaymentTypes: EXCLUDED_PAYMENT_TYPES,
-          // The link stops working after CARD_LINK_VALIDITY_MS, which is what makes
-          // the reuse window in card-claim.ts safe: an older checkout is dead, so
-          // creating a new one cannot leave two payable links for long.
-          expires: true,
-          // Backdated a minute: a clock a few seconds ahead of ours must not make the link "not active yet".
-          expirationDateFrom: toMpDate(new Date(Date.now() - 60_000)),
-          expirationDateTo: toMpDate(new Date(Date.now() + CARD_LINK_VALIDITY_MS)),
-        },
-        client
-      );
-    } catch (error) {
-      // Cancel only when Mercado Pago DEFINITELY rejected the request (a 4xx):
-      // then no preference exists. A timeout, a socket error or a 5xx is
-      // ambiguous - the preference may have been created server-side - and a
-      // CANCELLED row can no longer transition to APPROVED, so a real payment
-      // would go unrecorded. In that case the row stays PENDING and the
-      // webhook (external_reference = this Payment id) reconciles it.
-      if (isDefiniteRejection(error)) {
-        await prisma.payment.update({ where: { id: payment.id }, data: { status: 'CANCELLED' } }).catch(() => {});
-      }
-
-      if (isUnauthorizedError(error)) {
-        await markNeedsReconnect(target.restaurantId, unauthorizedReason(error));
-        return NextResponse.json({ error: ONLINE_PAYMENT_UNAVAILABLE, code: 'ONLINE_PAYMENT_UNAVAILABLE' }, { status: 409 });
-      }
-      console.error('[delivery-checkout] preference creation failed:', error);
-      return NextResponse.json({ error: 'Não foi possível iniciar o pagamento. Tente novamente.' }, { status: MP_FAILED_STATUS });
-    }
-
-    // Mercado Pago accepted: the preference exists and carries this Payment id
-    // as external_reference. From here the row must NEVER be cancelled, even if
-    // a local write fails: the customer can still pay through the link we
-    // return, and the webhook needs a PENDING row to record it.
-    try {
-      await prisma.mercadoPagoTransaction.create({
-        data: {
-          paymentId: payment.id,
-          preferenceId: preference.id,
-          externalReference: payment.id,
-          initPoint: preference.init_point,
-          sandboxInitPoint: preference.sandbox_init_point,
-        },
-      });
-    } catch (error) {
-      console.error(`[delivery-checkout] preference created but its transaction row was not stored (payment ${payment.id}):`, error);
-    }
-
-    return NextResponse.json({ success: true, paymentId: payment.id, initPoint: preference.init_point });
+    // The claim, the preference and its transaction row: lib/mercadopago-connect/card-checkout.ts
+    const out = await createCardCheckout({
+      target,
+      payer,
+      backUrl: (id, result) => `${base}/delivery/${target.restaurantId}?payment=${id}&n=${encodeURIComponent(order.orderNumber)}&result=${result}`,
+      itemId: order.orderNumber,
+      excludedPaymentTypes: EXCLUDED_PAYMENT_TYPES,
+    });
+    if (!out.ok) return NextResponse.json({ error: out.error, ...(out.code ? { code: out.code } : {}) }, { status: out.status });
+    return NextResponse.json({ success: true, paymentId: out.paymentId, initPoint: out.initPoint });
   } catch (error) {
     console.error('[delivery-checkout] error:', error);
     return NextResponse.json({ error: 'Erro ao iniciar pagamento com cartão' }, { status: 500 });
