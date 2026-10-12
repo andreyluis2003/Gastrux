@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { MAX_PEOPLE, reais, shareCents, type ShareMode } from '@/lib/comanda/table-share';
+import { isValidPayerKey, MAX_PEOPLE, parseReaisCents, reais, shareCents, type ShareMode } from '@/lib/comanda/table-share';
 import type { PublicTableBill, PublicOpenBill } from '@/lib/comanda/public-bill';
 
 const KEY_STORAGE = 'gastrux-payer-key';
@@ -16,7 +16,7 @@ function payerKey(): string {
   const make = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
   try {
     const kept = localStorage.getItem(KEY_STORAGE);
-    if (kept && /^[A-Za-z0-9_-]{16,64}$/.test(kept)) return kept;
+    if (kept && isValidPayerKey(kept)) return kept;
     const k = make();
     localStorage.setItem(KEY_STORAGE, k);
     return k;
@@ -39,13 +39,20 @@ export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () =
   const [paid, setPaid] = useState<{ cents: number } | null>(null);
   const keyRef = useRef<string>('');
   const sessionRef = useRef<string | null>(null);
+  const loadedRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
       const url = `/api/public/table/${qrToken}/bill${sessionRef.current ? `?session=${encodeURIComponent(sessionRef.current)}` : ''}`;
       const res = await fetch(url, { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error(data.error || 'Não foi possível abrir a conta'); onClose(); return; }
+      if (!res.ok) {
+        // Only the first load closes the screen: later, a passing error (a restart, the proxy) must not take
+        // away the bill and the QR the customer may be paying right now; the next poll tries again
+        if (!loadedRef.current) { toast.error(data.error || 'Não foi possível abrir a conta'); onClose(); }
+        return;
+      }
+      loadedRef.current = true;
       if (data.status === 'OPEN') sessionRef.current = data.sessionId;
       setBill(data);
     } catch { /* keep the last bill on a network blip */ }
@@ -79,7 +86,8 @@ export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () =
   }, [pix, load]);
 
   const open = bill?.status === 'OPEN' ? (bill as PublicOpenBill) : null;
-  const amountCents = Math.round(Number(amountText.replace(/\./g, '').replace(',', '.')) * 100);
+  // "25,50" and "25.50" are both R$ 25,50 (many phone keyboards only have the dot)
+  const amountCents = parseReaisCents(amountText);
   const preview = open ? shareCents({ mode, people, amountCents }, open) : null;
 
   async function payPix() {

@@ -1,4 +1,4 @@
-import { shareCents, normalizeCpf, isValidPayerKey, reais, MAX_PEOPLE } from '@/lib/comanda/table-share';
+import { shareCents, normalizeCpf, isValidPayerKey, reais, MAX_PEOPLE, parseReaisCents } from '@/lib/comanda/table-share';
 
 const bill = (totalCents: number, remainingCents = totalCents) => ({ totalCents, remainingCents });
 
@@ -45,5 +45,23 @@ describe('phone key and money', () => {
   it('formats reais', () => {
     expect(reais(123456)).toBe('R$ 1.234,56');
     expect(reais(5)).toBe('R$ 0,05');
+  });
+});
+
+describe('final review fixes (2026-10-12)', () => {
+  it('a phone key cannot carry LIKE wildcards (_ or %), so it never matches other phones', () => {
+    expect(isValidPayerKey('_'.repeat(32))).toBe(false);
+    expect(isValidPayerKey('abc%def0123456789')).toBe(false);
+    expect(isValidPayerKey('0123456789abcdef0123456789abcdef')).toBe(true);
+  });
+  it('reads the amount typed with a comma or with a dot as the decimal mark', () => {
+    expect(parseReaisCents('25,50')).toBe(2550);
+    expect(parseReaisCents('25.50')).toBe(2550);
+    expect(parseReaisCents('25.5')).toBe(2550);
+    expect(parseReaisCents('1.234,56')).toBe(123456);
+    expect(parseReaisCents('1.234')).toBe(123400);
+    expect(parseReaisCents('30')).toBe(3000);
+    expect(parseReaisCents('')).toBeNaN();
+    expect(parseReaisCents('abc')).toBeNaN();
   });
 });

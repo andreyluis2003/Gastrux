@@ -49,7 +49,23 @@ export function normalizeCpf(raw: unknown): { ok: true; cpf: string | null } | {
   return { ok: true, cpf: d };
 }
 
-/** The random key of one phone at the table (kept in its browser): only letters, digits, _ and - */
+/**
+ * The random key of one phone at the table (kept in its browser): only letters, digits and -. Never _ or %:
+ * the key goes into a `contains` (LIKE) filter, where they are wildcards that would match other phones.
+ */
 export function isValidPayerKey(raw: unknown): raw is string {
-  return typeof raw === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(raw);
+  return typeof raw === 'string' && /^[A-Za-z0-9-]{16,64}$/.test(raw);
+}
+
+/**
+ * An amount typed by the customer, in cents (NaN when it is not one). The comma is the decimal mark
+ * ("1.234,56"); without a comma, one dot followed by 1 or 2 digits is the decimal mark too ("25.50"),
+ * since many phone keyboards only offer the dot. Any other dot separates thousands ("1.234").
+ */
+export function parseReaisCents(text: string): number {
+  const t = text.trim().replace(/^R\$\s*/, '');
+  if (!/^[\d.,]+$/.test(t)) return NaN;
+  const normalized = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : /^\d+\.\d{1,2}$/.test(t) ? t : t.replace(/\./g, '');
+  const n = Number(normalized);
+  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
 }

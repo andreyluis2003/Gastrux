@@ -110,6 +110,15 @@ describe('splitting the table bill: one PIX per phone and per part', () => {
     expect((await prisma.payment.findUnique({ where: { id: out.pix.paymentId } })).customerDocument).toBe('52998224725');
   });
 
+  it('a CPF typed after the QR was made is not lost: a new PIX with the CPF replaces the one without (final review)', async () => {
+    const first = await pay({ mode: 'ALL' }, PHONE_A);
+    const r = await resolvePixTarget({ qrToken: table.qrToken, share: { mode: 'ALL', cpf: '52998224725', payerKey: PHONE_A } });
+    const second = await createPixForTarget(r.target, { email: 'cliente@exemplo.com', name: 'Cliente' });
+    expect(second.pix.paymentId).not.toBe(first.pix.paymentId);
+    expect((await prisma.payment.findUnique({ where: { id: second.pix.paymentId } })).customerDocument).toBe('52998224725');
+    expect((await prisma.payment.findUnique({ where: { id: first.pix.paymentId } })).status).toBe('CANCELLED');
+  });
+
   it('two parts paid close the bill; the second part is what is left after the first', async () => {
     const a = await pay({ mode: 'AMOUNT', amountCents: 2500 }, PHONE_A);
     expect((await approve(a.pix.paymentId)).outcome).toBe('applied');

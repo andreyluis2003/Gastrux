@@ -150,6 +150,9 @@ async function claimPixPayment(
         amount: target.amount,
         createdAt: { gte: new Date(Date.now() - REUSE_WINDOW_MS) },
         ...scopeFor(target),
+        // A phone that typed (or changed) its CPF after the QR was made gets a new PIX carrying it, so the
+        // NFC-e has the CPF the customer asked for; the old one is superseded
+        ...(target.payerKey ? { customerDocument: target.customerDocument ?? null } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });
