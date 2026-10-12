@@ -110,7 +110,8 @@ async function resolveTable(qrToken: string, share?: TableShareRequest): Promise
 
   const session = await prisma.orderSession.findFirst({
     where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: OPEN_SESSION_STATUSES } },
-    orderBy: { openedAt: 'desc' },
+    // The oldest open comanda of the table: the one the map shows and QR orders go to
+    orderBy: { openedAt: 'asc' },
     select: { id: true },
   });
   if (!session) return { ok: false, status: 409, error: 'Nenhuma comanda aberta nesta mesa' };

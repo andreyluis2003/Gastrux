@@ -22,7 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: { qrToken: str
 
   const session = await prisma.orderSession.findFirst({
     where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: [...OPEN] } },
-    orderBy: { openedAt: 'desc' },
+    // The oldest open comanda of the table: the one the map shows and QR orders go to
+    orderBy: { openedAt: 'asc' },
     select: { id: true },
   });
   if (session) {

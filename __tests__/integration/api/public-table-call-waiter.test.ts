@@ -54,6 +54,13 @@ describe('pagar com o garçom', () => {
     expect(await alerts()).toHaveLength(2);
   });
 
+  it('with two open comandas on the table, the call lands on the one the map shows (the oldest), like QR orders', async () => {
+    const newer = await prisma.orderSession.create({ data: { restaurantId: A.restaurantId, userId: A.ownerId, tableId: table.id, tableNumber: 8, status: 'OPEN', openedAt: new Date(Date.now() + 60_000) } });
+    await call();
+    expect((await prisma.orderSession.findUnique({ where: { id: session.id } })).payAtWaiterRequestedAt).not.toBeNull();
+    expect((await prisma.orderSession.findUnique({ where: { id: newer.id } })).payAtWaiterRequestedAt).toBeNull();
+  });
+
   it('refuses what it must', async () => {
     expect((await call('nao-existe-0123456789')).status).toBe(404);
     await prisma.orderSession.update({ where: { id: session.id }, data: { status: 'CLOSED', closedAt: new Date() } });

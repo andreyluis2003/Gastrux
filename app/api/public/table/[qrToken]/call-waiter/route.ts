@@ -21,7 +21,8 @@ export async function POST(_req: NextRequest, { params }: { params: { qrToken: s
 
   const session = await prisma.orderSession.findFirst({
     where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: [...OPEN] } },
-    orderBy: { openedAt: 'desc' },
+    // The oldest open comanda of the table: the one the map shows and QR orders go to
+    orderBy: { openedAt: 'asc' },
     select: { id: true, tableNumber: true, customerName: true },
   });
   if (!session) return NextResponse.json({ error: 'Esta mesa ainda não tem conta aberta. Chame o garçom.' }, { status: 409 });
