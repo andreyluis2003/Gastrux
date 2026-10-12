@@ -13,7 +13,7 @@ async function notify(restaurantId: string, kind: string, dedupeKey: string, tit
     if (existing) return;
     await prisma.notification.create({
       data: {
-        restaurantId, type: kind === 'table-paid' ? 'PAYMENT_RECEIVED' : 'SYSTEM_ERROR', severity, title, message,
+        restaurantId, type: kind === 'table-paid' ? 'PAYMENT_RECEIVED' : kind === 'table-call-waiter' ? 'PAYMENT_PENDING' : 'SYSTEM_ERROR', severity, title, message,
         actionUrl: '/vender', actionLabel: 'Ver mesas', data: { kind, dedupeKey, ...extra },
       },
     });
@@ -38,4 +38,10 @@ export function alertTableOverpaid(restaurantId: string, sessionId: string, labe
 export function alertOnlineWithoutShift(restaurantId: string, sessionId: string, label: string, amountCents: number, paymentId: string) {
   return notify(restaurantId, 'table-no-shift', `table-no-shift:${paymentId}`, 'Pagamento online recebido sem caixa aberto',
     `${label} pagou ${brl(amountCents)} pelo celular sem caixa aberto. O valor entrou na conta, fora de qualquer turno.`, 'HIGH', { orderSessionId: sessionId, paymentId });
+}
+
+/** "Pagar com o garçom" (spec 2026-10-10 §5.4): one alert per call; the route lets one through a minute */
+export function alertTableCallsWaiter(restaurantId: string, sessionId: string, label: string, at: Date) {
+  return notify(restaurantId, 'table-call-waiter', `table-call-waiter:${sessionId}:${at.getTime()}`, `${label} quer pagar com o garçom`,
+    `${label} pediu para pagar com o garçom. Leve a maquininha ou a conta até a mesa.`, 'MEDIUM', { orderSessionId: sessionId });
 }

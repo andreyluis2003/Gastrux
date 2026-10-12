@@ -42,6 +42,7 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
   const [amountText, setAmountText] = useState('');
   const [cpf, setCpf] = useState('');
   const [busy, setBusy] = useState(false);
+  const [waiterBusy, setWaiterBusy] = useState(false);
   const [pix, setPix] = useState<Pix | null>(null);
   const [paid, setPaid] = useState<{ cents: number } | null>(null);
   const keyRef = useRef<string>('');
@@ -131,6 +132,22 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
   // "25,50" and "25.50" are both R$ 25,50 (many phone keyboards only have the dot)
   const amountCents = parseReaisCents(amountText);
   const preview = open ? shareCents({ mode, people, amountCents }, open) : null;
+
+  // "Pagar com o garçom" (spec 2026-10-10 §5.4): the staff gets a bell alert, at most once a minute per table
+  async function callWaiter() {
+    setWaiterBusy(true);
+    try {
+      const res = await fetch(`/api/public/table/${qrToken}/call-waiter`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(data.error || 'Não foi possível chamar o garçom'); return; }
+      // Also when already called in the last minute: the staff already has the alert
+      toast.success('Pronto! O garçom foi avisado e já vem até a mesa.');
+    } catch {
+      toast.error('Sem conexão. Chame o garçom.');
+    } finally {
+      setWaiterBusy(false);
+    }
+  }
 
   async function pay() {
     if (!preview?.ok) return;
@@ -276,6 +293,7 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : method === 'PIX' ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
         {preview?.ok ? `Pagar ${reais(preview.cents)} com ${method === 'PIX' ? 'Pix' : 'cartão'}` : `Pagar com ${method === 'PIX' ? 'Pix' : 'cartão'}`}
       </Button>
+      <Button variant="ghost" className="w-full" disabled={waiterBusy} onClick={callWaiter}>Pagar com o garçom</Button>
     </>
   );
 }
