@@ -153,7 +153,8 @@ async function handlePUT(
           // Only one close writes: a second device sees the comanda already closed
           const guard = await tx.orderSession.updateMany({
             where: { id: params.id, status: { not: 'CLOSED' } },
-            data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: serviceCents },
+            // Paid: the table's "pagar com o garçom" was answered (spec 2026-10-10 §5.3)
+            data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: serviceCents, payAtWaiterRequestedAt: null },
           });
           if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
           if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
@@ -174,7 +175,8 @@ async function handlePUT(
             if (other) throw new CashRuleError(`A Mesa ${other.table?.number ?? ''} já tem outra comanda aberta. Feche ou transfira aquela comanda antes de reabrir esta.`, 409, 'TABLE_BUSY');
           }
           // Only one reopen writes: two requests at once must not give the money back twice
-          const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: 'CLOSED' }, data: { status } });
+          // A reopened bill starts with no waiter call: an old one must not come back as if new
+          const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: 'CLOSED' }, data: { status, payAtWaiterRequestedAt: null } });
           if (guard.count === 0) throw new CashRuleError('Esta conta já foi reaberta', 422, 'ALREADY_REOPENED');
           // The money of this bill leaves the drawer until it is closed again (a bill closed without
           // cash lines, before the cash register or with no shift, reopens without one)

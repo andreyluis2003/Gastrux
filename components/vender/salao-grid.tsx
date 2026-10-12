@@ -29,7 +29,7 @@ function Tile({ title, session, onClick }: { title: string; session: SalaoSessio
             {session!.newCount > 0 && <span className="ml-1 text-amber-700">· {session!.newCount} a enviar</span>}
           </div>
           {session!.billTotalCents !== null && session!.paidCents > 0 && (
-            <div className="text-xs">{brl(session!.paidCents)} pago de {brl(session!.billTotalCents)}</div>
+            <div className="text-xs">{brl(session!.paidCents)} pago de {brl(session!.billTotalCents)}{session!.billTotalCents !== session!.totalCents ? " (com serviço)" : ""}</div>
           )}
         </>
       ) : (

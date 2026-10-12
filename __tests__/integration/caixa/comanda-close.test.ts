@@ -198,6 +198,17 @@ describe('closing a comanda records the payments in the shift', () => {
     await prisma.tableSection.delete({ where: { id: sec.id } });
   });
 
+  it('closing with payments answers the waiter call, so a reopened bill does not come back as "Chamou o garçom" (stage 4 review)', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    const s = await comanda([[30, 1]]);
+    await prisma.orderSession.update({ where: { id: s.id }, data: { payAtWaiterRequestedAt: new Date() } });
+    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'credito', amount: 30 }] })).status).toBe(200);
+    expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).payAtWaiterRequestedAt).toBeNull();
+    await prisma.orderSession.update({ where: { id: s.id }, data: { payAtWaiterRequestedAt: new Date() } }); // an old stamp left by earlier code
+    expect((await put(s.id, { status: 'OPEN', cashSessionId: session.id, reason: 'faltou um item' })).status).toBe(200);
+    expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).payAtWaiterRequestedAt).toBeNull();
+  });
+
   it("another restaurant's shift is refused", async () => {
     const regB = await ensureDefaultRegister(B.restaurantId);
     const { session } = await openSession({ userId: B.ownerId, restaurantId: B.restaurantId, role: 'OWNER' }, { cashRegisterId: regB.id, openingFloat: 0 });
