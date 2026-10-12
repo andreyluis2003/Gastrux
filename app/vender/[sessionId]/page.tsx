@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,27 @@ export default function ComandaRapidaPage() {
     mq.addEventListener('change', set);
     return () => mq.removeEventListener('change', set);
   }, []);
+
+  // A tap on a free table opens its comanda at once: left with nothing on it (no item, none waiting
+  // offline), it frees the table when the waiter leaves (owner, 2026-10-12). The server checks again
+  // that it is empty, so another device or a QR order at the same time never loses anything.
+  const emptyRef = useRef(false);
+  emptyRef.current = c.session?.status === 'OPEN' && c.lines.length === 0 && c.online;
+  const releasedRef = useRef(false);
+  const releaseIfEmpty = useCallback(async () => {
+    if (!emptyRef.current || releasedRef.current) return;
+    releasedRef.current = true;
+    await fetch(`/api/comanda/sessions/${sessionId}/release`, { method: 'POST', keepalive: true }).catch(() => null);
+  }, [sessionId]);
+  useEffect(() => {
+    const onHide = () => { void releaseIfEmpty(); };
+    window.addEventListener('pagehide', onHide);
+    return () => { window.removeEventListener('pagehide', onHide); void releaseIfEmpty(); };
+  }, [releaseIfEmpty]);
+  async function backToSalao() {
+    await releaseIfEmpty();
+    router.push('/vender');
+  }
 
   if (c.loading) return <div className="p-6">Carregando...</div>;
   if (!c.session) {
@@ -67,7 +88,7 @@ export default function ComandaRapidaPage() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto pb-28 lg:pb-6">
       <div className="flex items-center gap-3 mb-4">
-        <Button variant="ghost" size="icon" aria-label="Voltar ao salão" onClick={() => router.push('/vender')}><ArrowLeft className="h-6 w-6" /></Button>
+        <Button variant="ghost" size="icon" aria-label="Voltar ao salão" onClick={backToSalao}><ArrowLeft className="h-6 w-6" /></Button>
         <div>
           <h1 className="text-2xl font-bold">{sessionLabel(s)}</h1>
           <p className="text-sm text-slate-500">
