@@ -179,6 +179,22 @@ describe('bad day 2: the kitchen screen or printer is down', () => {
 
       expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
     });
+
+    it('200 forgotten orders on the platform never hide a new stale order (2026-10-12)', async () => {
+      // The check read the 200 OLDEST stale orders, already alerted ones included: past 200 forgotten
+      // orders anywhere, no new order was ever alerted again
+      await prisma.order.createMany({
+        data: Array.from({ length: 205 }, (_, i) => ({
+          restaurantId: B.restaurantId, orderNumber: `K5B-${i}-${crypto.randomBytes(3).toString('hex')}`, orderType: 'DINE_IN', status: 'PENDING', total: 10,
+          createdAt: new Date(Date.now() - (120 + i) * 60_000),
+        })),
+      });
+      const { alertStaleKitchenOrders } = await import('../../../lib/kds/stale-orders');
+      await alertStaleKitchenOrders();
+      await mkOrder(A.restaurantId, 12, 'PENDING');
+      await alertStaleKitchenOrders();
+      expect(await prisma.notification.count({ where: { restaurantId: A.restaurantId } })).toBe(1);
+    });
   });
 
   describe('the stale-order check route', () => {

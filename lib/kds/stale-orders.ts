@@ -16,7 +16,9 @@ export async function alertStaleKitchenOrders(now = new Date(), afterMinutes = S
     // the visibility rule is declared readonly (as const); Prisma wants a mutable input
     where: { status: 'PENDING', createdAt: { lte: cutoff }, AND: [KITCHEN_VISIBLE_ORDER_WHERE as unknown as Prisma.OrderWhereInput] },
     select: { id: true, restaurantId: true, orderNumber: true, createdAt: true, orderType: true },
-    orderBy: { createdAt: 'asc' },
+    // Newest first: oldest first, the 200 forgotten orders of the platform (already alerted) filled the
+    // window and no new order was alerted again (2026-10-12)
+    orderBy: { createdAt: 'desc' },
     take: 200,
   });
 
