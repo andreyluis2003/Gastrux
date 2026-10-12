@@ -10,6 +10,8 @@ import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { ensureMenuItemRecipes } from '../../../lib/cardapio/product-recipe';
 import { seedStarterTemplate } from '../../../lib/onboarding/seed-template';
+import { checkTierLimit } from '../../../lib/tier-guard';
+import { getDashboardStats } from '../../../lib/dashboard/stats';
 import { POST as createRoute } from '../../../app/api/cardapio/itens/route';
 import { PUT as updateRoute } from '../../../app/api/cardapio/itens/[id]/route';
 
@@ -104,5 +106,21 @@ describe('ficha simples', () => {
     await updateItem(created.id, { recipeId: real.id });
     await updateItem(created.id, { name: `Burger ${tag}` });
     expect((await prisma.recipe.findUnique({ where: { id: real.id } })).name).toBe('Burger da cozinha');
+  });
+
+  it('fichas simples do not count toward the plan recipe limit nor the home "Receitas" card (final review)', async () => {
+    const lim = (await prisma.restaurant.create({ data: { name: `Lim ${tag}`, ownerId, status: 'ACTIVE', subscriptionTier: 'starter' } })).id;
+    try {
+      const c = await prisma.menuCategory.create({ data: { restaurantId: lim, name: 'Bebidas', position: 0, active: true } });
+      for (let i = 0; i < 12; i++) await item(lim, c.id, `Bebida ${i} ${tag}`);
+      await ensureMenuItemRecipes(prisma, lim);
+      await prisma.recipe.create({ data: { restaurantId: lim, code: `OWN-${tag}`, name: 'Burger', baseYield: 1, yieldUnit: 'un', portionUnit: 'un' } });
+      const check = await checkTierLimit(lim, 'recipes');
+      expect(check.current).toBe(1);
+      expect(check.allowed).toBe(true);
+      expect((await getDashboardStats(lim)).recipes.value).toBe(1);
+    } finally {
+      await prisma.restaurant.delete({ where: { id: lim } });
+    }
   });
 });

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 
 /**
  * The four dashboard cards, computed from the restaurant's own data. They used to show fixed
@@ -102,7 +103,7 @@ export async function getDashboardStats(restaurantId: string, now = new Date()):
   const lastWeekStart = new Date(localWeekStart(now).getTime() - 7 * DAY_MS);
   const [ingredients, recipes, plans, lowStock] = await Promise.all([
     prisma.ingredient.findMany({ where: { restaurantId, active: true }, select: { createdAt: true } }),
-    prisma.recipe.findMany({ where: { restaurantId, active: true }, select: { createdAt: true } }),
+    prisma.recipe.findMany({ where: { restaurantId, active: true, ...OWN_RECIPE_WHERE }, select: { createdAt: true } }),
     prisma.productionPlan.findMany({
       where: { restaurantId, planDate: { gte: new Date(Math.min(lastWeekStart.getTime(), now.getTime() - 7 * DAY_MS)) } },
       select: { planDate: true },

@@ -4,6 +4,7 @@
  * Checks if a restaurant's subscription tier allows a given feature/limit
  */
 import { prisma } from '@/lib/prisma';
+import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getTierLimits } from '@/lib/stripe-config';
 
 export interface TierCheckResult {
@@ -41,7 +42,8 @@ export async function checkTierLimit(
       current = await prisma.ingredient.count({ where: { restaurantId, active: true } });
       break;
     case 'recipes':
-      current = await prisma.recipe.count({ where: { restaurantId, active: true } });
+      // Fichas simples (items sold as bought) are not the restaurant's fichas técnicas
+      current = await prisma.recipe.count({ where: { restaurantId, active: true, ...OWN_RECIPE_WHERE } });
       break;
     case 'users':
       current = await prisma.restaurantUser.count({ where: { restaurantId, isActive: true } });

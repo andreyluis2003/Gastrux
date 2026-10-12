@@ -73,3 +73,12 @@ export async function syncProductRecipe(db: Db, restaurantId: string, menuItemId
     data: { name: mi.name, description: mi.description, sellingPrice: Number(mi.price) || 0 },
   });
 }
+
+/**
+ * The restaurant's own fichas técnicas: every recipe but a ficha simples (made here, still without
+ * ingredients). The plan's recipe limit and the home "Receitas" card count these (final review
+ * 2026-10-12: the example drinks alone took most of Starter's 10 recipes).
+ */
+export const OWN_RECIPE_WHERE: Prisma.RecipeWhereInput = {
+  NOT: { code: { startsWith: 'PROD-' }, ingredients: { none: {} } },
+};

@@ -70,7 +70,7 @@ describe('new account: "Comece com" and address in the sign-up questions', () =>
     const res = await answer(a.userId, { ...answers, businessType: 'pizzaria', startWith: 'template' });
     expect(res.status).toBe(200);
     expect((await res.json()).template).toBe('pizzaria');
-    const recipes = await prisma.recipe.findMany({ where: { restaurantId: a.restaurantId }, select: { name: true } });
+    const recipes = await prisma.recipe.findMany({ where: { restaurantId: a.restaurantId }, select: { name: true, code: true } });
     expect(recipes.map((r) => r.name)).toEqual(expect.arrayContaining(['Pizza muçarela', 'Pizza calabresa']));
     const menu = await prisma.menuItem.count({ where: { restaurantId: a.restaurantId } });
     // Every item has a ficha: the drinks get a ficha simples (2026-10-12; they used to have none and could not be sold)
@@ -78,7 +78,9 @@ describe('new account: "Comece com" and address in the sign-up questions', () =>
     expect(await prisma.menuItem.count({ where: { restaurantId: a.restaurantId, recipeId: null } })).toBe(0);
     const stats = await getDashboardStats(a.restaurantId);
     expect(stats.lowStock.value).toBe(0);
-    expect(stats.recipes.value).toBe(recipes.length);
+    // The home card counts the restaurant's own fichas, not the drinks' fichas simples
+    expect(stats.recipes.value).toBe(recipes.filter((r) => !r.code.startsWith('PROD-')).length);
+    expect(stats.recipes.value).toBeGreaterThan(0);
   });
 
   it('answering twice does not duplicate the examples', async () => {
