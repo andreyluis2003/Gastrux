@@ -150,7 +150,12 @@ export default function TablesPage() {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to delete');
+      if (!response.ok) {
+        // A refusal says why (an open comanda, reservations): show it as is
+        const data = await response.json().catch(() => ({}));
+        toast.error(data?.error || 'Erro ao deletar mesa');
+        return;
+      }
 
       toast.success('Mesa deletada com sucesso');
       fetchTables();
