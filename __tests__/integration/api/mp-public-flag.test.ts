@@ -60,6 +60,18 @@ describe('acceptsOnlinePayment flag on the public menus', () => {
     expect((await qr()).restaurant.acceptsOnlinePayment).toBe(true);
   });
 
+  it('is false on the QR menu of a Starter restaurant, even with Mercado Pago connected (2026-10-12)', async () => {
+    await saveConnection(A.restaurantId, TOKENS);
+    await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'starter' } });
+    try {
+      expect((await qr()).restaurant.acceptsOnlinePayment).toBe(false);
+      await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'pro' } });
+      expect((await qr()).restaurant.acceptsOnlinePayment).toBe(true);
+    } finally {
+      await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'business' } });
+    }
+  });
+
   it('never exposes token material', async () => {
     await saveConnection(A.restaurantId, TOKENS);
     const text = JSON.stringify(await delivery(A.restaurantId)) + JSON.stringify(await qr());

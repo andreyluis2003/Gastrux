@@ -3,7 +3,7 @@
 // Sprint 2: includes menu engineering badges (Star/Puzzle highlights)
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hasActiveConnection } from '@/lib/mercadopago-connect/connection-service';
+import { tablePaymentEnabled } from '@/lib/mercadopago-connect/table-payment-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,7 +130,8 @@ export async function GET(
       },
       restaurant: {
         ...table.restaurant,
-        acceptsOnlinePayment: await hasActiveConnection(table.restaurant.id),
+        // The pay button of the QR menu: plan (Pro and up) and Mercado Pago connected
+        acceptsOnlinePayment: await tablePaymentEnabled(table.restaurant.id),
       },
       categories: enrichedCategories,
       combos,

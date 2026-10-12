@@ -279,6 +279,20 @@ describe('public PIX routes', () => {
       return { qrToken, table, session };
     };
 
+    it('refuses the table PIX of a Starter restaurant (403), the plan is checked on the server (2026-10-12)', async () => {
+      await saveConnection(A.restaurantId, TOKENS);
+      const { qrToken } = await makeTable(A.restaurantId, A.ownerId, [[1, 10]]);
+      await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'starter' } });
+      try {
+        const res = await post({ qrToken });
+        expect(res.status).toBe(403);
+        expect((await res.json()).error).toMatch(/Peça a conta ao garçom/);
+        expect(createConnectPix).not.toHaveBeenCalled();
+      } finally {
+        await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'business' } });
+      }
+    });
+
     it("charges the sum of the open tab's items, computed on the server", async () => {
       await saveConnection(A.restaurantId, TOKENS);
       const { qrToken, session } = await makeTable(A.restaurantId, A.ownerId, [[2, 10.5], [1, 20]]);

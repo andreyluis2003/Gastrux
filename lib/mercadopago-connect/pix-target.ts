@@ -1,6 +1,7 @@
 import type { OrderSessionStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { loadBill } from '@/lib/comanda/bill-service';
+import { TABLE_PAYMENT_UNAVAILABLE, tablePaymentPlanAllows } from './table-payment-access';
 
 /**
  * Turns "what is the customer paying for" into a restaurant plus an amount
@@ -92,6 +93,9 @@ async function resolveTable(qrToken: string): Promise<ResolveResult> {
     select: { id: true, number: true, restaurantId: true },
   });
   if (!table) return { ok: false, status: 404, error: 'Mesa não encontrada' };
+  if (!(await tablePaymentPlanAllows(table.restaurantId))) {
+    return { ok: false, status: 403, error: TABLE_PAYMENT_UNAVAILABLE };
+  }
 
   const session = await prisma.orderSession.findFirst({
     where: { tableId: table.id, restaurantId: table.restaurantId, status: { in: OPEN_SESSION_STATUSES } },

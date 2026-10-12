@@ -50,6 +50,7 @@ export const BASE_PRICING_TIERS = {
       'NFC-e (nota do consumidor)',
       'Tela da cozinha (KDS) com até 3 estações',
       'Cardápio digital com QR Code',
+      'Conta e pagamento na mesa por Pix',
       'Clientes com anotações',
       'Etiquetas com controle de validades',
       'Analytics em tempo real',

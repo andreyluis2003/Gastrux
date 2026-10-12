@@ -78,13 +78,15 @@ export async function checkTierLimit(
  */
 export function isTierFeatureEnabled(
   tier: string,
-  feature: 'kds' | 'qrMenu' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
+  feature: 'kds' | 'qrMenu' | 'tablePayment' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
 ): boolean {
   const featureMap: Record<string, string[]> = {
     // Owner decision 2026-10-09: the KDS, the QR menu and the basic CRM (customer list and history) on
     // every plan; the paid plans keep more stations (limits.kitchenStations), notes and campaigns
     kds: ['starter', 'pro', 'business', 'enterprise'],
     qrMenu: ['starter', 'pro', 'business', 'enterprise'],
+    // Owner decision 2026-10-12: pay at the table by phone (bill, split, PIX) from Pro
+    tablePayment: ['pro', 'business', 'enterprise'],
     crm: ['starter', 'pro', 'business', 'enterprise'],
     crmNotes: ['pro', 'business', 'enterprise'],
     crmCampaigns: ['business', 'enterprise'],
