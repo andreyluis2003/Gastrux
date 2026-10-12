@@ -323,11 +323,8 @@ describe('bad day 5: the table tab changes around its PIX', () => {
 
   // Covered by __tests__/integration/vender/table-payment-apply.test.ts and table-payment-sync.test.ts (pay at the table, 2026-10-10)
 
-  describe('splitting the bill (a product gap: the feature does not exist)', () => {
-    it.todo('equal split among N people: the parts add up to the total to the cent (largest-remainder rounding, never 3 x 33.33 for 100.00)');
+  describe('splitting the bill: by item and by waiter-typed values (stage 2 covers equal parts and another amount, vender/table-split-pix.test.ts)', () => {
     it.todo('split by item: each person pays their own lines and shared lines are divided, parts add up to the total');
     it.todo('split by value: parts typed by the waiter must add up to the tab; a difference is refused, not absorbed');
-    it.todo('a tab total changed after a partial payment: the remaining balance is recomputed and no part is paid twice');
-    it.todo('one PIX per part, each tied to the tab; the tab closes only when the approved parts cover the total; a part paid twice is flagged');
   });
 });

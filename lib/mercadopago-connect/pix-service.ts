@@ -68,8 +68,16 @@ function lockKeyFor(target: ResolvedPixTarget): string | null {
   return null;
 }
 
+/**
+ * Which pending PIX rows belong to the same payer as this target. A table split in parts (stage 2) has
+ * one payer per phone: reuse and "supersede the older PIX" stay inside that phone, so two people never get
+ * or cancel each other's QR. The old one-shot table PIX (no phone key) never touches a phone's rows.
+ * The key is checked by isValidPayerKey (letters, digits, _ and -), so it is safe inside `contains`.
+ */
 function scopeFor(target: ResolvedPixTarget) {
-  return target.orderId ? { orderId: target.orderId } : { orderSessionId: target.sessionId };
+  if (target.orderId) return { orderId: target.orderId };
+  if (target.payerKey) return { orderSessionId: target.sessionId, metadata: { contains: `"payerKey":"${target.payerKey}"` } };
+  return { orderSessionId: target.sessionId, NOT: { metadata: { contains: '"payerKey"' } } };
 }
 
 function newPaymentData(target: ResolvedPixTarget, payer: { email: string; name?: string }) {
@@ -87,7 +95,9 @@ function newPaymentData(target: ResolvedPixTarget, payer: { email: string; name?
     metadata: JSON.stringify(target.metadata),
     // Pay at the table (spec 2026-10-10): the PIX of a table pays towards its comanda
     orderSessionId: target.sessionId ?? null,
-    tableShareMode: target.sessionId ? ('ALL' as const) : null,
+    tableShareMode: target.sessionId ? (target.shareMode ?? 'ALL') : null,
+    // CPF for the NFC-e of the bill (spec 2026-10-10 §3.4)
+    customerDocument: target.customerDocument ?? null,
   };
 }
 

@@ -2,6 +2,7 @@ import type { OrderSessionStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { loadBill } from '@/lib/comanda/bill-service';
 import { TABLE_PAYMENT_UNAVAILABLE, tablePaymentPlanAllows } from './table-payment-access';
+import { isValidPayerKey, shareCents } from '@/lib/comanda/table-share';
 
 /**
  * Turns "what is the customer paying for" into a restaurant plus an amount
@@ -28,7 +29,16 @@ export interface ResolvedPixTarget {
    */
   serviceCents?: number;
   paidCents?: number;
+  /** Pay at the table, stage 2: the phone that asked, the part chosen and the CPF for the note */
+  payerKey?: string | null;
+  shareMode?: string | null;
+  customerDocument?: string | null;
+  totalCents?: number;
+  remainingCents?: number;
 }
+
+/** One person's part of the table bill (stage 2). The CPF is already checked by the route (normalizeCpf). */
+export interface TableShareRequest { mode: unknown; people?: unknown; amountCents?: unknown; cpf: string | null; payerKey: string }
 
 export type ResolveResult =
   | { ok: true; target: ResolvedPixTarget }
@@ -87,7 +97,8 @@ async function resolveOrder(orderId: string): Promise<ResolveResult> {
   };
 }
 
-async function resolveTable(qrToken: string): Promise<ResolveResult> {
+async function resolveTable(qrToken: string, share?: TableShareRequest): Promise<ResolveResult> {
+  if (share && !isValidPayerKey(share.payerKey)) return { ok: false, status: 422, error: 'Recarregue a página e tente de novo.' };
   const table = await prisma.table.findUnique({
     where: { qrToken },
     select: { id: true, number: true, restaurantId: true },
@@ -110,24 +121,36 @@ async function resolveTable(qrToken: string): Promise<ResolveResult> {
   if (!bill || bill.items.length === 0) return { ok: false, status: 409, error: 'A comanda está vazia' };
   if (bill.remainingCents <= 0) return { ok: false, status: 409, error: 'Esta conta já está paga' };
 
+  // Stage 2: the part this phone pays; without a share (old route) it is everything that is left
+  const part = shareCents(share ?? { mode: 'ALL' }, { totalCents: bill.totalCents, remainingCents: bill.remainingCents });
+  if (!part.ok) return part;
+
   return {
     ok: true,
     target: {
       restaurantId: table.restaurantId,
-      amount: bill.remainingCents / 100,
+      amount: part.cents / 100,
       description: `Mesa ${table.number}`,
       orderId: null,
       sessionId: session.id,
-      metadata: { source: 'table', sessionId: session.id, tableId: table.id, tableNumber: table.number },
+      metadata: {
+        source: 'table', sessionId: session.id, tableId: table.id, tableNumber: table.number,
+        ...(share ? { payerKey: share.payerKey, shareMode: part.label } : {}),
+      },
       serviceCents: bill.serviceCents,
       paidCents: bill.paidCents,
+      payerKey: share?.payerKey ?? null,
+      shareMode: part.label,
+      customerDocument: share?.cpf ?? null,
+      totalCents: bill.totalCents,
+      remainingCents: bill.remainingCents,
     },
   };
 }
 
-export async function resolvePixTarget(input: { orderId?: unknown; qrToken?: unknown }): Promise<ResolveResult> {
+export async function resolvePixTarget(input: { orderId?: unknown; qrToken?: unknown; share?: TableShareRequest }): Promise<ResolveResult> {
   if (typeof input.orderId === 'string' && input.orderId) return resolveOrder(input.orderId);
-  if (typeof input.qrToken === 'string' && input.qrToken) return resolveTable(input.qrToken);
+  if (typeof input.qrToken === 'string' && input.qrToken) return resolveTable(input.qrToken, input.share);
   return { ok: false, status: 400, error: 'Informe orderId ou qrToken' };
 }
 
