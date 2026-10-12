@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { TableBill } from '@/components/menu/table-bill';
+import { readTableCardReturn } from '@/lib/menu/card-return';
 
 interface MenuBadge {
   type: 'popular' | 'chef';
@@ -80,6 +81,17 @@ export default function PublicMenuPage() {
   const [success, setSuccess] = useState(false);
   // Pay at the table (stage 2): the bill of this table, its split and this phone's PIX
   const [showBill, setShowBill] = useState(false);
+  // Back from the card checkout (stage 3): reopen the bill to confirm the payment
+  const [cardReturn, setCardReturn] = useState<ReturnType<typeof readTableCardReturn>>(null);
+
+  useEffect(() => {
+    const back = readTableCardReturn(window.location.search);
+    if (!back) return;
+    setCardReturn(back);
+    setShowBill(true);
+    // A reload must not confirm the same return again
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -239,7 +251,7 @@ export default function PublicMenuPage() {
   }
 
   // Pay at the table (stage 2): the bill of this table, its split and this phone's PIX
-  if (showBill) return <TableBill qrToken={qrToken} onClose={() => setShowBill(false)} />;
+  if (showBill) return <TableBill qrToken={qrToken} returning={cardReturn} onClose={() => { setShowBill(false); setCardReturn(null); }} />;
 
   if (success) {
     return (

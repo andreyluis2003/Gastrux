@@ -1,15 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle, Copy, Loader2, QrCode, X } from 'lucide-react';
+import { CheckCircle, Copy, CreditCard, Loader2, QrCode, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { isValidPayerKey, MAX_PEOPLE, parseReaisCents, reais, shareCents, type ShareMode } from '@/lib/comanda/table-share';
 import type { PublicTableBill, PublicOpenBill } from '@/lib/comanda/public-bill';
+import { statusPollUrl } from '@/lib/delivery-payments/return-params';
 
 const KEY_STORAGE = 'gastrux-payer-key';
+/** The comanda a phone was paying when it left for the card checkout (per table) */
+const SESSION_STORAGE = 'gastrux-paying-session:';
 
 /** The random key of this phone: kept in the browser so a reload keeps its PIX; in memory when storage is blocked */
 function payerKey(): string {
@@ -27,8 +30,12 @@ function payerKey(): string {
 
 type Pix = { paymentId: string; qrCode: string; qrCodeBase64: string; ticketUrl: string; cents: number };
 
-/** Pay at the table (spec 2026-10-10 §5.1): the bill, the part, the CPF and the PIX of this phone */
-export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () => void }) {
+type CardReturn = { paymentId: string; mpPaymentId: string | null; failed: boolean };
+
+/** Pay at the table (spec 2026-10-10 §5.1): the bill, the part, the CPF and the PIX or card of this phone */
+export function TableBill({ qrToken, onClose, returning }: { qrToken: string; onClose: () => void; returning?: CardReturn | null }) {
+  const [method, setMethod] = useState<'PIX' | 'CARD'>('PIX');
+  const [checkingCard, setCheckingCard] = useState<{ paymentId: string; mpPaymentId: string | null } | null>(null);
   const [bill, setBill] = useState<PublicTableBill | null>(null);
   const [mode, setMode] = useState<ShareMode>('ALL');
   const [people, setPeople] = useState(2);
@@ -60,6 +67,8 @@ export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () =
 
   useEffect(() => {
     keyRef.current = payerKey();
+    // Back from the card checkout: the comanda being paid, so a bill closed meanwhile reads "Conta paga"
+    if (returning) { try { sessionRef.current = sessionStorage.getItem(SESSION_STORAGE + qrToken); } catch { /* blocked storage */ } }
     load();
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
@@ -85,28 +94,72 @@ export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () =
     return () => { stopped = true; clearInterval(t); clearTimeout(end); };
   }, [pix, load]);
 
+  // Back from the card checkout (stage 3): a failure is said as such; anything else is confirmed only by our
+  // status route, with Mercado Pago's id from the return URL as the hint for a webhook still on its way
+  useEffect(() => {
+    if (!returning) return;
+    if (returning.failed) toast.error('O pagamento com cartão não foi concluído. Nada foi cobrado.');
+    else setCheckingCard({ paymentId: returning.paymentId, mpPaymentId: returning.mpPaymentId });
+  }, [returning]);
+
+  useEffect(() => {
+    if (!checkingCard) return;
+    let stopped = false;
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(statusPollUrl(checkingCard.paymentId, checkingCard.mpPaymentId));
+        const data = await res.json();
+        if (!stopped && data.approved) {
+          clearInterval(t);
+          toast.success('Pagamento com cartão confirmado.');
+          setCheckingCard(null);
+          load();
+        }
+      } catch { /* ignore */ }
+    }, 4000);
+    const end = setTimeout(() => {
+      clearInterval(t);
+      if (!stopped) {
+        setCheckingCard(null);
+        toast.message('Ainda não recebemos a confirmação do cartão. Se o valor foi cobrado, ele aparece na conta em instantes.');
+      }
+    }, 2 * 60_000);
+    return () => { stopped = true; clearInterval(t); clearTimeout(end); };
+  }, [checkingCard, load]);
+
   const open = bill?.status === 'OPEN' ? (bill as PublicOpenBill) : null;
   // "25,50" and "25.50" are both R$ 25,50 (many phone keyboards only have the dot)
   const amountCents = parseReaisCents(amountText);
   const preview = open ? shareCents({ mode, people, amountCents }, open) : null;
 
-  async function payPix() {
+  async function pay() {
     if (!preview?.ok) return;
     setBusy(true);
+    let leaving = false;
     try {
       const res = await fetch(`/api/public/table/${qrToken}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, people, amountCents, cpf, payerKey: keyRef.current }),
+        body: JSON.stringify({ method, mode, people, amountCents, cpf, payerKey: keyRef.current }),
       });
       const data = await res.json().catch(() => ({}));
+      if (method === 'CARD') {
+        if (!res.ok || !data.initPoint) { toast.error(data.error || 'Não foi possível abrir o pagamento com cartão'); load(); return; }
+        // Leaves the page: the customer pays at Mercado Pago and comes back to /menu/<qrToken>?payment=...
+        // The comanda is kept for the way back: if this part closed the bill, the screen says "Conta paga"
+        try { if (sessionRef.current) sessionStorage.setItem(SESSION_STORAGE + qrToken, sessionRef.current); } catch { /* blocked storage */ }
+        leaving = true;
+        window.location.href = data.initPoint;
+        return;
+      }
       if (!res.ok || !data.qrCode) { toast.error(data.error || 'Não foi possível gerar o Pix'); load(); return; }
       setPaid(null);
       setPix({ paymentId: data.paymentId, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64 || '', ticketUrl: data.ticketUrl || '', cents: Math.round(Number(data.amount) * 100) });
     } catch {
       toast.error('Sem conexão. Tente de novo.');
     } finally {
-      setBusy(false);
+      // Leaving for Mercado Pago keeps the button busy: no second checkout from a second tap
+      if (!leaving) setBusy(false);
     }
   }
 
@@ -159,6 +212,11 @@ export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () =
 
   return shell(
     <>
+      {checkingCard && (
+        <div role="status" className="flex items-center gap-2 rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
+          <Loader2 className="h-4 w-4 animate-spin" /> Confirmando o pagamento com cartão...
+        </div>
+      )}
       {paid && (
         <div role="status" className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-800">
           Pagamento confirmado: {reais(paid.cents)}. Falta {reais(open.remainingCents)}.
@@ -204,10 +262,19 @@ export function TableBill({ qrToken, onClose }: { qrToken: string; onClose: () =
         <Input inputMode="numeric" placeholder="CPF na nota (opcional)" value={cpf} onChange={(e) => setCpf(e.target.value)} maxLength={14} aria-label="CPF na nota (opcional)" />
       </div>
 
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Como você vai pagar?</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([['PIX', 'Pix'], ['CARD', 'Cartão']] as const).map(([m, label]) => (
+            <Button key={m} variant={method === m ? 'default' : 'outline'} onClick={() => setMethod(m)}>{label}</Button>
+          ))}
+        </div>
+      </div>
+
       {preview && !preview.ok && (mode !== 'AMOUNT' || amountText.trim()) && <p className="text-sm text-red-600">{preview.error}</p>}
-      <Button className="w-full h-12 text-base gap-2" disabled={busy || !preview?.ok} onClick={payPix}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-        {preview?.ok ? `Pagar ${reais(preview.cents)} com Pix` : 'Pagar com Pix'}
+      <Button className="w-full h-12 text-base gap-2" disabled={busy || !preview?.ok} onClick={pay}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : method === 'PIX' ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+        {preview?.ok ? `Pagar ${reais(preview.cents)} com ${method === 'PIX' ? 'Pix' : 'cartão'}` : `Pagar com ${method === 'PIX' ? 'Pix' : 'cartão'}`}
       </Button>
     </>
   );
