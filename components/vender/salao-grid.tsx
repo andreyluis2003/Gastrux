@@ -7,20 +7,31 @@ import type { Salao, SalaoSession, SalaoTable } from '@/lib/vender/salao';
 function Tile({ title, session, onClick }: { title: string; session: SalaoSession | null; onClick: () => void }) {
   const busy = !!session;
   const asked = !!session?.billRequested;
+  // Pay at the table (spec 2026-10-10 §5.2): a table asking for the waiter to pay goes before "pediu a conta"
+  const waiter = !!session?.waiterCalledAt;
   return (
     <button
       onClick={onClick}
       className={`min-h-[88px] rounded-xl border-2 p-3 text-left transition active:scale-[0.98] ${
-        asked ? 'bg-amber-50 border-amber-400 text-amber-900' : busy ? 'bg-emerald-50 border-emerald-400 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'
+        waiter
+          ? 'bg-rose-50 border-rose-500 text-rose-900 animate-pulse'
+          : asked ? 'bg-amber-50 border-amber-400 text-amber-900' : busy ? 'bg-emerald-50 border-emerald-400 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'
       }`}
     >
       <div className="text-lg font-bold">{title}</div>
-      {asked && <div className="text-xs font-semibold">Pediu a conta</div>}
+      {waiter
+        ? <div className="text-xs font-semibold">Chamou o garçom · {openFor(session!.waiterCalledAt!, new Date())}</div>
+        : asked && <div className="text-xs font-semibold">Pediu a conta</div>}
       {busy ? (
-        <div className="text-sm">
-          {brl(session!.totalCents)} · {openFor(session!.openedAt, new Date())}
-          {session!.newCount > 0 && <span className="ml-1 text-amber-700">· {session!.newCount} a enviar</span>}
-        </div>
+        <>
+          <div className="text-sm">
+            {brl(session!.totalCents)} · {openFor(session!.openedAt, new Date())}
+            {session!.newCount > 0 && <span className="ml-1 text-amber-700">· {session!.newCount} a enviar</span>}
+          </div>
+          {session!.billTotalCents !== null && session!.paidCents > 0 && (
+            <div className="text-xs">{brl(session!.paidCents)} pago de {brl(session!.billTotalCents)}</div>
+          )}
+        </>
       ) : (
         <div className="text-sm">Livre</div>
       )}
