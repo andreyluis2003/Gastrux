@@ -135,4 +135,26 @@ describe('cash shift service', () => {
     expect(view.expected.pix).toBe(0); // never in the drawer
     await prisma.payment.deleteMany({ where: { cashSessionId: session.id } });
   });
+
+  it('a bill paid by phone at the table is a sale of the shift: screen, history and close ticket (2026-10-12)', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: register.id, openingFloat: 0 });
+    const bill = await prisma.orderSession.create({ data: { restaurantId: A.restaurantId, userId: A.ownerId, status: 'CLOSED', tableNumber: 1 } });
+    const refunded = await prisma.orderSession.create({ data: { restaurantId: A.restaurantId, userId: A.ownerId, status: 'CLOSED', tableNumber: 2 } });
+    const base = { restaurantId: A.restaurantId, gateway: 'MERCADO_PAGO_CONNECT', status: 'APPROVED', method: 'PIX', cashSessionId: session.id, appliedToBillAt: new Date() };
+    await prisma.payment.create({ data: { ...base, amount: 1.1, orderSessionId: bill.id } });
+    await prisma.payment.create({ data: { ...base, amount: 5, orderSessionId: refunded.id, status: 'REFUNDED', amountRefunded: 5 } });
+
+    const view = await getSessionView(owner, session.id);
+    expect(view.sales.salesCount).toBe(1);
+    expect(view.sales.averageTicketCents).toBe(110);
+    expect(view.sales.byMethod.PIX).toBe(0); // the drawer methods stay as they were
+
+    await closeSession(owner, session.id, { counted: {} });
+    expect((await listSessions(A.restaurantId, {})).find((r) => r.id === session.id).salesCents).toBe(110);
+    const { buildCashCloseTicket } = await import('../../../lib/caixa/print');
+    expect((await buildCashCloseTicket(A.restaurantId, session.id)).sales).toEqual({ totalCents: 110, salesCount: 1 });
+
+    await prisma.payment.deleteMany({ where: { cashSessionId: session.id } });
+    await prisma.orderSession.deleteMany({ where: { id: { in: [bill.id, refunded.id] } } });
+  });
 });

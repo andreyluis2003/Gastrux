@@ -140,3 +140,31 @@ describe('sales summary after a reopen (final review 2026-10-05)', () => {
     expect(s.salesCount).toBe(0);
   });
 });
+
+describe('sales summary with bills paid at the table by phone (2026-10-12)', () => {
+  it('a bill paid only online is a sale of the shift, but not in the drawer methods', () => {
+    const s = salesSummary(
+      [{ type: 'RECEIPT', method: 'CASH', amountCents: 4000, orderSessionId: 's1' }],
+      [{ orderSessionId: 's2', cents: 110 }],
+    );
+    expect(s.salesCount).toBe(2);
+    expect(s.totalCents).toBe(4110);
+    expect(s.averageTicketCents).toBe(2055);
+    expect(s.byMethod).toMatchObject({ CASH: 4000, PIX: 0 });
+  });
+
+  it('a bill paid part at the counter and part by phone counts once', () => {
+    const s = salesSummary(
+      [{ type: 'RECEIPT', method: 'CASH', amountCents: 2000, orderSessionId: 's1' }],
+      [{ orderSessionId: 's1', cents: 1000 }],
+    );
+    expect(s.salesCount).toBe(1);
+    expect(s.totalCents).toBe(3000);
+  });
+
+  it('a refunded online payment (0 left) is no sale', () => {
+    const s = salesSummary([], [{ orderSessionId: 's3', cents: 0 }]);
+    expect(s.salesCount).toBe(0);
+    expect(s.totalCents).toBe(0);
+  });
+});

@@ -125,8 +125,10 @@ export interface SalesSummary { byMethod: ByMethod; salesCount: number; totalCen
  * What the shift sold, per method: every money line of a sale (receipt, change, refund, and the change
  * given back when a bill is reopened) with its effect. A sale is a comanda whose net is above zero, so a
  * bill reopened and not closed again is no sale, and one closed again counts once.
+ * `online` are the payments made by phone at the table and applied to bills of this shift (what is left
+ * after refunds): they count in the sales and the ticket, never in the drawer methods.
  */
-export function salesSummary(entries: EntryLike[]): SalesSummary {
+export function salesSummary(entries: EntryLike[], online: Array<{ orderSessionId: string; cents: number }> = []): SalesSummary {
   const byMethod = emptyByMethod();
   const netBySale = new Map<string, number>();
   for (const e of entries) {
@@ -136,7 +138,12 @@ export function salesSummary(entries: EntryLike[]): SalesSummary {
     byMethod[e.method] += effect;
     netBySale.set(e.orderSessionId, (netBySale.get(e.orderSessionId) ?? 0) + effect);
   }
-  const totalCents = CASH_METHODS.reduce((s, m) => s + byMethod[m], 0);
+  let onlineCents = 0;
+  for (const p of online) {
+    onlineCents += p.cents;
+    netBySale.set(p.orderSessionId, (netBySale.get(p.orderSessionId) ?? 0) + p.cents);
+  }
+  const totalCents = CASH_METHODS.reduce((s, m) => s + byMethod[m], 0) + onlineCents;
   const salesCount = [...netBySale.values()].filter((net) => net > 0).length;
   return { byMethod, salesCount, totalCents, averageTicketCents: salesCount ? Math.round(totalCents / salesCount) : 0 };
 }

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { CASH_METHODS, METHOD_KEY, METHOD_LABEL, type CashMethod } from './payment-methods';
 import { salesSummary, type EntryType } from './rules';
 import { ENTRY_TYPE_LABEL } from './labels';
+import { tableOnlineOf } from './table-online';
 
 async function nameOf(userId: string | null) {
   if (!userId) return null;
@@ -40,7 +41,11 @@ export async function buildCashCloseTicket(restaurantId: string, sessionId: stri
   const expected = (s.expectedCents ?? {}) as Record<string, number>;
   const counted = (s.countedCents ?? {}) as Record<string, number>;
   const difference = (s.differenceCents ?? {}) as Record<string, number>;
-  const sales = salesSummary(s.entries.map((e) => ({ type: e.type as EntryType, method: e.method as CashMethod, amountCents: e.amountCents, direction: e.direction as any, orderSessionId: e.orderSessionId })));
+  const online = await tableOnlineOf(restaurantId, s.id);
+  const sales = salesSummary(
+    s.entries.map((e) => ({ type: e.type as EntryType, method: e.method as CashMethod, amountCents: e.amountCents, direction: e.direction as any, orderSessionId: e.orderSessionId })),
+    online.perBill,
+  );
   return {
     restaurantName: restaurant?.name ?? '',
     registerName: s.cashRegister.name,

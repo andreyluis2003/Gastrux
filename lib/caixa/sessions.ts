@@ -7,7 +7,7 @@ import {
   CashRuleError, EXPENSE_CATEGORIES, differenceByMethod, expectedByMethod, methodsOverAlert, parseAmountCents,
   parseCountedCents, salesSummary, type EntryLike, type EntryType, type SalesSummary,
 } from './rules';
-import { onlinePaidCents } from '@/lib/comanda/bill';
+import { splitTableOnline, tableOnlineOf, TABLE_ONLINE_SELECT, TABLE_ONLINE_WHERE } from './table-online';
 import { isManager } from './roles';
 import { alertCashDifference } from './alerts';
 
@@ -228,21 +228,6 @@ async function onlineDuring(restaurantId: string, from: Date, to: Date) {
   return { revenue: s.revenue, paidCount: s.paidCount };
 }
 
-/** Pay at the table (spec 2026-10-10 §5.2): online payments applied to bills while this shift was open. Never in the drawer. */
-async function tableOnlineOf(restaurantId: string, cashSessionId: string) {
-  const rows = await prisma.payment.findMany({
-    where: { restaurantId, cashSessionId, appliedToBillAt: { not: null } },
-    select: { method: true, amount: true, amountRefunded: true, status: true },
-  });
-  let pixCents = 0;
-  let cardCents = 0;
-  for (const p of rows) {
-    const cents = onlinePaidCents(p);
-    if (p.method === 'PIX') pixCents += cents; else cardCents += cents;
-  }
-  return { pixCents, cardCents };
-}
-
 export async function getSessionView(member: RestaurantMember, sessionId: string): Promise<SessionView | null> {
   let session;
   try { session = await loadSession(member, sessionId); } catch (e) { if (e instanceof CashRuleError && e.status === 404) return null; throw e; }
@@ -252,6 +237,7 @@ export async function getSessionView(member: RestaurantMember, sessionId: string
   // Blind close (spec rule 5): a cashier never sees the expected amounts of an open shift
   const showExpected = !open || isManager(member.role);
   const end = session.closedAt ?? new Date();
+  const tableOnline = await tableOnlineOf(member.restaurantId, session.id);
   return {
     session: { id: session.id, status: session.status, openedAt: session.openedAt.toISOString(), closedAt: session.closedAt?.toISOString() ?? null, openingFloatCents: session.openingFloatCents, lateEntries: session.lateEntries, closingNotes: session.closingNotes },
     register: session.cashRegister,
@@ -262,9 +248,9 @@ export async function getSessionView(member: RestaurantMember, sessionId: string
       category: e.category, description: e.description, orderSessionId: e.orderSessionId, createdByName: names.get(e.createdById) ?? null,
       afterClose: e.afterClose, createdAt: e.createdAt.toISOString(),
     })),
-    sales: salesSummary(likes),
+    sales: salesSummary(likes, tableOnline.perBill),
     online: await onlineDuring(member.restaurantId, session.openedAt, end),
-    tableOnline: await tableOnlineOf(member.restaurantId, session.id),
+    tableOnline: tableOnline.totals,
     expected: showExpected ? (open ? toKeyed(expectedByMethod(session.openingFloatCents, likes)) : (session.expectedCents as Keyed)) : null,
     counted: (session.countedCents as Keyed) ?? null,
     difference: (session.differenceCents as Keyed) ?? null,
@@ -288,7 +274,7 @@ export async function listSessions(restaurantId: string, filter: { from?: Date; 
     },
     orderBy: { openedAt: 'desc' },
     take: 200,
-    include: { cashRegister: { select: { name: true } }, entries: true },
+    include: { cashRegister: { select: { name: true } }, entries: true, onlinePayments: { where: TABLE_ONLINE_WHERE, select: TABLE_ONLINE_SELECT } },
   });
   const names = await userNames(sessions.flatMap((s) => [s.openedById, s.closedById]));
   return sessions.map((s) => ({
@@ -299,7 +285,7 @@ export async function listSessions(restaurantId: string, filter: { from?: Date; 
     closedAt: s.closedAt?.toISOString() ?? null,
     openedByName: names.get(s.openedById) ?? null,
     closedByName: s.closedById ? names.get(s.closedById) ?? null : null,
-    salesCents: salesSummary(s.entries.map(asLike)).totalCents,
+    salesCents: salesSummary(s.entries.map(asLike), splitTableOnline(s.onlinePayments).perBill).totalCents,
     differenceCents: (s.differenceCents as Keyed) ?? null,
     lateEntries: s.lateEntries,
   }));
