@@ -28,6 +28,8 @@ export interface ComandaSession {
   tableNumber?: number | null;
   table?: { number: number; section?: { name: string } } | null;
   user?: { name: string | null } | null;
+  /** The table tapped "Pagar com o garçom" (pay at the table); cleared by a payment, the close or "Atendido" */
+  payAtWaiterRequestedAt?: string | null;
   items: ComandaLine[];
 }
 export interface Modifier { id: string; name: string; category?: string | null; priceAdjustment: number }

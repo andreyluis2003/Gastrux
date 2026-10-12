@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { ArrowLeft, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { brl } from '@/components/caixa/money';
@@ -12,7 +13,7 @@ import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
 import { MesaActions } from '@/components/vender/mesa-actions';
 import { ReopenBill } from '@/components/vender/reopen-bill';
-import { isUnsent, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
+import { isUnsent, openFor, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
 
@@ -25,6 +26,7 @@ export default function ComandaRapidaPage() {
   const [showList, setShowList] = useState(false);
   const [showConta, setShowConta] = useState(false);
   const [desktop, setDesktop] = useState(true);
+  const [attending, setAttending] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP);
@@ -50,6 +52,19 @@ export default function ComandaRapidaPage() {
     window.addEventListener('pagehide', onHide);
     return () => { window.removeEventListener('pagehide', onHide); void releaseIfEmpty(); };
   }, [releaseIfEmpty]);
+  // "Atendido" (owner, 2026-10-12): the staff went to the table; the call leaves the map without a payment
+  async function markAttended() {
+    setAttending(true);
+    try {
+      const res = await fetch(`/api/comanda/sessions/${sessionId}/waiter-attended`, { method: 'POST' });
+      if (!res.ok) { toast.error((await res.json().catch(() => ({}))).error || 'Não foi possível marcar como atendido'); return; }
+      c.refresh();
+    } catch {
+      toast.error('Sem conexão: tente de novo');
+    } finally {
+      setAttending(false);
+    }
+  }
   async function backToSalao() {
     await releaseIfEmpty();
     router.push('/vender');
@@ -109,6 +124,14 @@ export default function ComandaRapidaPage() {
           </div>
         )}
       </div>
+
+      {/* Pay at the table: the table asked for the waiter to pay; "Atendido" dismisses it without a payment */}
+      {s.payAtWaiterRequestedAt && !c.isClosed && (
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+          <span className="font-semibold">Esta mesa chamou o garçom para pagar · {openFor(s.payAtWaiterRequestedAt, new Date())}</span>
+          <Button size="sm" variant="outline" disabled={attending} onClick={markAttended}>Atendido</Button>
+        </div>
+      )}
 
       {(c.staleSince || !c.online) && (
         <div role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-4 py-3 text-sm">
