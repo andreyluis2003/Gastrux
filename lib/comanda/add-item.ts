@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 
 /**
  * Adds one line to a comanda. The price always comes from the restaurant's menu (menu item price,
@@ -44,6 +45,8 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
   let price: number | null = null;
 
   if (input.menuItemId) {
+    // A menu item without a ficha técnica sells too: it gets its ficha simples here (lib/cardapio/product-recipe.ts)
+    await ensureMenuItemRecipes(db, restaurantId, [input.menuItemId]);
     const menuItem = await db.menuItem.findFirst({
       where: { id: input.menuItemId, restaurantId },
       include: { recipe: { select: { id: true } } },
@@ -122,6 +125,8 @@ export async function addOrMergeComandaItem(restaurantId: string, sessionId: str
     await assertOpen(tx, restaurantId, sessionId);
     const plain = !(input.modifierIds ?? []).length && !String(input.specialInstructions ?? '').trim();
     if (plain && input.menuItemId) {
+      // Linked first, so the second tap on a soda merges like any item
+      await ensureMenuItemRecipes(tx, restaurantId, [input.menuItemId]);
       const menuItem = await tx.menuItem.findFirst({ where: { id: input.menuItemId, restaurantId }, select: { recipeId: true, price: true } });
       if (menuItem?.recipeId) {
         const target = await tx.orderSessionItem.findFirst({

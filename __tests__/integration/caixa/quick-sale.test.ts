@@ -103,4 +103,17 @@ describe('counter sale records its payments in the shift', () => {
     expect((await prisma.orderSession.findUnique({ where: { id: clientId } })).status).toBe('CLOSED');
     expect(await linesOf(clientId)).toHaveLength(1);
   });
+
+  it('sells a menu item without a ficha técnica (a soda): it gets a ficha simples (2026-10-12)', async () => {
+    const cat = await prisma.menuCategory.create({ data: { restaurantId: A.restaurantId, name: `Bebidas ${tag}`, position: 9, active: true } });
+    const soda = await prisma.menuItem.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, name: `Refri ${tag}`, price: 6, position: 0 } });
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    const clientId = `bal-${crypto.randomUUID()}`;
+    const res = await sale({ clientId, items: [{ menuItemId: soda.id, quantity: 2 }], cashSessionId: session.id, payments: [{ method: 'pix', amount: 12 }] });
+    expect(res.status).toBe(201);
+    const line = await prisma.orderSessionItem.findFirst({ where: { sessionId: clientId }, include: { recipe: true } });
+    expect(line.recipe.name).toBe(`Refri ${tag}`);
+    expect(Number(line.price)).toBe(6);
+    expect((await prisma.menuItem.findUnique({ where: { id: soda.id } })).recipeId).toBe(line.recipeId);
+  });
 });

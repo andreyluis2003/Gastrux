@@ -107,6 +107,16 @@ describe('POST /api/public/delivery/order - payment choice', () => {
     expect(await customerCount()).toBe(customersBefore + 1);
   });
 
+  it('takes a drink without a ficha técnica: it gets a ficha simples (2026-10-12)', async () => {
+    const category = await prisma.menuCategory.findFirst({ where: { restaurantId: A.restaurantId } });
+    const soda = await prisma.menuItem.create({ data: { restaurantId: A.restaurantId, categoryId: category.id, name: 'Refri lata', price: 6, active: true, available: true } });
+    const res = await post(body({ paymentMethod: 'CREDIT_ON_DELIVERY', items: [{ menuItemId: soda.id, quantity: 1 }] }));
+    expect(res.status).toBe(200);
+    const linked = await prisma.menuItem.findUnique({ where: { id: soda.id } });
+    expect(linked.recipeId).not.toBeNull();
+    expect(await prisma.orderItem.count({ where: { recipeId: linked.recipeId, order: { restaurantId: A.restaurantId } } })).toBe(1);
+  });
+
   it('cannot lower the total with a negative, zero, fractional or non-numeric quantity', async () => {
     for (const quantity of [-5, 0, -0.5, 'abc', null]) {
       const res = await post(body({ paymentMethod: 'CREDIT_ON_DELIVERY', items: [{ menuItemId: itemA, quantity }] }));

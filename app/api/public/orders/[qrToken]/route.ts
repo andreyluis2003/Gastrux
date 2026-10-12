@@ -2,6 +2,7 @@
 // No authentication required - creates or appends items to an active OrderSession
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { OPEN_STATUSES as OPEN } from '@/lib/comanda/transfer';
 
@@ -74,6 +75,8 @@ export async function POST(
 
     // Load menu items to get price + recipeId mapping
     const menuItemIds = items.map((i: any) => i.menuItemId).filter(Boolean);
+    // Items without a ficha técnica get their ficha simples before the check below (2026-10-12)
+    await ensureMenuItemRecipes(prisma, table.restaurantId, menuItemIds.filter((id: unknown) => typeof id === 'string'));
     const menuItems = await prisma.menuItem.findMany({
       // Only this table's restaurant: a QR order took any restaurant's item, price and recipe (2026-10-07)
       where: { id: { in: menuItemIds }, restaurantId: table.restaurantId, active: true, available: true },

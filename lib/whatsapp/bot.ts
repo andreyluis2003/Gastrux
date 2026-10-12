@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { MetaCloudClient, normalizePhone } from './meta-client';
 import { sendSessionToKitchen } from '@/lib/kds/send-session';
 import type { WhatsAppConversation, WhatsAppConfig } from '@prisma/client';
@@ -554,14 +555,17 @@ async function handleConfirmOrder(ctx: BotContext) {
     return safeSendText(ctx, '😓 Não conseguimos processar seu pedido. Tente novamente.');
   }
 
-  // Map MenuItem → recipeId
+  // Map MenuItem → recipeId (items without a ficha técnica get their ficha simples first, 2026-10-12)
   const menuItemIds = cart.map((c) => c.menuItemId);
+  await ensureMenuItemRecipes(prisma, ctx.restaurantId, menuItemIds);
   const menuItems = await prisma.menuItem.findMany({
-    where: { id: { in: menuItemIds } },
+    // Only this restaurant's items: the lookup had no restaurant filter (an item of another restaurant was accepted)
+    where: { id: { in: menuItemIds }, restaurantId: ctx.restaurantId },
     select: { id: true, recipeId: true, name: true, price: true },
   });
   const missing = menuItems.filter((mi) => !mi.recipeId);
-  if (missing.length > 0) {
+  const unknown = new Set(menuItemIds).size > menuItems.length;
+  if (missing.length > 0 || unknown) {
     return safeSendText(
       ctx,
       `😓 Alguns itens não estão disponíveis agora: ${missing.map((m) => m.name).join(', ')}. Por favor, escolha outros itens.`,

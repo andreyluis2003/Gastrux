@@ -49,4 +49,14 @@ describe('QR-code order on a table', () => {
     const res = await order([{ menuItemId: theirs, quantity: 1 }]);
     expect(res.status).toBe(400);
   });
+
+  it('a QR order takes a drink without a ficha técnica (2026-10-12)', async () => {
+    const cat = await prisma.menuCategory.findFirst({ where: { restaurantId: rid } });
+    const soda = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: `Refri ${tag}`, price: 6, position: 5 } });
+    const res = await order([{ menuItemId: soda.id, quantity: 1 }]);
+    expect(res.status).toBeLessThan(300);
+    const linked = await prisma.menuItem.findUnique({ where: { id: soda.id } });
+    expect(linked.recipeId).not.toBeNull();
+    expect(await prisma.orderSessionItem.count({ where: { recipeId: linked.recipeId } })).toBe(1);
+  });
 });

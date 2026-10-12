@@ -1,6 +1,7 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery-payments/choice';
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
     // Resolve menu items and compute totals (scoped to this restaurant - a
     // client could otherwise mix in another restaurant's menuItemIds/prices)
     const menuItemIds = items.map((i: any) => i.menuItemId);
+    // Items without a ficha técnica get their ficha simples first (2026-10-12)
+    await ensureMenuItemRecipes(prisma, restaurantId, menuItemIds.filter((id: unknown) => typeof id === 'string'));
     const menuItems = await prisma.menuItem.findMany({
       where: { id: { in: menuItemIds }, restaurantId, active: true, available: true },
       include: { images: { take: 1 } },
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // OrderItem.recipeId is required (no menuItemId fallback on that model),
+    // Safety net after the ficha simples above: OrderItem.recipeId is required (no menuItemId fallback),
     // so any requested menu item without a linked recipe cannot become a
     // kitchen-visible line item. Silently dropping it would still charge the
     // customer for something the kitchen never sees - refuse instead.

@@ -56,4 +56,33 @@ describe('WhatsApp order: confirmed order reaches the kitchen', () => {
     expect(comanda.orderId).toBe(orders[0].id);
     expect(sent.some((b) => b.includes('Pedido confirmado'))).toBe(true);
   });
+
+  // The conversation goes back to "confirming" with a new cart, as a customer ordering again
+  const confirmWith = async (cart) => {
+    await prisma.whatsAppConversation.updateMany({ where: { restaurantId: rid, phoneNumber: phone }, data: { state: 'CONFIRMING', orderType: 'DELIVERY', deliveryAddress: 'Rua A, 1', cart, cartTotal: 6 } });
+    await handleInboundMessage(rid, { from: phone, buttonId: 'BTN_CONFIRM_ORDER', waMessageId: `wamid-${crypto.randomBytes(4).toString('hex')}` });
+  };
+
+  it('takes a drink without a ficha técnica: it gets a ficha simples (2026-10-12)', async () => {
+    const cat = await prisma.menuCategory.findFirst({ where: { restaurantId: rid } });
+    const soda = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: 'Refri', price: 6, position: 1 } });
+    await confirmWith([{ menuItemId: soda.id, name: 'Refri', quantity: 1, price: 6 }]);
+    const linked = await prisma.menuItem.findUnique({ where: { id: soda.id } });
+    expect(linked.recipeId).not.toBeNull();
+    expect(await prisma.orderSessionItem.count({ where: { recipeId: linked.recipeId } })).toBe(1);
+  });
+
+  it('never takes a menu item of another restaurant (the lookup had no restaurant filter)', async () => {
+    const other = (await prisma.restaurant.create({ data: { name: `WakO ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    try {
+      const recipeId = (await prisma.recipe.create({ data: { restaurantId: other, code: `WO${tag}`, name: 'Alheio', baseYield: 1, yieldUnit: 'un', portionUnit: 'un' } })).id;
+      const cat = await prisma.menuCategory.create({ data: { restaurantId: other, name: 'X', position: 0, active: true } });
+      const theirs = await prisma.menuItem.create({ data: { restaurantId: other, categoryId: cat.id, name: 'Alheio', price: 6, recipeId, position: 0 } });
+      const before = await prisma.orderSessionItem.count({ where: { recipeId } });
+      await confirmWith([{ menuItemId: theirs.id, name: 'Alheio', quantity: 1, price: 6 }]);
+      expect(await prisma.orderSessionItem.count({ where: { recipeId } })).toBe(before);
+    } finally {
+      try { await prisma.restaurant.delete({ where: { id: other } }); } catch {}
+    }
+  });
 });
