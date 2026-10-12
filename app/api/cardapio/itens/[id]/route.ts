@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { ensureMenuItemRecipes, syncProductRecipe } from '@/lib/cardapio/product-recipe';
+import { ensureMenuItemRecipes, isProductRecipe, retireProductRecipe, syncProductRecipe } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
@@ -59,13 +59,17 @@ export async function PUT(
     }
     const existingItem = await prisma.menuItem.findFirst({
       where: { id: params.id, restaurantId },
-      select: { id: true },
+      select: { id: true, recipeId: true, recipe: { select: { code: true, _count: { select: { ingredients: true } } } } },
     });
     if (!existingItem) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 });
     }
 
     const body = await req.json();
+    // "Sem ficha técnica" on an item already on its ficha simples keeps that ficha (no new one each save)
+    if (body.recipeId !== undefined && !body.recipeId && existingItem.recipe && isProductRecipe(existingItem.recipe)) {
+      delete body.recipeId;
+    }
     const { name, description, price, available, position, displayOnQR, displayOnWeb, recipeId, categoryId } = body;
 
     if (recipeId) {
@@ -100,6 +104,8 @@ export async function PUT(
     // item's name and price (the comanda, the kitchen and the cupom show the ficha's name) (2026-10-12)
     await ensureMenuItemRecipes(prisma, restaurantId, [params.id]);
     await syncProductRecipe(prisma, restaurantId, params.id);
+    // Moved to another ficha: its former ficha simples, if no other item uses it, leaves the lists
+    await retireProductRecipe(prisma, restaurantId, existingItem.recipeId);
     const item = await prisma.menuItem.findUnique({ where: { id: params.id }, include: { category: true, images: true } });
 
     return NextResponse.json(item);
@@ -127,16 +133,18 @@ export async function DELETE(
     }
     const existingItem = await prisma.menuItem.findFirst({
       where: { id: params.id, restaurantId },
-      select: { id: true },
+      select: { id: true, recipeId: true },
     });
     if (!existingItem) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 });
     }
 
-    const item = await prisma.menuItem.update({
+    await prisma.menuItem.update({
       where: { id: params.id },
       data: { active: false },
     });
+    // Its ficha simples, if no other item uses it, leaves the Fichas técnicas list and the reports
+    await retireProductRecipe(prisma, restaurantId, existingItem.recipeId);
 
     return NextResponse.json({ message: 'Menu item deleted' });
   } catch (error) {

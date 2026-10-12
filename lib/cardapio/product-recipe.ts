@@ -1,6 +1,9 @@
 import { randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { isProductRecipe } from './is-product-recipe';
+
+export { isProductRecipe };
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -67,7 +70,9 @@ export async function syncProductRecipe(db: Db, restaurantId: string, menuItemId
     where: { id: menuItemId, restaurantId },
     select: { name: true, description: true, price: true, recipe: { select: { id: true, code: true, _count: { select: { ingredients: true } } } } },
   });
-  if (!mi?.recipe || !mi.recipe.code.startsWith('PROD-') || mi.recipe._count.ingredients > 0) return;
+  if (!mi?.recipe || !isProductRecipe(mi.recipe)) return;
+  // Shared with another item (linked by hand to its ficha simples): that item's name stays
+  if ((await db.menuItem.count({ where: { recipeId: mi.recipe.id, restaurantId, NOT: { id: menuItemId } } })) > 0) return;
   await db.recipe.update({
     where: { id: mi.recipe.id },
     data: { name: mi.name, description: mi.description, sellingPrice: Number(mi.price) || 0 },
@@ -82,3 +87,20 @@ export async function syncProductRecipe(db: Db, restaurantId: string, menuItemId
 export const OWN_RECIPE_WHERE: Prisma.RecipeWhereInput = {
   NOT: { code: { startsWith: 'PROD-' }, ingredients: { none: {} } },
 };
+
+
+/**
+ * A ficha simples no active menu item uses any more (its item moved to a real ficha técnica, or was
+ * removed) leaves the Fichas técnicas list and the reports: set inactive, never deleted (past sale
+ * lines point to it). Final review 2026-10-12.
+ */
+export async function retireProductRecipe(db: Db, restaurantId: string, recipeId: string | null | undefined) {
+  if (!recipeId) return;
+  const recipe = await db.recipe.findFirst({
+    where: { id: recipeId, restaurantId, active: true },
+    select: { id: true, code: true, _count: { select: { ingredients: true } } },
+  });
+  if (!recipe || !isProductRecipe(recipe)) return;
+  if ((await db.menuItem.count({ where: { recipeId, restaurantId, active: true } })) > 0) return;
+  await db.recipe.update({ where: { id: recipeId }, data: { active: false } });
+}

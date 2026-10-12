@@ -13,7 +13,7 @@ import { seedStarterTemplate } from '../../../lib/onboarding/seed-template';
 import { checkTierLimit } from '../../../lib/tier-guard';
 import { getDashboardStats } from '../../../lib/dashboard/stats';
 import { POST as createRoute } from '../../../app/api/cardapio/itens/route';
-import { PUT as updateRoute } from '../../../app/api/cardapio/itens/[id]/route';
+import { PUT as updateRoute, DELETE as deleteRoute } from '../../../app/api/cardapio/itens/[id]/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -122,5 +122,47 @@ describe('ficha simples', () => {
     } finally {
       await prisma.restaurant.delete({ where: { id: lim } });
     }
+  });
+
+  describe('no orphan fichas simples (final review)', () => {
+    const simpleOf = async (id) => (await prisma.menuItem.findUnique({ where: { id }, include: { recipe: true } })).recipe;
+    const realFicha = (name) => prisma.recipe.create({ data: { restaurantId: rid, code: `RF-${crypto.randomBytes(3).toString('hex')}`, name, baseYield: 1, yieldUnit: 'un', portionUnit: 'un' } });
+
+    it('linking the item to a real ficha retires its ficha simples', async () => {
+      as(ownerId, rid);
+      const created = await (await createItem({ categoryId: cat.id, name: `Burger ${tag}`, price: 30 })).json();
+      const simple = await simpleOf(created.id);
+      const real = await realFicha('Burger da cozinha');
+      await updateItem(created.id, { recipeId: real.id });
+      expect((await prisma.recipe.findUnique({ where: { id: simple.id } })).active).toBe(false);
+    });
+
+    it('"Sem ficha técnica" on an item already on its ficha simples keeps that same ficha', async () => {
+      as(ownerId, rid);
+      const created = await (await createItem({ categoryId: cat.id, name: `Gelo ${tag}`, price: 2 })).json();
+      const before = await simpleOf(created.id);
+      await updateItem(created.id, { recipeId: '' });
+      const after = await simpleOf(created.id);
+      expect(after.id).toBe(before.id);
+      expect(after.active).toBe(true);
+    });
+
+    it('renaming an item never renames a ficha simples another item also uses', async () => {
+      as(ownerId, rid);
+      const y = await (await createItem({ categoryId: cat.id, name: `Limonada ${tag}`, price: 8 })).json();
+      const x = await (await createItem({ categoryId: cat.id, name: `Outro ${tag}`, price: 9 })).json();
+      const ySimple = await simpleOf(y.id);
+      await updateItem(x.id, { recipeId: ySimple.id });
+      await updateItem(x.id, { name: `Renomeado ${tag}` });
+      expect((await prisma.recipe.findUnique({ where: { id: ySimple.id } })).name).toBe(`Limonada ${tag}`);
+    });
+
+    it('removing an item retires its ficha simples', async () => {
+      as(ownerId, rid);
+      const created = await (await createItem({ categoryId: cat.id, name: `Sai ${tag}`, price: 3 })).json();
+      const simple = await simpleOf(created.id);
+      expect((await deleteRoute(json('DELETE', {}), { params: { id: created.id } })).status).toBeLessThan(300);
+      expect((await prisma.recipe.findUnique({ where: { id: simple.id } })).active).toBe(false);
+    });
   });
 });

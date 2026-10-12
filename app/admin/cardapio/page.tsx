@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { brl } from '@/components/caixa/money';
+import { isProductRecipe } from '@/lib/cardapio/is-product-recipe';
 import { Plus, Trash2, Edit2, Eye, EyeOff, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -39,6 +40,8 @@ interface MenuItem {
 }
 
 interface Recipe {
+  code: string;
+  ingredients?: unknown[];
   id: string;
   name: string;
   sellingPrice?: string | number | null;
@@ -91,7 +94,8 @@ export default function AdminCardapioPage() {
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.recipes || [];
-        setRecipes(list);
+        // Fichas simples (made for an item sold without a ficha técnica) are not offered to link other items
+        setRecipes(list.filter((r: Recipe) => !isProductRecipe(r)));
       }
     } catch (err) {
       console.error(err);
