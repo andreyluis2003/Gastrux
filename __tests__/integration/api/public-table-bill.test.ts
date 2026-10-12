@@ -71,6 +71,17 @@ describe('public table bill and pay', () => {
     expect(JSON.stringify(body)).not.toMatch(/Segredo|userId|restaurantId|cashSession/);
   });
 
+  it('the table reads the name it ordered from the menu, not the kitchen recipe name (2026-10-12)', async () => {
+    const cat = await prisma.menuCategory.create({ data: { restaurantId: A.restaurantId, name: `Cat ${tag}` } });
+    await prisma.menuItem.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, name: 'Hambúrguer da Casa', price: 25, position: 0, recipeId: burger.id } });
+    const s = await open(A.restaurantId, tableA);
+    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: burger.id, price: 25, quantity: 1 } });
+    const body = await (await bill(tableA.qrToken)).json();
+    expect(body.items.map((i) => i.name)).toEqual(['Hambúrguer da Casa']);
+    await prisma.menuItem.deleteMany({ where: { categoryId: cat.id } });
+    await prisma.menuCategory.delete({ where: { id: cat.id } });
+  });
+
   it('closed while the screen is open: the session of this table says CLOSED with the NFC-e link; another table\'s session says NONE', async () => {
     const s = await open(A.restaurantId, tableA, { status: 'CLOSED', closedAt: new Date() });
     // NFeDocument has no restaurantId of its own: the restaurant comes through its fiscal config

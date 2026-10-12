@@ -13,6 +13,8 @@ import { statusPollUrl } from '@/lib/delivery-payments/return-params';
 const KEY_STORAGE = 'gastrux-payer-key';
 /** The comanda a phone was paying when it left for the card checkout (per table) */
 const SESSION_STORAGE = 'gastrux-paying-session:';
+/** The amount of the card part being paid, for the confirmation line on the way back */
+const AMOUNT_STORAGE = 'gastrux-paying-cents:';
 
 /** The random key of this phone: kept in the browser so a reload keeps its PIX; in memory when storage is blocked */
 function payerKey(): string {
@@ -112,7 +114,10 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
         const data = await res.json();
         if (!stopped && data.approved) {
           clearInterval(t);
-          toast.success('Pagamento com cartão confirmado.');
+          // The same green line as a PIX: the amount was kept before leaving for Mercado Pago
+          let cents = 0;
+          try { cents = Number(sessionStorage.getItem(AMOUNT_STORAGE + qrToken)) || 0; } catch { /* blocked storage */ }
+          if (cents > 0) setPaid({ cents }); else toast.success('Pagamento com cartão confirmado.');
           setCheckingCard(null);
           load();
         }
@@ -172,7 +177,10 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
         if (!res.ok || !data.initPoint) { toast.error(data.error || 'Não foi possível abrir o pagamento com cartão'); load(); return; }
         // Leaves the page: the customer pays at Mercado Pago and comes back to /menu/<qrToken>?payment=...
         // The comanda is kept for the way back: if this part closed the bill, the screen says "Conta paga"
-        try { if (sessionRef.current) sessionStorage.setItem(SESSION_STORAGE + qrToken, sessionRef.current); } catch { /* blocked storage */ }
+        try {
+          if (sessionRef.current) sessionStorage.setItem(SESSION_STORAGE + qrToken, sessionRef.current);
+          sessionStorage.setItem(AMOUNT_STORAGE + qrToken, String(Math.round(Number(data.amount) * 100)));
+        } catch { /* blocked storage */ }
         leaving = true;
         window.location.href = data.initPoint;
         return;
@@ -266,6 +274,11 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
         <div className="flex justify-between font-bold"><span>Falta pagar</span><span>{reais(open.remainingCents)}</span></div>
       </div>
 
+      {/* After a confirmed payment the same part is not offered again: another part is a choice of its own */}
+      {paid ? (
+        <Button variant="outline" className="w-full" onClick={() => { setPaid(null); setMode('ALL'); }}>Pagar outra parte</Button>
+      ) : (
+      <>
       <div className="space-y-2">
         <p className="text-sm font-medium">Quanto você vai pagar?</p>
         <div className="grid grid-cols-3 gap-2">
@@ -302,6 +315,8 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : method === 'PIX' ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
         {preview?.ok ? `Pagar ${reais(preview.cents)} com ${method === 'PIX' ? 'Pix' : 'cartão'}` : `Pagar com ${method === 'PIX' ? 'Pix' : 'cartão'}`}
       </Button>
+      </>
+      )}
       <Button variant="ghost" className="w-full" disabled={waiterBusy} onClick={callWaiter}>Pagar com o garçom</Button>
     </>
   );

@@ -53,6 +53,6 @@ export async function POST(req: NextRequest, { params }: { params: { qrToken: st
     return NextResponse.json({ success: true, ...result.pix, sessionId: resolved.target.sessionId });
   } catch (error) {
     console.error('[table pay] failed:', error);
-    return NextResponse.json({ error: 'Não foi possível gerar o Pix. Tente de novo.' }, { status: 500 });
+    return NextResponse.json({ error: 'Não foi possível iniciar o pagamento. Tente de novo.' }, { status: 500 });
   }
 }

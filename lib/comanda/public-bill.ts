@@ -16,12 +16,13 @@ export interface PublicOpenBill {
 }
 export type PublicTableBill = PublicOpenBill | { status: 'CLOSED'; sessionId: string; nfceUrl: string | null } | { status: 'NONE' };
 
-export function toPublicBill(bill: Bill): PublicOpenBill {
+/** `names`: the menu name of each line (by line id), when the line's recipe is on the menu under another name */
+export function toPublicBill(bill: Bill, names: Map<string, string> = new Map()): PublicOpenBill {
   return {
     status: 'OPEN',
     sessionId: bill.sessionId,
     label: bill.label,
-    items: bill.items.map((i) => ({ name: i.name, quantity: i.quantity, totalCents: i.totalCents })),
+    items: bill.items.map((i) => ({ name: names.get(i.id) ?? i.name, quantity: i.quantity, totalCents: i.totalCents })),
     subtotalCents: bill.subtotalCents,
     serviceCents: bill.serviceCents,
     servicePercent: bill.percent,

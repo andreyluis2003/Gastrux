@@ -85,7 +85,10 @@ describe('cash register races', () => {
     const body = { status: 'OPEN', cashSessionId: session.id, reason: 'cliente pediu mais' };
     const statuses = (await Promise.all([put(s.id, body), put(s.id, body)])).map((r) => r.status).sort();
 
-    expect(statuses).toEqual([200, 422]);
+    // At the same instant the second is refused (422); when it lands after the first committed it finds the
+    // bill already open and changes nothing (200). Either way the money goes back once.
+    expect(statuses[0]).toBe(200);
+    expect([200, 422]).toContain(statuses[1]);
     expect(await prisma.cashSessionEntry.count({ where: { orderSessionId: s.id, type: 'REFUND' } })).toBe(1);
   });
 });

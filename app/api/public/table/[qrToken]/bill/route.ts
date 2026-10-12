@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { qrToken: str
   });
   if (session) {
     const bill = await loadBill(prisma, table.restaurantId, session.id);
-    if (bill && bill.items.length) return NextResponse.json(toPublicBill(bill) satisfies PublicTableBill, { headers: noStore });
+    if (bill && bill.items.length) return NextResponse.json(toPublicBill(bill, await menuNames(table.restaurantId, bill.items.map((i) => i.id))) satisfies PublicTableBill, { headers: noStore });
   }
 
   const asked = new URL(req.url).searchParams.get('session');
@@ -49,4 +49,23 @@ export async function GET(req: NextRequest, { params }: { params: { qrToken: str
   }
   const none: PublicTableBill = { status: 'NONE' };
   return NextResponse.json(none, { headers: noStore });
+}
+
+/**
+ * The table ordered from the menu: each line shows the menu name of its recipe (2026-10-12: the bill said
+ * "Salada Mista", the recipe, for the menu's "Teste R$ 1"). Lines whose recipe is not on the menu keep the
+ * recipe name. An active menu item wins; among several, the one shown on the QR menu.
+ */
+async function menuNames(restaurantId: string, lineIds: string[]): Promise<Map<string, string>> {
+  const lines = await prisma.orderSessionItem.findMany({ where: { id: { in: lineIds } }, select: { id: true, recipeId: true } });
+  const items = await prisma.menuItem.findMany({
+    where: { restaurantId, active: true, recipeId: { in: [...new Set(lines.map((l) => l.recipeId))] } },
+    select: { recipeId: true, name: true, displayOnQR: true },
+    orderBy: { displayOnQR: 'desc' },
+  });
+  const byRecipe = new Map<string, string>();
+  for (const m of items) if (m.recipeId && !byRecipe.has(m.recipeId)) byRecipe.set(m.recipeId, m.name);
+  const names = new Map<string, string>();
+  for (const l of lines) { const n = byRecipe.get(l.recipeId); if (n) names.set(l.id, n); }
+  return names;
 }

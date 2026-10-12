@@ -124,7 +124,9 @@ export function KDSOrderCard({
 
   const completedItems = order.items.filter((i) => i.status === 'COMPLETED')
     .length;
-  const progress = (completedItems / order.totalItems) * 100;
+  // An item withdrawn from the comanda (CANCELADO) is not to be made: it does not count in the total
+  const liveItems = order.items.filter((i) => i.status !== 'CANCELLED').length;
+  const progress = liveItems ? (completedItems / liveItems) * 100 : 0;
 
   return (
     <Card
@@ -164,7 +166,7 @@ export function KDSOrderCard({
       <div className="mb-3">
         <div className="flex items-center justify-between text-sm mb-1">
           <span className="text-gray-600">
-            {completedItems}/{order.totalItems} itens
+            {completedItems}/{liveItems} itens
           </span>
           <span className="font-semibold">{Math.round(progress)}%</span>
         </div>
