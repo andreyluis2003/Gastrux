@@ -99,6 +99,14 @@ describe('table card checkout', () => {
     expect((await applyTablePayment(A.restaurantId, b.body.paymentId)).outcome).toBe('closed');
   });
 
+  it('a CPF typed after the first card tap reaches the payment: the same link, the row carries the CPF (final review)', async () => {
+    const first = await pay({ method: 'CARD', mode: 'ALL', payerKey: PHONE_A });
+    const again = await pay({ method: 'CARD', mode: 'ALL', cpf: '529.982.247-25', payerKey: PHONE_A });
+    expect(again.body.paymentId).toBe(first.body.paymentId);
+    expect((await prisma.payment.findUnique({ where: { id: first.body.paymentId } })).customerDocument).toBe('52998224725');
+    expect(createCheckoutPreference).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses an unknown method', async () => {
     expect((await pay({ method: 'BOLETO', mode: 'ALL', payerKey: PHONE_A })).status).toBe(422);
   });

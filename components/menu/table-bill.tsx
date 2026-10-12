@@ -128,6 +128,14 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
     return () => { stopped = true; clearInterval(t); clearTimeout(end); };
   }, [checkingCard, load]);
 
+  // Back from Mercado Pago with the browser's back button: the page may come back from the back-forward
+  // cache as it was, with the pay button still busy; it must be usable again (to pay by Pix, for example)
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) { setBusy(false); load(); } };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, [load]);
+
   const open = bill?.status === 'OPEN' ? (bill as PublicOpenBill) : null;
   // "25,50" and "25.50" are both R$ 25,50 (many phone keyboards only have the dot)
   const amountCents = parseReaisCents(amountText);
@@ -289,7 +297,8 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
       </div>
 
       {preview && !preview.ok && (mode !== 'AMOUNT' || amountText.trim()) && <p className="text-sm text-red-600">{preview.error}</p>}
-      <Button className="w-full h-12 text-base gap-2" disabled={busy || !preview?.ok} onClick={pay}>
+      {/* While a card payment is being confirmed, a second payment would charge the same part twice */}
+      <Button className="w-full h-12 text-base gap-2" disabled={busy || !!checkingCard || !preview?.ok} onClick={pay}>
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : method === 'PIX' ? <QrCode className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
         {preview?.ok ? `Pagar ${reais(preview.cents)} com ${method === 'PIX' ? 'Pix' : 'cartão'}` : `Pagar com ${method === 'PIX' ? 'Pix' : 'cartão'}`}
       </Button>

@@ -74,7 +74,14 @@ export async function claimCardPayment(
       // The link lives on the MercadoPagoTransaction row, which is written
       // first and right after the preference exists.
       const initPoint = existing.mercadoPagoData?.initPoint;
-      if (initPoint) return { kind: 'reuse' as const, payment: existing, initPoint };
+      if (initPoint) {
+        // A table phone that typed or changed its CPF after the first tap: the link stays (the CPF is not sent
+        // to Mercado Pago), the row takes the CPF the NFC-e must carry
+        if (target.sessionId && existing.customerDocument !== (target.customerDocument ?? null)) {
+          await tx.payment.update({ where: { id: existing.id }, data: { customerDocument: target.customerDocument ?? null } });
+        }
+        return { kind: 'reuse' as const, payment: existing, initPoint };
+      }
       if (Date.now() - new Date(existing.createdAt).getTime() < IN_PROGRESS_TIMEOUT_MS) {
         return { kind: 'in-progress' as const };
       }
