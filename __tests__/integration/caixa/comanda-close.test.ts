@@ -177,6 +177,27 @@ describe('closing a comanda records the payments in the shift', () => {
     await prisma.order.delete({ where: { id: order.id } });
   });
 
+  it('a closed bill is not reopened while its table has another open comanda (two bills on one table) (2026-10-12)', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    const sec = await prisma.tableSection.create({ data: { restaurantId: A.restaurantId, name: `Reab ${tag}`, capacity: 10 } });
+    const table = await prisma.table.create({ data: { restaurantId: A.restaurantId, number: 41, sectionId: sec.id, capacity: 4, qrToken: `reab-${tag}-0123456` } });
+    const old = await prisma.orderSession.create({ data: { restaurantId: A.restaurantId, userId: A.ownerId, status: 'OPEN', tableId: table.id, tableNumber: 41 } });
+    await prisma.orderSessionItem.create({ data: { sessionId: old.id, recipeId: burger.id, price: 30, quantity: 1 } });
+    await put(old.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'credito', amount: 30 }] });
+    const next = await prisma.orderSession.create({ data: { restaurantId: A.restaurantId, userId: A.ownerId, status: 'OPEN', tableId: table.id, tableNumber: 41 } });
+
+    const refused = await put(old.id, { status: 'OPEN', cashSessionId: session.id, reason: 'lançado por engano' });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toMatch(/Mesa 41 já tem outra comanda aberta/);
+    expect((await prisma.orderSession.findUnique({ where: { id: old.id } })).status).toBe('CLOSED');
+
+    await prisma.orderSession.update({ where: { id: next.id }, data: { status: 'CANCELLED' } });
+    expect((await put(old.id, { status: 'OPEN', cashSessionId: session.id, reason: 'lançado por engano' })).status).toBe(200);
+    await prisma.orderSession.deleteMany({ where: { id: { in: [old.id, next.id] } } });
+    await prisma.table.delete({ where: { id: table.id } });
+    await prisma.tableSection.delete({ where: { id: sec.id } });
+  });
+
   it("another restaurant's shift is refused", async () => {
     const regB = await ensureDefaultRegister(B.restaurantId);
     const { session } = await openSession({ userId: B.ownerId, restaurantId: B.restaurantId, role: 'OWNER' }, { cashRegisterId: regB.id, openingFloat: 0 });

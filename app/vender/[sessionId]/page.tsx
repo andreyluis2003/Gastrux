@@ -11,6 +11,7 @@ import { ItemSheet } from '@/components/vender/item-sheet';
 import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
 import { MesaActions } from '@/components/vender/mesa-actions';
+import { ReopenBill } from '@/components/vender/reopen-bill';
 import { isUnsent, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
@@ -99,6 +100,12 @@ export default function ComandaRapidaPage() {
         {!c.isClosed && (
           <div className="ml-auto">
             <MesaActions sessionId={sessionId} lines={c.lines} onDone={(goTo) => (goTo ? router.push(goTo) : c.refresh())} />
+          </div>
+        )}
+        {/* Only a bill closed with its payments (not a cancelled comanda) can be reopened */}
+        {s.status === 'CLOSED' && (
+          <div className="ml-auto">
+            <ReopenBill sessionId={sessionId} onDone={() => c.refresh()} />
           </div>
         )}
       </div>

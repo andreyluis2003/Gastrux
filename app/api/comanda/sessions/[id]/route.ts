@@ -72,7 +72,7 @@ async function handlePUT(
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 403 });
     const ownedSession = await prisma.orderSession.findFirst({
       where: { id: params.id, restaurantId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, tableId: true },
     });
     if (!ownedSession) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
 
@@ -163,6 +163,16 @@ async function handlePUT(
         if (reopening) {
           const reason = String(body?.reason ?? '').trim();
           if (reason.length < 3) throw new CashRuleError('Informe o motivo da reabertura');
+          // The table was freed when this bill closed and may have a new comanda now: reopening this one would
+          // leave two open bills on one table (2026-10-12). Under the lock a tap on the table takes to open one.
+          if (ownedSession.tableId) {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-table:' + ownedSession.tableId}))`;
+            const other = await tx.orderSession.findFirst({
+              where: { tableId: ownedSession.tableId, restaurantId, id: { not: params.id }, status: { in: ['OPEN', 'SENT_TO_KITCHEN', 'READY'] } },
+              select: { id: true, table: { select: { number: true } } },
+            });
+            if (other) throw new CashRuleError(`A Mesa ${other.table?.number ?? ''} já tem outra comanda aberta. Feche ou transfira aquela comanda antes de reabrir esta.`, 409, 'TABLE_BUSY');
+          }
           // Only one reopen writes: two requests at once must not give the money back twice
           const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: 'CLOSED' }, data: { status } });
           if (guard.count === 0) throw new CashRuleError('Esta conta já foi reaberta', 422, 'ALREADY_REOPENED');

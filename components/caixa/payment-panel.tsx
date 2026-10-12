@@ -37,6 +37,8 @@ export function PaymentPanel({ totalCents, payments, onChange, disabled }: { tot
           <div className="grid grid-cols-4 gap-2">
             {QUICK.map((q) => <Button key={q.method} type="button" variant="outline" onClick={() => fill(q.method)} disabled={disabled}>{q.label}</Button>)}
           </div>
+          {/* The staff records here what it received itself; a table that paid by phone is already on the bill (2026-10-12) */}
+          <p className="text-xs text-slate-500 mt-1">Registre aqui o que você recebeu: crédito e débito na maquininha. O que a mesa pagou pelo celular já entra sozinho na conta.</p>
         </div>
       )}
       {state.changeCents > 0 && <p className="text-lg font-semibold text-green-700">Troco: {brl(state.changeCents)}</p>}
