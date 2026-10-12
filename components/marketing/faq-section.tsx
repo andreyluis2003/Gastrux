@@ -15,7 +15,7 @@ const DEFAULT_FAQS: FAQ[] = [
   },
   {
     q: 'Quanto tempo leva pra começar a usar?',
-    a: 'Uns 10 minutos. Você cadastra o restaurante, coloca os pratos principais e os ingredientes — e já começa a ver o custo e a margem de cada prato.',
+    a: 'Uns 10 minutos. Você cadastra o restaurante, coloca os pratos principais e os ingredientes e já começa a ver o custo e a margem de cada prato.',
   },
   {
     q: 'Funciona no celular? Não tenho computador no restaurante.',

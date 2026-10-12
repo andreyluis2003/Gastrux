@@ -218,7 +218,7 @@ export const SEGMENTS: Segment[] = [
     benefits: [
       { icon: 'Zap', title: 'PDV Rápido', description: 'Tela de vendas otimizada para alto volume e agilidade no caixa.' },
       { icon: 'Calculator', title: 'Custo por Item', description: 'Saiba a margem de cada salgado, suco e sanduíche.' },
-      { icon: 'Package', title: 'Estoque Simplificado', description: 'Controle de insumos sem complicação — só o essencial.' },
+      { icon: 'Package', title: 'Estoque Simplificado', description: 'Controle de insumos sem complicação, só o essencial.' },
       { icon: 'Wallet', title: 'Controle de Caixa', description: 'Abertura, sangria, fechamento e conferência de caixa.' },
       { icon: 'Smartphone', title: 'Pedidos WhatsApp', description: 'Receba pedidos pelo WhatsApp e integre com a produção.' },
       { icon: 'Receipt', title: 'NFC-e Automática', description: 'A nota do consumidor sai ao fechar a conta (plano Business, com certificado e dados do contador).' },

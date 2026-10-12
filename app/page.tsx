@@ -138,7 +138,7 @@ function HomePageContent() {
           <p className="text-lg sm:text-xl text-slate-600 dark:text-slate-400 mb-8 leading-relaxed max-w-3xl mx-auto">
             {heroDescription.isLoaded
               ? heroDescription.content
-              : 'Você sabe quanto custa cada prato que serve? Com a Gastrux, em 10 minutos você descobre — e nunca mais precisa de caderno, planilha ou calculadora.'}
+              : 'Você sabe quanto custa cada prato que serve? Com a Gastrux, você descobre em 10 minutos e nunca mais precisa de caderno, planilha ou calculadora.'}
           </p>
 
           {/* Hero benefits quick-list */}
@@ -202,7 +202,7 @@ function HomePageContent() {
               : 'Seu restaurante merece mais que um caderno'}
           </h2>
           <p className="text-lg mb-8 text-blue-100 max-w-2xl mx-auto">
-            Começa grátis em 10 minutos. Se não gostar, volta pro caderno — sem custo, sem burocracia.
+            Começa grátis em 10 minutos. Se não gostar, volta pro caderno, sem custo e sem burocracia.
           </p>
           <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handleFinalCtaClick}>
@@ -250,7 +250,7 @@ function HomePageContent() {
           </div>
           <div className="border-t border-slate-800 pt-6 text-center text-sm">
             <p>&copy; 2026 Gastrux. Todos os direitos reservados.</p>
-            <p className="mt-1 text-xs text-slate-500">Gastrux é um produto da Help Flow Ltda — CNPJ 61.639.918/0001-70</p>
+            <p className="mt-1 text-xs text-slate-500">Gastrux é um produto da Help Flow Ltda, CNPJ 61.639.918/0001-70</p>
           </div>
         </div>
       </footer>

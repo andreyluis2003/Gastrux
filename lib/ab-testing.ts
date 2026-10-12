@@ -128,9 +128,9 @@ export const AB_TESTS = {
   HERO_DESCRIPTION: {
     testId: 'hero-description',
     variants: {
-      control: 'Você sabe quanto custa cada prato que serve? Com a Gastrux, em 10 minutos você descobre — e nunca mais precisa de caderno, planilha ou calculadora.',
+      control: 'Você sabe quanto custa cada prato que serve? Com a Gastrux, você descobre em 10 minutos e nunca mais precisa de caderno, planilha ou calculadora.',
       'variant-a': 'Se você ainda anota no caderno ou na planilha, está perdendo dinheiro sem saber. A Gastrux mostra o custo e a margem de cada prato.',
-      'variant-b': 'Pare de adivinhar quanto sobra em cada prato. A Gastrux calcula seu CMV, controla estoque e mostra onde você perde dinheiro — tudo no celular.',
+      'variant-b': 'Pare de adivinhar quanto sobra em cada prato. A Gastrux calcula seu CMV, controla estoque e mostra onde você perde dinheiro. Tudo no celular.',
     },
     description: 'Test hero description text',
   } as ABTestConfig,

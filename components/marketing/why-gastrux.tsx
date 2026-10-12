@@ -37,7 +37,7 @@ const DIFFERENTIALS = [
   {
     icon: Shield,
     title: 'Tudo num lugar só',
-    description: 'Estoque, vendas, custo, caixa e clientes — tudo junto. Sem precisar de 5 caderninhos diferentes.',
+    description: 'Estoque, vendas, custo, caixa e clientes, tudo junto. Sem precisar de 5 caderninhos diferentes.',
   },
 ];
 

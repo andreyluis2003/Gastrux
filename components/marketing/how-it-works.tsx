@@ -8,7 +8,7 @@ const steps = [
     icon: PlugZap,
     title: 'Cadastre em 10 minutos',
     description:
-      'Sem cartão, sem instalar nada. Coloca o nome do restaurante, os pratos principais e os ingredientes — pronto.',
+      'Sem cartão, sem instalar nada. Coloca o nome do restaurante, os pratos principais e os ingredientes. Pronto.',
     color: 'from-blue-500 to-cyan-500',
   },
   {

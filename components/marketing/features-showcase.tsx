@@ -12,7 +12,7 @@ const features = [
   {
     icon: ChefHat,
     title: 'Custo de cada prato calculado',
-    description: 'Coloca os ingredientes e a quantidade — a Gastrux calcula o custo sozinha. Sem calculadora, sem planilha.',
+    description: 'Coloca os ingredientes e a quantidade, e a Gastrux calcula o custo sozinha. Sem calculadora, sem planilha.',
     color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
   },
   {
@@ -53,7 +53,7 @@ export function FeaturesShowcase() {
             Tudo que o caderno não faz por você
           </h2>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            No caderno você anota, mas não calcula, não avisa e não mostra onde está o problema. A Gastrux faz tudo isso — no celular.
+            No caderno você anota, mas não calcula, não avisa e não mostra onde está o problema. A Gastrux faz tudo isso no celular.
           </p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
