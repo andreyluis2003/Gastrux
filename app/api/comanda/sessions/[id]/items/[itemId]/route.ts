@@ -6,6 +6,7 @@ import { isManager, recordAudit, requireRestaurantRole } from '@/lib/auth/restau
 import { lockComanda } from '@/lib/comanda/add-item';
 import { billHasPayments } from '@/lib/comanda/bill-service';
 import { resolveMergedSession } from '@/lib/comanda/transfer';
+import { withdrawFromKitchen } from '@/lib/kds/withdraw-line';
 
 export const dynamic = 'force-dynamic';
 
@@ -165,6 +166,10 @@ async function handlePUT(
         changes: { sessionId: params.id, before: snapshot(line), quantity, reason: reason || null },
       });
     }
+    // What left the comanda leaves the kitchen too (2026-10-12)
+    if (reducing && kitchenHasIt(line)) {
+      await withdrawSafely({ restaurantId: member.restaurantId, sessionId: params.id, line, quantity: line.quantity - quantity, userId: member.userId, reason: String(reason ?? '').trim() });
+    }
 
     return NextResponse.json(item);
   } catch (error) {
@@ -212,6 +217,10 @@ async function handleDELETE(
       entityId: line.id,
       changes: { sessionId: params.id, removed: snapshot(line), reason: reason || null },
     });
+    // What left the comanda leaves the kitchen too (2026-10-12)
+    if (kitchenHasIt(line)) {
+      await withdrawSafely({ restaurantId: member.restaurantId, sessionId: params.id, line, quantity: line.quantity, userId: member.userId, reason });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -225,3 +234,13 @@ export const PUT = idempotent(handlePUT);
 
 // Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)
 export const DELETE = idempotent(handleDELETE);
+
+/** The comanda change is already done; the kitchen follows it, and a failure there is logged, never undoes it */
+async function withdrawSafely(input: Parameters<typeof withdrawFromKitchen>[0]) {
+  try {
+    const outcome = await withdrawFromKitchen(input);
+    if (outcome === 'not-found') console.warn(`[comanda] no kitchen item found for a line withdrawn from comanda ${input.sessionId}`);
+  } catch (error) {
+    console.error('[comanda] could not withdraw the line from the kitchen:', error);
+  }
+}

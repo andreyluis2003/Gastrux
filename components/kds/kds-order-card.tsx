@@ -186,9 +186,11 @@ export function KDSOrderCard({
             <div className="flex items-start gap-2 flex-1">
               {ItemStatus(item.status)}
               <div className="flex-1">
-                <p className="font-medium">
+                <p className={`font-medium ${item.status === 'CANCELLED' ? 'line-through text-gray-400' : ''}`}>
                   {item.quantity}x {item.recipe.name}
                 </p>
+                {/* Withdrawn from the comanda after it was sent (2026-10-12): the cook must not make it */}
+                {item.status === 'CANCELLED' && <p className="text-xs font-bold text-red-600">CANCELADO: não fazer</p>}
                 {(item.modifiers ?? []).map((m, idx) =>
                   m.modifier?.name ? (
                     <p key={idx} className="text-xs font-semibold text-red-700">

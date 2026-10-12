@@ -72,7 +72,8 @@ export async function changeOrderStatus(restaurantId: string, orderId: string, s
 /** The recipes' ingredients leave this restaurant's stock; the movement is recorded for the CMV. */
 async function deductOrderStock(tx: any, restaurantId: string, orderId: string) {
   const items = await tx.orderItem.findMany({
-    where: { orderId },
+    // An item withdrawn from the comanda was not made (its loss, if any, was recorded then: lib/kds/withdraw-line.ts)
+    where: { orderId, status: { not: 'CANCELLED' } },
     select: { quantity: true, recipe: { select: { restaurantId: true, ingredients: { select: { ingredientId: true, quantity: true } } } } },
   });
   const totals = new Map<string, number>();

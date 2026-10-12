@@ -58,49 +58,11 @@ export async function cancelOrder(
 
     await tx.orderItem.updateMany({ where: { orderId }, data: { status: 'CANCELLED' } });
 
-    const loss = { recorded: false, ingredients: 0, estimatedCost: 0 };
-    if (KITCHEN_STARTED.includes(order.status)) {
-      const used = new Map<string, { quantity: number; ingredient: any }>();
-      for (const item of order.items) {
-        for (const ri of item.recipe?.ingredients ?? []) {
-          const entry = used.get(ri.ingredientId) ?? { quantity: 0, ingredient: ri.ingredient };
-          entry.quantity += ri.quantity * item.quantity;
-          used.set(ri.ingredientId, entry);
-        }
-      }
-      for (const [ingredientId, { quantity, ingredient }] of used) {
-        const estimatedCost = quantity * (ingredient?.referenceCost ?? 0);
-        await tx.wasteLog.create({
-          data: {
-            restaurantId: order.restaurantId,
-            ingredientId,
-            quantity,
-            unit: ingredient.standardUnit,
-            estimatedCost,
-            reason: 'PREPARATION',
-            notes: `Pedido #${order.orderNumber} cancelado depois de iniciado o preparo${opts.reason ? `: ${opts.reason}` : ''}`,
-          },
-        });
-        await tx.stockMovement.create({
-          data: {
-            restaurantId: order.restaurantId,
-            ingredientId,
-            movementType: 'LOSS',
-            quantity: -quantity,
-            reason: `Pedido #${order.orderNumber} cancelado após iniciar o preparo`,
-            referenceId: order.id,
-            referenceType: 'ORDER_CANCELLED',
-          },
-        });
-        await tx.stock.updateMany({
-          where: { ingredientId, restaurantId: order.restaurantId },
-          data: { currentQuantity: { decrement: quantity }, lastUpdated: new Date() },
-        });
-        loss.recorded = true;
-        loss.ingredients++;
-        loss.estimatedCost += estimatedCost;
-      }
-    }
+    // An item already withdrawn from the comanda had its loss recorded then (lib/kds/withdraw-line.ts)
+    const live = order.items.filter((item) => item.status !== 'CANCELLED');
+    const loss = KITCHEN_STARTED.includes(order.status)
+      ? await recordKitchenLoss(tx, { restaurantId: order.restaurantId, orderId: order.id, orderNumber: order.orderNumber, items: live, reason: opts.reason })
+      : { recorded: false, ingredients: 0, estimatedCost: 0 };
 
     // Payments of this order: a pending one is called off (a late PIX must not be accepted for a dead
     // order); an approved online one still holds the customer's money and is reported below.
@@ -186,4 +148,58 @@ async function settlePaymentsOfCancelledOrder(order: any, payments: CancelPaymen
       dedupeKey: `cancelled-paid-order:${p.id}`,
     });
   }
+}
+
+/**
+ * The ingredients of items the kitchen had already started, recorded as a LOSS (WasteLog reason PREPARATION
+ * + a LOSS stock movement + the stock decrement), computed like the completion deduction (recipe quantity x
+ * item quantity). Used when a whole order is cancelled and when a single item leaves the comanda
+ * (lib/kds/withdraw-line.ts). `items` carry `quantity` and `recipe.ingredients[].ingredient`.
+ */
+export async function recordKitchenLoss(
+  tx: any,
+  opts: { restaurantId: string; orderId: string; orderNumber: string; items: any[]; reason?: string }
+): Promise<{ recorded: boolean; ingredients: number; estimatedCost: number }> {
+  const loss = { recorded: false, ingredients: 0, estimatedCost: 0 };
+  const used = new Map<string, { quantity: number; ingredient: any }>();
+  for (const item of opts.items) {
+    for (const ri of item.recipe?.ingredients ?? []) {
+      const entry = used.get(ri.ingredientId) ?? { quantity: 0, ingredient: ri.ingredient };
+      entry.quantity += ri.quantity * item.quantity;
+      used.set(ri.ingredientId, entry);
+    }
+  }
+  for (const [ingredientId, { quantity, ingredient }] of used) {
+    const estimatedCost = quantity * (ingredient?.referenceCost ?? 0);
+    await tx.wasteLog.create({
+      data: {
+        restaurantId: opts.restaurantId,
+        ingredientId,
+        quantity,
+        unit: ingredient.standardUnit,
+        estimatedCost,
+        reason: 'PREPARATION',
+        notes: `Pedido #${opts.orderNumber} cancelado depois de iniciado o preparo${opts.reason ? `: ${opts.reason}` : ''}`,
+      },
+    });
+    await tx.stockMovement.create({
+      data: {
+        restaurantId: opts.restaurantId,
+        ingredientId,
+        movementType: 'LOSS',
+        quantity: -quantity,
+        reason: `Pedido #${opts.orderNumber} cancelado após iniciar o preparo`,
+        referenceId: opts.orderId,
+        referenceType: 'ORDER_CANCELLED',
+      },
+    });
+    await tx.stock.updateMany({
+      where: { ingredientId, restaurantId: opts.restaurantId },
+      data: { currentQuantity: { decrement: quantity }, lastUpdated: new Date() },
+    });
+    loss.recorded = true;
+    loss.ingredients++;
+    loss.estimatedCost += estimatedCost;
+  }
+  return loss;
 }
