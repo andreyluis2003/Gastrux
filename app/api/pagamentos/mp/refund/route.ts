@@ -11,6 +11,7 @@ import { requireRestaurantManager } from '@/lib/mercadopago-connect/guard';
 import { refundPayment } from '@/lib/mercado-pago';
 import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-service';
 import { refundConnectPayment } from '@/lib/mercadopago-connect/payments';
+import { recordGatewayRefund, refundAlreadyDone } from '@/lib/payments/refund-record';
 import { captureException, trackApiCall } from '@/lib/sentry';
 import { REFUNDABLE_GATEWAYS, REFUNDABLE_STATUSES } from '@/lib/payments/refund-eligibility';
 import { MP_FAILED_STATUS } from '@/lib/mercadopago-connect/http-status';
@@ -66,6 +67,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Só pagamentos do Mercado Pago podem ser estornados por aqui' }, { status: 400 });
     }
 
+    if (payment.status === 'REFUNDED') {
+      return NextResponse.json({ error: 'Este pagamento já foi estornado.' }, { status: 400 });
+    }
     if (!(REFUNDABLE_STATUSES as readonly string[]).includes(payment.status)) {
       return NextResponse.json(
         { error: 'Este pagamento não pode ser estornado (só pagamentos aprovados)' },
@@ -97,10 +101,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nada a reembolsar' }, { status: 400 });
     }
 
-    // Counted against what was ALREADY refunded: refunding 60 of 100 and then
-    // the remaining 40 must end as REFUNDED, not PARTIALLY_REFUNDED.
-    const isFullRefund = totalRefunded + refundAmount >= Number(payment.amount);
-
     // An identical repeated request (double click, client retry after a
     // timeout) maps to the SAME key, so Mercado Pago refunds only once.
     const idempotencyKey = `refund:${payment.id}:${totalRefunded}:${refundAmount}`;
@@ -118,9 +118,10 @@ export async function POST(request: NextRequest) {
 
     // Process refund via MP API - with the restaurant's own token for Connect payments.
     let mpRefund;
+    let client: Awaited<ReturnType<typeof getMpClientForRestaurant>> = null;
     try {
       if (isConnect) {
-        const client = await getMpClientForRestaurant(restaurantId);
+        client = await getMpClientForRestaurant(restaurantId);
         if (!client) {
           return NextResponse.json(
             { error: 'Conexão com o Mercado Pago indisponível. Reconecte sua conta para reembolsar.' },
@@ -137,43 +138,35 @@ export async function POST(request: NextRequest) {
         mpRefund = await refundPayment(mpPaymentId, amount ? Number(amount) : undefined);
       }
     } catch (mpError) {
-      // Mercado Pago said no (e.g. not enough balance, payment too old): the owner must see why.
-      // Nothing was written, so retrying later is safe.
-      const e = mpError as any;
-      const detail = e?.cause?.[0]?.description || e?.message;
-      console.error('[MP Refund] Mercado Pago refused the refund:', mpError);
-      return NextResponse.json(
-        { error: `O Mercado Pago não fez o estorno${detail ? `: ${detail}` : ''}. Nada foi alterado.` },
-        { status: MP_FAILED_STATUS }
-      );
+      // An error is not proof that nothing was refunded (prod 2026-10-12: the refund happened and only the
+      // answer failed). Ask Mercado Pago: if what was asked is refunded there, it is recorded as done.
+      const done = isConnect && client ? await refundAlreadyDone(client, mpPaymentId, totalRefunded + refundAmount) : null;
+      if (!done) {
+        // Mercado Pago said no (e.g. not enough balance, payment too old): the owner must see why.
+        // Nothing was written, so retrying later is safe.
+        const e = mpError as any;
+        const detail = e?.cause?.[0]?.description || e?.message;
+        console.error('[MP Refund] Mercado Pago refused the refund:', mpError);
+        return NextResponse.json(
+          { error: `O Mercado Pago não fez o estorno${detail ? `: ${detail}` : ''}. Nada foi alterado.` },
+          { status: MP_FAILED_STATUS }
+        );
+      }
+      console.error('[MP Refund] Mercado Pago answered with an error but the refund is done there; recording it:', mpError);
+      mpRefund = { id: done.refundId };
     }
 
-    // Create refund record
-    const refund = await prisma.paymentRefund.create({
-      data: {
-        paymentId: payment.id,
-        amount: refundAmount,
-        currency: payment.currency,
-        reason: reason || 'requested_by_customer',
-        gateway: payment.gateway,
-        gatewayRefundId: String(mpRefund.id),
-        status: 'completed',
-        description: description || `Refund for payment ${payment.id}`,
-        processedById: session.user.id,
-        completedAt: new Date(),
-      },
+    // Recorded once, also when the Mercado Pago notice of this same refund arrives first or later
+    const recorded = await recordGatewayRefund({
+      paymentId: payment.id,
+      refundedTotal: totalRefunded + refundAmount,
+      gatewayRefundId: mpRefund?.id != null ? String(mpRefund.id) : null,
+      processedById: session.user.id,
+      reason: reason || 'requested_by_customer',
+      description: description || `Refund for payment ${payment.id}`,
     });
-
-    // Update payment status
-    const newStatus = isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: newStatus,
-        amountRefunded: totalRefunded + refundAmount,
-        refundedAt: new Date(),
-      },
-    });
+    const newStatus = recorded.status;
+    const refund = { id: recorded.refundId };
 
     // A fully refunded payment must not leave its order showing as paid in the
     // KDS/POS. Idempotent and restaurantId-scoped, and only from APPROVED; a

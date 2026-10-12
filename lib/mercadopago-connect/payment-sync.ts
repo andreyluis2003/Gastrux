@@ -8,6 +8,7 @@ import { captureException } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
 import { reconcileTabPayment } from './tab-reconcile';
 import { applyTablePayment } from '@/lib/comanda/table-payment';
+import { recordGatewayRefund } from '@/lib/payments/refund-record';
 
 export interface SyncResult {
   updated: boolean;
@@ -209,6 +210,10 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
       // Pay at the table: an approval that never reached the bill (crash between the two writes) is applied now
       if (payment.orderSessionId && !payment.appliedToBillAt) await applyTablePaymentSafely(restaurantId, payment.id);
     }
+    // Self-healing for refunds: a payment already REFUNDED whose refund was never recorded gets its record now
+    if (mapped === 'REFUNDED' && payment.status === 'REFUNDED' && Number(payment.amountRefunded) < Number(payment.amount)) {
+      await recordRefundFromNotice(payment, mp);
+    }
     return { updated: false, reason: 'no-transition' };
   }
 
@@ -243,6 +248,9 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
     },
   });
   if (result.count === 0) return { updated: false, reason: 'concurrent' };
+  // A refund announced by Mercado Pago (from the "Estornar" button whose answer was lost, or made in the
+  // Mercado Pago app) is recorded: amount, date and one refund record, never twice
+  if (mapped === 'REFUNDED') await recordRefundFromNotice(payment, mp);
 
   // A REFUNDED or CHARGEBACK notification must also move the Order off
   // APPROVED, otherwise the KDS/POS keeps showing a refunded order as paid.
@@ -263,4 +271,22 @@ export async function syncRestaurantPayment(restaurantId: string, mpPaymentId: s
   }
 
   return { updated: true, status: mapped };
+}
+
+/** What Mercado Pago says was refunded for this payment, recorded once (lib/payments/refund-record.ts). Never throws. */
+async function recordRefundFromNotice(payment: { id: string; amount: unknown }, mp: any): Promise<void> {
+  try {
+    const refunds = Array.isArray(mp?.refunds) ? mp.refunds : [];
+    const last = refunds.length ? refunds[refunds.length - 1] : null;
+    const total = Number(mp?.transaction_amount_refunded) > 0 ? Number(mp.transaction_amount_refunded) : Number(payment.amount);
+    await recordGatewayRefund({
+      paymentId: payment.id,
+      refundedTotal: total,
+      gatewayRefundId: last?.id != null ? String(last.id) : null,
+      reason: 'mercado_pago',
+      description: 'Estorno registrado pelo aviso do Mercado Pago',
+    });
+  } catch (error) {
+    console.error(`[mp-connect] could not record the refund of payment ${payment.id}:`, error);
+  }
 }

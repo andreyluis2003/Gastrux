@@ -11,6 +11,18 @@ const prismaMock = {
   payment: { findFirst: jest.fn(), update: jest.fn() },
   paymentRefund: { create: jest.fn() },
   order: { updateMany: jest.fn() },
+  // The refund is recorded in one transaction (lib/payments/refund-record.ts): it reads the payment the
+  // route read and writes through the same mocks, so the assertions below still see the writes
+  $transaction: jest.fn(async (fn) =>
+    fn({
+      $executeRaw: jest.fn(),
+      payment: {
+        findUniqueOrThrow: async () => prismaMock.payment.findFirst.mock.results.at(-1)?.value,
+        updateMany: (args) => prismaMock.payment.update(args),
+      },
+      paymentRefund: { create: (args) => prismaMock.paymentRefund.create(args) },
+    })
+  ),
 };
 jest.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));

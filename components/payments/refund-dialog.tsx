@@ -53,6 +53,9 @@ export function RefundDialog({ payment, onDone }: Props) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(data?.error || 'Não foi possível fazer o estorno');
+        // The list may be behind (refunded meanwhile by the Mercado Pago notice): show what it is now
+        setOpen(false);
+        onDone();
         return;
       }
       toast.success(`Estorno de ${formatBRL(amount)} feito. O dinheiro volta para o cliente pelo Mercado Pago.`);
