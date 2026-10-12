@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { loadSalao } from '../../../lib/vender/salao';
 import { applyTablePayment } from '../../../lib/comanda/table-payment';
+import { recordBillPayment } from '../../../lib/comanda/bill-service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -52,5 +53,14 @@ describe('the map: paid so far and waiter calls', () => {
     const p = await prisma.payment.create({ data: { restaurantId: rid, gateway: 'MERCADO_PAGO_CONNECT', method: 'PIX', status: 'APPROVED', amount: 10, orderSessionId: s.id } });
     await applyTablePayment(rid, p.id);
     expect(await tile(t3)).toMatchObject({ waiterCalledAt: null, paidCents: 1000, billTotalCents: 6000 });
+  });
+
+  it('a payment recorded by the staff answers the waiter call too', async () => {
+    const sec = await prisma.tableSection.findFirst({ where: { restaurantId: rid } });
+    const tableId = (await prisma.table.create({ data: { restaurantId: rid, number: 4, sectionId: sec.id, capacity: 4, qrToken: `sp4${tag}` } })).id;
+    const s = await open(tableId, { payAtWaiterRequestedAt: new Date() });
+    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 30, quantity: 2 } });
+    await recordBillPayment({ userId: ownerId, restaurantId: rid, role: 'OWNER' }, s.id, { payments: [{ method: 'dinheiro', amount: '10,00' }], cashSessionId: shift.id });
+    expect(await tile(tableId)).toMatchObject({ waiterCalledAt: null, paidCents: 1000 });
   });
 });

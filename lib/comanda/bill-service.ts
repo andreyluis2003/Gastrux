@@ -245,6 +245,8 @@ export async function recordBillPayment(
     const settled = settlePartial(due, input.payments);
     const target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: input.cashSessionId, replay: false, legacy: false });
     await recordSaleEntries(tx, { restaurantId: member.restaurantId, target: target!, orderSessionId: sessionId, settled, createdById: member.userId });
+    // The staff took a payment: the table's "pagar com o garçom" was answered (spec 2026-10-10 §5.3)
+    await tx.orderSession.update({ where: { id: sessionId }, data: { payAtWaiterRequestedAt: null } });
     const paidNow = settled.paidCents - settled.changeCents;
     const closed = bill.paidCents + paidNow >= bill.totalCents;
     if (closed) {
