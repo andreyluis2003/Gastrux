@@ -9,7 +9,7 @@ jest.mock('next-auth/next', () => ({ getServerSession: jest.fn() }));
 import { getServerSession } from 'next-auth';
 import { getServerSession as getServerSessionNext } from 'next-auth/next';
 import { GET } from '../../../app/api/admin/tables/route';
-import { PUT } from '../../../app/api/admin/tables/[id]/route';
+import { PUT, DELETE } from '../../../app/api/admin/tables/[id]/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -105,5 +105,45 @@ describe('admin tables', () => {
     const res = await put(t1, { capacity: 12 });
     expect(res.status).toBe(403);
     expect((await prisma.table.findUnique({ where: { id: t1 } })).capacity).toBe(4);
+  });
+});
+
+describe('deleting a table (2026-10-12)', () => {
+  let rid: string, ownerId: string, busy: string, free: string, comandaId: string;
+  const email = `del-${tag}@gastrux.test`;
+  const del = (id: string) => DELETE(new NextRequest(`http://x/api/admin/tables/${id}`, { method: 'DELETE' }), { params: { id } });
+
+  beforeAll(async () => {
+    ownerId = (await prisma.user.create({ data: { email, name: 'Dora', password: 'x', role: 'OWNER' } })).id;
+    rid = (await prisma.restaurant.create({ data: { name: `Del ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    await prisma.user.update({ where: { id: ownerId }, data: { currentRestaurantId: rid } });
+    await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: ownerId, role: 'OWNER', permissions: ['ALL'], acceptedAt: new Date() } });
+    const sec = (await prisma.tableSection.create({ data: { restaurantId: rid, name: 'Salão', capacity: 20 } })).id;
+    busy = (await prisma.table.create({ data: { restaurantId: rid, number: 4, sectionId: sec, capacity: 4, qrToken: `e${tag}` } })).id;
+    free = (await prisma.table.create({ data: { restaurantId: rid, number: 6, sectionId: sec, capacity: 4, qrToken: `f${tag}` } })).id;
+    comandaId = (await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: busy, status: 'SENT_TO_KITCHEN' } })).id;
+    await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, tableId: free, status: 'CLOSED', closedAt: new Date() } });
+    const session = { user: { id: ownerId, email, role: 'OWNER' }, expires: '2099-01-01' };
+    (getServerSession as jest.Mock).mockResolvedValue(session);
+    (getServerSessionNext as jest.Mock).mockResolvedValue(session);
+  }, 60000);
+
+  afterAll(async () => {
+    await prisma.orderSession.deleteMany({ where: { restaurantId: rid } }).catch(() => {});
+    try { await prisma.restaurant.delete({ where: { id: rid } }); } catch {}
+    try { await prisma.user.delete({ where: { id: ownerId } }); } catch {}
+  });
+
+  it('a table with an open comanda is not deleted: the comanda would lose its table and show as "Balcão"', async () => {
+    const res = await del(busy);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/Mesa 4.*comanda aberta/);
+    expect(await prisma.table.findUnique({ where: { id: busy } })).not.toBeNull();
+    expect((await prisma.orderSession.findUnique({ where: { id: comandaId } })).tableId).toBe(busy);
+  });
+
+  it('a table whose comandas are all closed is deleted', async () => {
+    expect((await del(free)).status).toBe(200);
+    expect(await prisma.table.findUnique({ where: { id: free } })).toBeNull();
   });
 });

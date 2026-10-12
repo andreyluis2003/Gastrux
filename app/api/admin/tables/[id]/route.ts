@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { requireRestaurantRole, MANAGER_ROLES } from '@/lib/auth/restaurant-role';
+import { OPEN_STATUSES } from '@/lib/comanda/transfer';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,7 +164,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
     }
 
-    const owned = await prisma.table.findFirst({ where: { id: params.id, restaurantId }, select: { id: true } });
+    const owned = await prisma.table.findFirst({ where: { id: params.id, restaurantId }, select: { id: true, number: true } });
     if (!owned) {
       return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
@@ -178,14 +179,26 @@ export async function DELETE(
 
     if (activeReservations.length > 0) {
       return NextResponse.json(
-        { error: 'Cannot delete table with active reservations' },
+        { error: `A Mesa ${owned.number} tem reservas ativas. Cancele ou mude as reservas antes de excluir.` },
         { status: 409 }
       );
     }
 
-    await prisma.table.delete({
-      where: { id: params.id },
+    // An open comanda would lose its table (the link is set to null) and show as "Balcão" (2026-10-12).
+    // Under the lock a tap on the table takes to open its comanda, so one opened at the same time is seen.
+    const deleted = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'comanda-table:' + params.id}))`;
+      const open = await tx.orderSession.count({ where: { tableId: params.id, status: { in: [...OPEN_STATUSES] } } });
+      if (open) return false;
+      await tx.table.delete({ where: { id: params.id } });
+      return true;
     });
+    if (!deleted) {
+      return NextResponse.json(
+        { error: `A Mesa ${owned.number} tem uma comanda aberta. Feche a conta ou transfira os itens antes de excluir.` },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
