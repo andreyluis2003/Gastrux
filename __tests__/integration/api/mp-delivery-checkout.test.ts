@@ -145,14 +145,14 @@ describe('POST /api/pagamentos/mp/delivery-checkout', () => {
     expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('CANCELLED');
   });
 
-  it('returns 502 and cancels the payment when Mercado Pago definitely rejects the request (4xx)', async () => {
+  it('returns 424 and cancels the payment when Mercado Pago definitely rejects the request (4xx)', async () => {
     await saveConnection(A.restaurantId, TOKENS);
     const order = await makeOrder();
     createCheckoutPreference.mockRejectedValue({ status: 400, message: 'invalid preference' });
 
     const res = await post({ orderId: order.id });
 
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(424);
     expect((await getConnection(A.restaurantId)).status).toBe('ACTIVE');
     expect((await prisma.payment.findFirst({ where: { orderId: order.id } })).status).toBe('CANCELLED');
   });
@@ -160,14 +160,14 @@ describe('POST /api/pagamentos/mp/delivery-checkout', () => {
   it.each([
     ['a timeout or socket error (no status)', new Error('MP down')],
     ['a 5xx', { status: 503, message: 'unavailable' }],
-  ])('returns 502 but keeps the payment PENDING when the outcome is ambiguous: %s', async (_label, failure) => {
+  ])('returns 424 but keeps the payment PENDING when the outcome is ambiguous: %s', async (_label, failure) => {
     await saveConnection(A.restaurantId, TOKENS);
     const order = await makeOrder();
     createCheckoutPreference.mockRejectedValue(failure);
 
     const res = await post({ orderId: order.id });
 
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(424);
     expect(createCheckoutPreference).toHaveBeenCalledTimes(1);
     // The preference may exist at Mercado Pago: the row must not be CANCELLED,
     // or a real payment could never be recorded by the webhook.

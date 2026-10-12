@@ -106,7 +106,7 @@ describe('createPixForTarget', () => {
 
     const res = await createPixForTarget(orderTarget, payer);
 
-    expect(res).toMatchObject({ ok: false, status: 502 });
+    expect(res).toMatchObject({ ok: false, status: 424 });
     expect(statusWritten()).toEqual(['CANCELLED']);
   });
 
@@ -130,7 +130,7 @@ describe('createPixForTarget', () => {
 
     const res = await createPixForTarget(orderTarget, payer);
 
-    expect(res).toMatchObject({ ok: false, status: 502 });
+    expect(res).toMatchObject({ ok: false, status: 424 });
     expect(statusWritten()).toEqual([]);
     expect(markNeedsReconnect).not.toHaveBeenCalled();
   });

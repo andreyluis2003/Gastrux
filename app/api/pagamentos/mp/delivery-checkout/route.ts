@@ -6,6 +6,7 @@ import { isUnauthorizedError, unauthorizedReason, notificationUrlFor, toMpDate }
 import { CARD_LINK_VALIDITY_MS, CHECKOUT_IN_PROGRESS, claimCardPayment } from '@/lib/mercadopago-connect/card-claim';
 import { resolvePixTarget } from '@/lib/mercadopago-connect/pix-target';
 import { isDefiniteRejection, normalizePayer, ONLINE_PAYMENT_UNAVAILABLE } from '@/lib/mercadopago-connect/pix-service';
+import { MP_FAILED_STATUS } from '@/lib/mercadopago-connect/http-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: ONLINE_PAYMENT_UNAVAILABLE, code: 'ONLINE_PAYMENT_UNAVAILABLE' }, { status: 409 });
       }
       console.error('[delivery-checkout] preference creation failed:', error);
-      return NextResponse.json({ error: 'Não foi possível iniciar o pagamento. Tente novamente.' }, { status: 502 });
+      return NextResponse.json({ error: 'Não foi possível iniciar o pagamento. Tente novamente.' }, { status: MP_FAILED_STATUS });
     }
 
     // Mercado Pago accepted: the preference exists and carries this Payment id

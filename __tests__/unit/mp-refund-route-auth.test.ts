@@ -204,7 +204,7 @@ describe('refund route rules used by the "Estornar" button', () => {
       cause: [{ code: 4040, description: 'Insufficient balance' }],
     });
     const res = await post({ paymentId: 'pay-1', amount: 100 });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(424);
     expect((await res.json()).error).toMatch(/Insufficient balance/);
     expect(prismaMock.paymentRefund.create).not.toHaveBeenCalled();
     expect(prismaMock.payment.update).not.toHaveBeenCalled();

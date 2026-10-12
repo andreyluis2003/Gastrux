@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getMpClientForRestaurant, markNeedsReconnect } from './connection-service';
 import { cancelConnectPayment, createConnectPix, extractPixData, isUnauthorizedError, unauthorizedReason, type PixData } from './payments';
 import type { ResolvedPixTarget } from './pix-target';
+import { MP_FAILED_STATUS } from './http-status';
 
 /** PIX expires in 30 minutes; reuse a pending one only while it is surely valid. */
 const REUSE_WINDOW_MS = 25 * 60 * 1000;
@@ -272,7 +273,7 @@ export async function createPixForTarget(
     }
 
     console.error('[mp-connect] PIX creation failed:', error);
-    return { ok: false, status: 502, error: 'Não foi possível gerar o PIX. Tente novamente.' };
+    return { ok: false, status: MP_FAILED_STATUS, error: 'Não foi possível gerar o PIX. Tente novamente.' };
   }
 
   // Mercado Pago accepted: a LIVE charge now exists carrying this Payment id as

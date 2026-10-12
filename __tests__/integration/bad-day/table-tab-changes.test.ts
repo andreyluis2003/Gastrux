@@ -201,7 +201,7 @@ describe('bad day 5: the table tab changes around its PIX', () => {
 
       const second = await askPix();
 
-      expect(second.status).toBe(502);
+      expect(second.status).toBe(424);
       expect(cancelConnectPayment).not.toHaveBeenCalled();
       expect((await prisma.payment.findUnique({ where: { id: first.body.paymentId } })).status).toBe('PENDING');
     });

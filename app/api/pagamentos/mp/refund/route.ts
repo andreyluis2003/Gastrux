@@ -13,6 +13,7 @@ import { getMpClientForRestaurant } from '@/lib/mercadopago-connect/connection-s
 import { refundConnectPayment } from '@/lib/mercadopago-connect/payments';
 import { captureException, trackApiCall } from '@/lib/sentry';
 import { REFUNDABLE_GATEWAYS, REFUNDABLE_STATUSES } from '@/lib/payments/refund-eligibility';
+import { MP_FAILED_STATUS } from '@/lib/mercadopago-connect/http-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
       console.error('[MP Refund] Mercado Pago refused the refund:', mpError);
       return NextResponse.json(
         { error: `O Mercado Pago não fez o estorno${detail ? `: ${detail}` : ''}. Nada foi alterado.` },
-        { status: 502 }
+        { status: MP_FAILED_STATUS }
       );
     }
 

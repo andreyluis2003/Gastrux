@@ -150,7 +150,7 @@ describe('delivery-checkout route', () => {
 
     const res = await post({ orderId: 'order-1' });
 
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(424);
     expect(prismaMock.payment.update).not.toHaveBeenCalled();
   });
 
