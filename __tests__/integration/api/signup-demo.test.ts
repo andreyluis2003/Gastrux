@@ -99,6 +99,19 @@ describe('new account: "Comece com" and address in the sign-up questions', () =>
     expect(await prisma.menuItem.count({ where: { restaurantId: a.restaurantId } })).toBe(0);
   });
 
+  it('only the business type and "Comece com" are needed (owner 2026-10-12: the 3 lead questions left the screen)', async () => {
+    const a = await newAccount(); made.push(a);
+    const res = await answer(a.userId, { businessType: 'hamburgueria', startWith: 'template' });
+    expect(res.status).toBe(200);
+    expect((await res.json()).template).toBe('hamburgueria');
+    const owner = await prisma.user.findUnique({ where: { id: a.userId } });
+    expect(owner.businessType).toBe('hamburgueria');
+    expect(owner.businessStage).toBeNull();
+    // An answer that is sent is still checked
+    const bad = await answer(a.userId, { businessType: 'hamburgueria', startWith: 'blank', locationCount: '999' });
+    expect(bad.status).toBe(400);
+  });
+
   it('"Pular por enquanto" keeps the general example', async () => {
     const a = await newAccount(); made.push(a);
     const res = await answer(a.userId, { skip: true });

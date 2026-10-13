@@ -45,11 +45,14 @@ export async function POST(request: NextRequest) {
   const { businessStage, businessType, locationCount, mainPainPoint } = body;
   const startWith = body.startWith ?? 'template';
 
+  // The stage, units and main pain left the screen (owner, 2026-10-12: nobody used them and every question
+  // delays the first sale); an answer still sent by an old screen is checked and kept
+  const optional = (value: unknown, allowed: string[]) => value === undefined || value === null || allowed.includes(value as string);
   if (
-    !BUSINESS_STAGES.includes(businessStage) ||
     !BUSINESS_TYPES.includes(businessType) ||
-    !LOCATION_COUNTS.includes(locationCount) ||
-    !PAIN_POINTS.includes(mainPainPoint) ||
+    !optional(businessStage, BUSINESS_STAGES) ||
+    !optional(locationCount, LOCATION_COUNTS) ||
+    !optional(mainPainPoint, PAIN_POINTS) ||
     !['template', 'blank'].includes(startWith)
   ) {
     return NextResponse.json({ error: 'Resposta inválida' }, { status: 400 });
@@ -60,11 +63,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: address.error }, { status: 400 });
   }
 
-  const leadQuality = businessStage === 'just_researching' ? 'curious' : 'qualified';
+  const leadQuality = businessStage ? (businessStage === 'just_researching' ? 'curious' : 'qualified') : null;
 
   await prisma.user.update({
     where: { id: userId },
-    data: { businessStage, businessType, locationCount, mainPainPoint, leadQuality },
+    data: {
+      businessType,
+      ...(businessStage ? { businessStage, leadQuality } : {}),
+      ...(locationCount ? { locationCount } : {}),
+      ...(mainPainPoint ? { mainPainPoint } : {}),
+    },
   });
 
   let template: string | null = null;

@@ -17,25 +17,6 @@ const BUSINESS_TYPE_OPTIONS = SEGMENTS.filter((s) => !['delivery', 'franquias'].
   label: `${s.emoji} ${s.shortName}`,
 }));
 
-const BUSINESS_STAGE_OPTIONS = [
-  { value: 'operating', label: 'Já tenho um restaurante/negócio de alimentação em operação' },
-  { value: 'opening_soon', label: 'Vou abrir em breve' },
-  { value: 'just_researching', label: 'Não, só estou pesquisando' },
-];
-
-const LOCATION_COUNT_OPTIONS = [
-  { value: '1', label: '1 unidade' },
-  { value: '2_5', label: '2 a 5 unidades' },
-  { value: '6_plus', label: '6 ou mais unidades' },
-];
-
-const PAIN_POINT_OPTIONS = [
-  { value: 'estoque', label: 'Controle de estoque' },
-  { value: 'cmv', label: 'Custo de receita / CMV' },
-  { value: 'caixa', label: 'Caixa e vendas' },
-  { value: 'outro', label: 'Outro' },
-];
-
 type AddressField = 'zipCode' | 'street' | 'number' | 'complement' | 'neighborhood' | 'city' | 'state';
 const EMPTY_ADDRESS: Record<AddressField, string> = { zipCode: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '' };
 
@@ -76,9 +57,8 @@ function ChoiceStep({
 
 export default function QualificationPage() {
   const router = useRouter();
-  const [businessStage, setBusinessStage] = useState<string | null>(null);
-  const [locationCount, setLocationCount] = useState<string | null>(null);
-  const [mainPainPoint, setMainPainPoint] = useState<string | null>(null);
+  // Owner, 2026-10-12: the stage, units and main pain questions left (nobody used the answers, and each
+  // one delays the first sale); the business type, "Comece com" and the address stay
   const [businessType, setBusinessType] = useState<string | null>(null);
   // "Comece com" (2026-10-06): the example menu of the chosen business type, or nothing
   const [startWith, setStartWith] = useState<'template' | 'blank'>('template');
@@ -86,7 +66,7 @@ export default function QualificationPage() {
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = businessStage && locationCount && mainPainPoint && businessType;
+  const canSubmit = !!businessType;
   const typeLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.value === businessType)?.label;
 
   function setField(field: AddressField, value: string) {
@@ -125,7 +105,7 @@ export default function QualificationPage() {
       const res = await fetch('/api/onboarding/qualification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessStage, businessType, locationCount, mainPainPoint, startWith, address }),
+        body: JSON.stringify({ businessType, startWith, address }),
       });
       if (res.status === 400) {
         // A half-filled address: say what is missing and stay on the page
@@ -163,30 +143,9 @@ export default function QualificationPage() {
           <ChefHat className="h-10 w-10 text-red-600" />
           <h1 className="text-xl font-bold text-slate-900">Vamos preparar o seu restaurante</h1>
           <p className="text-sm text-slate-600">
-            Umas perguntas rápidas e o Gastrux já começa com o cardápio do seu tipo de negócio.
+            Duas escolhas rápidas e o Gastrux já começa com o cardápio do seu tipo de negócio.
           </p>
         </div>
-
-        <ChoiceStep
-          title="Você já tem um restaurante em operação?"
-          options={BUSINESS_STAGE_OPTIONS}
-          value={businessStage}
-          onSelect={setBusinessStage}
-        />
-
-        <ChoiceStep
-          title="Quantas unidades/lojas?"
-          options={LOCATION_COUNT_OPTIONS}
-          value={locationCount}
-          onSelect={setLocationCount}
-        />
-
-        <ChoiceStep
-          title="Qual seu maior problema hoje?"
-          options={PAIN_POINT_OPTIONS}
-          value={mainPainPoint}
-          onSelect={setMainPainPoint}
-        />
 
         <ChoiceStep
           title="Qual o tipo do seu negócio?"
