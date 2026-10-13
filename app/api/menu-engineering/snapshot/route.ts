@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -51,12 +52,14 @@ export async function POST(req: NextRequest) {
     if (!restaurantId) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
 
     const recipes = await prisma.recipe.findMany({
-      where: { active: true, restaurantId },
+      // Fichas simples (no cost) stay out, as in the live analysis (app/api/menu-engineering/route.ts)
+      where: { active: true, restaurantId, ...OWN_RECIPE_WHERE },
       include: {
         productionPlans: true,
       },
     });
 
+    const analysed = new Set(recipes.map((r) => r.id));
     const sessionItems = await prisma.orderSessionItem.findMany({
       where: {
         addedAt: { gte: startDate, lte: endDate },
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     const salesByRecipe: Record<string, { qty: number; revenue: number }> = {};
     for (const item of sessionItems) {
-      if (!item.recipeId) continue;
+      if (!item.recipeId || !analysed.has(item.recipeId)) continue;
       if (!salesByRecipe[item.recipeId]) salesByRecipe[item.recipeId] = { qty: 0, revenue: 0 };
       salesByRecipe[item.recipeId].qty += item.quantity;
       salesByRecipe[item.recipeId].revenue += item.quantity * Number(item.price);

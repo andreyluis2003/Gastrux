@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lineTotal } from '@/lib/comanda/line-total';
+import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -37,13 +38,22 @@ export async function GET(req: NextRequest) {
 
     const restaurantId = await getCurrentRestaurantId();
 
-    // Get all active recipes
+    // The restaurant's fichas técnicas. Fichas simples (items sold without one) have no cost: a soda showed
+    // a 100% margin and pulled the averages, so they are left out and named for the screen (2026-10-12)
     const recipes = await prisma.recipe.findMany({
-      where: { active: true, ...(restaurantId ? { restaurantId } : {}) },
+      where: { active: true, ...(restaurantId ? { restaurantId } : {}), ...OWN_RECIPE_WHERE },
       include: {
         productionPlans: { include: { plan: { select: { planDate: true } } } },
       },
     });
+    const withoutFicha = (
+      await prisma.recipe.findMany({
+        where: { active: true, ...(restaurantId ? { restaurantId } : {}), code: { startsWith: 'PROD-' }, ingredients: { none: {} } },
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      })
+    ).map((r) => r.name);
+    const analysed = new Set(recipes.map((r) => r.id));
 
     // SALES DATA: OrderSessionItem from sessions not CANCELLED in period
     const sessionItems = await prisma.orderSessionItem.findMany({
@@ -59,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     const salesByRecipe: Record<string, { qty: number; revenue: number }> = {};
     for (const item of sessionItems) {
-      if (!item.recipeId) continue;
+      if (!item.recipeId || !analysed.has(item.recipeId)) continue;
       if (!salesByRecipe[item.recipeId]) salesByRecipe[item.recipeId] = { qty: 0, revenue: 0 };
       salesByRecipe[item.recipeId].qty += item.quantity;
       // Modifier surcharges are revenue too, applied to each unit (lib/comanda/line-total.ts).
@@ -140,6 +150,7 @@ export async function GET(req: NextRequest) {
       recipes: classified,
       summary,
       averages: { avgCost, avgQty, avgContribution },
+      withoutFicha,
       dataSource: hasSalesData ? 'SALES' : 'PRODUCTION',
       period,
     });
