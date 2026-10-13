@@ -55,4 +55,15 @@ describe('Nova Movimentação starts the stock of an ingredient', () => {
     expect((await post({ ingredientId: id, movementType: 'MANUAL_DEDUCTION', quantity: 2 })).status).toBeLessThan(300);
     expect(await stockOf(id)).toBe(-2);
   });
+
+  it('an ingredient of another restaurant is refused and its stock is never created', async () => {
+    const other = (await prisma.restaurant.create({ data: { name: `SMO ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    try {
+      const cat = await prisma.ingredientCategory.create({ data: { restaurantId: other, name: `SMO ${tag}` } });
+      const theirs = (await prisma.ingredient.create({ data: { restaurantId: other, categoryId: cat.id, code: `SMO-${tag}`, name: 'Alheio', standardUnit: 'kg', purchaseUnit: 'kg' } })).id;
+      expect((await post({ ingredientId: theirs, movementType: 'ENTRY', quantity: 5 })).status).toBe(404);
+      expect(await stockOf(theirs)).toBeNull();
+      expect(await prisma.stockMovement.count({ where: { ingredientId: theirs } })).toBe(0);
+    } finally { await prisma.restaurant.delete({ where: { id: other } }); }
+  });
 });
