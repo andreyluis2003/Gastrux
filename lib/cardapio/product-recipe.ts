@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isProductRecipe } from './is-product-recipe';
@@ -20,10 +20,17 @@ export async function createProductRecipe(
   restaurantId: string,
   item: { name: string; description: string | null; price: Prisma.Decimal | number },
 ) {
+  // A free code: a taken one would abort the whole sale transaction (Postgres allows no retry after an error)
+  let code = '';
+  for (let attempt = 0; attempt < 5 && !code; attempt++) {
+    const candidate = `PROD-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    if (!(await tx.recipe.findFirst({ where: { restaurantId, code: candidate }, select: { id: true } }))) code = candidate;
+  }
+  if (!code) code = `PROD-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
   return tx.recipe.create({
     data: {
       restaurantId,
-      code: `PROD-${randomBytes(4).toString('hex').toUpperCase()}`,
+      code,
       name: item.name,
       description: item.description,
       baseYield: 1,

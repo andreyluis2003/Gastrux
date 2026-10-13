@@ -178,4 +178,16 @@ describe('ficha simples', () => {
       await prisma.restaurant.delete({ where: { id: early } });
     }
   });
+
+  it('a ficha code already taken in the restaurant is never reused (no error on a collision)', async () => {
+    await prisma.recipe.create({ data: { restaurantId: rid, code: 'PROD-AAAAAAAA', name: 'Ocupado', baseYield: 1, yieldUnit: 'un', portionUnit: 'un' } });
+    const spy = jest.spyOn(crypto, 'randomBytes').mockReturnValueOnce(Buffer.from([0xaa, 0xaa, 0xaa, 0xaa]) as any);
+    try {
+      const mi = await item(rid, cat.id, `Colisao ${tag}`);
+      expect(await ensureMenuItemRecipes(prisma, rid, [mi.id])).toBe(1);
+      const linked = await prisma.menuItem.findUnique({ where: { id: mi.id }, include: { recipe: true } });
+      expect(linked.recipe.code).toMatch(/^PROD-[0-9A-F]{8}$/);
+      expect(linked.recipe.code).not.toBe('PROD-AAAAAAAA');
+    } finally { spy.mockRestore(); }
+  });
 });
