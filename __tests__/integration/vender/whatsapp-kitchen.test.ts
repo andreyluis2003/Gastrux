@@ -81,6 +81,8 @@ describe('WhatsApp order: confirmed order reaches the kitchen', () => {
       const before = await prisma.orderSessionItem.count({ where: { recipeId } });
       await confirmWith([{ menuItemId: theirs.id, name: 'Alheio', quantity: 1, price: 6 }]);
       expect(await prisma.orderSessionItem.count({ where: { recipeId } })).toBe(before);
+      // The refusal names what cannot be ordered (it read "não estão disponíveis agora: .")
+      expect(sent[sent.length - 1]).toContain('Alheio');
     } finally {
       try { await prisma.restaurant.delete({ where: { id: other } }); } catch {}
     }

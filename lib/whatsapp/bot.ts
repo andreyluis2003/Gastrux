@@ -563,12 +563,14 @@ async function handleConfirmOrder(ctx: BotContext) {
     where: { id: { in: menuItemIds }, restaurantId: ctx.restaurantId },
     select: { id: true, recipeId: true, name: true, price: true },
   });
-  const missing = menuItems.filter((mi) => !mi.recipeId);
-  const unknown = new Set(menuItemIds).size > menuItems.length;
-  if (missing.length > 0 || unknown) {
+  // Not orderable: an item without a ficha (removed or unavailable), or one not on this menu any more;
+  // the cart keeps the name the customer saw, so the refusal always names them
+  const found = new Set(menuItems.filter((mi) => mi.recipeId).map((mi) => mi.id));
+  const refused = [...new Set(cart.filter((c) => !found.has(c.menuItemId)).map((c) => c.name))];
+  if (refused.length > 0) {
     return safeSendText(
       ctx,
-      `😓 Alguns itens não estão disponíveis agora: ${missing.map((m) => m.name).join(', ')}. Por favor, escolha outros itens.`,
+      `😓 Alguns itens não estão disponíveis agora: ${refused.join(', ')}. Por favor, escolha outros itens.`,
     );
   }
 
