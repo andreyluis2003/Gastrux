@@ -119,4 +119,22 @@ describe('stock at the sale', () => {
     await settleSessionStock(prisma, rid, s.id);
     expect(await stockOf(bread.id)).toBeCloseTo(p0 - 2);
   });
+
+  it('the kitchen completing while the bill is being closed takes the stock once (final review 2026-10-13)', async () => {
+    const { changeOrderStatus } = await import('../../../lib/kds/order-status');
+    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, status: 'OPEN', tableNumber: 4 } });
+    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: burger.id, quantity: 1, price: 30 } });
+    const order = await prisma.order.create({ data: { restaurantId: rid, orderNumber: `K-${tag}-4`, orderType: 'DINE_IN', status: 'PREPARING', total: 30, orderSessionId: s.id } });
+    await prisma.orderItem.create({ data: { orderId: order.id, recipeId: burger.id, quantity: 1 } });
+    const p0 = await stockOf(bread.id);
+    // The close settles, then is still running (not committed) when the kitchen taps Concluído
+    const close = prisma.$transaction(async (tx) => {
+      await tx.orderSession.update({ where: { id: s.id }, data: { status: 'CLOSED' } });
+      await settleSessionStock(tx, rid, s.id);
+      await tx.$executeRaw`SELECT pg_sleep(1)`;
+    }, { timeout: 20000 });
+    await new Promise((r) => setTimeout(r, 300));
+    await Promise.all([close, changeOrderStatus(rid, order.id, 'COMPLETED')]);
+    expect(await stockOf(bread.id)).toBeCloseTo(p0 - 1);
+  });
 });

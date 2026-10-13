@@ -31,10 +31,15 @@ export async function changeOrderStatus(restaurantId: string, orderId: string, s
     return { kind: 'invalid', error: 'Para cancelar um pedido use o cancelamento (exige um gerente)' };
   }
 
-  const current = await prisma.order.findFirst({ where: { id: orderId, restaurantId }, select: { status: true } });
+  const current = await prisma.order.findFirst({ where: { id: orderId, restaurantId }, select: { status: true, orderSessionId: true } });
   if (!current) return { kind: 'not-found' };
 
   const outcome = await prisma.$transaction(async (tx) => {
+    // The comanda's stock lock (lib/stock/session-stock.ts): a close settling it at the same time finishes
+    // first and the kitchen sees it CLOSED, or the close waits and counts this deduction
+    if (status === 'COMPLETED' && current.orderSessionId) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'stock-session:' + current.orderSessionId}))`;
+    }
     const data: any = { status };
     if (status === 'COMPLETED') data.completedAt = new Date();
     if (status === 'PREPARING') data.actualStartTime = new Date();

@@ -278,6 +278,8 @@ export async function DELETE(
         if (cooking) throw new CashRuleError('A cozinha ainda tem pedidos desta comanda. Cancele esses pedidos na cozinha (ou os itens enviados) antes de cancelar a comanda.', 409, 'KITCHEN_OPEN');
         const guard = await tx.orderSession.updateMany({ where: { id: params.id, status: ownedSession.status }, data: { status: 'CANCELLED' } });
         if (guard.count === 0) throw new CashRuleError('Esta comanda mudou enquanto era cancelada. Atualize e tente de novo.', 422, 'CHANGED');
+        // A closed sale that is cancelled gives back the stock its close took (lib/stock/session-stock.ts)
+        await settleSessionStock(tx, member.restaurantId, params.id);
         // Online money (pay at the table) cannot be given back from the drawer: it is refunded through
         // Mercado Pago first, so the cancel is refused (and rolled back) while the bill still holds it
         const { cashCents, onlineCents } = await billPaidCents(tx, member.restaurantId, params.id);

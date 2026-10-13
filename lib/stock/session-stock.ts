@@ -12,7 +12,7 @@ const EPS = 1e-9;
  * earlier settlements (ORDER_SESSION). The difference leaves stock; a reopened bill that lost lines gets
  * back only what an earlier settlement took (what the kitchen made is a loss, lib/kds-cancel-order.ts).
  * The quantity changes only for a controlled ingredient (one with a Stock row); the movement is always
- * recorded, for the CMV.
+ * recorded, for the CMV. A cancelled comanda has no target: its settlements come back (the sale is undone).
  */
 export async function settleSessionStock(db: Db, restaurantId: string, sessionId: string): Promise<{ moved: number }> {
   const run = async (tx: Prisma.TransactionClient) => {
@@ -24,10 +24,11 @@ export async function settleSessionStock(db: Db, restaurantId: string, sessionId
         items: { select: { quantity: true, recipe: { select: { restaurantId: true, ingredients: { select: { ingredientId: true, quantity: true } } } } } },
       },
     });
-    if (!session || session.status !== 'CLOSED') return { moved: 0 };
+    if (!session || (session.status !== 'CLOSED' && session.status !== 'CANCELLED')) return { moved: 0 };
+    const cancelled = session.status === 'CANCELLED';
 
     const target = new Map<string, number>();
-    for (const line of session.items) {
+    for (const line of cancelled ? [] : session.items) {
       if (!line.recipe || line.recipe.restaurantId !== restaurantId) continue;
       for (const ri of line.recipe.ingredients) {
         target.set(ri.ingredientId, (target.get(ri.ingredientId) ?? 0) + Number(ri.quantity) * Number(line.quantity));
@@ -64,7 +65,7 @@ export async function settleSessionStock(db: Db, restaurantId: string, sessionId
       await tx.stockMovement.create({
         data: {
           restaurantId, ingredientId, quantity: change, movementType: 'AUTO_DEDUCTION',
-          reason: change < 0 ? `Venda: ${label}` : `Item retirado da conta: ${label}`,
+          reason: change < 0 ? `Venda: ${label}` : cancelled ? `Venda cancelada: ${label}` : `Item retirado da conta: ${label}`,
           referenceType: 'ORDER_SESSION', referenceId: sessionId,
         },
       });

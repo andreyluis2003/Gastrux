@@ -241,4 +241,22 @@ describe('closing a comanda records the payments in the shift', () => {
       await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
     }
   });
+
+  it('cancelling a closed sale gives its stock back: the sale is undone (final review 2026-10-13)', async () => {
+    const cat = await prisma.ingredientCategory.create({ data: { restaurantId: A.restaurantId, name: `CX ${tag}` } });
+    const bread = await prisma.ingredient.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, code: `CXB-${tag}`, name: 'Pão', standardUnit: 'un', purchaseUnit: 'un' } });
+    await prisma.stock.create({ data: { restaurantId: A.restaurantId, ingredientId: bread.id, currentQuantity: 10 } });
+    await prisma.recipeIngredient.create({ data: { recipeId: burger.id, ingredientId: bread.id, quantity: 1, unit: 'un' } });
+    try {
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      const s = await comanda([[30, 2]]);
+      expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 60 }] })).status).toBe(200);
+      expect((await prisma.stock.findFirst({ where: { ingredientId: bread.id } })).currentQuantity).toBe(8);
+      const del = deleteComanda(new Request(`http://x/api/comanda/sessions/${s.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'venda lançada errada', cashSessionId: session.id }) }) as any, { params: { id: s.id } });
+      expect((await del).status).toBe(200);
+      expect((await prisma.stock.findFirst({ where: { ingredientId: bread.id } })).currentQuantity).toBe(10);
+    } finally {
+      await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
+    }
+  });
 });

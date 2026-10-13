@@ -55,6 +55,8 @@ async function handlePOST(request: Request) {
       await settleSessionStock(prisma, member.restaurantId, clientId);
       return NextResponse.json({ session: closed, alreadyRecorded: true });
     }
+    // A replay also settles a closed sale whose stock was never settled (reconciled: never twice)
+    if (existing.status === 'CLOSED') await settleSessionStock(prisma, member.restaurantId, clientId);
     return NextResponse.json({ session: existing, alreadyRecorded: true });
   }
 

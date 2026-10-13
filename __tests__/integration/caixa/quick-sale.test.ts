@@ -133,4 +133,23 @@ describe('counter sale records its payments in the shift', () => {
       await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
     }
   });
+
+  it('a replay of a sale closed without its stock settled settles it (final review 2026-10-13)', async () => {
+    const cat = await prisma.ingredientCategory.create({ data: { restaurantId: A.restaurantId, name: `QR ${tag}` } });
+    const bread = await prisma.ingredient.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, code: `QRB-${tag}`, name: 'Pão', standardUnit: 'un', purchaseUnit: 'un' } });
+    await prisma.stock.create({ data: { restaurantId: A.restaurantId, ingredientId: bread.id, currentQuantity: 10 } });
+    await prisma.recipeIngredient.create({ data: { recipeId: burger.id, ingredientId: bread.id, quantity: 1, unit: 'un' } });
+    try {
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      const clientId = `bal-${crypto.randomUUID()}`;
+      // The sale closed, but its settlement failed (crash between the two): no stock movement
+      await prisma.orderSession.create({ data: { id: clientId, restaurantId: A.restaurantId, userId: A.ownerId, status: 'CLOSED', closedAt: new Date() } });
+      await prisma.orderSessionItem.create({ data: { sessionId: clientId, recipeId: burger.id, quantity: 1, price: 30 } });
+      const res = await sale({ clientId, items: [{ recipeId: burger.id, quantity: 1 }], cashSessionId: session.id, payments: [{ method: 'dinheiro', amount: 30 }] });
+      expect((await res.json()).alreadyRecorded).toBe(true);
+      expect((await prisma.stock.findFirst({ where: { ingredientId: bread.id } })).currentQuantity).toBe(9);
+    } finally {
+      await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
+    }
+  });
 });
