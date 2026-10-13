@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
+import { ensureMenuItemRecipes, OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { templateFor, type IngredientCategoryKey } from './starter-templates';
 
 /**
@@ -16,7 +16,8 @@ export async function seedStarterTemplate(restaurantId: string, businessType: st
 
   const [ingredientCount, recipeCount] = await Promise.all([
     prisma.ingredient.count({ where: { restaurantId } }),
-    prisma.recipe.count({ where: { restaurantId } }),
+    // A ficha simples (an item sold before answering) is not the restaurant's own data
+    prisma.recipe.count({ where: { restaurantId, ...OWN_RECIPE_WHERE } }),
   ]);
   if (ingredientCount > 0 || recipeCount > 0) return { seeded: false, template: template.slug };
 

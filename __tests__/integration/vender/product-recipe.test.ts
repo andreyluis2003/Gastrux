@@ -165,4 +165,17 @@ describe('ficha simples', () => {
       expect((await prisma.recipe.findUnique({ where: { id: simple.id } })).active).toBe(false);
     });
   });
+
+  it('a ficha simples made before the sign-up questions does not block the example menu', async () => {
+    const early = (await prisma.restaurant.create({ data: { name: `Early ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    try {
+      const c = await prisma.menuCategory.create({ data: { restaurantId: early, name: 'Bebidas', position: 0, active: true } });
+      await item(early, c.id, `Cafe ${tag}`);
+      await ensureMenuItemRecipes(prisma, early);
+      expect((await seedStarterTemplate(early, 'hamburgueria')).seeded).toBe(true);
+    } finally {
+      await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId: early } } });
+      await prisma.restaurant.delete({ where: { id: early } });
+    }
+  });
 });
