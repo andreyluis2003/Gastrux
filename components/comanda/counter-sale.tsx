@@ -14,8 +14,13 @@ import { OpenShiftCard } from '@/components/caixa/open-shift-card';
 import { brl } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 
-/** The "Venda registrada" notice: a comanda screen dismisses it (it stayed over the next comanda, 2026-10-12) */
-export const SALE_TOAST = 'counter-sale-done';
+/** The "Venda registrada" notices, one per sale (each keeps its own "Imprimir cupom"); a comanda screen
+ *  dismisses them all (they stayed over the next comanda, 2026-10-12) */
+const saleNotices = new Set<string>();
+export function dismissSaleNotices() {
+  saleNotices.forEach((id) => toast.dismiss(id));
+  saleNotices.clear();
+}
 
 interface MenuEntry {
   id: string;
@@ -58,6 +63,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
     [menu, cart]
   );
   const total = lines.reduce((sum, l) => sum + Math.round(priceOf(l.entry) * 100) * l.quantity, 0) / 100;
+  const hint = finishHint(Math.round(total * 100), payments);
   const visible = menu.filter((m) => m.available !== false && m.name?.toLowerCase().includes(search.toLowerCase()));
   const change = (id: string, delta: number) =>
     setCart((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
@@ -105,10 +111,13 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           return;
         }
         if (data.changeCents > 0) toast.success(`Troco: ${brl(data.changeCents)}`, { duration: 15000 });
+        saleNotices.add(`counter-sale-done:${clientId}`);
         toast.success('Venda registrada', {
           action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${clientId}`) },
           duration: 15000,
-          id: SALE_TOAST,
+          id: `counter-sale-done:${clientId}`,
+          onDismiss: () => saleNotices.delete(`counter-sale-done:${clientId}`),
+          onAutoClose: () => saleNotices.delete(`counter-sale-done:${clientId}`),
         });
         if (data.nfce?.message) {
           (data.nfce.nfce?.status === 'authorized' ? toast.success : toast.warning)(data.nfce.message);
@@ -173,8 +182,8 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         )}
       </div>
       {/* Why the button is still grey (2026-10-12: it stayed disabled with no reason on screen) */}
-      {lines.length > 0 && shift.shiftId && finishHint(Math.round(total * 100), payments) && (
-        <p className="text-sm text-amber-700 mt-3 text-right">{finishHint(Math.round(total * 100), payments)}</p>
+      {lines.length > 0 && shift.shiftId && hint && (
+        <p className="text-sm text-amber-700 mt-3 text-right">{hint}</p>
       )}
       <div className="flex items-center justify-between mt-4">
         <span className="text-2xl font-bold text-green-700">{brl(Math.round(total * 100))}</span>

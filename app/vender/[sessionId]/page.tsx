@@ -13,7 +13,7 @@ import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
 import { MesaActions } from '@/components/vender/mesa-actions';
 import { ReopenBill } from '@/components/vender/reopen-bill';
-import { SALE_TOAST } from '@/components/comanda/counter-sale';
+import { dismissSaleNotices } from '@/components/comanda/counter-sale';
 import { isUnsent, openFor, openedLabel, sessionLabel, type MenuEntry } from '@/lib/vender/rules';
 
 const DESKTOP = '(min-width: 1024px)';
@@ -30,7 +30,7 @@ export default function ComandaRapidaPage() {
   const [attending, setAttending] = useState(false);
 
   // The balcão's "Venda registrada" notice does not cover this comanda (2026-10-12)
-  useEffect(() => { toast.dismiss(SALE_TOAST); }, []);
+  useEffect(() => { dismissSaleNotices(); }, []);
 
   useEffect(() => {
     const mq = window.matchMedia(DESKTOP);
