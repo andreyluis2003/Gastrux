@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { GastruxLogo, HelpflowLogo } from '@/components/brand/logo';
+import { CookiePreferencesLink } from '@/components/analytics/cookie-banner';
 
 /**
  * The footer of the public site (landing, segment pages, plans, calculator): one footer, in the brand
@@ -44,7 +45,14 @@ export function SiteFooter() {
             <HelpflowLogo negative className="h-11 -ml-2" />
           </div>
         </div>
-        <p className="mt-3 text-center sm:text-right text-xs text-brand-light/60">Help Flow Ltda, CNPJ 61.639.918/0001-70</p>
+        <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-brand-light/60">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+            <Link href="/termos" className="hover:text-white">Termos de Uso</Link>
+            <Link href="/privacidade" className="hover:text-white">Política de Privacidade</Link>
+            <CookiePreferencesLink className="hover:text-white" />
+          </div>
+          <p>Help Flow Ltda, CNPJ 61.639.918/0001-70</p>
+        </div>
       </div>
     </footer>
   );

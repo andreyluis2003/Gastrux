@@ -14,6 +14,7 @@ import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { FontPreload } from '@/components/font-preload';
 import { PerformanceOptimizations } from '@/components/performance-optimizations';
 import { GAScript } from '@/components/analytics/ga-script';
+import { CookieBanner } from '@/components/analytics/cookie-banner';
 import { FeedbackWidget } from '@/components/feedback/feedback-widget';
 import { GastruxChat } from '@/components/ai/gastrux-chat';
 import { RadixPointerEventsFix } from '@/components/radix-pointer-events-fix';
@@ -81,7 +82,6 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <head suppressHydrationWarning>
         <FontPreload />
-        <GAScript />
       </head>
       <body
         suppressHydrationWarning
@@ -103,6 +103,9 @@ export default function RootLayout({
                 </OutboxProvider>
               </SessionProvider>
               <AppToaster />
+              {/* Google Analytics only after consent (lib/analytics/consent.ts) */}
+              <GAScript />
+              <CookieBanner />
             </ThemeProvider>
           </QueryProvider>
         </I18nProvider>
