@@ -7,7 +7,7 @@ const features = [
     icon: BarChart3,
     title: 'Margem de cada prato, todo dia',
     description: 'Chega de descobrir no fim do mês que o prato não pagava o próprio custo. Veja o CMV e a margem de contribuição por prato e por dia.',
-    color: 'bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400',
+    color: 'bg-brand-paper dark:bg-brand-ink/40 text-brand-green dark:text-brand-light',
   },
   {
     icon: ChefHat,
@@ -19,13 +19,13 @@ const features = [
     icon: Package,
     title: 'Estoque no automático',
     description: 'Vendeu um prato? O estoque já desconta os ingredientes. Avisa quando vai faltar algo.',
-    color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400',
+    color: 'bg-brand-paper dark:bg-brand-ink/40 text-brand-green dark:text-brand-light',
   },
   {
     icon: Bell,
     title: 'Alertas no celular',
     description: 'Estoque baixo, custo subiu demais, margem caiu. Você recebe o alerta antes do problema virar prejuízo.',
-    color: 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400',
+    color: 'bg-orange-50 dark:bg-orange-950/40 text-brand-green dark:text-orange-400',
   },
   {
     icon: Truck,
@@ -49,7 +49,7 @@ export function FeaturesShowcase() {
           <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold tracking-wide uppercase mb-3">
             Tudo que você precisa
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900 dark:text-slate-100 mb-3">
             Tudo que o caderno não faz por você
           </h2>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">

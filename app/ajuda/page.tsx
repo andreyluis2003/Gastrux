@@ -70,14 +70,14 @@ export default function HelpIndexPage() {
   }, [query]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-brand-paper to-white font-brand">
       {/* Hero */}
       <section className="px-4 py-12 sm:py-16">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-100 mb-4">
-            <BookOpen className="w-7 h-7 text-blue-600" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-card mb-4">
+            <BookOpen className="w-7 h-7 text-brand-green" />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3">Central de Ajuda</h1>
+          <h1 className="text-3xl sm:text-4xl font-medium tracking-tight mb-3">Central de Ajuda</h1>
           <p className="text-muted-foreground mb-8 text-base">
             Tudo que você precisa para tirar o máximo do Gastrux
           </p>
@@ -106,7 +106,7 @@ export default function HelpIndexPage() {
                 <Link key={a.id} href={`/ajuda/${a.slug}`}>
                   <Card className="hover:shadow-md transition cursor-pointer">
                     <CardContent className="p-4 flex items-start gap-3">
-                      <HelpCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <HelpCircle className="w-5 h-5 text-brand-green mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
                         <div className="font-medium">{a.title}</div>
                         {a.summary && (
@@ -136,7 +136,7 @@ export default function HelpIndexPage() {
                 <Link key={a.id} href={`/ajuda/${a.slug}`}>
                   <Card className="h-full hover:shadow-md transition cursor-pointer">
                     <CardContent className="p-5">
-                      <div className="text-xs text-blue-600 font-medium mb-2">
+                      <div className="text-xs text-brand-green font-medium mb-2">
                         {a.category.name}
                       </div>
                       <div className="font-semibold mb-2">{a.title}</div>
@@ -182,12 +182,12 @@ export default function HelpIndexPage() {
         )}
 
         {/* CTA Support */}
-        <section className="mt-12 text-center py-10 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 text-white">
+        <section className="mt-12 text-center py-10 rounded-2xl bg-brand-green text-white">
           <h3 className="text-2xl font-bold mb-2">Não encontrou o que procurava?</h3>
-          <p className="mb-5 opacity-90">Fale com a gente diretamente — atendemos em até 4 horas úteis</p>
+          <p className="mb-5 opacity-90">Fale com a gente diretamente: atendemos em até 4 horas úteis</p>
           <Link
             href="/suporte"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-brand-green rounded-lg font-semibold hover:bg-gray-100 transition"
           >
             Abrir ticket de suporte <ArrowRight className="w-4 h-4" />
           </Link>

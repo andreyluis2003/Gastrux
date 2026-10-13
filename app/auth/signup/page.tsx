@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ChefHat, Chrome } from 'lucide-react';
+import { Chrome } from 'lucide-react';
+import { GastruxLogo } from '@/components/brand/logo';
 import { useAnalytics } from '@/hooks/use-analytics';
 
 export default function SignUpPage() {
@@ -103,11 +104,10 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="flex min-h-screen items-center justify-center bg-brand-paper font-brand">
       <div className="w-full max-w-md space-y-8 rounded-lg bg-white p-8 shadow-lg">
         <div className="flex flex-col items-center space-y-2">
-          <ChefHat className="h-12 w-12 text-red-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Gastrux</h1>
+          <h1><GastruxLogo className="h-16" /></h1>
           <p className="text-sm text-slate-600">Crie sua conta</p>
         </div>
 
@@ -172,15 +172,16 @@ export default function SignUpPage() {
             />
             <span>
               Li e aceito os{' '}
-              <Link href="/termos" target="_blank" className="text-blue-600 hover:underline">Termos de Uso</Link>
+              <Link href="/termos" target="_blank" className="text-brand-green hover:underline">Termos de Uso</Link>
               {', a '}
-              <Link href="/privacidade" target="_blank" className="text-blue-600 hover:underline">Política de Privacidade</Link>
+              <Link href="/privacidade" target="_blank" className="text-brand-green hover:underline">Política de Privacidade</Link>
               {' e autorizo o tratamento dos meus dados conforme a LGPD (Lei Geral de Proteção de Dados)'}
             </span>
           </label>
 
           <Button
             type="submit"
+            variant="cta"
             className="w-full"
             disabled={isLoading || !acceptedTerms}
             loading={isLoading}
@@ -212,7 +213,7 @@ export default function SignUpPage() {
 
         <p className="text-center text-sm text-slate-600">
           Já tem uma conta?{' '}
-          <Link href="/auth/signin" className="font-medium text-red-600 hover:underline">
+          <Link href="/auth/signin" className="font-medium text-brand-green hover:underline">
             Entre aqui
           </Link>
         </p>

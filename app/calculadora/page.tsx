@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { GastruxLogo } from '@/components/brand/logo';
+import { SiteFooter } from '@/components/marketing/site-footer';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +15,6 @@ import {
   Users,
   ShoppingCart,
   Building2,
-  ChefHat,
   Share2,
   Mail,
   CheckCircle2,
@@ -237,15 +238,15 @@ export default function CalculadoraPage() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-b from-brand-paper to-white dark:from-gray-950 dark:to-gray-900 font-brand">
       {/* Header */}
       <header className="border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-orange-600 font-bold text-lg">
-            <ChefHat className="h-6 w-6" /> Gastrux
+          <Link href="/" className="flex items-center -ml-2" aria-label="Gastrux, página inicial">
+            <GastruxLogo className="h-14" />
           </Link>
           <Link href="/auth/signup">
-            <Button size="sm">Criar conta grátis</Button>
+            <Button size="sm" variant="cta">Criar conta grátis</Button>
           </Link>
         </div>
       </header>
@@ -253,12 +254,12 @@ export default function CalculadoraPage() {
       <main className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
         {/* Hero */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-card dark:bg-brand-ink/30 text-brand-ink dark:text-brand-light text-sm font-medium mb-4">
             <Calculator className="h-4 w-4" /> Gratuito • Sem cadastro
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight text-gray-900 dark:text-white mb-4">
             Você sabe se está{' '}
-            <span className="text-orange-600">lucrando ou só girando dinheiro?</span>
+            <span className="text-brand-green">lucrando ou só girando dinheiro?</span>
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Responda 5 perguntas rápidas e descubra — o caderno não mostra isso, mas a calculadora mostra.
@@ -277,7 +278,7 @@ export default function CalculadoraPage() {
                 <select
                   value={form.segmento}
                   onChange={(e) => setForm({ ...form, segmento: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:border-brand-green transition"
                 >
                   {SEGMENTOS.map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
@@ -296,7 +297,7 @@ export default function CalculadoraPage() {
                   placeholder="Ex: 80"
                   value={form.pratosPerDia}
                   onChange={(e) => setForm({ ...form, pratosPerDia: e.target.value ? Number(e.target.value) : '' })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:border-brand-green transition"
                 />
               </div>
 
@@ -312,7 +313,7 @@ export default function CalculadoraPage() {
                   placeholder="Ex: 35"
                   value={form.ticketMedio}
                   onChange={(e) => setForm({ ...form, ticketMedio: e.target.value ? Number(e.target.value) : '' })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:border-brand-green transition"
                 />
               </div>
 
@@ -327,7 +328,7 @@ export default function CalculadoraPage() {
                   placeholder="Ex: 25000"
                   value={form.comprasMes}
                   onChange={(e) => setForm({ ...form, comprasMes: e.target.value ? Number(e.target.value) : '' })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:border-brand-green transition"
                 />
               </div>
 
@@ -342,7 +343,7 @@ export default function CalculadoraPage() {
                   placeholder="Ex: 5"
                   value={form.funcionarios}
                   onChange={(e) => setForm({ ...form, funcionarios: e.target.value ? Number(e.target.value) : '' })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:border-brand-green transition"
                 />
               </div>
 
@@ -357,14 +358,14 @@ export default function CalculadoraPage() {
                   placeholder="Ex: 5000"
                   value={form.aluguel}
                   onChange={(e) => setForm({ ...form, aluguel: e.target.value ? Number(e.target.value) : '' })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green focus:border-brand-green transition"
                 />
               </div>
 
               <Button
                 onClick={handleCalculate}
                 disabled={!isFormValid}
-                className="w-full py-6 text-lg rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+                className="w-full py-6 text-lg rounded-xl bg-brand-green hover:bg-brand-ink text-white"
               >
                 <Calculator className="h-5 w-5 mr-2" />
                 Ver meu diagnóstico grátis
@@ -471,7 +472,7 @@ export default function CalculadoraPage() {
                   label="Folha estimada"
                   value={results.folhaEstimada}
                   total={results.faturamentoMes}
-                  color="bg-blue-500"
+                  color="bg-brand-green"
                   formatBRL={formatBRL}
                 />
                 <CostBar
@@ -492,7 +493,7 @@ export default function CalculadoraPage() {
             </div>
 
             {/* Lead capture */}
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-6 sm:p-8">
+            <div className="bg-gradient-to-br from-brand-paper to-amber-50 dark:from-brand-ink/20 dark:to-amber-900/20 border border-brand-light dark:border-brand-ink rounded-2xl p-6 sm:p-8">
               {!leadSent ? (
                 <div className="text-center">
                   <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
@@ -507,12 +508,12 @@ export default function CalculadoraPage() {
                       placeholder="Seu melhor email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500"
+                      className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-green"
                     />
                     <Button
                       onClick={handleCaptureLead}
                       disabled={!email || leadLoading}
-                      className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl px-6"
+                      className="bg-brand-green hover:bg-brand-ink text-white rounded-xl px-6"
                     >
                       {leadLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
                       Receber dicas
@@ -534,7 +535,7 @@ export default function CalculadoraPage() {
                     Enquanto isso, crie sua conta gratuita para ver o diagnóstico completo.
                   </p>
                   <Link href="/auth/signup">
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl">
+                    <Button className="bg-brand-green hover:bg-brand-ink text-white rounded-xl">
                       Criar conta grátis <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
@@ -563,6 +564,7 @@ export default function CalculadoraPage() {
         )}
 
       </main>
+      <SiteFooter />
     </div>
   );
 }
@@ -582,7 +584,7 @@ function KpiCard({
   color: 'blue' | 'green' | 'red' | 'amber';
 }) {
   const colors = {
-    blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    blue: 'bg-brand-paper dark:bg-brand-ink/20 text-brand-green dark:text-brand-light',
     green: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
     red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
     amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',

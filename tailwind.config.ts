@@ -15,6 +15,8 @@ const config: Config = {
         sans: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
         display: ['var(--font-display)', 'var(--font-dm-sans)', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        // Brand kit 2026-10-13 ("gastrux marca/cores-e-tipografia.json"): the public site uses Arial
+        brand: ['Arial', 'Helvetica', 'sans-serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -27,6 +29,18 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        // Brand kit 2026-10-13 (Gastrux greens; Helpflow lime only for the Helpflow mark)
+        brand: {
+          ink: '#142D27',
+          green: '#335538',
+          accent: '#38624D',
+          light: '#DFEBD3',
+          card: '#E6EDDD',
+          paper: '#F7F8F2',
+          hat: '#FFFEF5',
+          muted: '#65716A',
+          lime: '#C2F275',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { ChefHat } from 'lucide-react';
+import { GastruxSymbol } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
 import { SEGMENTS } from '@/lib/marketing/segments';
 
@@ -43,7 +43,7 @@ function ChoiceStep({
             className={cn(
               'w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition',
               value === opt.value
-                ? 'border-red-600 bg-red-50 text-red-700'
+                ? 'border-brand-green bg-brand-card text-brand-ink'
                 : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50',
             )}
           >
@@ -137,10 +137,10 @@ export default function QualificationPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-brand-paper px-4 py-10 font-brand">
       <div className="w-full max-w-md space-y-6 rounded-lg bg-white p-8 shadow-lg">
         <div className="flex flex-col items-center space-y-2 text-center">
-          <ChefHat className="h-10 w-10 text-red-600" />
+          <GastruxSymbol className="h-14" />
           <h1 className="text-xl font-bold text-slate-900">Vamos preparar o seu restaurante</h1>
           <p className="text-sm text-slate-600">
             Duas escolhas rápidas e o Gastrux já começa com o cardápio do seu tipo de negócio.
@@ -196,7 +196,7 @@ export default function QualificationPage() {
         </div>
 
         <div className="space-y-2 pt-2">
-          <Button className="w-full" disabled={!canSubmit || submitting} loading={submitting} onClick={handleSubmit}>
+          <Button variant="cta" className="w-full" disabled={!canSubmit || submitting} loading={submitting} onClick={handleSubmit}>
             Continuar
           </Button>
           <button

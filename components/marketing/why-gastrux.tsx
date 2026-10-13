@@ -50,7 +50,7 @@ export function WhyGastrux() {
           <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide uppercase mb-3">
             O que a Gastrux faz
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900 dark:text-white mb-4">
             Por que a Gastrux e não o caderno?
           </h2>
           <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
@@ -62,8 +62,8 @@ export function WhyGastrux() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
           {DIFFERENTIALS.map((d, i) => (
             <div key={i} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 hover:shadow-lg transition-shadow">
-              <div className="w-11 h-11 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-                <d.icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-11 h-11 rounded-lg bg-brand-card dark:bg-brand-ink/30 flex items-center justify-center mb-4">
+                <d.icon className="w-5 h-5 text-brand-green dark:text-brand-light" />
               </div>
               <h3 className="font-semibold text-slate-900 dark:text-white mb-2">{d.title}</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{d.description}</p>
@@ -76,7 +76,7 @@ export function WhyGastrux() {
           <div className="p-6 border-b border-slate-200 dark:border-slate-700">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">Funcionalidades e planos</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              O detalhe de limites e preços está na <a href="/pricing" className="underline hover:text-blue-600">página de planos</a>.
+              O detalhe de limites e preços está na <a href="/pricing" className="underline hover:text-brand-green">página de planos</a>.
             </p>
           </div>
           <div className="overflow-x-auto">

@@ -45,7 +45,11 @@ const PUBLIC_PATHS = [
   '/delivery', // pedido e pagamento do cliente final, sem conta no Gastrux
 ];
 
+/** Brand files and app icons in public/ (2026-10-13: the new logo did not show to visitors) */
+const PUBLIC_ASSET = /^\/(brand\/[\w.-]+\.(svg|png)|favicon\.svg|icon-[\w-]+\.png|og-image\.png|screenshot-[\w-]+\.png)$/;
+
 function isPublicPage(pathname: string): boolean {
+  if (PUBLIC_ASSET.test(pathname)) return true;
   // Exact matches or prefix matches for dynamic segments
   for (const pub of PUBLIC_PATHS) {
     if (pathname === pub || pathname.startsWith(pub + '/')) {

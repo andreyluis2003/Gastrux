@@ -9,7 +9,7 @@ const steps = [
     title: 'Cadastre em 10 minutos',
     description:
       'Sem cartão, sem instalar nada. Coloca o nome do restaurante, os pratos principais e os ingredientes. Pronto.',
-    color: 'from-blue-500 to-cyan-500',
+    color: 'from-brand-green to-cyan-500',
   },
   {
     n: 2,
@@ -17,7 +17,7 @@ const steps = [
     title: 'Larga o caderno',
     description:
       'Tudo que você anotava no caderno agora aparece organizado na tela: compras, estoque, custo de cada prato.',
-    color: 'from-violet-500 to-fuchsia-500',
+    color: 'from-brand-green to-fuchsia-500',
   },
   {
     n: 3,
@@ -34,10 +34,10 @@ export function HowItWorks() {
     <section className="py-20 px-4 sm:px-6 bg-slate-50 dark:bg-slate-800/50">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 text-xs font-semibold tracking-wide uppercase mb-3">
+          <span className="inline-block px-3 py-1 rounded-full bg-brand-card dark:bg-brand-ink/30 text-brand-green dark:text-brand-light text-xs font-semibold tracking-wide uppercase mb-3">
             Começar é fácil
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900 dark:text-slate-100 mb-3">
             Do caderno ao controle total em 3 passos
           </h2>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400">

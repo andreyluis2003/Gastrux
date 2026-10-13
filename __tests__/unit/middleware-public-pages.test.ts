@@ -22,6 +22,12 @@ describe('middleware: public pages without login', () => {
     '/delivery/cmushbbri0001nx0klhijo24p',
     '/delivery/cmushbbri0001nx0klhijo24p?payment=abc&result=success',
     '/menu/qr-token',
+    // The brand files and app icons of the public site (2026-10-13: the new logo did not show to visitors)
+    '/brand/gastrux.svg',
+    '/brand/helpflow-negativa.svg',
+    '/favicon.svg',
+    '/icon-192.png',
+    '/og-image.png',
   ])('%s opens for a visitor', async (path) => {
     expect(redirectsToSignIn(await visit(path))).toBe(false);
   });

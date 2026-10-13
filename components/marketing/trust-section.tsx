@@ -34,10 +34,10 @@ export function TrustSection() {
     <section id="como-comecar" className="py-20 px-4 sm:px-6 bg-slate-50 dark:bg-slate-800/40">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <span className="inline-block px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
+          <span className="inline-block px-3 py-1 rounded-full bg-brand-card dark:bg-brand-ink/30 text-brand-ink dark:text-brand-light text-xs font-semibold tracking-wide uppercase mb-3">
             Como é a implantação
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900 dark:text-white mb-4">
             Do caderno ao sistema, em quatro passos
           </h2>
           <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
@@ -49,8 +49,8 @@ export function TrustSection() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-14">
           {STEPS.map((s) => (
             <div key={s.title} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-              <div className="w-11 h-11 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-                <s.icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-11 h-11 rounded-lg bg-brand-card dark:bg-brand-ink/30 flex items-center justify-center mb-4">
+                <s.icon className="w-5 h-5 text-brand-green dark:text-brand-light" />
               </div>
               <h3 className="font-semibold text-slate-900 dark:text-white mb-2">{s.title}</h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{s.description}</p>
@@ -59,15 +59,15 @@ export function TrustSection() {
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row gap-6 md:items-center">
-          <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
-            <Building2 className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+          <div className="w-12 h-12 rounded-xl bg-brand-card dark:bg-brand-ink/30 flex items-center justify-center shrink-0">
+            <Building2 className="w-6 h-6 text-brand-green dark:text-brand-light" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Quem está por trás</h3>
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               A Gastrux é desenvolvida pela Help Flow Ltda, empresa brasileira (CNPJ 61.639.918/0001-70). Antes de
               assinar, você pode criar a conta grátis e testar com os seus próprios pratos. Dúvidas? Escreva para{' '}
-              <a href="mailto:contato@gastrux.com" className="font-medium text-blue-600 hover:underline">contato@gastrux.com</a>.
+              <a href="mailto:contato@gastrux.com" className="font-medium text-brand-green hover:underline">contato@gastrux.com</a>.
             </p>
           </div>
           <Link

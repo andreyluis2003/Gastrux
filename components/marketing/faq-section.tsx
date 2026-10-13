@@ -53,7 +53,7 @@ export function FAQSection({
           <span className="inline-block px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-semibold tracking-wide uppercase mb-3">
             Dúvidas comuns
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-100">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900 dark:text-slate-100">
             {title}
           </h2>
         </div>
@@ -61,7 +61,7 @@ export function FAQSection({
           {faqs.map((f, i) => (
             <details
               key={i}
-              className="group border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 open:border-blue-300 open:dark:border-blue-700 open:bg-blue-50/50 open:dark:bg-blue-950/20 open:shadow-sm transition-all"
+              className="group border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 open:border-brand-light open:dark:border-brand-ink open:bg-brand-paper/50 open:dark:bg-brand-ink/20 open:shadow-sm transition-all"
               open={i === 0}
             >
               <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-slate-900 dark:text-slate-100">

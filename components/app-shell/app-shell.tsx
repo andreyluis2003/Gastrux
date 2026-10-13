@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { GastruxLogo } from '@/components/brand/logo';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ChefHat, ChevronDown, CreditCard, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
+import { ChevronDown, CreditCard, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
 import { openFeedback } from '@/components/feedback/feedback-widget';
 import { signOutSafely } from '@/lib/offline/sign-out';
@@ -55,9 +56,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <Menu className="h-6 w-6" />
         </button>
-        <Link href="/dashboard" className="flex items-center gap-2 min-w-0 flex-1">
-          <ChefHat className="h-5 w-5 text-red-600 shrink-0" />
-          <span className="font-semibold truncate">Gastrux</span>
+        <Link href="/dashboard" className="flex items-center min-w-0 flex-1 -ml-1" aria-label="Gastrux, início">
+          <GastruxLogo className="h-9" />
         </Link>
         {bellInTopBar && <NotificationCenter />}
       </header>
@@ -73,9 +73,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Menu principal"
       >
         <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-2 shrink-0">
-          <ChefHat className="h-7 w-7 text-red-400 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="font-bold leading-tight">Gastrux</p>
+            <GastruxLogo negative className="h-10 -ml-2" />
             <p className="text-xs text-slate-400 truncate">{user?.name || 'Gestão Integrada'}</p>
           </div>
           {bellInMenu && (

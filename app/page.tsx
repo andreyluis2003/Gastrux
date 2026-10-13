@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ChefHat, ArrowRight, Check, Sparkles, ShieldCheck, Menu, X } from 'lucide-react';
+import { ArrowRight, Check, Sparkles, ShieldCheck, Menu, X } from 'lucide-react';
+import { GastruxLogo } from '@/components/brand/logo';
+import { SiteFooter } from '@/components/marketing/site-footer';
 import { Button } from '@/components/ui/button';
 import { useAnalytics } from '@/hooks/use-analytics';
 import { useScrollTracking } from '@/hooks/use-scroll-tracking';
@@ -57,23 +59,22 @@ function HomePageContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900">
+    <div className="min-h-screen bg-white dark:bg-slate-900 font-brand">
       <ClarityScript />
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-slate-100">
-            <ChefHat className="w-6 h-6 text-blue-600" />
-            Gastrux
+          <Link href="/" className="flex items-center -ml-2" aria-label="Gastrux, página inicial">
+            <GastruxLogo className="h-14" />
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-            <Link href="#features" className="text-slate-600 dark:text-slate-300 hover:text-blue-600">
+            <Link href="#features" className="text-slate-600 dark:text-slate-300 hover:text-brand-green">
               Funcionalidades
             </Link>
-            <Link href="/#segmentos" className="text-slate-600 dark:text-slate-300 hover:text-blue-600">
+            <Link href="/#segmentos" className="text-slate-600 dark:text-slate-300 hover:text-brand-green">
               Segmentos
             </Link>
-            <Link href="/pricing" className="text-slate-600 dark:text-slate-300 hover:text-blue-600">
+            <Link href="/pricing" className="text-slate-600 dark:text-slate-300 hover:text-brand-green">
               Planos
             </Link>
           </div>
@@ -96,13 +97,13 @@ function HomePageContent() {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 py-4 space-y-3">
-            <Link href="#features" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600" onClick={() => setMobileMenuOpen(false)}>
+            <Link href="#features" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-brand-green" onClick={() => setMobileMenuOpen(false)}>
               Funcionalidades
             </Link>
-            <Link href="/#segmentos" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600" onClick={() => setMobileMenuOpen(false)}>
+            <Link href="/#segmentos" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-brand-green" onClick={() => setMobileMenuOpen(false)}>
               Segmentos
             </Link>
-            <Link href="/pricing" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600" onClick={() => setMobileMenuOpen(false)}>
+            <Link href="/pricing" className="block text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-brand-green" onClick={() => setMobileMenuOpen(false)}>
               Planos
             </Link>
             <div className="border-t border-slate-200 dark:border-slate-700 pt-3 flex flex-col gap-2">
@@ -118,18 +119,18 @@ function HomePageContent() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden pt-24 sm:pt-28 pb-16 px-4 sm:px-6 bg-gradient-to-b from-blue-50 via-white to-white dark:from-slate-800 dark:via-slate-900 dark:to-slate-900">
+      <section className="relative overflow-hidden pt-24 sm:pt-28 pb-16 px-4 sm:px-6 bg-gradient-to-b from-brand-paper via-white to-white dark:from-slate-800 dark:via-slate-900 dark:to-slate-900">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute top-20 left-1/4 w-72 h-72 bg-blue-300/20 rounded-full blur-3xl" />
-          <div className="absolute top-40 right-1/4 w-80 h-80 bg-violet-300/20 rounded-full blur-3xl" />
+          <div className="absolute top-20 left-1/4 w-72 h-72 bg-brand-light/20 rounded-full blur-3xl" />
+          <div className="absolute top-40 right-1/4 w-80 h-80 bg-brand-light/20 rounded-full blur-3xl" />
         </div>
         <div className="max-w-5xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 shadow-sm mb-6 backdrop-blur">
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" aria-hidden />
+            <Sparkles className="w-3.5 h-3.5 text-brand-green" aria-hidden />
             <span>Custo de cada prato, estoque, comanda e caixa num lugar só</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 dark:text-slate-100 mb-6 leading-tight tracking-tight">
-            <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-medium text-brand-ink dark:text-slate-100 mb-6 leading-tight tracking-tighter">
+            <span className="text-brand-ink dark:text-slate-100">
               {heroHeadline.isLoaded
                 ? heroHeadline.content
                 : 'Troque o caderno pelo controle de verdade'}
@@ -153,7 +154,7 @@ function HomePageContent() {
 
           <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handlePrimaryCtaClick}>
-              <Button size="lg" variant="cta" className="w-full sm:w-auto gap-2 shadow-lg shadow-orange-600/20">
+              <Button size="lg" variant="cta" className="w-full sm:w-auto gap-2 shadow-lg shadow-brand-green/20">
                 {heroPrimaryBtn.isLoaded ? heroPrimaryBtn.content : 'Trocar o Caderno Agora'}
                 <ArrowRight className="w-4 h-4" />
               </Button>
@@ -168,7 +169,7 @@ function HomePageContent() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 pt-8 border-t border-slate-200 dark:border-slate-700">
             {heroStats.map((s) => (
               <div key={s.label}>
-                <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
+                <div className="text-2xl sm:text-3xl font-bold text-brand-green">
                   {s.value}
                 </div>
                 <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">{s.label}</div>
@@ -194,66 +195,29 @@ function HomePageContent() {
       <FAQSection />
 
       {/* Final CTA */}
-      <section className="py-20 px-4 sm:px-6 bg-gradient-to-r from-blue-600 to-violet-600">
+      <section className="py-20 px-4 sm:px-6 bg-brand-ink">
         <div className="max-w-4xl mx-auto text-center text-white">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight mb-6">
             {finalCtaHeadline.isLoaded
               ? finalCtaHeadline.content
               : 'Seu restaurante merece mais que um caderno'}
           </h2>
-          <p className="text-lg mb-8 text-blue-100 max-w-2xl mx-auto">
+          <p className="text-lg mb-8 text-brand-light max-w-2xl mx-auto">
             Começa grátis em 10 minutos. Se não gostar, volta pro caderno, sem custo e sem burocracia.
           </p>
           <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handleFinalCtaClick}>
-              <Button size="lg" variant="cta" className="gap-2 shadow-xl">
+              <Button size="lg" variant="cta" className="gap-2 shadow-xl bg-brand-light text-brand-ink hover:bg-white">
                 {finalCtaBtn.isLoaded ? finalCtaBtn.content : 'Criar Conta Grátis'}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
           </div>
-          <p className="text-sm text-blue-100 mt-6">Sem cartão • Sem contrato • Grátis para sempre no Starter</p>
+          <p className="text-sm text-brand-light mt-6">Sem cartão • Sem contrato • Grátis para sempre no Starter</p>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-12 px-4 sm:px-6 border-t border-slate-800">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div className="md:col-span-2">
-              <Link href="/" className="flex items-center gap-2 font-bold text-xl text-white mb-3">
-                <ChefHat className="w-6 h-6 text-blue-400" />
-                Gastrux
-              </Link>
-              <p className="text-sm leading-relaxed">
-                A calculadora inteligente do seu restaurante. Sai do caderno, enxerga o custo e a margem de cada prato e toma decisão com segurança.
-              </p>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">Produto</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="#features" className="hover:text-white">Funcionalidades</Link></li>
-                <li><Link href="#como-comecar" className="hover:text-white">Como é a implantação</Link></li>
-                <li><Link href="/pricing" className="hover:text-white">Planos</Link></li>
-                <li><Link href="/#segmentos" className="hover:text-white">Segmentos</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">Suporte</h4>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/ajuda" className="hover:text-white">Central de Ajuda</Link></li>
-                <li><Link href="/suporte" className="hover:text-white">Abrir chamado</Link></li>
-                <li><a href="mailto:contato@gastrux.com" className="hover:text-white">contato@gastrux.com</a></li>
-                <li><Link href="/auth/signin" className="hover:text-white">Entrar</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-slate-800 pt-6 text-center text-sm">
-            <p>&copy; 2026 Gastrux. Todos os direitos reservados.</p>
-            <p className="mt-1 text-xs text-slate-500">Gastrux é um produto da Help Flow Ltda, CNPJ 61.639.918/0001-70</p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

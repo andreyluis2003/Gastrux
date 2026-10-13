@@ -21,7 +21,7 @@ interface Ticket {
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
-  OPEN: { label: 'Aberto', color: 'bg-blue-100 text-blue-700' },
+  OPEN: { label: 'Aberto', color: 'bg-brand-card text-brand-ink' },
   IN_PROGRESS: { label: 'Em andamento', color: 'bg-amber-100 text-amber-700' },
   WAITING_CUSTOMER: { label: 'Aguardando você', color: 'bg-purple-100 text-purple-700' },
   RESOLVED: { label: 'Resolvido', color: 'bg-emerald-100 text-emerald-700' },
@@ -30,7 +30,7 @@ const STATUS_STYLES: Record<string, { label: string; color: string }> = {
 
 const PRIORITY_STYLES: Record<string, string> = {
   LOW: 'bg-gray-100 text-gray-600',
-  NORMAL: 'bg-blue-100 text-blue-700',
+  NORMAL: 'bg-brand-card text-brand-ink',
   HIGH: 'bg-amber-100 text-amber-700',
   URGENT: 'bg-red-100 text-red-700',
 }
@@ -47,7 +47,7 @@ export default function SuportePage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-brand-paper font-brand">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -62,7 +62,7 @@ export default function SuportePage() {
               </Button>
             </Link>
             <Link href="/suporte/novo">
-              <Button>
+              <Button variant="cta">
                 <Plus className="h-4 w-4 mr-2" />
                 Novo ticket
               </Button>
@@ -77,15 +77,15 @@ export default function SuportePage() {
         ) : tickets.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
-                <MessageSquare className="h-8 w-8 text-blue-600" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-brand-paper flex items-center justify-center">
+                <MessageSquare className="h-8 w-8 text-brand-green" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">Nenhum ticket por enquanto</h3>
               <p className="text-gray-600 mt-1 mb-6 max-w-md mx-auto">
                 Se você tiver alguma dúvida ou problema, abra um ticket e nossa equipe ajudará você.
               </p>
               <Link href="/suporte/novo">
-                <Button>
+                <Button variant="cta">
                   <Plus className="h-4 w-4 mr-2" />
                   Abrir primeiro ticket
                 </Button>

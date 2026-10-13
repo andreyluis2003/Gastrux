@@ -15,10 +15,10 @@ export function SegmentsSection() {
     <section id="segmentos" className="py-16 px-4 sm:px-6 bg-slate-50 dark:bg-slate-800/50">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-10">
-          <span className="inline-block px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold tracking-wide uppercase mb-3">
+          <span className="inline-block px-3 py-1 rounded-full bg-brand-card dark:bg-brand-ink/30 text-brand-ink dark:text-brand-light text-xs font-semibold tracking-wide uppercase mb-3">
             Para cada tipo de negócio
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-4">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight text-slate-900 dark:text-white mb-4">
             A solução ideal para o seu segmento
           </h2>
           <p className="text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
@@ -30,11 +30,11 @@ export function SegmentsSection() {
             <Link
               key={seg.slug}
               href={`/para/${seg.slug}`}
-              className="group bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200"
+              className="group bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:shadow-lg hover:border-brand-light dark:hover:border-brand-light transition-all duration-200"
             >
               <span className="text-3xl mb-3 block">{seg.emoji}</span>
               <h3 className="font-semibold text-slate-900 dark:text-white text-sm mb-1">{seg.shortName}</h3>
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-xs text-brand-green dark:text-brand-light font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 Saiba mais <ArrowRight className="w-3 h-3" />
               </span>
             </Link>
@@ -45,7 +45,7 @@ export function SegmentsSection() {
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="text-blue-600 dark:text-blue-400 hover:underline font-semibold text-sm"
+              className="text-brand-green dark:text-brand-light hover:underline font-semibold text-sm"
             >
               Ver todos os segmentos ({SEGMENTS.length})
             </button>

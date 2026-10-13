@@ -5,7 +5,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
-import { CheckCircle2, X, Zap, ArrowRight, ChefHat, ShieldCheck, HelpCircle, RefreshCw } from 'lucide-react';
+import { GastruxLogo } from '@/components/brand/logo';
+import { SiteFooter } from '@/components/marketing/site-footer';
+import { CheckCircle2, X, Zap, ArrowRight, ShieldCheck, HelpCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -170,14 +172,13 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900">
+    <div className="min-h-screen bg-white dark:bg-slate-900 font-brand">
       <ClarityScript />
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-slate-900 dark:text-slate-100">
-            <ChefHat className="w-6 h-6 text-blue-600" />
-            Gastrux
+          <Link href="/" className="flex items-center -ml-2" aria-label="Gastrux, página inicial">
+            <GastruxLogo className="h-14" />
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link href="/auth/signin" className="hidden sm:block">
@@ -191,12 +192,12 @@ export default function PricingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="pt-28 pb-12 px-4 sm:px-6 bg-gradient-to-b from-blue-50 via-white to-white dark:from-slate-800 dark:via-slate-900 dark:to-slate-900">
+      <section className="pt-28 pb-12 px-4 sm:px-6 bg-gradient-to-b from-brand-paper via-white to-white dark:from-slate-800 dark:via-slate-900 dark:to-slate-900">
         <div className="max-w-4xl mx-auto text-center">
-          <span className="inline-block px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold tracking-wide uppercase mb-3">
+          <span className="inline-block px-3 py-1 rounded-full bg-brand-card dark:bg-brand-ink/30 text-brand-ink dark:text-brand-light text-xs font-semibold tracking-wide uppercase mb-3">
             Planos simples e transparentes
           </span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+          <h1 className="text-4xl sm:text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-100 mb-4">
             Escolha o plano certo. Cresce com você.
           </h1>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
@@ -254,12 +255,12 @@ export default function PricingPage() {
                   className={cn(
                     'relative bg-white dark:bg-slate-900 rounded-2xl border transition-all overflow-hidden',
                     isPopular
-                      ? 'border-blue-500 shadow-2xl ring-2 ring-blue-500 lg:scale-105'
+                      ? 'border-brand-green shadow-2xl ring-2 ring-brand-green lg:scale-105'
                       : 'border-slate-200 dark:border-slate-700 hover:shadow-xl'
                   )}
                 >
                   {isPopular && (
-                    <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-blue-500 to-violet-500 text-white text-xs font-semibold text-center py-1.5 tracking-wider uppercase">
+                    <div className="absolute top-0 left-0 right-0 bg-brand-green text-white text-xs font-semibold text-center py-1.5 tracking-wider uppercase">
                       Recomendado
                     </div>
                   )}
@@ -274,7 +275,7 @@ export default function PricingPage() {
                     <div className="mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
                       {isCustom ? (
                         <div>
-                          <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                          <span className="text-3xl font-bold text-brand-green dark:text-brand-light">
                             Personalizado
                           </span>
                           <p className="text-xs text-slate-500 mt-2">
@@ -350,7 +351,7 @@ export default function PricingPage() {
           {/* Enterprise: consultation-only, not a self-serve card */}
           <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-8">
             Precisa de mais que o Business — mais lojas, mais usuários, requisitos específicos?{' '}
-            <a href="mailto:contato@gastrux.com?subject=Plano%20Enterprise" className="text-blue-600 dark:text-blue-400 font-semibold hover:underline">
+            <a href="mailto:contato@gastrux.com?subject=Plano%20Enterprise" className="text-brand-green dark:text-brand-light font-semibold hover:underline">
               Plano Enterprise, preço sob consulta: contato@gastrux.com
             </a>
           </p>
@@ -366,7 +367,7 @@ export default function PricingPage() {
               <span>Cancele quando quiser</span>
             </div>
             <div className="flex items-center gap-2">
-              <HelpCircle className="w-5 h-5 text-blue-500" />
+              <HelpCircle className="w-5 h-5 text-brand-green" />
               <span>Suporte em português</span>
             </div>
           </div>
@@ -379,7 +380,7 @@ export default function PricingPage() {
           <div className="text-center mb-6">
             <button
               onClick={() => setShowComparison(!showComparison)}
-              className="text-blue-600 dark:text-blue-400 hover:underline font-semibold flex items-center justify-center gap-2 mx-auto"
+              className="text-brand-green dark:text-brand-light hover:underline font-semibold flex items-center justify-center gap-2 mx-auto"
             >
               {showComparison ? 'Ocultar' : 'Ver'} comparação completa de recursos
               <ArrowRight className={cn('w-4 h-4 transition', showComparison && 'rotate-90')} />
@@ -400,13 +401,13 @@ export default function PricingPage() {
                         className={cn(
                           'px-5 py-4 text-center font-semibold min-w-[140px]',
                           tier.id === 'business'
-                            ? 'text-blue-600 dark:text-blue-400'
+                            ? 'text-brand-green dark:text-brand-light'
                             : 'text-slate-700 dark:text-slate-300'
                         )}
                       >
                         {tier.name}
                         {tier.id === 'business' && (
-                          <span className="block text-xs font-normal text-blue-500 mt-0.5">Recomendado</span>
+                          <span className="block text-xs font-normal text-brand-green mt-0.5">Recomendado</span>
                         )}
                       </th>
                     ))}
@@ -442,7 +443,7 @@ export default function PricingPage() {
                                 key={tier.id}
                                 className={cn(
                                   'px-5 py-3.5 text-center',
-                                  tier.id === 'business' && 'bg-blue-50/40 dark:bg-blue-950/20'
+                                  tier.id === 'business' && 'bg-brand-paper/40 dark:bg-brand-ink/20'
                                 )}
                               >
                                 {typeof value === 'boolean' ? (
@@ -474,17 +475,17 @@ export default function PricingPage() {
       <FAQSection />
 
       {/* Final CTA */}
-      <section className="py-16 px-4 sm:px-6 bg-gradient-to-r from-blue-600 to-violet-600">
+      <section className="py-16 px-4 sm:px-6 bg-brand-ink">
         <div className="max-w-4xl mx-auto text-center text-white">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+          <h2 className="text-3xl sm:text-4xl font-medium tracking-tight mb-4">
             Ainda tem dúvidas?
           </h2>
-          <p className="text-base sm:text-lg mb-8 text-blue-100">
+          <p className="text-base sm:text-lg mb-8 text-brand-light">
             Comece gratuitamente hoje. Se não servir, é só cancelar.
           </p>
           <div className="flex justify-center">
             <Link href="/auth/signup">
-              <Button size="lg" variant="cta" className="gap-2">
+              <Button size="lg" variant="cta" className="gap-2 bg-brand-light text-brand-ink hover:bg-white">
                 Começar Grátis
                 <ArrowRight className="w-4 h-4" />
               </Button>
@@ -492,6 +493,8 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+
+      <SiteFooter />
 
       {gatewayDialogTier && (
         <GatewayChoiceDialog
