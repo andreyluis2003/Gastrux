@@ -170,6 +170,12 @@ export default function ShoppingListDetailPage() {
       const data = await res.json();
       setList(data);
       toast.success(`Status atualizado para ${statusConfig[newStatus]?.label || newStatus}`);
+      // Recebido / Parcial: what entered stock, and the items that are not a registered insumo
+      if (data.received) {
+        const { entered, skipped } = data.received;
+        if (entered > 0) toast.success(`${entered} ${entered === 1 ? 'item entrou' : 'itens entraram'} no estoque`);
+        if (skipped?.length) toast.warning(`Fora do estoque (não são insumos cadastrados): ${skipped.join(', ')}`);
+      }
     } catch (error) {
       toast.error('Erro ao atualizar status');
     } finally {
@@ -482,6 +488,11 @@ export default function ShoppingListDetailPage() {
                 );
               })}
             </div>
+            {(nextStatuses.includes('RECEIVED') || nextStatuses.includes('PARTIAL')) && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Recebido coloca no estoque todos os itens da lista. Parcial coloca só os itens marcados; o resto entra quando marcar Recebido.
+              </p>
+            )}
           </Card>
         </FadeIn>
       )}

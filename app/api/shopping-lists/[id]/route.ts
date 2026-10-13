@@ -6,8 +6,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { receiveShoppingList } from '@/lib/stock/receive-shopping-list';
 
 export const dynamic = 'force-dynamic';
+
+const LIST_STATUSES = ['PENDING', 'ORDERED', 'RECEIVED', 'PARTIAL', 'CANCELLED'];
 
 export async function GET(
   req: NextRequest,
@@ -86,22 +89,33 @@ export async function PUT(
     }
 
     const body = await req.json();
+    if (body.status !== undefined && !LIST_STATUSES.includes(body.status)) {
+      return NextResponse.json({ error: 'Status inválido' }, { status: 400 });
+    }
 
-    const list = await prisma.shoppingList.update({
-      where: { id: params.id },
-      data: {
-        status: body.status,
-        notes: body.notes,
-      },
-      include: {
-        items: {
-          include: {
-            supplier: {
-              include: { ingredient: true },
+    // Recebido / Parcial put the items that arrived in stock, in the same transaction as the status
+    // (lib/stock/receive-shopping-list.ts: each item once)
+    const { list, received } = await prisma.$transaction(async (tx) => {
+      const list = await tx.shoppingList.update({
+        where: { id: params.id },
+        data: {
+          status: body.status,
+          notes: body.notes,
+        },
+        include: {
+          items: {
+            include: {
+              supplier: {
+                include: { ingredient: true },
+              },
             },
           },
         },
-      },
+      });
+      const received = body.status === 'RECEIVED' || body.status === 'PARTIAL'
+        ? await receiveShoppingList(tx, restaurantId, params.id, { checkedOnly: body.status === 'PARTIAL' })
+        : undefined;
+      return { list, received };
     });
 
     await prisma.auditLog.create({
@@ -110,11 +124,11 @@ export async function PUT(
         action: 'UPDATE',
         entityType: 'ShoppingList',
         entityId: list.id,
-        changes: JSON.stringify({ status: body.status }),
+        changes: JSON.stringify({ status: body.status, ...(received ? { received } : {}) }),
       },
     });
 
-    return NextResponse.json(list);
+    return NextResponse.json({ ...list, ...(received ? { received } : {}) });
   } catch (error) {
     console.error('Error updating shopping list:', error);
     return NextResponse.json(
