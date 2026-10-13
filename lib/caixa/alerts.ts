@@ -43,7 +43,8 @@ export async function alertForgottenShifts(now = new Date()): Promise<{ alerted:
   const shifts = await prisma.cashSession.findMany({
     where: { status: 'OPEN', openedAt: { lt: limit } },
     select: { id: true, restaurantId: true, openedAt: true, cashRegister: { select: { name: true } } },
-    orderBy: { openedAt: 'asc' },
+    // Newest first: oldest first, 200 shifts already alerted would hide every newly forgotten one
+    orderBy: { openedAt: 'desc' },
     take: 200,
   });
   for (const s of shifts) {
