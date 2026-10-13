@@ -255,6 +255,9 @@ describe('closing a comanda records the payments in the shift', () => {
       const del = deleteComanda(new Request(`http://x/api/comanda/sessions/${s.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'venda lançada errada', cashSessionId: session.id }) }) as any, { params: { id: s.id } });
       expect((await del).status).toBe(200);
       expect((await prisma.stock.findFirst({ where: { ingredientId: bread.id } })).currentQuantity).toBe(10);
+      // The money given back says it was a cancellation, not a reopening (2026-10-13)
+      const refund = await prisma.cashSessionEntry.findFirst({ where: { orderSessionId: s.id, type: 'REFUND' } });
+      expect(refund.description).toBe('Cancelamento da comanda: venda lançada errada');
     } finally {
       await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
     }

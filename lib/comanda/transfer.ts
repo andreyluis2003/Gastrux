@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { settleSessionStock } from '@/lib/stock/session-stock';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
+import { REVERSAL_PREFIXES } from '@/lib/caixa/sale';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { billHasPayments, emitClosedBill, loadBill } from './bill-service';
 
@@ -49,7 +50,7 @@ export async function resolveMergedSession(db: Prisma.TransactionClient | typeof
 
 // A manager's reopening (lib/caixa/sale.ts reverseSaleEntries) marks every payment made before it as
 // given back by time (loadBill): mixed with another comanda's payments, it would mark those too
-const REOPEN_PREFIX = 'Reabertura da comanda';
+const REOPEN_PREFIX = REVERSAL_PREFIXES.reopen;
 async function assertNotReopened(tx: Prisma.TransactionClient, restaurantId: string, ids: string[]) {
   const reopened = await tx.cashSessionEntry.count({
     where: { orderSessionId: { in: ids }, restaurantId, type: 'REFUND', description: { startsWith: REOPEN_PREFIX } },

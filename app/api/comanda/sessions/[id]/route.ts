@@ -285,7 +285,7 @@ export async function DELETE(
         const { cashCents, onlineCents } = await billPaidCents(tx, member.restaurantId, params.id);
         if (onlineCents > 0) throw new CashRuleError('Pagamento online: estorne pelo Mercado Pago antes de cancelar', 409, 'ONLINE_PAYMENTS');
         if (cashCents > 0) {
-          await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason });
+          await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason, kind: 'cancel' });
         }
       });
     } catch (error) {

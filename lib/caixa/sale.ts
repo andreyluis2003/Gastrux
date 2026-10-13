@@ -76,9 +76,14 @@ export async function recordSaleEntries(
   }
 }
 
+/** Every payment given back by a reopening or a cancellation starts with one of these (bill and merge read them). */
+export const REVERSAL_PREFIXES = { reopen: 'Reabertura da comanda', cancel: 'Cancelamento da comanda' } as const;
+export const isReversal = (description: string | null | undefined) =>
+  Object.values(REVERSAL_PREFIXES).some((p) => (description ?? '').startsWith(p));
+
 export async function reverseSaleEntries(
   tx: Prisma.TransactionClient,
-  input: { restaurantId: string; orderSessionId: string; cashSessionId: string; createdById: string; reason: string }
+  input: { restaurantId: string; orderSessionId: string; cashSessionId: string; createdById: string; reason: string; kind?: keyof typeof REVERSAL_PREFIXES }
 ) {
   const shift = input.cashSessionId ? await lockShift(tx, input.restaurantId, input.cashSessionId) : null;
   if (!shift || shift.status !== 'OPEN') throw REQUIRED();
@@ -92,7 +97,7 @@ export async function reverseSaleEntries(
     if (l.type === 'CHANGE') n.change += l.amountCents;
     if (l.type === 'ADJUSTMENT' && l.direction === 'IN') n.change -= l.amountCents;
   }
-  const description = `Reabertura da comanda: ${input.reason}`.slice(0, 200);
+  const description = `${REVERSAL_PREFIXES[input.kind ?? 'reopen']}: ${input.reason}`.slice(0, 200);
   const base = { restaurantId: input.restaurantId, cashSessionId: shift.id, orderSessionId: input.orderSessionId, createdById: input.createdById, description };
   const rows: Prisma.CashSessionEntryCreateManyInput[] = [];
   for (const [method, n] of Object.entries(net)) {

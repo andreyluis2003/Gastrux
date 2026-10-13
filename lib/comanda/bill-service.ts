@@ -5,7 +5,7 @@ import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
-import { recordSaleEntries, resolveSaleShift } from '@/lib/caixa/sale';
+import { isReversal, recordSaleEntries, resolveSaleShift } from '@/lib/caixa/sale';
 import { CASH_METHODS, toNfcePaymentMethod, type CashMethod } from '@/lib/caixa/payment-methods';
 import type { PaymentInput } from '@/lib/caixa/rules';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
@@ -88,9 +88,9 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
   const paidCents = paidNetCents(entries) + onlineRows.reduce((sum, p) => sum + onlinePaidCents(p), 0);
 
   const refunds = entries.filter((e) => e.type === 'REFUND').map((e) => e.description ?? '');
-  // A manager's reopening gives every payment made until then back (lib/caixa/sale.ts reverseSaleEntries)
+  // A manager's reopening or cancellation gives every payment made until then back (lib/caixa/sale.ts reverseSaleEntries)
   const lastReopen = entries
-    .filter((e) => e.type === 'REFUND' && (e.description ?? '').startsWith('Reabertura da comanda'))
+    .filter((e) => e.type === 'REFUND' && isReversal(e.description))
     .reduce((t, e) => Math.max(t, e.createdAt.getTime()), 0);
   const payments: BillPayment[] = entries
     .filter((e) => e.type === 'RECEIPT')
