@@ -557,7 +557,7 @@ async function handleConfirmOrder(ctx: BotContext) {
 
   // Map MenuItem → recipeId (items without a ficha técnica get their ficha simples first, 2026-10-12)
   const menuItemIds = cart.map((c) => c.menuItemId);
-  await ensureMenuItemRecipes(prisma, ctx.restaurantId, menuItemIds);
+  await ensureMenuItemRecipes(prisma, ctx.restaurantId, menuItemIds, { onSaleOnly: true });
   const menuItems = await prisma.menuItem.findMany({
     // Only this restaurant's items: the lookup had no restaurant filter (an item of another restaurant was accepted)
     where: { id: { in: menuItemIds }, restaurantId: ctx.restaurantId },

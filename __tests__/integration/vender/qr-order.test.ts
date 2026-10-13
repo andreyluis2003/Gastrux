@@ -59,4 +59,14 @@ describe('QR-code order on a table', () => {
     expect(linked.recipeId).not.toBeNull();
     expect(await prisma.orderSessionItem.count({ where: { recipeId: linked.recipeId } })).toBe(1);
   });
+
+  it('a QR order never creates a ficha for a removed or unavailable item (2026-10-12)', async () => {
+    const cat = await prisma.menuCategory.findFirst({ where: { restaurantId: rid } });
+    const removed = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: `Velho ${tag}`, price: 6, position: 6, active: false } });
+    const off = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: `Acabou ${tag}`, price: 6, position: 7, available: false } });
+    expect((await order([{ menuItemId: removed.id, quantity: 1 }])).status).toBe(400);
+    expect((await order([{ menuItemId: off.id, quantity: 1 }])).status).toBe(400);
+    expect((await prisma.menuItem.findUnique({ where: { id: removed.id } })).recipeId).toBeNull();
+    expect((await prisma.menuItem.findUnique({ where: { id: off.id } })).recipeId).toBeNull();
+  });
 });

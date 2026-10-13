@@ -41,10 +41,16 @@ export async function createProductRecipe(
  * all of them). Under a per-restaurant lock, re-read after it: two sales of the same item at the same
  * instant create one ficha. Returns how many items were linked.
  */
-export async function ensureMenuItemRecipes(db: Db, restaurantId: string, menuItemIds?: string[]): Promise<number> {
+export async function ensureMenuItemRecipes(
+  db: Db,
+  restaurantId: string,
+  menuItemIds?: string[],
+  /** Public callers (QR, delivery site, WhatsApp): only items on sale, never a removed or unavailable one */
+  opts: { onSaleOnly?: boolean } = {},
+): Promise<number> {
   const ids = menuItemIds ? [...new Set(menuItemIds.filter(Boolean))] : undefined;
   if (ids && ids.length === 0) return 0;
-  const where = { restaurantId, recipeId: null, ...(ids ? { id: { in: ids } } : {}) };
+  const where = { restaurantId, recipeId: null, ...(ids ? { id: { in: ids } } : {}), ...(opts.onSaleOnly ? { active: true, available: true } : {}) };
   // The usual case (every item linked) costs one read and no lock
   if ((await db.menuItem.count({ where })) === 0) return 0;
 
