@@ -202,6 +202,32 @@ export async function closeSession(member: RestaurantMember, sessionId: string, 
   return { sessionId: session.id, alreadyClosed: false, counted: toKeyed(counted), expected: toKeyed(result.expected), difference: toKeyed(result.difference), alertMethods };
 }
 
+const REASON_MARK = 'Motivo da diferença:';
+
+/**
+ * The reason of a close with a difference (2026-10-13: the blind close showed it and nobody explained it).
+ * Asked after the close (the count is blind), written once into the shift notes by who closed it or a
+ * manager; a second reason is refused, so it cannot be rewritten later.
+ */
+export async function setDifferenceReason(member: RestaurantMember, sessionId: string, reasonInput: unknown): Promise<void> {
+  const reason = String(reasonInput ?? '').trim().slice(0, 300);
+  if (reason.length < 3) throw new CashRuleError('Informe o motivo da diferença', 422);
+  const session = await loadSession(member, sessionId);
+  if (session.status !== 'CLOSED') throw new CashRuleError('O caixa ainda não foi fechado', 409);
+  if (session.closedById !== member.userId && !isManager(member.role)) throw new CashRuleError('Só quem fechou o caixa ou um gerente', 403);
+  const difference = (session.differenceCents ?? {}) as Record<string, number>;
+  if (!Object.values(difference).some((v) => v !== 0)) throw new CashRuleError('Este caixa fechou sem diferença', 409);
+  const before = session.closingNotes;
+  if (before?.includes(REASON_MARK)) throw new CashRuleError('O motivo da diferença já foi informado', 409, 'ALREADY_SET');
+  // Compare-and-set on the notes read: two reasons at once, only one is written
+  const written = await prisma.cashSession.updateMany({
+    where: { id: session.id, closingNotes: before ?? null },
+    data: { closingNotes: `${before ? `${before}\n` : ''}${REASON_MARK} ${reason}` },
+  });
+  if (written.count === 0) throw new CashRuleError('O motivo da diferença já foi informado', 409, 'ALREADY_SET');
+  await recordAudit(member, { action: 'UPDATE', entityType: 'CashSession', entityId: session.id, changes: { differenceReason: reason, difference } });
+}
+
 export interface SessionView {
   session: { id: string; status: 'OPEN' | 'CLOSED'; openedAt: string; closedAt: string | null; openingFloatCents: number; lateEntries: number; closingNotes: string | null };
   register: { id: string; name: string };

@@ -24,6 +24,28 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
   const [showCounter, setShowCounter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [reason, setReason] = useState('');
+  const [reasonSaved, setReasonSaved] = useState(false);
+  const hasDifference = Boolean(result) && Object.values(result.difference ?? {}).some((v) => v !== 0);
+
+  // A difference needs its reason before "Concluir" (written once on the closed shift)
+  const saveReason = async () => {
+    if (reason.trim().length < 3) { toast.error('Informe o motivo da diferença'); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/caixa/sessions/${sessionId}/difference-reason`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok && data.code !== 'ALREADY_SET') { toast.error(data.error || 'Erro ao salvar o motivo'); return; }
+      setReasonSaved(true);
+      toast.success('Motivo da diferença salvo');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const confirm = async () => {
     const { counted, invalid } = buildCountedPayload(fields);
@@ -94,9 +116,22 @@ export function CloseShiftDialog({ sessionId, registerName, onClose, onClosed }:
             </table>
             {result.alreadyClosed && <p className="text-sm text-amber-700">Este caixa já tinha sido fechado; estes são os valores do primeiro fechamento.</p>}
             {result.alertMethods?.length > 0 && <p className="text-sm text-red-700">Diferença acima do limite: o dono foi avisado.</p>}
+            {hasDifference && !result.alreadyClosed && (
+              reasonSaved ? (
+                <p className="text-sm text-green-700">Motivo da diferença salvo no fechamento.</p>
+              ) : (
+                <div>
+                  <label htmlFor="difference-reason" className="text-sm font-semibold block mb-1">Motivo da diferença</label>
+                  <div className="flex gap-2">
+                    <Input id="difference-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} placeholder="Ex.: troco dado a mais, sangria não lançada" />
+                    <Button onClick={saveReason} disabled={saving || reason.trim().length < 3}>Salvar</Button>
+                  </div>
+                </div>
+              )
+            )}
             <div className="sticky -bottom-6 -mx-6 -mb-6 flex flex-wrap gap-2 justify-end border-t bg-white px-6 py-3">
               <Button variant="outline" onClick={() => printInHiddenFrame(`/imprimir/caixa/fechamento/${sessionId}`)}>Imprimir fechamento</Button>
-              <Button onClick={() => { onClosed(); onClose(); }}>Concluir</Button>
+              <Button onClick={() => { onClosed(); onClose(); }} disabled={hasDifference && !result.alreadyClosed && !reasonSaved}>Concluir</Button>
             </div>
           </>
         )}
