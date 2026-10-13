@@ -54,7 +54,7 @@ export function NotificationCenter({ inMenu = false }: { inMenu?: boolean } = {}
 
   if (!mounted || status !== 'authenticated') {
     return (
-      <button className="relative p-2 text-slate-700 hover:text-slate-900 transition-colors" disabled>
+      <button className={`relative p-2 transition-colors ${inMenu ? 'text-brand-light/90' : 'text-slate-700'}`} disabled>
         <Bell className="w-5 h-5" />
       </button>
     );
@@ -65,7 +65,7 @@ export function NotificationCenter({ inMenu = false }: { inMenu?: boolean } = {}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`relative p-2 rounded-lg transition-colors ${
-          isOpen ? 'bg-slate-200 text-slate-900' : inMenu ? 'text-slate-200 hover:text-white' : 'text-slate-700 hover:text-slate-900'
+          isOpen ? 'bg-slate-200 text-slate-900' : inMenu ? 'text-brand-light/90 hover:text-white' : 'text-slate-700 hover:text-slate-900'
         }`}
         aria-label={`Notificações (${unreadCount} não lidas)`}
       >

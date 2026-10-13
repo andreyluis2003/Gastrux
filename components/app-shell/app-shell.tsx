@@ -66,23 +66,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <aside
         className={cn(
-          'fixed left-0 top-0 z-50 h-screen w-72 flex flex-col bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-transform duration-200',
+          'fixed left-0 top-0 z-50 h-screen w-72 flex flex-col bg-brand-ink text-white transition-transform duration-200',
           open ? 'translate-x-0' : '-translate-x-full',
           sidebar && 'md:z-30 md:w-64 md:translate-x-0'
         )}
         aria-label="Menu principal"
       >
-        <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-white/10 flex items-center gap-2 shrink-0">
           <div className="min-w-0 flex-1">
             <GastruxLogo negative className="h-10 -ml-2" />
-            <p className="text-xs text-slate-400 truncate">{user?.name || 'Gestão Integrada'}</p>
+            <p className="text-xs text-brand-light/70 truncate">{user?.name || 'Gestão Integrada'}</p>
           </div>
           {bellInMenu && (
             <NotificationCenter inMenu />
           )}
           <button
             onClick={() => setOpen(false)}
-            className={cn('p-1 rounded hover:bg-slate-700', sidebar && 'md:hidden')}
+            className={cn('p-1 rounded hover:bg-white/10', sidebar && 'md:hidden')}
             aria-label="Fechar menu"
           >
             <X className="h-5 w-5" />
@@ -95,27 +95,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-slate-700 space-y-1 shrink-0">
+        <div className="p-3 border-t border-white/10 space-y-1 shrink-0">
           <button
             onClick={() => {
               setOpen(false);
               openFeedback();
             }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10"
           >
             <Lightbulb className="h-4 w-4" /> Enviar sugestão
           </button>
           {canSeeBilling && (
-            <Link href="/dashboard/billing" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700">
+            <Link href="/dashboard/billing" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10">
               <CreditCard className="h-4 w-4" /> Minha assinatura
             </Link>
           )}
-          <Link href="/conta" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700">
+          <Link href="/conta" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10">
             <UserCog className="h-4 w-4" /> Minha conta e senha
           </Link>
           <button
             onClick={() => signOutSafely({ redirect: true, callbackUrl: '/auth/signin' })}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10"
           >
             <LogOut className="h-4 w-4" /> Sair
           </button>
@@ -146,7 +146,7 @@ function NavSection({ group, active }: { group: NavGroup; active: string | null 
         onClick={() => setExpanded((e) => !e)}
         className={cn(
           'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium',
-          containsActive ? 'text-white' : 'text-slate-300 hover:bg-slate-700'
+          containsActive ? 'text-white' : 'text-brand-light/90 hover:bg-white/10'
         )}
         aria-expanded={expanded}
       >
@@ -154,7 +154,7 @@ function NavSection({ group, active }: { group: NavGroup; active: string | null 
         <ChevronDown className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
       </button>
       {expanded && (
-        <div className="ml-2 pl-2 border-l border-slate-700 space-y-0.5 mt-0.5 mb-1">
+        <div className="ml-2 pl-2 border-l border-white/10 space-y-0.5 mt-0.5 mb-1">
           {group.links.map((l) => (
             <NavItem key={l.href} href={l.href} label={l.label} active={l.href === active} />
           ))}
@@ -172,7 +172,7 @@ function NavItem({ href, label, active, strong }: { href: string; label: string;
       className={cn(
         'block px-3 py-2 rounded-lg text-sm transition-colors',
         strong && 'font-medium',
-        active ? 'bg-primary text-white' : strong ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700'
+        active ? 'bg-primary text-white' : strong ? 'text-brand-hat hover:bg-white/10' : 'text-brand-light/70 hover:text-white hover:bg-white/10'
       )}
     >
       {label}
