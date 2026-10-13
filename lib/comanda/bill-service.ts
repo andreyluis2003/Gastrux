@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { settleSessionStock } from '@/lib/stock/session-stock';
 import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
@@ -179,6 +180,7 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
         where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
         data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents },
       });
+      await settleSessionStock(tx, member.restaurantId, sessionId);
       return (await loadBill(tx, member.restaurantId, sessionId))!;
     }
     return after;
@@ -255,6 +257,8 @@ export async function recordBillPayment(
         data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: bill.serviceCents },
       });
       if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
+      // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
+      await settleSessionStock(tx, member.restaurantId, sessionId);
     }
     return { closed, changeCents: settled.changeCents, customerName: bill.customerName };
   });

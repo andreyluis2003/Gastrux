@@ -226,4 +226,19 @@ describe('closing a comanda records the payments in the shift', () => {
     expect(lines.map((e) => [e.type, e.method, e.amountCents, e.afterClose])).toEqual([['RECEIPT', 'PIX', 3000, true]]);
     expect((await prisma.cashSession.findUnique({ where: { id: session.id } })).lateEntries).toBe(1);
   });
+
+  it('closing the bill takes its ingredients out of stock (2026-10-13)', async () => {
+    const cat = await prisma.ingredientCategory.create({ data: { restaurantId: A.restaurantId, name: `CC ${tag}` } });
+    const bread = await prisma.ingredient.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, code: `CCB-${tag}`, name: 'Pão', standardUnit: 'un', purchaseUnit: 'un' } });
+    await prisma.stock.create({ data: { restaurantId: A.restaurantId, ingredientId: bread.id, currentQuantity: 10 } });
+    await prisma.recipeIngredient.create({ data: { recipeId: burger.id, ingredientId: bread.id, quantity: 1, unit: 'un' } });
+    try {
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      const s = await comanda([[30, 3]]);
+      expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: 90 }] })).status).toBe(200);
+      expect((await prisma.stock.findFirst({ where: { ingredientId: bread.id } })).currentQuantity).toBe(7);
+    } finally {
+      await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
+    }
+  });
 });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { settleSessionStock } from '@/lib/stock/session-stock';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { idempotent } from '@/lib/api/idempotency';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
@@ -51,6 +52,7 @@ async function handlePOST(request: Request) {
     // here: left open and paid, closing it later would record its money a second time
     if (existing.status === 'OPEN' && (await prisma.cashSessionEntry.count({ where: { orderSessionId: clientId } })) > 0) {
       const closed = await prisma.orderSession.update({ where: { id: clientId }, data: { status: 'CLOSED', closedAt: new Date() } });
+      await settleSessionStock(prisma, member.restaurantId, clientId);
       return NextResponse.json({ session: closed, alreadyRecorded: true });
     }
     return NextResponse.json({ session: existing, alreadyRecorded: true });
@@ -110,6 +112,8 @@ async function handlePOST(request: Request) {
     data: { status: 'CLOSED', closedAt: new Date() },
     include: { items: { include: { recipe: { select: { name: true } }, modifiers: true } } },
   });
+  // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
+  await settleSessionStock(prisma, member.restaurantId, clientId);
   const nfce = await autoEmitNFCe({
     restaurantId: member.restaurantId,
     orderSessionId: clientId,

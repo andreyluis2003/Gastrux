@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { settleSessionStock } from '@/lib/stock/session-stock';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { emitClosedBillFor, loadBill } from '@/lib/comanda/bill-service';
 import { onlinePaidCents } from '@/lib/comanda/bill';
@@ -47,6 +48,7 @@ export async function applyTablePayment(restaurantId: string, paymentId: string)
       where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
       data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents, payAtWaiterRequestedAt: null },
     });
+    if (guard.count === 1) await settleSessionStock(tx, restaurantId, sessionId);
     return { outcome: guard.count === 1 ? ('closed' as const) : ('applied' as const), overpaidCents, withoutShift, label, totalCents: after.totalCents };
   });
 

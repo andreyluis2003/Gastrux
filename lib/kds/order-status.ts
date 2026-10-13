@@ -46,7 +46,11 @@ export async function changeOrderStatus(restaurantId: string, orderId: string, s
     });
     if (moved.count === 0) return null;
 
-    if (status === 'COMPLETED') await deductOrderStock(tx, restaurantId, orderId);
+    if (status === 'COMPLETED') {
+      // A comanda already closed settled its stock at the close (lib/stock/session-stock.ts): the kitchen takes nothing more
+      const link = await tx.order.findUnique({ where: { id: orderId }, select: { comanda: { select: { status: true } } } });
+      if (link?.comanda?.status !== 'CLOSED') await deductOrderStock(tx, restaurantId, orderId);
+    }
     return true;
   });
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { settleSessionStock } from '@/lib/stock/session-stock';
 import { idempotent } from '@/lib/api/idempotency';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
@@ -157,6 +158,8 @@ async function handlePUT(
             data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: serviceCents, payAtWaiterRequestedAt: null },
           });
           if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
+          // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
+          await settleSessionStock(tx, restaurantId, params.id);
           if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
           primaryMethod = toNfcePaymentMethod(settled.primaryMethod);
           changeCents = settled.changeCents;

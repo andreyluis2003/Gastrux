@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { settleSessionStock } from '@/lib/stock/session-stock';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
@@ -115,6 +116,8 @@ export async function mergeSessions(member: RestaurantMember, targetSessionId: s
     // stays on the joined bill and a later approval lands on it
     await tx.payment.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
     await tx.order.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
+    // Stock already settled for the source (closed and reopened before) follows it, so the target close does not take it again
+    await tx.stockMovement.updateMany({ where: { restaurantId: member.restaurantId, referenceType: 'ORDER_SESSION', referenceId: source.id }, data: { referenceId: target.id } });
     await tx.orderSession.update({ where: { id: source.id }, data: { status: 'CANCELLED', mergedIntoId: target.id } });
     // New lines on the target: it is ordering again, not waiting for the bill
     await tx.orderSession.update({ where: { id: target.id }, data: { preBillPrintedAt: null } });
@@ -133,6 +136,7 @@ export async function mergeSessions(member: RestaurantMember, targetSessionId: s
     let closed = false;
     if (bill.paidCents > 0 && bill.remainingCents === 0) {
       await tx.orderSession.update({ where: { id: target.id }, data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: bill.serviceCents } });
+      await settleSessionStock(tx, member.restaurantId, target.id);
       closed = true;
     }
     return { sessionId: target.id, movedItems: items.count, movedPayments: payments.count, closed, customerName: bill.customerName };

@@ -70,4 +70,30 @@ describe('merge comandas', () => {
     await prisma.orderSession.update({ where: { id: closed }, data: { status: 'CLOSED', closedAt: new Date() } });
     expect((await MERGE(req({ sourceSessionId: closed }), { params: { id: a } })).status).toBe(409);
   });
+
+  describe('stock (2026-10-13)', () => {
+    let ingredientId: string;
+    beforeAll(async () => {
+      const cat = await prisma.ingredientCategory.create({ data: { restaurantId: rid, name: `Mg ${tag}` } });
+      ingredientId = (await prisma.ingredient.create({ data: { restaurantId: rid, categoryId: cat.id, code: `MGI-${tag}`, name: 'Arroz', standardUnit: 'kg', purchaseUnit: 'kg' } })).id;
+      await prisma.stock.create({ data: { restaurantId: rid, ingredientId, currentQuantity: 10 } });
+      await prisma.recipeIngredient.create({ data: { recipeId, ingredientId, quantity: 0.2, unit: 'kg' } });
+    });
+
+    it('what was settled for the source (closed and reopened before) follows it into the target', async () => {
+      const target = await comanda(1);
+      const source = await comanda(1);
+      const mv = await prisma.stockMovement.create({ data: { restaurantId: rid, ingredientId, quantity: -0.2, movementType: 'AUTO_DEDUCTION', referenceType: 'ORDER_SESSION', referenceId: source } });
+      expect((await MERGE(req({ sourceSessionId: source }), { params: { id: target } })).status).toBe(200);
+      expect((await prisma.stockMovement.findUnique({ where: { id: mv.id } })).referenceId).toBe(target);
+    });
+
+    it('paying the whole bill closes it and takes its stock', async () => {
+      const id = await comanda(2); // 100 + 10
+      const before = (await prisma.stock.findFirst({ where: { ingredientId } })).currentQuantity;
+      expect((await PAY(req({ payments: [{ method: 'pix', amount: '110,00' }], cashSessionId: shiftId }), { params: { id } })).status).toBeLessThan(300);
+      expect((await prisma.orderSession.findUnique({ where: { id } })).status).toBe('CLOSED');
+      expect((await prisma.stock.findFirst({ where: { ingredientId } })).currentQuantity).toBeCloseTo(before - 0.4);
+    });
+  });
 });

@@ -116,4 +116,21 @@ describe('counter sale records its payments in the shift', () => {
     expect(Number(line.price)).toBe(6);
     expect((await prisma.menuItem.findUnique({ where: { id: soda.id } })).recipeId).toBe(line.recipeId);
   });
+
+  it('a counter sale takes its ingredients out of stock without the kitchen screen (2026-10-13)', async () => {
+    const cat = await prisma.ingredientCategory.create({ data: { restaurantId: A.restaurantId, name: `QS ${tag}` } });
+    const bread = await prisma.ingredient.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, code: `QSB-${tag}`, name: 'Pão', standardUnit: 'un', purchaseUnit: 'un' } });
+    await prisma.stock.create({ data: { restaurantId: A.restaurantId, ingredientId: bread.id, currentQuantity: 10 } });
+    await prisma.recipeIngredient.create({ data: { recipeId: burger.id, ingredientId: bread.id, quantity: 1, unit: 'un' } });
+    try {
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      const clientId = `bal-${crypto.randomUUID()}`;
+      const res = await sale({ clientId, items: [{ recipeId: burger.id, quantity: 2 }], cashSessionId: session.id, payments: [{ method: 'dinheiro', amount: 60 }] });
+      expect(res.status).toBe(201);
+      expect((await prisma.stock.findFirst({ where: { ingredientId: bread.id } })).currentQuantity).toBe(8);
+      expect(await prisma.stockMovement.count({ where: { referenceType: 'ORDER_SESSION', referenceId: clientId, ingredientId: bread.id } })).toBe(1);
+    } finally {
+      await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
+    }
+  });
 });

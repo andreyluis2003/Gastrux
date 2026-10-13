@@ -95,4 +95,28 @@ describe('stock at the sale', () => {
     await Promise.all([settleSessionStock(prisma, rid, sid), settleSessionStock(prisma, rid, sid)]);
     expect(await stockOf(bread.id)).toBeCloseTo(p0 - 1);
   });
+  it('the kitchen finishing an order after its comanda closed takes nothing more', async () => {
+    const { changeOrderStatus } = await import('../../../lib/kds/order-status');
+    const sid = await closedSale([[burger.id, 1]]);
+    await settleSessionStock(prisma, rid, sid);
+    const p0 = await stockOf(bread.id);
+    const order = await prisma.order.create({ data: { restaurantId: rid, orderNumber: `K-${tag}-2`, orderType: 'DINE_IN', status: 'PREPARING', total: 30, orderSessionId: sid } });
+    await prisma.orderItem.create({ data: { orderId: order.id, recipeId: burger.id, quantity: 1 } });
+    await changeOrderStatus(rid, order.id, 'COMPLETED');
+    expect(await stockOf(bread.id)).toBeCloseTo(p0);
+  });
+
+  it('the kitchen still takes stock while the comanda is open, and the close takes only the rest', async () => {
+    const { changeOrderStatus } = await import('../../../lib/kds/order-status');
+    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, status: 'OPEN', tableNumber: 3 } });
+    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: burger.id, quantity: 2, price: 30 } });
+    const order = await prisma.order.create({ data: { restaurantId: rid, orderNumber: `K-${tag}-3`, orderType: 'DINE_IN', status: 'PREPARING', total: 30, orderSessionId: s.id } });
+    await prisma.orderItem.create({ data: { orderId: order.id, recipeId: burger.id, quantity: 1 } });
+    const p0 = await stockOf(bread.id);
+    await changeOrderStatus(rid, order.id, 'COMPLETED');
+    expect(await stockOf(bread.id)).toBeCloseTo(p0 - 1);
+    await prisma.orderSession.update({ where: { id: s.id }, data: { status: 'CLOSED' } });
+    await settleSessionStock(prisma, rid, s.id);
+    expect(await stockOf(bread.id)).toBeCloseTo(p0 - 2);
+  });
 });
