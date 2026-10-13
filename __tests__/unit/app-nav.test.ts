@@ -38,7 +38,7 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
 
   it('the owner sees the cash register, fiscal and reports, grouped by task', () => {
     const groups = navFor('OWNER', false);
-    expect(groups.map((g) => g.id)).toEqual(['inicio', 'vender', 'caixa', 'cardapio', 'estoque', 'fiscal', 'relatorios', 'clientes', 'equipe', 'config']);
+    expect(groups.map((g) => g.id)).toEqual(['inicio', 'vender', 'caixa', 'cardapio', 'estoque', 'fiscal', 'relatorios', 'clientes', 'equipe', 'mais', 'config']);
     expect(hrefs(groups)).toEqual(expect.arrayContaining(['/caixa', '/admin/fiscal', '/cmv', '/dashboard']));
   });
 
@@ -94,5 +94,23 @@ describe('floating helpers on full-screen operation (homolog check of tela Vende
   it('toasts go to the top there, so they never cover the bottom bar', () => {
     expect(toastPosition('/vender/abc')).toBe('top-center');
     expect(toastPosition('/dashboard')).toBe('bottom-right');
+  });
+});
+
+describe('advanced screens under "Mais recursos" (owner, 2026-10-12)', () => {
+  const ADVANCED = ['/planejamento', '/etiquetas', '/etiquetas/validades', '/engenharia-cardapio', '/dashboard/financeiro/dre', '/admin/staff/shifts', '/admin/staff/commissions'];
+
+  it('the advanced screens live only in "Mais recursos", just before Configurações', () => {
+    const mais = NAV_GROUPS.find((g) => g.id === 'mais');
+    expect(mais?.label).toBe('Mais recursos');
+    expect(mais?.links.map((l) => l.href)).toEqual(ADVANCED);
+    const elsewhere = NAV_GROUPS.filter((g) => g.id !== 'mais').flatMap((g) => g.links.map((l) => l.href));
+    for (const href of ADVANCED) expect(elsewhere).not.toContain(href);
+  });
+
+  it('the old "Maquininha" link (a POS sales webhook, not a card machine) is out of the menu', () => {
+    const all = NAV_GROUPS.flatMap((g) => g.links);
+    expect(all.find((l) => l.href === '/admin/pdv')).toBeUndefined();
+    expect(all.find((l) => l.label === 'Maquininha')).toBeUndefined();
   });
 });

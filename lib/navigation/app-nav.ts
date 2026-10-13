@@ -60,7 +60,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Cardápio digital', href: '/admin/cardapio', roles: MANAGERS },
       { label: 'Fichas técnicas', href: '/receitas', roles: [...MANAGERS, 'COOK'] },
       { label: 'Insumos', href: '/insumos', roles: [...MANAGERS, 'COOK'] },
-      { label: 'Engenharia de cardápio', href: '/engenharia-cardapio', roles: MANAGERS },
       { label: 'QR Codes das mesas', href: '/admin/tables/qrcodes', roles: MANAGERS },
     ],
   },
@@ -72,10 +71,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Contagem', href: '/contagem', roles: [...MANAGERS, 'COOK'] },
       { label: 'Compras', href: '/compras', roles: MANAGERS },
       { label: 'Desperdício', href: '/desperdicio', roles: [...MANAGERS, 'COOK'] },
-      // Food labels (spec 2026-10-09 etiquetas): print on every plan, the expiry control from Pro
-      { label: 'Etiquetas', href: '/etiquetas', roles: [...MANAGERS, 'COOK'] },
-      { label: 'Validades', href: '/etiquetas/validades', roles: [...MANAGERS, 'COOK'] },
-      { label: 'Planejamento de produção', href: '/planejamento', roles: [...MANAGERS, 'COOK'] },
       // The register (add, edit); its price comparison panel is one click away from there
       // Owner decision 2026-10-09: the cook registers suppliers too (lib/suppliers/access.ts)
       { label: 'Fornecedores', href: '/fornecedores', roles: [...MANAGERS, 'COOK'] },
@@ -98,7 +93,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Vendas', href: '/dashboard/reports/sales', roles: MANAGERS },
       { label: 'Lucratividade', href: '/dashboard/reports/profitability', roles: MANAGERS },
       { label: 'Financeiro', href: '/dashboard/financeiro', roles: MANAGERS },
-      { label: 'DRE', href: '/dashboard/financeiro/dre', roles: MANAGERS },
       { label: 'Relatório executivo (PDF)', href: '/relatorios', roles: MANAGERS },
     ],
   },
@@ -118,6 +112,19 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Equipe',
     links: [
       { label: 'Equipe e acessos', href: '/admin/staff', roles: MANAGERS },
+    ],
+  },
+  {
+    // Owner decision 2026-10-12 (usability walkthrough): advanced screens in one group, out of the daily
+    // groups. Food labels: print on every plan, the expiry control from Pro (spec 2026-10-09 etiquetas)
+    id: 'mais',
+    label: 'Mais recursos',
+    links: [
+      { label: 'Planejamento de produção', href: '/planejamento', roles: [...MANAGERS, 'COOK'] },
+      { label: 'Etiquetas', href: '/etiquetas', roles: [...MANAGERS, 'COOK'] },
+      { label: 'Validades', href: '/etiquetas/validades', roles: [...MANAGERS, 'COOK'] },
+      { label: 'Engenharia de cardápio', href: '/engenharia-cardapio', roles: MANAGERS },
+      { label: 'DRE', href: '/dashboard/financeiro/dre', roles: MANAGERS },
       { label: 'Turnos', href: '/admin/staff/shifts', roles: MANAGERS },
       { label: 'Comissões', href: '/admin/staff/commissions', roles: MANAGERS },
     ],
@@ -130,7 +137,6 @@ export const NAV_GROUPS: NavGroup[] = [
       // Only the owner subscribes; ADMIN is the platform admin
       { label: 'Minha assinatura', href: '/dashboard/billing', roles: ['OWNER', 'ADMIN'] },
       { label: 'WhatsApp', href: '/admin/integrations/whatsapp', roles: MANAGERS },
-      { label: 'Maquininha', href: '/admin/pdv', roles: MANAGERS },
       { label: 'Várias lojas', href: '/admin/multi-location', roles: MANAGERS },
       { label: 'Todos os recursos', href: '/dashboard#modulos', roles: MANAGERS },
     ],
