@@ -31,4 +31,26 @@ describe('primeiros passos', () => {
     expect(d.endereco).toBe(true);
     expect(d.caixa).toBe(false);
   });
+
+  it('an account started blank has its products step done as soon as it adds an item', async () => {
+    const blank = (await prisma.restaurant.create({ data: { name: `Blank ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    try {
+      const c = await prisma.menuCategory.create({ data: { restaurantId: blank, name: 'Lanches', position: 0, active: true } });
+      await prisma.menuItem.create({ data: { restaurantId: blank, categoryId: c.id, name: 'X-Burger', price: 20, position: 0 } });
+      expect((await firstSteps(blank)).find((s) => s.key === 'cardapio').done).toBe(true);
+    } finally { await prisma.restaurant.delete({ where: { id: blank } }); }
+  });
+
+  it('an account started from the example menu has it done only for an item of its own', async () => {
+    const demo = (await prisma.restaurant.create({ data: { name: `Demo ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    try {
+      const r = await prisma.recipe.create({ data: { restaurantId: demo, code: `DEMO-${tag}`, name: 'Burger', baseYield: 1, yieldUnit: 'un', portionUnit: 'un' } });
+      const c = await prisma.menuCategory.create({ data: { restaurantId: demo, name: 'Lanches', position: 0, active: true } });
+      await prisma.menuItem.create({ data: { restaurantId: demo, categoryId: c.id, name: 'Burger', price: 20, position: 0, recipeId: r.id } });
+      expect((await firstSteps(demo)).find((s) => s.key === 'cardapio').done).toBe(false);
+    } finally {
+      await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId: demo } } });
+      await prisma.restaurant.delete({ where: { id: demo } });
+    }
+  });
 });
