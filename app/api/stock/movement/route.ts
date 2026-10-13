@@ -38,35 +38,21 @@ export const POST = safeHandler(async (req, context) => {
     },
   });
 
-  // Update stock
-  const stock = await prisma.stock.findUnique({
-    where: {
-      restaurantId_ingredientId: {
-        restaurantId: context.restaurantId,
-        ingredientId: body.ingredientId,
-      },
-    },
-  });
-
-  if (stock && ingredient) {
-    // Atomic increment/decrement - computing newQuantity from a prior read
-    // and writing it back loses updates when two movements for the same
-    // ingredient happen concurrently (e.g. two orders auto-deducting stock
-    // at the same time).
-    const updatedStock = await prisma.stock.update({
+  // Update stock. Atomic increment/decrement - computing newQuantity from a prior read and writing it back
+  // loses updates when two movements for the same ingredient happen concurrently. The first movement of an
+  // ingredient starts its control (2026-10-13: an ENTRY on an ingredient without a Stock row was recorded
+  // but never counted, so a new account's first purchase vanished from Estoque).
+  const signed = body.movementType === 'ENTRY' ? body.quantity : -body.quantity;
+  {
+    const updatedStock = await prisma.stock.upsert({
       where: {
         restaurantId_ingredientId: {
           restaurantId: context.restaurantId,
           ingredientId: body.ingredientId,
         },
       },
-      data: {
-        currentQuantity:
-          body.movementType === 'ENTRY'
-            ? { increment: body.quantity }
-            : { decrement: body.quantity },
-        lastUpdated: new Date(),
-      },
+      create: { restaurantId: context.restaurantId, ingredientId: body.ingredientId, currentQuantity: signed },
+      update: { currentQuantity: { increment: signed }, lastUpdated: new Date() },
     });
     const newQuantity = updatedStock.currentQuantity;
 
