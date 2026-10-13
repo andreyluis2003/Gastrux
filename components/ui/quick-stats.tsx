@@ -14,7 +14,7 @@ interface QuickStatProps {
   };
 }
 
-export function QuickStats({ label, value, icon, color = 'text-blue-600', trend }: QuickStatProps) {
+export function QuickStats({ label, value, icon, color = 'text-primary', trend }: QuickStatProps) {
   return (
     <Card className="p-4 sm:p-6">
       <div className="flex items-start justify-between">

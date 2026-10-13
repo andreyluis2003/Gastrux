@@ -79,7 +79,7 @@ export function GatewayChoiceDialog({
               onClick={() => handleChoice('mercadopago')}
               disabled={loading !== null}
               className={cn(
-                'w-full flex items-center gap-4 p-4 rounded-xl border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-left transition hover:bg-blue-100 dark:hover:bg-blue-950/40 disabled:opacity-60'
+                'w-full flex items-center gap-4 p-4 rounded-xl border-2 border-primary bg-primary/5 dark:bg-brand-ink text-left transition hover:bg-primary/10 dark:hover:bg-brand-ink disabled:opacity-60'
               )}
             >
               <Wallet className="w-6 h-6 text-blue-600 flex-shrink-0" />

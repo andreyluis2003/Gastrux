@@ -107,12 +107,12 @@ type CategoryId = typeof CATEGORY_ORDER[number];
 
 const CATEGORY_META: Record<CategoryId, { icon: any; gradient: string }> = {
   essentials:    { icon: Star,       gradient: 'from-emerald-500 to-teal-500' },
-  sales:         { icon: Store,      gradient: 'from-blue-500 to-indigo-500' },
+  sales:         { icon: Store,      gradient: 'from-primary to-brand-accent' },
   inventory:     { icon: Warehouse,  gradient: 'from-orange-500 to-amber-500' },
   financial:     { icon: DollarSign,  gradient: 'from-green-500 to-emerald-500' },
-  analytics:     { icon: LineChart,   gradient: 'from-purple-500 to-violet-500' },
+  analytics:     { icon: LineChart,   gradient: 'from-purple-500 to-brand-accent' },
   marketing:     { icon: Target,      gradient: 'from-pink-500 to-rose-500' },
-  communication: { icon: Radio,       gradient: 'from-cyan-500 to-blue-500' },
+  communication: { icon: Radio,       gradient: 'from-cyan-500 to-brand-accent' },
   advanced:      { icon: Wrench,      gradient: 'from-slate-500 to-gray-500' },
 };
 
@@ -313,10 +313,10 @@ export function DashboardContent({
               </Card>
             </Link>
             <Link href="/contagem">
-              <Card className="p-4 hover:shadow-md transition-all cursor-pointer group border-blue-100 hover:border-blue-300 dark:border-blue-900/30">
+              <Card className="p-4 hover:shadow-md transition-all cursor-pointer group border-primary/20 hover:border-primary/30 dark:border-brand-ink">
                 <div className="flex flex-col items-center gap-2 text-center">
-                  <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-100 transition-colors">
-                    <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 rounded-lg bg-primary/5 dark:bg-brand-ink group-hover:bg-primary/10 transition-colors">
+                    <ClipboardCheck className="h-5 w-5 text-primary" />
                   </div>
                   <span className="text-xs sm:text-sm font-medium">{t('dashboard.quickAction.quickCount')}</span>
                 </div>

@@ -45,7 +45,7 @@ const STEP_ICONS: Record<string, any> = {
 };
 
 const STEP_COLORS: Record<string, string> = {
-  settings: 'bg-blue-500',
+  settings: 'bg-primary',
   menu: 'bg-purple-500',
   table: 'bg-orange-500',
   qr: 'bg-green-500',

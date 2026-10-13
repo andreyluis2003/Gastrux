@@ -58,7 +58,7 @@ export default function ReceiptPage() {
     <div className="p-4">
       {!auto && (
         <div className="no-print mb-4 flex gap-2">
-          <button type="button" className="px-4 py-2 rounded bg-blue-600 text-white" onClick={() => window.print()}>
+          <button type="button" className="px-4 py-2 rounded bg-primary text-white" onClick={() => window.print()}>
             Imprimir
           </button>
           {nfce?.officialDanfeUrl && (

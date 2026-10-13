@@ -184,12 +184,12 @@ export default function BetaTesterDetailPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  <a href={`mailto:${tester.email}`} className="text-blue-600 hover:underline">{tester.email}</a>
+                  <a href={`mailto:${tester.email}`} className="text-primary hover:underline">{tester.email}</a>
                 </div>
                 {tester.phone && (
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4" />
-                    <a href={`tel:${tester.phone}`} className="text-blue-600 hover:underline">{tester.phone}</a>
+                    <a href={`tel:${tester.phone}`} className="text-primary hover:underline">{tester.phone}</a>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
@@ -229,7 +229,7 @@ export default function BetaTesterDetailPage() {
               <Button
                 size="sm"
                 onClick={() => setShowNewInteraction(true)}
-                className="gap-2 bg-blue-600 hover:bg-blue-700"
+                className="gap-2 bg-primary hover:bg-primary/90"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar

@@ -173,7 +173,7 @@ export default function RoadmapPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as any)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="votes">Mais votadas</option>
             <option value="recent">Mais recentes</option>
@@ -181,7 +181,7 @@ export default function RoadmapPage() {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Todas as categorias</option>
             {categoryOptions.map((c) => (
@@ -190,7 +190,7 @@ export default function RoadmapPage() {
           </select>
           <Link
             href="/feedback/share"
-            className="ml-auto text-sm text-blue-600 hover:underline"
+            className="ml-auto text-sm text-primary hover:underline"
           >
             Enviar outro feedback →
           </Link>
@@ -227,7 +227,7 @@ export default function RoadmapPage() {
                     {list.map((it) => (
                       <div
                         key={it.id}
-                        className="border border-gray-100 rounded-lg p-3 hover:border-blue-200 hover:shadow-sm transition"
+                        className="border border-gray-100 rounded-lg p-3 hover:border-primary/30 hover:shadow-sm transition"
                       >
                         <div className="flex items-start gap-2">
                           <button
@@ -236,7 +236,7 @@ export default function RoadmapPage() {
                               'flex flex-col items-center px-2 py-1 rounded-lg border transition',
                               it.userVoted
                                 ? 'bg-blue-500 text-white border-blue-500'
-                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-blue-300'
+                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-primary/30'
                             )}
                           >
                             <ChevronUp className="h-4 w-4" />
@@ -287,7 +287,7 @@ export default function RoadmapPage() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Ex: Exportar relatorio em Excel"
-                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div>
@@ -296,7 +296,7 @@ export default function RoadmapPage() {
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="Descreva como essa melhoria te ajudaria"
-                  className="w-full border border-gray-200 rounded-lg p-2 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full border border-gray-200 rounded-lg p-2 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div>
@@ -304,7 +304,7 @@ export default function RoadmapPage() {
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="w-full border border-gray-200 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
                   {categoryOptions.map((c) => (
                     <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</option>
@@ -322,7 +322,7 @@ export default function RoadmapPage() {
               <button
                 onClick={handleCreate}
                 disabled={!session || creating || !newTitle.trim()}
-                className="flex-1 rounded-lg bg-blue-500 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-primary py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-50"
               >
                 {creating ? 'Enviando...' : 'Registrar'}
               </button>

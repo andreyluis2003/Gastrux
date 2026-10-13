@@ -170,7 +170,7 @@ export default function KDSPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleAddStation} className="flex-1 bg-blue-500 hover:bg-blue-600">
+              <Button onClick={handleAddStation} className="flex-1 bg-primary hover:bg-primary">
                 Adicionar
               </Button>
               <Button

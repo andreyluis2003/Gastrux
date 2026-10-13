@@ -159,7 +159,7 @@ export default function MessagingProvidersPage() {
             <Button variant="outline" className="gap-2"><FileText className="h-4 w-4" />Templates</Button>
           </Link>
           <Link href="/admin/messaging/campaigns">
-            <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700"><Megaphone className="h-4 w-4" />Campanhas</Button>
+            <Button className="gap-2 bg-primary hover:bg-primary/90"><Megaphone className="h-4 w-4" />Campanhas</Button>
           </Link>
         </div>
       </div>
@@ -304,7 +304,7 @@ export default function MessagingProvidersPage() {
                     <Button
                       onClick={() => save(p.id)}
                       disabled={saving === p.id}
-                      className="gap-2 bg-indigo-600 hover:bg-indigo-700"
+                      className="gap-2 bg-primary hover:bg-primary/90"
                     >
                       {saving === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       Salvar

@@ -149,7 +149,7 @@ export default function ComprasPage() {
             <button
               onClick={() => handleCreate(false)}
               disabled={creating}
-              className="flex flex-col items-center gap-3 p-5 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left"
+              className="flex flex-col items-center gap-3 p-5 rounded-lg border-2 border-dashed border-primary/30 dark:border-primary hover:border-primary dark:hover:border-primary hover:bg-primary/5 dark:hover:bg-brand-ink transition-all text-left"
             >
               {creating ? (
                 <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />

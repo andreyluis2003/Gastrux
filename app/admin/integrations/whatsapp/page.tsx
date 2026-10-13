@@ -339,7 +339,7 @@ export default function WhatsAppIntegrationPage() {
               href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline pt-2"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline pt-2"
             >
               Ver documentação oficial <ExternalLink className="h-3 w-3" />
             </a>
@@ -415,7 +415,7 @@ export default function WhatsAppIntegrationPage() {
         <div className="flex justify-center pt-4">
           <Link
             href="/admin/integrations/whatsapp/conversations"
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-primary hover:underline"
           >
             Ver conversas recentes →
           </Link>

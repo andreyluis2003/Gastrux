@@ -98,7 +98,7 @@ export default function VenderPage() {
       {counter && <CounterSale onDone={() => { setCounter(false); load(); }} />}
 
       <div className="flex items-center gap-2 border-b">
-        <span className="px-3 py-2 font-semibold border-b-2 border-blue-600">Mesas</span>
+        <span className="px-3 py-2 font-semibold border-b-2 border-primary">Mesas</span>
         <Link href="/admin/integrations/orders" className="px-3 py-2 text-slate-600">
           Delivery{salao?.deliveryNew ? <span className="ml-1 rounded-full bg-red-600 text-white text-xs px-2">{salao.deliveryNew}</span> : null}
         </Link>
@@ -110,7 +110,7 @@ export default function VenderPage() {
             <button
               key={s.id ?? 'all'}
               onClick={() => setSection(s.id)}
-              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${section === s.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${section === s.id ? 'bg-primary text-primary-foreground' : 'bg-slate-100 text-slate-700'}`}
             >
               {s.name}
             </button>

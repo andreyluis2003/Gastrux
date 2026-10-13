@@ -74,7 +74,7 @@ export default function TermosPage() {
           </section>
 
           <div className="pt-4 border-t">
-            <p className="text-sm text-gray-500">Veja também nossa <Link href="/privacidade" className="text-blue-600 hover:underline">Política de Privacidade</Link>.</p>
+            <p className="text-sm text-gray-500">Veja também nossa <Link href="/privacidade" className="text-primary hover:underline">Política de Privacidade</Link>.</p>
           </div>
         </div>
       </div>

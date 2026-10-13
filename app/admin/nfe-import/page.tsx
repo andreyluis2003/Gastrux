@@ -64,7 +64,7 @@ export default function NFeImportPage() {
       </div>
 
       <Card className="p-6 space-y-4">
-        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-primary transition-colors">
           <Upload className="h-10 w-10 mx-auto text-gray-400 mb-3" />
           <p className="text-sm text-gray-600 mb-3">
             {fileName ? (<span className="font-medium text-blue-600">{fileName}</span>) : 'Arraste ou clique para selecionar o XML da NF-e'}
@@ -82,7 +82,7 @@ export default function NFeImportPage() {
         </div>
 
         {xmlContent && (
-          <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleImport} disabled={loading}>
+          <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleImport} disabled={loading}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processando...</> : <><Package className="h-4 w-4 mr-2" /> Importar e Atualizar Estoque</>}
           </Button>
         )}

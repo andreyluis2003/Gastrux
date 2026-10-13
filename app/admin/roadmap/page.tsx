@@ -122,7 +122,7 @@ export default function AdminRoadmapPage() {
                 href="/roadmap"
                 target="_blank"
                 rel="noopener"
-                className="ml-auto text-sm text-blue-600 hover:underline"
+                className="ml-auto text-sm text-primary hover:underline"
               >
                 Ver roadmap publico →
               </a>
@@ -300,7 +300,7 @@ function EditPanel({ item, onSave }: { item: FeatureRequest; onSave: (p: any) =>
               plannedFor: plannedFor ? new Date(plannedFor).toISOString() : null,
             })
           }
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary"
         >
           <Save className="h-4 w-4" /> Salvar
         </button>

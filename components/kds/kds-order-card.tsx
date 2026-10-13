@@ -238,7 +238,7 @@ export function KDSOrderCard({
           <Button
             size="sm"
             onClick={() => onStatusChange?.(order.id, 'PREPARING')}
-            className="flex-1 bg-blue-500 hover:bg-blue-600"
+            className="flex-1 bg-primary hover:bg-primary"
           >
             Iniciar
           </Button>

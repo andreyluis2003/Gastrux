@@ -72,7 +72,7 @@ export default function FeedbackSharePage() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/roadmap"
-              className="rounded-lg bg-blue-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-600"
+              className="rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary"
             >
               Ver roadmap publico
             </Link>
@@ -201,7 +201,7 @@ export default function FeedbackSharePage() {
                   ? 'Conte sua ideia em detalhes'
                   : 'Compartilhe o que achou'
               }
-              className="w-full border border-gray-200 rounded-lg p-3 resize-none h-32 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-full border border-gray-200 rounded-lg p-3 resize-none h-32 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
 
@@ -215,7 +215,7 @@ export default function FeedbackSharePage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
-                className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <p className="text-xs text-gray-400 mt-1">Para contato em caso de follow-up</p>
             </div>
@@ -232,7 +232,7 @@ export default function FeedbackSharePage() {
           <div className="mt-6 pt-6 border-t border-gray-100">
             <Link
               href="/roadmap"
-              className="flex items-center justify-between text-sm text-gray-600 hover:text-blue-600 group"
+              className="flex items-center justify-between text-sm text-gray-600 hover:text-primary group"
             >
               <span>Veja o que estamos construindo</span>
               <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition" />

@@ -96,7 +96,7 @@ export default function AIMonitoringPage() {
               <option value={720}>Últimos 30 dias</option>
             </select>
             <Button onClick={fetchData} variant="outline" size="sm"><RefreshCw className="h-4 w-4 mr-2" />Atualizar</Button>
-            <Button onClick={runEvaluation} disabled={running} className="bg-blue-600 hover:bg-blue-700" size="sm">
+            <Button onClick={runEvaluation} disabled={running} className="bg-primary hover:bg-primary/90" size="sm">
               <Bell className="h-4 w-4 mr-2" />{running ? 'Avaliando...' : 'Avaliar agora'}
             </Button>
           </div>

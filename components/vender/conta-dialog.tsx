@@ -243,7 +243,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {(['all', 'equal', 'items'] as const).map((m) => (
-              <button key={m} onClick={() => { setMode(m); setAmountText(''); }} className={`px-3 py-1.5 rounded-full ${mode === m ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}>
+              <button key={m} onClick={() => { setMode(m); setAmountText(''); }} className={`px-3 py-1.5 rounded-full ${mode === m ? 'bg-primary text-white' : 'bg-slate-100'}`}>
                 {m === 'all' ? 'Tudo' : m === 'equal' ? 'Dividir igual' : 'Por item'}
               </button>
             ))}

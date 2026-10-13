@@ -334,7 +334,7 @@ export default function MinhaContaPage() {
           <h2 className="text-lg font-semibold text-red-700">Zona de Perigo</h2>
         </div>
         <p className="text-sm text-gray-600 mb-4">
-          Ao excluir sua conta, seus dados serão desativados imediatamente e removidos permanentemente após 30 dias, conforme nossa <Link href="/privacidade" className="text-blue-600 hover:underline">Política de Privacidade</Link>.
+          Ao excluir sua conta, seus dados serão desativados imediatamente e removidos permanentemente após 30 dias, conforme nossa <Link href="/privacidade" className="text-primary hover:underline">Política de Privacidade</Link>.
         </p>
         {!showDeleteConfirm ? (
           <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={() => setShowDeleteConfirm(true)}>

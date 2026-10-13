@@ -35,7 +35,7 @@ export default function KitchenTicketPage() {
   return (
     <div className="p-4">
       {!auto && (
-        <button type="button" className="no-print mb-4 px-4 py-2 rounded bg-blue-600 text-white" onClick={() => window.print()}>
+        <button type="button" className="no-print mb-4 px-4 py-2 rounded bg-primary text-white" onClick={() => window.print()}>
           Imprimir
         </button>
       )}

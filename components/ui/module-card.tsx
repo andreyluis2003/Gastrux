@@ -22,10 +22,10 @@ export function ModuleCard({
   description,
   href,
   icon,
-  color = 'bg-blue-50',
-  accentColor = 'text-blue-600',
+  color = 'bg-brand-card',
+  accentColor = 'text-primary',
   badge,
-  badgeColor = 'bg-blue-100 text-blue-700',
+  badgeColor = 'bg-primary/10 text-brand-ink',
 }: ModuleCardProps) {
   return (
     <Link href={href}>
@@ -34,11 +34,11 @@ export function ModuleCard({
           {icon && <div className={`${accentColor} flex-shrink-0`}>{icon}</div>}
           {badge && <span className={`text-xs font-semibold px-2 py-1 rounded ${badgeColor}`}>{badge}</span>}
         </div>
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2 group-hover:text-primary dark:group-hover:text-primary/80 transition">
           {title}
         </h3>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">{description}</p>
-        <div className="flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium group-hover:gap-2 transition-all gap-1">
+        <div className="flex items-center text-primary dark:text-primary/80 text-sm font-medium group-hover:gap-2 transition-all gap-1">
           Acessar <ArrowRight className="w-4 h-4" />
         </div>
       </Card>

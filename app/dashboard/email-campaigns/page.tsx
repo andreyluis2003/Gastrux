@@ -127,7 +127,7 @@ export default function EmailCampaignsPage() {
           <Button
             onClick={handleCreateNew}
             disabled={creatingNew}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+            className="w-full sm:w-auto bg-primary hover:bg-primary/90"
           >
             <Plus className="mr-2 h-4 w-4" />
             {creatingNew ? 'Criando...' : 'Nova Campanha'}
@@ -156,7 +156,7 @@ export default function EmailCampaignsPage() {
             <Button
               onClick={handleCreateNew}
               disabled={creatingNew}
-              className="mt-2 bg-blue-600 hover:bg-blue-700"
+              className="mt-2 bg-primary hover:bg-primary/90"
             >
               <Plus className="mr-2 h-4 w-4" />
               {creatingNew ? 'Criando...' : 'Criar Campanha'}

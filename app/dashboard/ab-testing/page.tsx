@@ -69,7 +69,7 @@ export default function ABTestingPage() {
           </div>
           <Button
             onClick={() => setShowNewTest(true)}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+            className="w-full sm:w-auto bg-primary hover:bg-primary/90"
           >
             <Mail className="w-4 h-4 mr-2" />
             Novo Teste

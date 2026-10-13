@@ -179,7 +179,7 @@ export function FeedbackWidget() {
               </p>
               <button
                 onClick={handleClose}
-                className="rounded-lg bg-blue-500 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-600"
+                className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary"
               >
                 Fechar
               </button>
@@ -198,7 +198,7 @@ export function FeedbackWidget() {
                     className={cn(
                       'flex-1 py-3 text-xs font-medium transition-colors',
                       tab === t.k
-                        ? 'text-blue-600 border-b-2 border-blue-500'
+                        ? 'text-primary border-b-2 border-primary'
                         : 'text-gray-500 hover:text-gray-700'
                     )}
                   >
@@ -241,13 +241,13 @@ export function FeedbackWidget() {
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       placeholder="Conte o motivo (opcional)"
-                      className="w-full text-sm border border-gray-200 rounded-lg p-2 resize-none h-16 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full text-sm border border-gray-200 rounded-lg p-2 resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <div className="mt-4 flex gap-2">
                       <button
                         onClick={submitNps}
                         disabled={loading || npsScore == null}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                        className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-50"
                       >
                         <Send className="h-4 w-4" /> {loading ? 'Enviando...' : 'Enviar'}
                       </button>
@@ -270,12 +270,12 @@ export function FeedbackWidget() {
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
                       placeholder="Descreva o que está funcionando bem, ou o que não está."
-                      className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-none h-32 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-none h-32 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <button
                       onClick={submitComment}
                       disabled={loading || !comment.trim()}
-                      className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                      className="mt-4 w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary disabled:opacity-50"
                     >
                       <Send className="h-4 w-4" /> {loading ? 'Enviando...' : 'Enviar comentario'}
                     </button>
@@ -292,18 +292,18 @@ export function FeedbackWidget() {
                       value={ideaTitle}
                       onChange={(e) => setIdeaTitle(e.target.value)}
                       placeholder="Titulo da ideia"
-                      className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <textarea
                       value={ideaDesc}
                       onChange={(e) => setIdeaDesc(e.target.value)}
                       placeholder="Descreva como essa melhoria ajudaria o seu dia a dia"
-                      className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-2 resize-none h-24 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-2 resize-none h-24 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full text-sm border border-gray-200 rounded-lg p-2 mb-3 focus:outline-none focus:ring-2 focus:ring-primary/30"
                     >
                       <option value="GERAL">Geral</option>
                       <option value="PEDIDOS">Pedidos</option>

@@ -125,7 +125,7 @@ export default function PartnershipsPage() {
             <p className="text-sm text-slate-600">Gerencie contatos e negociações com plataformas</p>
           </div>
         </div>
-        <Button onClick={() => setShowNewDialog(true)} className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800">
+        <Button onClick={() => setShowNewDialog(true)} className="w-full sm:w-auto bg-gradient-to-r from-primary to-brand-ink hover:from-brand-ink hover:to-brand-ink">
           <Plus className="mr-2 h-4 w-4" /> Novo Contato
         </Button>
       </div>
@@ -206,7 +206,7 @@ export default function PartnershipsPage() {
               onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
             />
             <div className="flex gap-2">
-              <Button onClick={handleCreate} className="flex-1 bg-blue-600 hover:bg-blue-700">Criar</Button>
+              <Button onClick={handleCreate} className="flex-1 bg-primary hover:bg-primary/90">Criar</Button>
               <Button onClick={() => setShowNewDialog(false)} variant="outline" className="flex-1">Cancelar</Button>
             </div>
           </Card>

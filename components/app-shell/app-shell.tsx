@@ -172,7 +172,7 @@ function NavItem({ href, label, active, strong }: { href: string; label: string;
       className={cn(
         'block px-3 py-2 rounded-lg text-sm transition-colors',
         strong && 'font-medium',
-        active ? 'bg-blue-600 text-white' : strong ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700'
+        active ? 'bg-primary text-white' : strong ? 'text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700'
       )}
     >
       {label}

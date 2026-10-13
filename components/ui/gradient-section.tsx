@@ -16,7 +16,7 @@ const gradientVariants: Record<GradientVariant, string> = {
   success: 'bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500',
   warning: 'bg-gradient-to-br from-yellow-500 via-orange-500 to-red-500',
   error: 'bg-gradient-to-br from-red-500 via-pink-500 to-rose-500',
-  info: 'bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500',
+  info: 'bg-gradient-to-br from-primary via-cyan-500 to-teal-500',
   vibrant: 'bg-gradient-to-br from-purple-500 via-pink-500 to-red-500',
 };
 

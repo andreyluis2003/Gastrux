@@ -203,7 +203,7 @@ export default function TemplatesPage() {
           <Link href="/admin/messaging/campaigns">
             <Button variant="outline" className="gap-2"><Megaphone className="h-4 w-4" />Campanhas</Button>
           </Link>
-          <Button onClick={openCreate} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+          <Button onClick={openCreate} className="gap-2 bg-primary hover:bg-primary/90">
             <Plus className="h-4 w-4" />Novo Template
           </Button>
         </div>
@@ -388,7 +388,7 @@ export default function TemplatesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={save} disabled={saving} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+            <Button onClick={save} disabled={saving} className="gap-2 bg-primary hover:bg-primary/90">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {editing ? 'Atualizar' : 'Criar'}
             </Button>

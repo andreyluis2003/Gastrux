@@ -83,7 +83,7 @@ export function RecipeCostTable({ data, loading }: RecipeCostTableProps) {
               <TableCell className="text-center">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <button className="text-xs text-blue-600 hover:underline">
+                    <button className="text-xs text-primary hover:underline">
                       Ver
                     </button>
                   </DialogTrigger>

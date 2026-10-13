@@ -257,7 +257,7 @@ export default function BetaTestersPage() {
                 {userResults.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                     {userResults.map(u => (
-                      <button key={u.id} type="button" onClick={() => pickExistingUser(u)} className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b text-sm">
+                      <button key={u.id} type="button" onClick={() => pickExistingUser(u)} className="w-full text-left px-3 py-2 hover:bg-primary/5 border-b text-sm">
                         <div className="font-semibold">{u.name || u.email}</div>
                         <div className="text-xs text-gray-500">{u.email} {u.restaurant ? `· ${u.restaurant.name}` : ''}</div>
                       </button>

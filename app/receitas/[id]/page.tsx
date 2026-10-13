@@ -472,7 +472,7 @@ export default function ReceitaDetailPage() {
                     return (
                       <tr key={ri.id} className="border-b dark:border-slate-700 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
                         <td className="py-3">
-                          <Link href={`/insumos/${ri.ingredient.id}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                          <Link href={`/insumos/${ri.ingredient.id}`} className="text-primary hover:underline dark:text-primary/80">
                             {ri.ingredient.name}
                           </Link>
                           <p className="text-xs text-slate-500">{ri.ingredient.code}</p>

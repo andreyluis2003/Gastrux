@@ -65,7 +65,7 @@ export default function FornecedoresPainelPage() {
           <p className="text-sm text-gray-500">Cotações e comparativo de preços</p>
         </div>
         {/* The menu used to open only this panel, which has no way to add a supplier (2026-10-09) */}
-        <Link href="/fornecedores" className="ml-auto inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+        <Link href="/fornecedores" className="ml-auto inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90">
           Cadastrar fornecedor
         </Link>
       </div>

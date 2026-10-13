@@ -53,7 +53,7 @@ export default function ExpiryPage() {
         <Card className="p-6 space-y-2">
           <h1 className="text-xl font-bold">Validades</h1>
           <p>Controle de validades no plano Pro: lista do que venceu e do que vence hoje, aviso de manhã e descarte lançado no desperdício.</p>
-          <Link href="/pricing" className="font-medium text-blue-600 hover:underline">Ver planos</Link>
+          <Link href="/pricing" className="font-medium text-primary hover:underline">Ver planos</Link>
         </Card>
       </div>
     );
@@ -85,13 +85,13 @@ export default function ExpiryPage() {
     <div className="max-w-2xl mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Validades</h1>
-        <Link href="/etiquetas" className="text-sm font-medium text-blue-600 hover:underline">Imprimir etiqueta</Link>
+        <Link href="/etiquetas" className="text-sm font-medium text-primary hover:underline">Imprimir etiqueta</Link>
       </div>
       {nothing && <Card className="p-4">Nada vencendo hoje ou amanhã.</Card>}
       {board.expired.length > 0 && section('Vencidas', board.expired, 'border-red-300 bg-red-50')}
       {board.today.length > 0 && section('Vencem hoje', board.today, 'border-amber-300 bg-amber-50')}
       {board.tomorrow.length > 0 && section('Vencem amanhã', board.tomorrow, '')}
-      <button type="button" className="text-sm font-medium text-blue-600 hover:underline" onClick={() => setShowHistory(!showHistory)}>
+      <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setShowHistory(!showHistory)}>
         {showHistory ? 'Esconder histórico' : 'Histórico (30 dias)'}
       </button>
       {showHistory && (

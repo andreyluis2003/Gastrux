@@ -187,18 +187,18 @@ export default function PartnershipDetailPage() {
                 )}
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a>
+                  <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a>
                 </div>
                 {contact.phone && (
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4" />
-                    <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">{contact.phone}</a>
+                    <a href={`tel:${contact.phone}`} className="text-primary hover:underline">{contact.phone}</a>
                   </div>
                 )}
                 {contact.linkedinUrl && (
                   <div className="flex items-center gap-2">
                     <LinkedinIcon className="h-4 w-4" />
-                    <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                       LinkedIn
                     </a>
                   </div>
@@ -232,7 +232,7 @@ export default function PartnershipDetailPage() {
               <Button
                 size="sm"
                 onClick={() => setShowNewComm(true)}
-                className="gap-2 bg-blue-600 hover:bg-blue-700"
+                className="gap-2 bg-primary hover:bg-primary/90"
               >
                 <Plus className="h-4 w-4" />
                 Adicionar

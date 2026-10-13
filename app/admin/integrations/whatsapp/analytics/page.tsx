@@ -292,7 +292,7 @@ export default function WhatsAppAnalyticsPage() {
               return (
                 <div key={i} className="flex-1 flex flex-col items-center group relative">
                   <div
-                    className="w-full bg-blue-400 hover:bg-blue-500 rounded-t transition-colors cursor-default"
+                    className="w-full bg-primary/60 hover:bg-primary rounded-t transition-colors cursor-default"
                     style={{ height: `${h}%` }}
                   />
                   <div className="hidden group-hover:block absolute -top-8 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10">

@@ -390,7 +390,7 @@ export default function PlatformDashboardPage() {
                       className="flex-1 flex flex-col items-center justify-end group relative"
                     >
                       <div
-                        className="w-full bg-blue-500 rounded-t-sm min-h-[2px] transition-all hover:bg-blue-600"
+                        className="w-full bg-primary rounded-t-sm min-h-[2px] transition-all hover:bg-primary"
                         style={{ height: `${Math.max(heightPct, 2)}%` }}
                         title={`${day.date}: ${day.count} cadastro(s)`}
                       />
@@ -457,7 +457,7 @@ export default function PlatformDashboardPage() {
                         {c.restaurantId && (
                           <Link
                             href={`/admin/customers/${c.restaurantId}`}
-                            className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+                            className="text-primary hover:text-brand-ink inline-flex items-center gap-1"
                           >
                             <span>Detalhes</span>
                             <ExternalLink className="h-3 w-3" />

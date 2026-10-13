@@ -261,7 +261,7 @@ export default function CobrancaPage() {
         <div className="mt-8 text-center text-sm text-gray-500">
           Precisa de ajuda?
           {' '}
-          <Link href="/suporte" className="text-blue-600 hover:underline">Abra um ticket de suporte</Link>
+          <Link href="/suporte" className="text-primary hover:underline">Abra um ticket de suporte</Link>
         </div>
       </div>
     </div>

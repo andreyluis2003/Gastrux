@@ -79,7 +79,7 @@ export default function LabelPage() {
           ) : (
             <p className="pt-2 text-sm">
               Controle de validades no plano Pro.{' '}
-              <Link href="/pricing" className="font-medium text-blue-600 hover:underline">Ver planos</Link>
+              <Link href="/pricing" className="font-medium text-primary hover:underline">Ver planos</Link>
             </p>
           ))}
       </Card>

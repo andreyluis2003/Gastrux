@@ -191,7 +191,7 @@ export default function SettingsPage() {
             const IconComponent = setting.icon;
             return (
               <Link href={setting.href} key={idx}>
-                <Card variant="glass-dark-interactive" className="h-full hover:border-blue-500/50 transition-colors cursor-pointer overflow-hidden group relative">
+                <Card variant="glass-dark-interactive" className="h-full hover:border-primary transition-colors cursor-pointer overflow-hidden group relative">
                   <div className={`absolute inset-0 bg-gradient-to-br ${setting.color} opacity-0 group-hover:opacity-5 transition-opacity`} />
                   <div className="relative p-6 sm:p-8">
                     <div className={`inline-flex items-center justify-center w-14 h-14 rounded-lg bg-gradient-to-br ${setting.color} text-white mb-4`}>

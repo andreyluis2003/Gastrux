@@ -221,7 +221,7 @@ export default function ReferralPage() {
                         WhatsApp
                       </Button>
                       <Button
-                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        className="flex-1 bg-primary hover:bg-primary/90"
                         onClick={shareViaEmail}
                       >
                         <Mail className="w-4 h-4 mr-2" />
@@ -301,7 +301,7 @@ export default function ReferralPage() {
                 <Button
                   type="submit"
                   disabled={redeeming || !redeemCode.trim()}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {redeeming ? 'Resgatando...' : 'Resgatar'}
                 </Button>

@@ -134,7 +134,7 @@ export default function AIInsightsPage() {
             </h1>
             <p className="text-gray-600 mt-1">Insights acionáveis gerados por IA a partir dos dados do seu restaurante</p>
           </div>
-          <Button onClick={generate} disabled={generating} className="bg-violet-600 hover:bg-violet-700 text-white">
+          <Button onClick={generate} disabled={generating} className="bg-primary hover:bg-primary/90 text-white">
             {generating ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando...</>
             ) : (
@@ -156,7 +156,7 @@ export default function AIInsightsPage() {
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition ${
                   active
                     ? 'bg-violet-600 text-white border-violet-600'
-                    : 'bg-white text-gray-700 border-gray-200 hover:border-violet-300'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-primary/30'
                 }`}
               >
                 <TI className="h-4 w-4" />
@@ -233,7 +233,7 @@ export default function AIInsightsPage() {
 
                     <button
                       onClick={() => setExpanded((s) => ({ ...s, [ins.id]: !s[ins.id] }))}
-                      className="mt-3 inline-flex items-center gap-1 text-sm text-violet-600 hover:text-violet-700 font-medium"
+                      className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:text-brand-ink font-medium"
                     >
                       {isExp ? (<><ChevronUp className="h-4 w-4" /> Ocultar detalhes</>) : (<><ChevronDown className="h-4 w-4" /> Ver detalhes</>)}
                     </button>

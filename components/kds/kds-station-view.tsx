@@ -68,7 +68,7 @@ export function KDSStationView({
                 <Button
                   size="sm"
                   onClick={() => onOrderStatusChange?.(order.id, 'READY')}
-                  className="w-full mt-2 bg-blue-500 hover:bg-blue-600"
+                  className="w-full mt-2 bg-primary hover:bg-primary"
                 >
                   Pronto
                 </Button>

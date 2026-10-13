@@ -501,7 +501,7 @@ export default function MultiLocationPage() {
                         {selectedRecipes.size} receita(s) selecionada(s)
                       </p>
                       <Button onClick={handleSync} disabled={syncing || !targetId || selectedRecipes.size === 0}
-                        className="gap-2 bg-violet-500 hover:bg-violet-600 text-white">
+                        className="gap-2 bg-primary hover:bg-primary text-white">
                         {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                         Sincronizar
                       </Button>

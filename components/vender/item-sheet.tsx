@@ -59,7 +59,7 @@ export function ItemSheet({ title, modifiers, initial, sent, saveLabel, onSave, 
                     <button
                       key={m.id}
                       onClick={() => toggle(m.id)}
-                      className={`px-3 py-2 rounded-lg text-sm border ${d.modifierIds.includes(m.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white'}`}
+                      className={`px-3 py-2 rounded-lg text-sm border ${d.modifierIds.includes(m.id) ? 'bg-primary text-primary-foreground border-primary' : 'bg-white'}`}
                     >
                       {m.name}{toCents(m.priceAdjustment) ? ` +${brl(toCents(m.priceAdjustment))}` : ''}
                     </button>

@@ -50,7 +50,7 @@ export function MenuPanel({ groups, disabled, onTap, onDetails }: {
             <button
               key={g.id}
               onClick={() => setActive(g.id)}
-              className={`px-3 py-2 rounded-full text-sm whitespace-nowrap ${current === g.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}`}
+              className={`px-3 py-2 rounded-full text-sm whitespace-nowrap ${current === g.id ? 'bg-primary text-primary-foreground' : 'bg-slate-100 text-slate-700'}`}
             >
               {g.emoji ? `${g.emoji} ` : ''}{g.name}
             </button>
@@ -72,7 +72,7 @@ export function MenuPanel({ groups, disabled, onTap, onDetails }: {
                   onContextMenu={(e) => e.preventDefault()}
                   // Pointer events drive tap/hold; the keyboard (a computer at the counter) adds with Enter or Space
                   onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); onTap(entry); } }}
-                  className="w-full min-h-[72px] rounded-xl border bg-white p-3 pr-9 text-left active:bg-blue-50 disabled:opacity-50 select-none"
+                  className="w-full min-h-[72px] rounded-xl border bg-white p-3 pr-9 text-left active:bg-primary/5 disabled:opacity-50 select-none"
                 >
                   <div className="font-semibold text-sm leading-tight line-clamp-2">{entry.name}</div>
                   <div className="text-sm text-emerald-700 mt-1">{brl(toCents(entry.price))}</div>

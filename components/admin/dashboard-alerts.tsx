@@ -97,7 +97,7 @@ export function DashboardAlerts({ alerts, loading }: DashboardAlertsProps) {
             </div>
           ))}
           {alerts.length > 5 && (
-            <button className="w-full p-2 text-center text-blue-600 hover:bg-blue-50 rounded text-sm font-medium">
+            <button className="w-full p-2 text-center text-primary hover:bg-primary/5 rounded text-sm font-medium">
               Ver todos os {alerts.length} alertas
             </button>
           )}

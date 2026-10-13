@@ -262,7 +262,7 @@ export default function CampaignEditorPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -275,7 +275,7 @@ export default function CampaignEditorPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   rows={3}
                 />
               </div>
@@ -291,7 +291,7 @@ export default function CampaignEditorPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, subjectLine: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
 
@@ -305,7 +305,7 @@ export default function CampaignEditorPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, preheader: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -319,7 +319,7 @@ export default function CampaignEditorPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, content: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-xs"
                   rows={8}
                 />
               </div>
@@ -352,7 +352,7 @@ export default function CampaignEditorPage() {
                         abTestingMetric: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="open_rate">Taxa de Abertura</option>
                     <option value="click_rate">Taxa de Clique</option>
@@ -365,7 +365,7 @@ export default function CampaignEditorPage() {
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? 'Salvando...' : 'Salvar Campanha'}
@@ -424,7 +424,7 @@ export default function CampaignEditorPage() {
                     <Button
                       onClick={handleCreateVariant}
                       size="sm"
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-primary hover:bg-primary/90"
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -498,7 +498,7 @@ export default function CampaignEditorPage() {
 
                 <Button
                   onClick={handleSaveSchedule}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  className="w-full bg-primary hover:bg-primary/90"
                 >
                   <Calendar className="mr-2 h-4 w-4" />
                   Salvar Agendamento

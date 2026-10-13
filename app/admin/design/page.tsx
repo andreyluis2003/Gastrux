@@ -50,7 +50,7 @@ export default function DesignPage() {
 
         {/* Tabs Navigation */}
         <div className="flex gap-2 border-b border-slate-200 dark:border-slate-700">
-          <button className="px-4 py-2 font-medium border-b-2 border-blue-500 text-blue-600 dark:text-blue-400">
+          <button className="px-4 py-2 font-medium border-b-2 border-primary text-primary dark:text-primary/80">
             <span className="flex items-center gap-2">
               <Palette className="w-4 h-4" />
               Temas & Cores

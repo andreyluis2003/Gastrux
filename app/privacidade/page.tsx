@@ -119,7 +119,7 @@ export default function PrivacidadePage() {
           </section>
 
           <div className="pt-4 border-t">
-            <p className="text-sm text-gray-500">Veja também nossos <Link href="/termos" className="text-blue-600 hover:underline">Termos de Uso</Link>.</p>
+            <p className="text-sm text-gray-500">Veja também nossos <Link href="/termos" className="text-primary hover:underline">Termos de Uso</Link>.</p>
           </div>
         </div>
       </div>

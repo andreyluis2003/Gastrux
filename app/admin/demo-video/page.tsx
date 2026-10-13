@@ -156,7 +156,7 @@ export default function DemoVideoUploadPage() {
 
           {/* Drop Zone */}
           <div
-            className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition"
+            className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition"
             onClick={() => fileInputRef.current?.click()}
           >
             <input

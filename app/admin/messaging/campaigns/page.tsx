@@ -174,7 +174,7 @@ export default function CampaignsPage() {
         <div className="flex gap-2">
           <Link href="/admin/messaging/providers"><Button variant="outline" className="gap-2"><Plug className="h-4 w-4" />Provedores</Button></Link>
           <Link href="/admin/messaging/templates"><Button variant="outline" className="gap-2"><FileText className="h-4 w-4" />Templates</Button></Link>
-          <Button onClick={() => setOpen(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700"><Plus className="h-4 w-4" />Nova Campanha</Button>
+          <Button onClick={() => setOpen(true)} className="gap-2 bg-primary hover:bg-primary/90"><Plus className="h-4 w-4" />Nova Campanha</Button>
         </div>
       </div>
 
@@ -316,7 +316,7 @@ export default function CampaignsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={create} disabled={creating} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+            <Button onClick={create} disabled={creating} className="gap-2 bg-primary hover:bg-primary/90">
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Criar
             </Button>

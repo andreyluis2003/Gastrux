@@ -112,7 +112,7 @@ export default function CampaignDetailPage() {
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={load} className="gap-2"><RefreshCw className="h-4 w-4" />Atualizar</Button>
           {pending > 0 && campaign.status !== 'CANCELLED' && (
-            <Button onClick={send} disabled={sending} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+            <Button onClick={send} disabled={sending} className="gap-2 bg-primary hover:bg-primary/90">
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
               Enviar agora
             </Button>

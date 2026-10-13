@@ -85,7 +85,7 @@ export default function FornecedoresPage() {
         <div className="flex items-center gap-3">
           {/* The comparison panel is in the admin area, which a cook cannot open */}
           {role !== 'COOK' && (
-            <Link href="/admin/fornecedores-painel" className="text-sm font-medium text-indigo-600 hover:underline">
+            <Link href="/admin/fornecedores-painel" className="text-sm font-medium text-primary hover:underline">
               Comparar preços
             </Link>
           )}

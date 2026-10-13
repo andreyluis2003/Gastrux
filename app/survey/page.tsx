@@ -100,7 +100,7 @@ export default function SurveyPage() {
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Qual sistema você usa atualmente?</h2>
               {['manual', 'spreadsheet', 'pos'].map(option => (
-                <label key={option} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-blue-50">
+                <label key={option} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-primary/5">
                   <input
                     type="radio"
                     value={option}
