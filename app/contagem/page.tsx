@@ -11,6 +11,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import { FadeIn } from '@/components/ui/animate';
 import { CheckCircle, AlertTriangle, Search, Save, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatQuantity } from '@/lib/formatters';
 
 interface CountItem {
   id: string;
@@ -197,7 +198,7 @@ export default function ContagemPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          Sistema: <strong>{item.systemQuantity.toFixed(2)} {item.unit}</strong>
+                          Sistema: <strong>{formatQuantity(item.systemQuantity)} {item.unit}</strong>
                           <span className="mx-1">•</span>
                           <span style={{ color: item.categoryColor }}>{item.category}</span>
                         </p>
@@ -215,7 +216,7 @@ export default function ContagemPage() {
                         <span className="text-xs text-muted-foreground w-8">{item.unit}</span>
                         {hasDiff && (
                           <span className={`text-xs font-bold whitespace-nowrap ${diff! > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {diff! > 0 ? '+' : ''}{diff!.toFixed(2)}
+                            {diff! > 0 ? '+' : ''}{formatQuantity(diff!)}
                           </span>
                         )}
                       </div>
@@ -237,9 +238,9 @@ export default function ContagemPage() {
                     const diff = parseFloat(item.countedQuantity) - item.systemQuantity;
                     return (
                       <p key={item.id} className="text-xs">
-                        <strong>{item.name}</strong>: {item.systemQuantity.toFixed(2)} → {parseFloat(item.countedQuantity).toFixed(2)} {item.unit}
+                        <strong>{item.name}</strong>: {formatQuantity(item.systemQuantity)} → {formatQuantity(parseFloat(item.countedQuantity))} {item.unit}
                         <span className={`ml-1 font-bold ${diff > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ({diff > 0 ? '+' : ''}{diff.toFixed(2)})
+                          ({diff > 0 ? '+' : ''}{formatQuantity(diff)})
                         </span>
                       </p>
                     );
