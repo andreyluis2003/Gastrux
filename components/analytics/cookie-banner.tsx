@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { asksConsentOn, writeConsent } from '@/lib/analytics/consent';
-import { analyticsConfigured, useConsent } from './ga-script';
+import { useConsent, useGaId } from './ga-script';
 
 /** Asks once, on the public pages, before Google Analytics runs (Política de Privacidade, seção 10). */
 export function CookieBanner() {
   const pathname = usePathname();
   const consent = useConsent();
-  if (!analyticsConfigured || consent !== null || !asksConsentOn(pathname)) return null;
+  const gaId = useGaId();
+  if (!gaId || consent !== null || !asksConsentOn(pathname)) return null;
 
   return (
     <div role="region" aria-label="Aviso de cookies" className="fixed inset-x-0 bottom-0 z-50 border-t bg-white px-4 py-3 shadow-lg">
@@ -31,7 +32,8 @@ export function CookieBanner() {
 
 /** Footer link that forgets the choice so the banner asks again. */
 export function CookiePreferencesLink({ className }: { className?: string }) {
-  if (!analyticsConfigured) return null;
+  const gaId = useGaId();
+  if (!gaId) return null;
   return (
     <button type="button" className={className} onClick={() => writeConsent(null)}>
       Preferências de cookies

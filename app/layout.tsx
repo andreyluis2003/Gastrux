@@ -13,7 +13,8 @@ import { OutboxProvider } from '@/components/offline/outbox-provider';
 import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { FontPreload } from '@/components/font-preload';
 import { PerformanceOptimizations } from '@/components/performance-optimizations';
-import { GAScript } from '@/components/analytics/ga-script';
+import { AnalyticsProvider, GAScript } from '@/components/analytics/ga-script';
+import { gaIdFrom } from '@/lib/analytics/consent';
 import { CookieBanner } from '@/components/analytics/cookie-banner';
 import { FeedbackWidget } from '@/components/feedback/feedback-widget';
 import { GastruxChat } from '@/components/ai/gastrux-chat';
@@ -73,11 +74,15 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+// Read at request time: a plain process.env.NEXT_PUBLIC_* would be inlined at build, where Easypanel has no env
+const GA_ENV = 'NEXT_PUBLIC_GA_MEASUREMENT_ID';
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const gaId = gaIdFrom(process.env[GA_ENV]);
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head suppressHydrationWarning>
@@ -87,6 +92,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${dmSans.variable} ${poppins.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
+        <AnalyticsProvider gaId={gaId}>
         <I18nProvider>
           <QueryProvider>
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -109,6 +115,7 @@ export default function RootLayout({
             </ThemeProvider>
           </QueryProvider>
         </I18nProvider>
+        </AnalyticsProvider>
       </body>
     </html>
   );

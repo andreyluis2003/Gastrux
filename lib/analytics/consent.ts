@@ -36,3 +36,10 @@ export function writeConsent(value: Consent | null): void {
   }
   window.dispatchEvent(new CustomEvent(CONSENT_EVENT, { detail: value }));
 }
+
+/** A real GA4 id or null (unset, the old 'G-PLACEHOLDER', or anything that could break the inline script). */
+export function gaIdFrom(raw: string | null | undefined): string | null {
+  const id = raw?.trim();
+  if (!id || id === 'G-PLACEHOLDER') return null;
+  return /^G-[A-Z0-9]{4,20}$/.test(id) ? id : null;
+}
