@@ -100,6 +100,7 @@ model User {
   dailyCountsClosed   DailyCount[]      @relation("DailyCountClosedBy")
   utilityBillsCreated UtilityBill[]     @relation("UtilityBillCreatedBy")
   utilityBillsUpdated UtilityBill[]     @relation("UtilityBillUpdatedBy")
+  aiQuestions         AiQuestion[]
   dailyCountEntries   DailyCountEntry[] @relation("DailyCountEntryUser")
   settledFoodLabels   FoodLabel[]       @relation("FoodLabelSettledBy")
 
@@ -2990,6 +2991,7 @@ model Restaurant {
   dailyCounts     DailyCount[]
   utilityAccounts UtilityAccount[]
   utilityBills    UtilityBill[]
+  aiQuestions     AiQuestion[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -4736,4 +4738,32 @@ model UtilityBill {
   @@unique([accountId, referenceMonth])
   @@index([restaurantId, referenceMonth])
   @@map("utility_bills")
+}
+
+/// One question to "Pergunte ao Gastrux" (spec 2026-10-16 ia-assistente, §4.6); counted ones drive the monthly limit
+model AiQuestion {
+  id               String     @id @default(cuid())
+  restaurantId     String
+  userId           String
+  role             String
+  question         String
+  answer           String?
+  model            String?
+  detailed         Boolean    @default(false)
+  toolCalls        Json?
+  deniedTools      Json?
+  inputTokens      Int        @default(0)
+  outputTokens     Int        @default(0)
+  cacheReadTokens  Int        @default(0)
+  cacheWriteTokens Int        @default(0)
+  costUsd          Float      @default(0)
+  counted          Boolean    @default(true)
+  error            String?
+  createdAt        DateTime   @default(now())
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("ai_questions")
 }
