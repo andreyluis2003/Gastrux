@@ -41,6 +41,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Mesas e balcão', href: '/vender', roles: FRONT },
       { label: 'Mesas', href: '/admin/tables', roles: MANAGERS },
       { label: 'Pedidos de delivery', href: '/admin/integrations/orders', roles: FRONT },
+      // Spec 2026-10-16 contagem de espetos: mounted, sold, loss and leftover per night (every plan)
+      { label: 'Contagem do dia', href: '/contagem-do-dia', roles: [...FRONT, 'COOK'] },
       { label: 'Cozinha (KDS)', href: '/cozinha', roles: [...MANAGERS, 'COOK'] },
     ],
   },

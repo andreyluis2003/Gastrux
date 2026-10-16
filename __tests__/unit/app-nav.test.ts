@@ -43,7 +43,13 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
   });
 
   it('a cashier sees only what the counter uses', () => {
-    expect(hrefs(navFor('CASHIER', false))).toEqual(['/dashboard', '/vender', '/admin/integrations/orders', '/caixa']);
+    expect(hrefs(navFor('CASHIER', false))).toEqual(['/dashboard', '/vender', '/admin/integrations/orders', '/contagem-do-dia', '/caixa']);
+  });
+
+  it('the daily count is in Vender for every role that taps it', () => {
+    for (const role of ['OWNER', 'MANAGER', 'CASHIER', 'COOK']) expect(hrefs(navFor(role, false))).toContain('/contagem-do-dia');
+    const link = NAV_GROUPS.find((g) => g.id === 'vender')?.links.find((l) => l.href === '/contagem-do-dia');
+    expect(link?.label).toBe('Contagem do dia');
   });
 
   it('a cook sees recipes and stock, not money', () => {
