@@ -8,11 +8,13 @@ export async function loadHistory(restaurantId: string, weeks: number, now = new
     orderBy: { closedAt: 'desc' },
     include: { lines: { orderBy: { recipeName: 'asc' } }, closedBy: { select: { name: true } } },
   });
-  const byItem = new Map<string, { recipeName: string; sold: number; loss: number; difference: number }>();
+  // Missing and extra apart (review I4): netting them let a night with missing espetos read as 0
+  const byItem = new Map<string, { recipeName: string; sold: number; loss: number; difference: number; missing: number; extra: number }>();
   for (const n of nights) {
     for (const l of n.lines) {
-      const it = byItem.get(l.recipeName) ?? { recipeName: l.recipeName, sold: 0, loss: 0, difference: 0 };
+      const it = byItem.get(l.recipeName) ?? { recipeName: l.recipeName, sold: 0, loss: 0, difference: 0, missing: 0, extra: 0 };
       it.sold += l.sold; it.loss += l.loss; it.difference += l.difference;
+      if (l.difference < 0) it.missing += -l.difference; else it.extra += l.difference;
       byItem.set(l.recipeName, it);
     }
   }
@@ -26,6 +28,9 @@ export async function loadHistory(restaurantId: string, weeks: number, now = new
       loss: n.lines.reduce((s, l) => s + l.loss, 0),
       difference: n.lines.reduce((s, l) => s + l.difference, 0),
       differenceValue: n.lines.reduce((s, l) => s + l.difference * l.unitCost, 0),
+      missing: n.lines.reduce((s, l) => s + (l.difference < 0 ? -l.difference : 0), 0),
+      missingValue: n.lines.reduce((s, l) => s + (l.difference < 0 ? -l.difference * l.unitCost : 0), 0),
+      extra: n.lines.reduce((s, l) => s + (l.difference > 0 ? l.difference : 0), 0),
       lines: n.lines.map((l) => ({ recipeName: l.recipeName, opening: l.opening, mounted: l.mounted, sold: l.sold, loss: l.loss, expected: l.expected, counted: l.counted, difference: l.difference })),
     })),
     byItem: [...byItem.values()].sort((a, b) => b.sold - a.sold),

@@ -52,29 +52,34 @@ async function titleFor(restaurantId: string): Promise<string> {
   return owner?.businessType === 'espetaria' ? 'Contagem de espetos' : 'Contagem do dia';
 }
 
-const canDelete = (member: RestaurantMember, e: { userId: string; createdAt: Date }, now: Date) =>
-  MANAGER_ROLES.includes(member.role) || (e.userId === member.userId && now.getTime() - e.createdAt.getTime() <= UNDO_MS);
+/** Once a night was closed, an opening is the leftover the close carried: it can never be entered again, so never undone (review I3) */
+const canDelete = (member: RestaurantMember, e: { userId: string; createdAt: Date; kind: string }, now: Date, openingLocked: boolean) =>
+  !(e.kind === 'OPENING' && openingLocked) &&
+  (MANAGER_ROLES.includes(member.role) || (e.userId === member.userId && now.getTime() - e.createdAt.getTime() <= UNDO_MS));
 
 export async function loadBoard(member: RestaurantMember, now = new Date()) {
   const { restaurantId } = member;
   const night = await openNight(prisma, restaurantId);
-  const [rows, entries, closedBefore, title] = await Promise.all([
+  const [rows, entries, closedBefore, title, openings] = await Promise.all([
     nightRows(prisma, restaurantId, night, now),
     prisma.dailyCountEntry.findMany({ where: { countId: night.id, restaurantId }, orderBy: { createdAt: 'desc' }, take: 100, include: { user: { select: { name: true } } } }),
     prisma.dailyCount.count({ where: { restaurantId, status: 'CLOSED' } }),
     titleFor(restaurantId),
+    prisma.dailyCountEntry.count({ where: { countId: night.id, restaurantId, kind: 'OPENING' } }),
   ]);
   return {
     countId: night.id,
     openedAt: night.openedAt.toISOString(),
     title,
     firstUse: closedBefore === 0,
+    /** The opening was already entered in this night (review I2: the first-use banner goes away) */
+    hasOpening: openings > 0,
     openTooLong: now.getTime() - night.openedAt.getTime() > TOO_LONG_MS,
     canClose: MANAGER_ROLES.includes(member.role),
     rows,
     entries: entries.map((e) => ({
       id: e.id, recipeId: e.recipeId, kind: e.kind as EntryKind, quantity: e.quantity, reason: e.reason,
-      userName: e.user?.name ?? null, createdAt: e.createdAt.toISOString(), canDelete: canDelete(member, e, now),
+      userName: e.user?.name ?? null, createdAt: e.createdAt.toISOString(), canDelete: canDelete(member, e, now, closedBefore > 0),
     })),
   };
 }
@@ -96,6 +101,14 @@ export async function addEntry(member: RestaurantMember, body: { recipeId?: unkn
     // Wait for a close in progress: the tap then lands in the new night (lib/daily-count/close.ts)
     const locked = await tx.$queryRaw<{ status: string }[]>`SELECT "status"::text AS "status" FROM "daily_counts" WHERE "id" = ${night.id} FOR UPDATE`;
     const target = locked[0]?.status === 'OPEN' ? night : await openNight(tx, restaurantId);
+    if (kind === 'OPENING') {
+      // The first night just closed while this waited: the new night's opening is the counted leftover
+      if (target.id !== night.id) throw new DailyCountError('O início da noite vem da contagem do fechamento anterior', 409);
+      // Once per item and night: a second device or a retry would double it (review I2)
+      if (await tx.dailyCountEntry.count({ where: { countId: target.id, restaurantId, recipeId: recipe.id, kind: 'OPENING' } })) {
+        throw new DailyCountError('O início deste item já foi lançado', 409);
+      }
+    }
     const entry = await tx.dailyCountEntry.create({
       data: { countId: target.id, restaurantId, recipeId: recipe.id, kind, quantity, reason, userId: member.userId },
       select: { id: true, countId: true },
@@ -111,7 +124,9 @@ export async function deleteEntry(member: RestaurantMember, entryId: string, now
   });
   if (!entry) throw new DailyCountError('Lançamento não encontrado', 404);
   if (entry.count.status !== 'OPEN') throw new DailyCountError('Esta contagem já foi fechada', 409);
-  if (!canDelete(member, entry, now)) throw new DailyCountError('Só o gerente apaga este lançamento', 403);
+  const openingLocked = entry.kind === 'OPENING' && (await prisma.dailyCount.count({ where: { restaurantId: member.restaurantId, status: 'CLOSED' } })) > 0;
+  if (openingLocked) throw new DailyCountError('A sobra da noite anterior não pode ser apagada', 409);
+  if (!canDelete(member, entry, now, false)) throw new DailyCountError('Só o gerente apaga este lançamento', 403);
   await prisma.dailyCountEntry.delete({ where: { id: entry.id } });
   if (entry.userId !== member.userId || now.getTime() - entry.createdAt.getTime() > UNDO_MS) {
     await recordAudit(member, { action: 'DELETE', entityType: 'DailyCountEntry', entityId: entry.id, changes: { kind: entry.kind, quantity: entry.quantity, recipeId: entry.recipeId, by: entry.userId } });

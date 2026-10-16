@@ -91,6 +91,9 @@ describe('daily count: sold, entries, board', () => {
   it('cook and cashier tap opening, mounted and loss; the board adds them up with the sales of the night', async () => {
     as(cook);
     expect((await add({ recipeId: frango, kind: 'OPENING', quantity: 8 })).status).toBe(200);
+    // Review I2: the opening of an item goes in once per night (a second device or a retry would double it)
+    expect((await add({ recipeId: frango, kind: 'OPENING', quantity: 8 })).status).toBe(409);
+    expect((await board()).hasOpening).toBe(true);
     expect((await add({ recipeId: frango, kind: 'MOUNTED', quantity: 20 })).status).toBe(200);
     as(cashier);
     expect((await add({ recipeId: frango, kind: 'MOUNTED', quantity: '20' })).status).toBe(200);
@@ -155,5 +158,23 @@ describe('daily count: sold, entries, board', () => {
     const b = await board();
     expect(b.title).toBe('Contagem do dia');
     expect(b.rows.map((r) => r.name)).toEqual(['Espeto alheio']);
+  });
+
+  it('review C1: sold counts what was sold, sent to the kitchen or not, and only once', async () => {
+    as(owner);
+    const before = row(await board(), kafta).sold;
+    const now = new Date();
+    // Counter sale without "Enviar para a cozinha": a closed comanda with lines and no kitchen order
+    await prisma.orderSession.create({ data: { restaurantId: rid, userId: owner.id, status: 'CLOSED', items: { create: [{ recipeId: kafta, quantity: 3, price: 13, addedAt: now }] } } });
+    // A table sent to the kitchen: the comanda line and its kitchen copy count once
+    const table = await prisma.orderSession.create({ data: { restaurantId: rid, userId: owner.id, status: 'OPEN', items: { create: [{ recipeId: kafta, quantity: 2, price: 13, addedAt: now, sentAt: now }] } } });
+    await prisma.order.create({ data: { restaurantId: rid, orderNumber: `DC${tag}${seq++}`, status: 'PREPARING', orderSessionId: table.id, items: { create: [{ recipeId: kafta, quantity: 2 }] } } });
+    // A cancelled comanda sold nothing
+    await prisma.orderSession.create({ data: { restaurantId: rid, userId: owner.id, status: 'CANCELLED', items: { create: [{ recipeId: kafta, quantity: 7, price: 13, addedAt: now }] } } });
+    // Site delivery (a kitchen order without a comanda) counts
+    await sell(rid, kafta, 1, now);
+    // Another restaurant's comanda never counts here
+    await prisma.orderSession.create({ data: { restaurantId: otherRid, userId: owner.id, status: 'CLOSED', items: { create: [{ recipeId: otherRecipe, quantity: 9, price: 1, addedAt: now }] } } });
+    expect(row(await board(), kafta).sold - before).toBe(6);
   });
 });

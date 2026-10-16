@@ -57,3 +57,7 @@ CREATE TABLE "daily_count_lines" (
 CREATE UNIQUE INDEX "daily_count_lines_countId_recipeId_key" ON "daily_count_lines"("countId", "recipeId");
 ALTER TABLE "daily_count_lines" ADD CONSTRAINT "daily_count_lines_countId_fkey" FOREIGN KEY ("countId") REFERENCES "daily_counts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "daily_count_lines" ADD CONSTRAINT "daily_count_lines_recipeId_fkey" FOREIGN KEY ("recipeId") REFERENCES "recipes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- The sold query of the daily count (lib/daily-count/sold.ts)
+CREATE INDEX "order_session_items_recipeId_addedAt_idx" ON "order_session_items"("recipeId", "addedAt");
+CREATE INDEX "order_items_recipeId_createdAt_idx" ON "order_items"("recipeId", "createdAt");

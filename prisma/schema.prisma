@@ -1736,6 +1736,8 @@ model OrderItem {
   @@index([orderId])
   @@index([stationId])
   @@index([status])
+  /// Daily count sold query (lib/daily-count/sold.ts)
+  @@index([recipeId, createdAt])
   @@map("order_items")
 }
 
@@ -1851,6 +1853,8 @@ model OrderSessionItem {
   session             OrderSession               @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+  /// Daily count sold query (lib/daily-count/sold.ts)
+  @@index([recipeId, addedAt])
   @@index([recipeId])
   @@map("order_session_items")
 }

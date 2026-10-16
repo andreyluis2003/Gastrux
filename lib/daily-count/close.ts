@@ -35,12 +35,14 @@ export function differenceAlertText(lines: { recipeName: string; difference: num
  * Closes the open night (spec 2026-10-16, 4.5): lock, frozen lines, next night opened at the same
  * instant with each counted leftover as its OPENING entry. A second close at once gets 409.
  */
-export async function closeNight(member: RestaurantMember, counts: { recipeId: string; counted: unknown }[], now = new Date()) {
+export async function closeNight(member: RestaurantMember, counts: { recipeId: string; counted: unknown }[], now = new Date(), countId?: unknown) {
   const { restaurantId } = member;
   if (!Array.isArray(counts)) throw new DailyCountError('Envie a contagem de cada item');
   const result = await prisma.$transaction(async (tx) => {
     const open = await tx.dailyCount.findFirst({ where: { restaurantId, status: 'OPEN' }, select: { id: true, openedAt: true } });
     if (!open) throw new DailyCountError('Não há contagem aberta', 409);
+    // The night the person looked at (review I1): a stale screen must not close the night that just opened
+    if (typeof countId === 'string' && countId !== open.id) throw new DailyCountError('Esta contagem já foi fechada. Atualize a tela.', 409);
     const locked = await tx.$queryRaw<{ status: string }[]>`SELECT "status"::text AS "status" FROM "daily_counts" WHERE "id" = ${open.id} FOR UPDATE`;
     if (locked[0]?.status !== 'OPEN') throw new DailyCountError('Esta contagem acabou de ser fechada', 409);
     const closedAt = new Date(Math.max(now.getTime(), Date.now()));

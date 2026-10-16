@@ -12,6 +12,7 @@ import { GET as BOARD } from '../../../app/api/daily-count/route';
 import { POST as ADD } from '../../../app/api/daily-count/entries/route';
 import { POST as CLOSE } from '../../../app/api/daily-count/close/route';
 import { GET as HISTORY } from '../../../app/api/daily-count/history/route';
+import { DELETE as REMOVE } from '../../../app/api/daily-count/entries/[id]/route';
 import { differenceAlertText } from '../../../lib/daily-count/close';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -22,7 +23,7 @@ const as = (u) => {
   (getServerSessionNext as jest.Mock).mockResolvedValue(s);
 };
 const add = (body) => ADD(new NextRequest('http://x', { method: 'POST', body: JSON.stringify(body) }));
-const close = (counts) => CLOSE(new NextRequest('http://x', { method: 'POST', body: JSON.stringify({ counts }) }));
+const close = (counts, countId?: string) => CLOSE(new NextRequest('http://x', { method: 'POST', body: JSON.stringify({ counts, countId }) }));
 const board = async () => (await BOARD(new NextRequest('http://x'))).json();
 let seq = 0;
 
@@ -90,6 +91,22 @@ describe('daily count: close', () => {
     // Next night: frango starts at 6, kafta (flag on, leftover 0) stays with 0
     const b = await board();
     expect(b.rows.map((r) => [r.name, r.opening])).toEqual([['Espeto de frango', 6], ['Espeto de kafta', 0]]);
+    // Review I3: the leftover carried by the close cannot be undone (it could never be entered again)
+    const carried = b.entries.find((e) => e.kind === 'OPENING');
+    expect(carried.canDelete).toBe(false);
+    const del = await REMOVE(new NextRequest('http://x', { method: 'DELETE' }), { params: { id: carried.id } });
+    expect(del.status).toBe(409);
+    expect(await prisma.dailyCountEntry.count({ where: { id: carried.id } })).toBe(1);
+  });
+
+  it('review I1: a close sent from a stale screen (the night already closed) is refused', async () => {
+    as(s.owner);
+    const stale = (await board()).countId;
+    const counts = [{ recipeId: s.frango, counted: 6 }, { recipeId: s.kafta, counted: 0 }];
+    expect((await close(counts, stale)).status).toBe(200);
+    const before = await prisma.dailyCount.count({ where: { restaurantId: s.rid } });
+    expect((await close(counts, stale)).status).toBe(409);
+    expect(await prisma.dailyCount.count({ where: { restaurantId: s.rid } })).toBe(before);
   });
 
   it('every item needs a count; an unknown item is refused; nothing changes', async () => {
@@ -154,6 +171,10 @@ describe('daily count: close', () => {
     const first = h.nights[h.nights.length - 1];
     expect(first).toMatchObject({ sold: 38, loss: 12, difference: -2 });
     expect(first.differenceValue).toBeCloseTo(-5.6, 2); // −4 × 2.40 + 2 × 2.00
+    // Review I4: missing and extra apart, so a missing item never hides behind another item's extra
+    expect(first).toMatchObject({ missing: 4, extra: 2 });
+    expect(first.missingValue).toBeCloseTo(9.6, 2);
+    expect(h.byItem.find((i) => i.recipeName === 'Espeto de frango').missing).toBeGreaterThanOrEqual(4);
     expect(h.byItem.find((i) => i.recipeName === 'Espeto de frango').sold).toBeGreaterThanOrEqual(38);
     as(s.cook);
     expect((await HISTORY(new NextRequest('http://x/api/daily-count/history'))).status).toBe(200);
