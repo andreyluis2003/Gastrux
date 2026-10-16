@@ -345,6 +345,35 @@ export const SEGMENTS: Segment[] = [
     },
     color: 'from-yellow-700 to-amber-800',
   },
+  {
+    slug: 'espetaria',
+    name: 'Sistema para Espetaria',
+    shortName: 'Espetaria',
+    emoji: '🍢',
+    metaTitle: 'Sistema para Espetaria e Espetinho | Gastrux',
+    metaDescription: 'Sistema para espetarias. Comanda por mesa no celular, custo de cada espeto, estoque de carnes e caixa.',
+    heroHeadline: 'O sistema para a sua espetaria',
+    heroDescription: 'Lance os espetos na comanda pelo celular, saiba quanto custa cada espeto e controle carnes, carvão e caixa. Tudo digital.',
+    painPoints: [
+      'Comanda de papel com dezenas de espetos que somem ou saem errados',
+      'Custo de cada espeto desconhecido quando a carne sobe',
+      'Carne e carvão acabando no meio da noite',
+      'Fechamento de caixa que nunca bate',
+    ],
+    benefits: [
+      { icon: 'Smartphone', title: 'Comanda no Celular', description: 'O garçom lança os espetos da mesa pelo celular, sem papel.' },
+      { icon: 'Utensils', title: 'Pedido na Churrasqueira', description: 'O pedido da mesa aparece na tela da cozinha ou da churrasqueira.' },
+      { icon: 'DollarSign', title: 'Custo por Espeto', description: 'A ficha técnica mostra o custo e a margem de cada espeto.' },
+      { icon: 'Package', title: 'Estoque de Carnes', description: 'Baixa pelas vendas e alerta quando a carne ou o carvão está acabando.' },
+      { icon: 'Clock', title: 'Funciona sem Internet', description: 'Comanda e venda de balcão continuam se a internet cair.' },
+      { icon: 'Users', title: 'Equipe e Permissões', description: 'Garçom, caixa e gerente, cada um com o acesso que precisa.' },
+    ],
+    cta: {
+      headline: 'Pronto para modernizar sua espetaria?',
+      description: 'Comanda no celular, custo por espeto e caixa conferido.',
+    },
+    color: 'from-orange-700 to-red-800',
+  },
 ];
 
 export function getSegmentBySlug(slug: string): Segment | undefined {

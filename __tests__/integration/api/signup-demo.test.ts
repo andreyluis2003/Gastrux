@@ -143,7 +143,7 @@ describe('new account: "Comece com" and address in the sign-up questions', () =>
   });
 
   it('every business type template goes in without errors', async () => {
-    for (const businessType of ['restaurantes', 'japones', 'lanchonete', 'doceria', 'marmitaria', 'acai', 'bar']) {
+    for (const businessType of ['restaurantes', 'japones', 'lanchonete', 'doceria', 'marmitaria', 'acai', 'bar', 'espetaria']) {
       const a = await newAccount(); made.push(a);
       const res = await answer(a.userId, { ...answers, businessType, startWith: 'template' });
       expect([businessType, (await res.json()).template]).toEqual([businessType, businessType]);

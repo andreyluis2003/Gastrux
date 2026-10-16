@@ -267,7 +267,7 @@ export default function MarketingLeadsPage() {
               onChange={e => setNewLead({ ...newLead, segment: e.target.value })}
             >
               <option value="">Segmento...</option>
-              {['restaurantes', 'delivery', 'franquias', 'pizzaria', 'hamburgueria', 'japones', 'lanchonete', 'doceria', 'marmitaria', 'acai', 'bar'].map(s => (
+              {['restaurantes', 'delivery', 'franquias', 'pizzaria', 'hamburgueria', 'japones', 'lanchonete', 'doceria', 'marmitaria', 'acai', 'bar', 'espetaria'].map(s => (
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
             </select>

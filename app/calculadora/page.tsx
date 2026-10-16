@@ -48,6 +48,7 @@ const SEGMENTOS = [
   { value: 'hamburgueria', label: 'Hamburgueria' },
   { value: 'delivery', label: 'Delivery / Dark Kitchen' },
   { value: 'bar', label: 'Bar / Pub' },
+  { value: 'espetaria', label: 'Espetaria' },
   { value: 'cafeteria', label: 'Cafeteria / Padaria' },
   { value: 'outro', label: 'Outro' },
 ];
