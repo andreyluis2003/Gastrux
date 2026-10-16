@@ -95,6 +95,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Vendas', href: '/dashboard/reports/sales', roles: MANAGERS },
       { label: 'Lucratividade', href: '/dashboard/reports/profitability', roles: MANAGERS },
       { label: 'Financeiro', href: '/dashboard/financeiro', roles: MANAGERS },
+      // Spec 2026-10-16 contas de consumo: bills on every plan, indicators from Pro
+      { label: 'Contas de consumo', href: '/dashboard/financeiro/contas', roles: MANAGERS },
       { label: 'Relatório executivo (PDF)', href: '/relatorios', roles: MANAGERS },
     ],
   },

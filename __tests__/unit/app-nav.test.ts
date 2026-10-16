@@ -52,6 +52,14 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
     expect(link?.label).toBe('Contagem do dia');
   });
 
+  it('utility bills sit in Relatórios for owner and manager only', () => {
+    const link = NAV_GROUPS.find((g) => g.id === 'relatorios')?.links.find((l) => l.href === '/dashboard/financeiro/contas');
+    expect(link?.label).toBe('Contas de consumo');
+    expect(hrefs(navFor('MANAGER', false))).toContain('/dashboard/financeiro/contas');
+    expect(hrefs(navFor('CASHIER', false))).not.toContain('/dashboard/financeiro/contas');
+    expect(hrefs(navFor('COOK', false))).not.toContain('/dashboard/financeiro/contas');
+  });
+
   it('a cook sees recipes and stock, not money', () => {
     const h = hrefs(navFor('COOK', false));
     expect(h).toEqual(expect.arrayContaining(['/cozinha', '/receitas', '/estoque', '/contagem']));
