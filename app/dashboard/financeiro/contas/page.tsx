@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { KIND_INFO, addMonths, monthLabel, type Indicators, type UtilityKind } from '@/lib/utility-bills/rules';
+import { KIND_INFO, addMonths, monthLabel, shouldAlert, type Indicators, type UtilityKind } from '@/lib/utility-bills/rules';
 
 interface Bill { referenceMonth: string; amountCents: number; consumption: number | null; dueDate: string | null; notes: string | null }
 interface Account { id: string; kind: UtilityKind; name: string; unit: string | null; active: boolean; bills: Bill[]; latest: { referenceMonth: string; indicators: Indicators | null } | null }
@@ -58,7 +58,8 @@ export default function UtilityBillsPage() {
   if (!data) return <div className="max-w-3xl mx-auto p-4 text-muted-foreground">{error ?? 'Carregando…'}</div>;
 
   const active = data.accounts.filter((a) => a.active);
-  const missingFixed = FIXED.filter((k) => !data.accounts.some((a) => a.kind === k && a.active));
+  const missingFixed = FIXED.filter((k) => !data.accounts.some((a) => a.kind === k));
+  const hasGas = (name: string) => data.accounts.some((a) => a.kind === 'BOTTLED_GAS' && a.name === name);
   const startForm = (a: Account, ym = data.defaultMonth) => {
     const b = a.bills.find((x) => x.referenceMonth === ym);
     setError(null);
@@ -75,13 +76,13 @@ export default function UtilityBillsPage() {
       </div>
       {error && !form && <Card className="p-3 text-red-600 text-sm">{error}</Card>}
 
-      {(missingFixed.length > 0 || active.length === 0) && (
+      {(
         <Card className="p-3 space-y-2">
           <div className="text-sm font-medium">{active.length === 0 ? 'Quais contas o restaurante tem?' : 'Adicionar conta'}</div>
           <div className="flex gap-2 flex-wrap">
             {missingFixed.map((k) => <Button key={k} size="sm" variant="outline" disabled={busy} onClick={() => call('/api/utility-bills/accounts', 'POST', { kind: k })}>+ {KIND_INFO[k].label}</Button>)}
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => call('/api/utility-bills/accounts', 'POST', { kind: 'BOTTLED_GAS', name: 'Gás P13' })}>+ Gás P13</Button>
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => call('/api/utility-bills/accounts', 'POST', { kind: 'BOTTLED_GAS', name: 'Gás P45' })}>+ Gás P45</Button>
+            {!hasGas('Gás P13') && <Button size="sm" variant="outline" disabled={busy} onClick={() => call('/api/utility-bills/accounts', 'POST', { kind: 'BOTTLED_GAS', name: 'Gás P13' })}>+ Gás P13</Button>}
+            {!hasGas('Gás P45') && <Button size="sm" variant="outline" disabled={busy} onClick={() => call('/api/utility-bills/accounts', 'POST', { kind: 'BOTTLED_GAS', name: 'Gás P45' })}>+ Gás P45</Button>}
           </div>
           <div className="flex gap-2">
             <input className="flex-1 border rounded p-2 bg-background text-sm" placeholder="Outra conta (ex.: Aluguel, Condomínio)" value={newName} onChange={(e) => setNewName(e.target.value)} />
@@ -99,7 +100,7 @@ export default function UtilityBillsPage() {
       {active.map((a) => {
         const last = a.bills[0];
         const ind = a.latest?.indicators;
-        const alert = !!(ind?.avg3 && ind.measure > ind.avg3.average * 1.2);
+        const alert = !!ind && shouldAlert(ind);
         const max = Math.max(1, ...a.bills.map((b) => (a.unit ? b.consumption ?? 0 : b.amountCents)));
         return (
           <Card key={a.id} className="p-3 space-y-2">
@@ -126,7 +127,7 @@ export default function UtilityBillsPage() {
             {open === a.id && (
               <table className="w-full text-xs">
                 <thead><tr className="text-left text-muted-foreground"><th>Mês</th><th className="text-right">Valor</th>{a.unit && <th className="text-right">{a.unit}</th>}{data.insights && <th className="w-1/3"></th>}<th></th></tr></thead>
-                <tbody>{a.bills.slice(0, 12).map((b) => {
+                <tbody>{a.bills.filter((b) => b.referenceMonth >= addMonths(data.defaultMonth, -11)).slice(0, 12).map((b) => {
                   const v = a.unit ? b.consumption ?? 0 : b.amountCents;
                   return (
                     <tr key={b.referenceMonth}>
