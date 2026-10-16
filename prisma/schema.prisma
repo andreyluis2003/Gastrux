@@ -96,10 +96,12 @@ model User {
   referredByUser         User?                   @relation("ReferredBy", fields: [referredByUserId], references: [id])
   referrals              User[]                  @relation("ReferredBy")
 
-  printedFoodLabels FoodLabel[]       @relation("FoodLabelPrintedBy")
-  dailyCountsClosed DailyCount[]      @relation("DailyCountClosedBy")
-  dailyCountEntries DailyCountEntry[] @relation("DailyCountEntryUser")
-  settledFoodLabels FoodLabel[]       @relation("FoodLabelSettledBy")
+  printedFoodLabels   FoodLabel[]       @relation("FoodLabelPrintedBy")
+  dailyCountsClosed   DailyCount[]      @relation("DailyCountClosedBy")
+  utilityBillsCreated UtilityBill[]     @relation("UtilityBillCreatedBy")
+  utilityBillsUpdated UtilityBill[]     @relation("UtilityBillUpdatedBy")
+  dailyCountEntries   DailyCountEntry[] @relation("DailyCountEntryUser")
+  settledFoodLabels   FoodLabel[]       @relation("FoodLabelSettledBy")
 
   @@index([role])
   @@index([active])
@@ -2983,9 +2985,11 @@ model Restaurant {
   metricSnapshots         MetricSnapshot[]
 
   /// Thermal label size printed by the browser: '60x40' or '40x25' (spec 2026-10-09 etiquetas)
-  labelSize   String       @default("60x40")
-  foodLabels  FoodLabel[]
-  dailyCounts DailyCount[]
+  labelSize       String           @default("60x40")
+  foodLabels      FoodLabel[]
+  dailyCounts     DailyCount[]
+  utilityAccounts UtilityAccount[]
+  utilityBills    UtilityBill[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -4684,4 +4688,52 @@ model DailyCountLine {
 
   @@unique([countId, recipeId])
   @@map("daily_count_lines")
+}
+
+enum UtilityKind {
+  ENERGY
+  WATER
+  PIPED_GAS
+  BOTTLED_GAS
+  PHONE_INTERNET
+  OTHER
+}
+
+/// A bill the restaurant pays every month (spec 2026-10-16 contas de consumo)
+model UtilityAccount {
+  id           String        @id @default(cuid())
+  restaurantId String
+  kind         UtilityKind
+  name         String
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  bills        UtilityBill[]
+
+  @@index([restaurantId])
+  @@map("utility_accounts")
+}
+
+/// One bill per account and reference month; entering it again corrects it (audited)
+model UtilityBill {
+  id             String         @id @default(cuid())
+  accountId      String
+  restaurantId   String
+  referenceMonth DateTime       @db.Date
+  amountCents    Int
+  consumption    Decimal?       @db.Decimal(12, 3)
+  dueDate        DateTime?      @db.Date
+  notes          String?
+  createdById    String
+  updatedById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  account        UtilityAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  restaurant     Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdBy      User           @relation("UtilityBillCreatedBy", fields: [createdById], references: [id])
+  updatedBy      User?          @relation("UtilityBillUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([accountId, referenceMonth])
+  @@index([restaurantId, referenceMonth])
+  @@map("utility_bills")
 }
