@@ -1,104 +1,54 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { itemSalesInRange } from '@/lib/finance/item-sales';
+import { salesInRange } from '@/lib/finance/month-sales';
+import { brtDayStart } from '@/lib/staff/commission-rules';
 
 export const dynamic = 'force-dynamic';
 
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00.000Z`) + 864e5).toISOString().slice(0, 10);
+const br = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+
+/**
+ * GET /api/reports/sales?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD - Relatórios › Vendas with the Caixa
+ * criterion (owner 2026-10-16): the same totals as the DRE and the Caixa; items by what was sold, at the
+ * price charged; categories from the menu; Brasília days; owner and managers only.
+ */
 export async function GET(request: NextRequest) {
+  const auth = await requireRestaurantRole([...MANAGER_ROLES, 'ADMIN'], 'O relatório de vendas é do dono e do gerente');
+  if (!auth.ok) return auth.response;
+  const { searchParams } = new URL(request.url);
+  const startDate = searchParams.get('startDate') ?? '';
+  const endDate = searchParams.get('endDate') ?? '';
+  if (!DAY.test(startDate) || !DAY.test(endDate)) {
+    return NextResponse.json({ error: 'startDate e endDate são obrigatórios (AAAA-MM-DD)' }, { status: 400 });
+  }
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { restaurantId } = auth.member;
+    const from = brtDayStart(startDate);
+    const to = brtDayStart(nextDay(endDate));
+    const [sales, items] = await Promise.all([salesInRange(restaurantId, from, to), itemSalesInRange(restaurantId, from, to)]);
+    const totalSales = sales.totalCents / 100;
+    const totalOrders = sales.salesCount;
+    const itemsTotal = items.reduce((s, i) => s + i.revenue, 0);
+    const byCategory = new Map<string, { category: string; sales: number; percentage: number }>();
+    for (const i of items) {
+      const c = byCategory.get(i.category) ?? { category: i.category, sales: 0, percentage: 0 };
+      c.sales = Math.round((c.sales + i.revenue) * 100) / 100;
+      byCategory.set(i.category, c);
     }
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const startDate = new Date(searchParams.get('startDate') || '');
-    const endDate = new Date(searchParams.get('endDate') || '');
-
-    const orders = await prisma.order.findMany({
-      where: {
-        restaurantId,
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      include: {
-        items: {
-          include: {
-            recipe: true,
-          },
-        },
-      },
-    });
-
-    const totalSales = orders.reduce(
-      (sum, order) =>
-        sum +
-        order.items.reduce(
-          (itemSum, item) => itemSum + Number(item.recipe.sellingPrice || 0) * item.quantity,
-          0
-        ),
-      0
-    );
-
-    const totalOrders = orders.length;
-    const averageTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
-
-    const topDishes = new Map();
-    orders.forEach((order) => {
-      order.items.forEach((item) => {
-        const key = item.recipe.name;
-        if (!topDishes.has(key)) {
-          topDishes.set(key, {
-            name: key,
-            quantity: 0,
-            revenue: 0,
-          });
-        }
-        const dish = topDishes.get(key);
-        dish.quantity += item.quantity;
-        dish.revenue += Number(item.recipe.sellingPrice || 0) * item.quantity;
-      });
-    });
-
-    const byCategory = new Map();
-    orders.forEach((order) => {
-      order.items.forEach((item) => {
-        const category = 'Pratos';
-        if (!byCategory.has(category)) {
-          byCategory.set(category, { category, sales: 0, percentage: 0 });
-        }
-        const cat = byCategory.get(category);
-        cat.sales += Number(item.recipe.sellingPrice || 0) * item.quantity;
-      });
-    });
-
-    byCategory.forEach((cat) => {
-      cat.percentage = totalSales > 0 ? (cat.sales / totalSales) * 100 : 0;
-    });
-
+    for (const c of byCategory.values()) c.percentage = itemsTotal > 0 ? (c.sales / itemsTotal) * 100 : 0;
     return NextResponse.json({
-      period: `${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`,
+      period: `${br(startDate)} a ${br(endDate)}`,
       totalSales,
       totalOrders,
-      averageTicket,
-      topDishes: Array.from(topDishes.values()).sort((a, b) => b.revenue - a.revenue),
-      byCategory: Array.from(byCategory.values()).sort((a, b) => b.sales - a.sales),
+      averageTicket: totalOrders > 0 ? totalSales / totalOrders : 0,
+      topDishes: items.map((i) => ({ name: i.name, quantity: i.quantity, revenue: i.revenue })),
+      byCategory: [...byCategory.values()].sort((a, b) => b.sales - a.sales),
     });
   } catch (error) {
-    console.error('Error generating sales report:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate report' },
-      { status: 500 }
-    );
+    console.error('[reports/sales] failed:', error);
+    return NextResponse.json({ error: 'Não foi possível gerar o relatório' }, { status: 500 });
   }
 }

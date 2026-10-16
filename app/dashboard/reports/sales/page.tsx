@@ -91,28 +91,35 @@ export default function SalesReportPage() {
     fetchReport(start, end);
   };
 
-  const handleExport = async () => {
+  // A spreadsheet of what is on screen (the old PDF export downloaded a placeholder file); semicolons
+  // and decimal commas so Excel in Portuguese opens it in columns
+  const handleExport = () => {
+    if (!report) return;
+    setExporting(true);
     try {
-      setExporting(true);
-      const response = await fetch(
-        `/api/reports/sales/export?startDate=${startDate}&endDate=${endDate}&format=pdf`
-      );
-
-      if (!response.ok) throw new Error('Failed to export');
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const money = (v: number) => v.toFixed(2).replace('.', ',');
+      const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const rows = [
+        ['Período', report.period],
+        ['Vendas totais (R$)', money(report.totalSales)],
+        ['Número de vendas', String(report.totalOrders)],
+        ['Ticket médio (R$)', money(report.averageTicket)],
+        [],
+        ['Item', 'Quantidade', 'Receita (R$)'],
+        ...report.topDishes.map((d) => [d.name, String(d.quantity), money(d.revenue)]),
+        [],
+        ['Categoria', 'Vendas (R$)', '%'],
+        ...report.byCategory.map((c) => [c.category, money(c.sales), c.percentage.toFixed(1).replace('.', ',')]),
+      ];
+      const csv = '﻿' + rows.map((r) => r.map(cell).join(';')).join('\r\n');
+      const url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `relatorio_vendas_${startDate}_${endDate}.pdf`;
+      a.download = `vendas_${startDate || 'periodo'}_${endDate || ''}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
-      toast.success('Relatorio exportado com sucesso');
-    } catch (error) {
-      console.error('Error exporting:', error);
-      toast.error('Erro ao exportar relatorio');
     } finally {
       setExporting(false);
     }
@@ -136,7 +143,7 @@ export default function SalesReportPage() {
           className="gap-2 w-full sm:w-auto"
         >
           <Download size={18} />
-          {exporting ? 'Exportando...' : 'Exportar PDF'}
+          {exporting ? 'Gerando...' : 'Baixar planilha (CSV)'}
         </Button>
       </div>
 
