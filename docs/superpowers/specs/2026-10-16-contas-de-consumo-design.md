@@ -64,7 +64,7 @@ Mesmo critério do Caixa: entradas de venda do caixa com comanda (`salesSummary`
 
 ## 5. Telas e rotas
 
-- **Menu:** Relatórios › "Contas de consumo" (`/financeiro/contas`), dono e gerente.
+- **Menu:** Relatórios › "Contas de consumo" (`/dashboard/financeiro/contas`, junto da DRE e do fluxo de caixa), dono e gerente.
 - **Primeiro uso:** marcar as contas que o restaurante tem (lista fixa) e criar "Outras".
 - **Tela principal:** um cartão por conta ativa com o último mês lançado e, no Pro, os indicadores de 4.3; botão "Lançar conta"; histórico de 12 meses por conta (lista em todos os planos; gráfico de valor e consumo no Pro). No Starter, os indicadores aparecem bloqueados com o link para os planos.
 - **Lançar conta:** conta, mês de referência (padrão o mês anterior), valor, consumo (quando houver, com a unidade), vencimento e observação opcionais. Se já existir conta daquele mês, o formulário abre preenchido e o botão diz "Corrigir".
