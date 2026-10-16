@@ -141,7 +141,7 @@ export default function UtilityBillsPage() {
                 })}</tbody>
               </table>
             )}
-            <button className="text-xs text-muted-foreground hover:underline" disabled={busy} onClick={() => call(`/api/utility-bills/accounts/${a.id}`, 'PATCH', { active: false })}>Desativar conta</button>
+            <button className="text-xs text-muted-foreground hover:underline ml-4" disabled={busy} onClick={() => { if (window.confirm(`Desativar ${a.name}? O histórico fica guardado e dá para reativar.`)) call(`/api/utility-bills/accounts/${a.id}`, 'PATCH', { active: false }); }}>Desativar conta</button>
           </Card>
         );
       })}
