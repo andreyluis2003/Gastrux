@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { monthDate } from '@/lib/utility-bills/rules';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -100,7 +101,18 @@ export async function GET(req: NextRequest) {
     const despesasPessoal = staff.reduce((sum, s) => sum + Number(s.basesalary || 0), 0) * monthsInRange;
 
     // 6. RESULTADO
-    const despesasTotais = despesasOperacionais + despesasPessoal;
+    // 5b. CONTAS DE CONSUMO - by reference month, whole months (spec 2026-10-16 contas de consumo, 4.6)
+    const startMonth = startDate.slice(0, 7);
+    const endMonth = endDate.slice(0, 7);
+    const utility = await prisma.utilityBill.aggregate({
+      where: { restaurantId, referenceMonth: { gte: monthDate(startMonth), lte: monthDate(endMonth) } },
+      _sum: { amountCents: true },
+    });
+    const contasConsumo = (utility._sum.amountCents ?? 0) / 100;
+    const lastDay = new Date(Date.UTC(Number(endMonth.slice(0, 4)), Number(endMonth.slice(5, 7)), 0)).getUTCDate();
+    const contasConsumoMesInteiro = contasConsumo > 0 && (!startDate.endsWith('-01') || Number(endDate.slice(8, 10)) !== lastDay);
+
+    const despesasTotais = despesasOperacionais + despesasPessoal + contasConsumo;
     const resultadoOperacional = lucroBruto - despesasTotais;
     const margemOperacional = receitaLiquida > 0 ? (resultadoOperacional / receitaLiquida) * 100 : 0;
 
@@ -152,9 +164,11 @@ export async function GET(req: NextRequest) {
         despesasOperacionais: {
           operacional: despesasOperacionais,
           pessoal: despesasPessoal,
+          contasConsumo,
           taxasGateway,
           total: despesasTotais + taxasGateway,
         },
+        contasConsumoMesInteiro,
         resultadoOperacional,
         margemOperacional: Math.round(margemOperacional * 100) / 100,
         resultadoLiquido,
