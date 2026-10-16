@@ -10,13 +10,15 @@ type Db = PrismaClient | Prisma.TransactionClient;
  *   merging moves the lines and cancels the source, and removal deletes the line, so each counts once;
  * - kitchen orders without a comanda (site delivery, delivery integrations), items and orders not cancelled.
  */
-export async function soldByRecipe(db: Db, restaurantId: string, recipeIds: string[], from: Date, to: Date): Promise<Record<string, number>> {
-  if (recipeIds.length === 0) return {};
+export async function soldByRecipe(db: Db, restaurantId: string, recipeIds: string[] | null, from: Date, to: Date): Promise<Record<string, number>> {
+  // null = every recipe (the DRE estimated CMV); an empty list = nothing to count
+  if (recipeIds && recipeIds.length === 0) return {};
+  const recipeFilter = recipeIds ? { recipeId: { in: recipeIds } } : {};
   const [lines, kitchen] = await Promise.all([
     db.orderSessionItem.groupBy({
       by: ['recipeId'],
       where: {
-        recipeId: { in: recipeIds },
+        ...recipeFilter,
         addedAt: { gte: from, lt: to },
         session: { restaurantId, status: { not: 'CANCELLED' } },
       },
@@ -25,7 +27,7 @@ export async function soldByRecipe(db: Db, restaurantId: string, recipeIds: stri
     db.orderItem.groupBy({
       by: ['recipeId'],
       where: {
-        recipeId: { in: recipeIds },
+        ...recipeFilter,
         status: { not: 'CANCELLED' },
         createdAt: { gte: from, lt: to },
         order: { restaurantId, status: { not: 'CANCELLED' }, orderSessionId: null },

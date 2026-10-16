@@ -20,6 +20,7 @@ interface DREData {
     receitaBruta: number;
     receitaDineIn: number;
     receitaDelivery: number;
+    taxaServico?: number;
     receitaCaixa: number;
     deducoes: { impostos: number; descontos: number; total: number };
     receitaLiquida: number;
@@ -79,6 +80,7 @@ function formatPeriodLabel(type: PeriodType, startDate: string, endDate: string)
 const PAYMENT_LABELS: Record<string, string> = {
   CASH: 'Dinheiro', CARD: 'Cartão', PIX: 'PIX', MERCADO_PAGO: 'Mercado Pago',
   BANK_TRANSFER: 'Transferência', OTHER: 'Outros', STRIPE: 'Stripe',
+  CREDIT: 'Crédito', DEBIT: 'Débito', PIX_ONLINE: 'PIX pelo celular (mesa)', CARD_ONLINE: 'Cartão pelo celular (mesa)', DELIVERY: 'Delivery (site e integrações)',
 };
 
 export default function DREPage() {
@@ -250,7 +252,8 @@ export default function DREPage() {
             {expandedSections.receita && (
               <div className="mb-4 border-l-2 border-blue-200 pl-4">
                 <DRELine label="Receita Bruta" value={d.receitaBruta} />
-                <DRELine label="Vendas Salão" value={d.receitaDineIn} indent sub />
+                <DRELine label="Vendas Salão (mesas e balcão)" value={d.receitaDineIn} indent sub />
+                {(d.taxaServico ?? 0) > 0 && <DRELine label="Taxa de serviço (incluída)" value={d.taxaServico ?? 0} indent sub />}
                 <DRELine label="Vendas Delivery" value={d.receitaDelivery} indent sub />
                 {d.receitaCaixa > 0 && <DRELine label="Receita Caixa" value={d.receitaCaixa} indent sub />}
               </div>

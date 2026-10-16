@@ -4,6 +4,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { monthDate } from '@/lib/utility-bills/rules';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { salesInRange } from '@/lib/finance/month-sales';
+import { soldByRecipe } from '@/lib/daily-count/sold';
+import { brtDayStart } from '@/lib/staff/commission-rules';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -12,42 +16,39 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Financial results: owner and managers only (the cashier and the cook could open it)
+    const auth = await requireRestaurantRole([...MANAGER_ROLES, 'ADMIN'], 'A DRE é do dono e do gerente');
+    if (!auth.ok) return auth.response;
 
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    if (!startDate || !endDate) {
-      return NextResponse.json({ error: 'startDate e endDate são obrigatórios' }, { status: 400 });
+    if (!startDate || !endDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      return NextResponse.json({ error: 'startDate e endDate são obrigatórios (AAAA-MM-DD)' }, { status: 400 });
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    // The period follows Brasília days: [start 00:00, day after end 00:00)
+    const start = brtDayStart(startDate);
+    const endExclusive = brtDayStart(new Date(Date.parse(`${endDate}T00:00:00.000Z`) + 864e5).toISOString().slice(0, 10));
+    const end = new Date(endExclusive.getTime() - 1);
 
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 400 });
     }
 
-    // 1. RECEITA BRUTA - Revenue from completed orders
-    const orders = await prisma.order.findMany({
-      where: {
-        restaurantId,
-        createdAt: { gte: start, lte: end },
-        status: { in: ['COMPLETED', 'READY'] },
-      },
-      select: { subtotal: true, total: true, taxes: true, fees: true, discount: true, orderType: true },
-    });
+    // 1. RECEITA BRUTA - the Caixa criterion (owner 2026-10-16): paid comandas and counter sales,
+    // pay at the table after refunds, and delivery orders without a comanda; the service charge is inside
+    const sales = await salesInRange(restaurantId, start, endExclusive);
+    const receitaBruta = sales.totalCents / 100;
+    const receitaDineIn = sales.salaoCents / 100;
+    const receitaDelivery = sales.deliveryCents / 100;
+    const taxaServico = sales.serviceCents / 100;
 
-    const receitaBruta = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const receitaDineIn = orders.filter(o => o.orderType === 'DINE_IN').reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const receitaDelivery = orders.filter(o => o.orderType === 'DELIVERY').reduce((sum, o) => sum + Number(o.total || 0), 0);
-
-    // 2. DEDUÇÕES - Taxes, discounts, fees
-    const impostos = orders.reduce((sum, o) => sum + Number(o.taxes || 0), 0);
-    const descontos = orders.reduce((sum, o) => sum + Number(o.discount || 0), 0);
-    const taxasPlataforma = orders.reduce((sum, o) => sum + Number(o.fees || 0), 0);
+    // 2. DEDUÇÕES - taxes and discounts of the delivery orders (comanda discounts are already net)
+    const impostos = sales.deliveryTaxesCents / 100;
+    const descontos = sales.deliveryDiscountCents / 100;
     const deducoes = impostos + descontos;
     const receitaLiquida = receitaBruta - deducoes;
 
@@ -61,36 +62,30 @@ export async function GET(req: NextRequest) {
     });
     const cmvTotal = cmvSnapshots.reduce((sum, s) => sum + Number((s as any).totalCost || 0), 0);
 
-    // If no CMV snapshots, estimate from recipe costs
+    // If no CMV snapshots, estimate from what was sold (comanda lines + delivery) at the recipe cost
     let cmv = cmvTotal;
     if (cmv === 0) {
-      const orderItems = await prisma.orderItem.findMany({
-        where: {
-          order: {
-            restaurantId,
-            createdAt: { gte: start, lte: end },
-            status: { in: ['COMPLETED', 'READY'] },
-          },
-        },
-        include: { recipe: { select: { costPerPortion: true } } },
-      });
-      cmv = orderItems.reduce((sum, item) => sum + (item.recipe?.costPerPortion || 0) * item.quantity, 0);
+      const sold = await soldByRecipe(prisma, restaurantId, null, start, endExclusive);
+      const costs = await prisma.recipe.findMany({ where: { restaurantId, id: { in: Object.keys(sold) } }, select: { id: true, costPerPortion: true } });
+      cmv = costs.reduce((sum, r) => sum + (r.costPerPortion || 0) * (sold[r.id] ?? 0), 0);
     }
 
     const lucroBruto = receitaLiquida - cmv;
     const margemBruta = receitaLiquida > 0 ? (lucroBruto / receitaLiquida) * 100 : 0;
 
-    // 4. DESPESAS OPERACIONAIS - from CashMovements
-    const cashMovements = await prisma.cashMovement.findMany({
-      where: {
-        cashRegister: { restaurantId },
-        createdAt: { gte: start, lte: end },
-        type: { in: ['PAYMENT', 'WITHDRAWAL', 'OTHER'] },
-      },
-      select: { amount: true, description: true, type: true },
-    });
-
-    const despesasOperacionais = cashMovements.reduce((sum, m) => sum + Math.abs(Number(m.amount)), 0);
+    // 4. DESPESAS OPERACIONAIS - expenses paid from the drawer (Caixa "Despesa"); a withdrawal is money
+    // moved to the safe, not an expense. Plus the legacy register payments (before 2026-10-05).
+    const [drawerExpenses, cashMovements] = await Promise.all([
+      prisma.cashSessionEntry.aggregate({
+        where: { restaurantId, type: 'EXPENSE', createdAt: { gte: start, lt: endExclusive } },
+        _sum: { amountCents: true },
+      }),
+      prisma.cashMovement.findMany({
+        where: { cashRegister: { restaurantId }, createdAt: { gte: start, lt: endExclusive }, type: { in: ['PAYMENT', 'OTHER'] } },
+        select: { amount: true },
+      }),
+    ]);
+    const despesasOperacionais = (drawerExpenses._sum.amountCents ?? 0) / 100 + cashMovements.reduce((sum, m) => sum + Math.abs(Number(m.amount)), 0);
 
     // 5. DESPESAS COM PESSOAL - from StaffMembers
     const staff = await prisma.staffMember.findMany({
@@ -126,21 +121,10 @@ export async function GET(req: NextRequest) {
       select: { method: true, amount: true, gatewayFee: true },
     });
 
-    const receitaPorMetodo: Record<string, number> = {};
     const taxasGateway = payments.reduce((sum, p) => sum + Number(p.gatewayFee || 0), 0);
-    payments.forEach((p) => {
-      receitaPorMetodo[p.method] = (receitaPorMetodo[p.method] || 0) + Number(p.amount);
-    });
+    const receitaPorMetodo: Record<string, number> = Object.fromEntries(Object.entries(sales.byMethod).map(([m, c]) => [m, c / 100]));
 
-    // Income from CashMovements (SALE type)
-    const salesMovements = await prisma.cashMovement.findMany({
-      where: {
-        cashRegister: { restaurantId },
-        createdAt: { gte: start, lte: end },
-        type: 'SALE',
-      },
-    });
-    const receitaCaixa = salesMovements.reduce((sum, m) => sum + Number(m.amount), 0);
+    const receitaCaixa = 0; // legacy register, replaced by the Caixa criterion above
 
     const resultadoLiquido = resultadoOperacional - taxasGateway;
     const margemLiquida = receitaLiquida > 0 ? (resultadoLiquido / receitaLiquida) * 100 : 0;
@@ -151,6 +135,7 @@ export async function GET(req: NextRequest) {
         receitaBruta,
         receitaDineIn,
         receitaDelivery,
+        taxaServico,
         receitaCaixa,
         deducoes: {
           impostos,
@@ -175,7 +160,7 @@ export async function GET(req: NextRequest) {
         margemLiquida: Math.round(margemLiquida * 100) / 100,
       },
       detalhamento: {
-        totalPedidos: orders.length,
+        totalPedidos: sales.salesCount,
         receitaPorMetodo,
         totalFuncionarios: staff.length,
       },
