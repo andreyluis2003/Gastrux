@@ -35,7 +35,6 @@ export const monthDate = (ym: string) => new Date(`${ym}-01T00:00:00.000Z`);
 export const monthOf = (d: Date) => d.toISOString().slice(0, 7);
 export const monthLabel = (ym: string) =>
   monthDate(ym).toLocaleDateString('pt-BR', { timeZone: 'UTC', month: 'long', year: 'numeric' });
-const monthName = (ym: string) => monthDate(ym).toLocaleDateString('pt-BR', { timeZone: 'UTC', month: 'long' });
 
 export function parseMonth(v: unknown, now = new Date()): string {
   if (typeof v !== 'string' || !YM.test(v)) throw new UtilityError('Mês de referência inválido');
@@ -44,17 +43,25 @@ export function parseMonth(v: unknown, now = new Date()): string {
 }
 
 /** A Brazilian or plain decimal: "1.240,50", "1240.5", 1240 */
+/**
+ * A Brazilian or plain decimal: "1.240,50", "1240.5", 1240. A dot followed by groups of exactly three
+ * digits and no comma is a thousands separator, as on a Brazilian bill ("1.240" = 1240, review I1);
+ * a comma before a dot ("1,240.00") is ambiguous and refused.
+ */
 function parseDecimal(v: unknown): number {
   if (typeof v === 'number') return v;
   if (typeof v !== 'string' || v.trim() === '') return NaN;
   const s = v.trim();
+  if (/^\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ''));
+  if (s.includes(',') && s.includes('.') && s.indexOf(',') < s.lastIndexOf('.')) return NaN;
   const normalized = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
   return /^-?\d+(\.\d+)?$/.test(normalized) ? Number(normalized) : NaN;
 }
 
 export function parseAmountCents(v: unknown): number {
   const n = parseDecimal(v);
-  if (!Number.isFinite(n) || n <= 0 || n > 10_000_000) throw new UtilityError('Valor inválido');
+  // Checked after rounding: "0,004" would be saved as zero (review M1)
+  if (!Number.isFinite(n) || Math.round(n * 100) <= 0 || n > 10_000_000) throw new UtilityError('Valor inválido');
   return Math.round(n * 100);
 }
 
@@ -66,8 +73,8 @@ export function parseConsumption(v: unknown, kind: UtilityKind): number | null {
   }
   if (empty) throw new UtilityError(`Informe o consumo em ${KIND_INFO[kind].unit}`);
   // "1.380" means one thousand three hundred eighty on a Brazilian bill
-  const n = typeof v === 'string' && /^\d{1,3}(\.\d{3})+$/.test(v.trim()) ? Number(v.trim().replace(/\./g, '')) : parseDecimal(v);
-  if (!Number.isFinite(n) || n <= 0 || n > 100_000_000) throw new UtilityError('Consumo inválido');
+  const n = parseDecimal(v);
+  if (!Number.isFinite(n) || Math.round(n * 1000) <= 0 || n > 100_000_000) throw new UtilityError('Consumo inválido');
   return Math.round(n * 1000) / 1000;
 }
 
@@ -114,8 +121,11 @@ export const shouldAlert = (ind: Indicators) => ind.avg3 !== null && ind.measure
 
 const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ');
 
+/** The bell rings only for the last 3 months: backfilling a year of bills at the start is not news (review M5) */
+export const isAlertableMonth = (ym: string, now = new Date()) => ym >= addMonths(currentMonth(now), -3);
+
 export function alertText(name: string, kind: UtilityKind, ym: string, ind: Indicators) {
-  const month = monthName(ym);
+  const month = monthLabel(ym);
   const p = Math.round(ind.avg3?.pct ?? 0);
   const unit = KIND_INFO[kind].unit;
   const message = unit

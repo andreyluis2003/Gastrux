@@ -1,6 +1,6 @@
 import {
   addMonths, alertText, currentMonth, indicators, monthDate, monthLabel, monthOf, parseAmountCents, parseConsumption,
-  parseMonth, shouldAlert, UtilityError,
+  isAlertableMonth, parseMonth, shouldAlert, UtilityError,
 } from '../../lib/utility-bills/rules';
 
 const now = new Date('2026-10-16T15:00:00Z');
@@ -28,6 +28,21 @@ describe('utility bills rules (lib/utility-bills/rules.ts)', () => {
     expect(parseAmountCents('1.240,50')).toBe(124050);
     expect(parseAmountCents('0,99')).toBe(99);
     for (const bad of [0, -1, '', 'abc', null]) expect(() => parseAmountCents(bad)).toThrow(UtilityError);
+  });
+
+  it('review I1/M1: a thousands dot is thousands; mixed forms and amounts that round to 0 are refused', () => {
+    expect(parseAmountCents('1.240')).toBe(124000);
+    expect(parseAmountCents('12.345')).toBe(1234500);
+    expect(parseAmountCents('1.240.000')).toBe(124000000);
+    expect(parseAmountCents('12.50')).toBe(1250);
+    for (const bad of ['1,240.00', '0,004', 0.001]) expect(() => parseAmountCents(bad)).toThrow(UtilityError);
+    expect(() => parseConsumption(0.0004, 'WATER')).toThrow(UtilityError);
+  });
+
+  it('review M5: alerts only for recent months', () => {
+    expect(isAlertableMonth('2026-09', now)).toBe(true);
+    expect(isAlertableMonth('2026-07', now)).toBe(true);
+    expect(isAlertableMonth('2026-06', now)).toBe(false);
   });
 
   it('consumption: required with a unit, refused without one', () => {
@@ -86,15 +101,15 @@ describe('utility bills rules (lib/utility-bills/rules.ts)', () => {
     expect(ind.unitPrice).toBeNull();
     expect(Math.round(ind.avg3!.pct)).toBe(38);
     expect(alertText('Telefone/Internet', 'PHONE_INTERNET', '2026-09', ind)).toEqual({
-      title: 'Telefone/Internet de setembro acima da média',
-      message: 'Telefone/Internet de setembro: valor 38% acima da média (R$ 300,00).',
+      title: 'Telefone/Internet de setembro de 2026 acima da média',
+      message: 'Telefone/Internet de setembro de 2026: valor 38% acima da média (R$ 300,00).',
     });
   });
 
   it('alert text for consumption', () => {
     const ind = indicators('ENERGY', '2026-09', { '2026-06': e(1000, 1100), '2026-07': e(1050, 1100), '2026-08': e(1100, 1135), '2026-09': e(1240, 1380) }, null);
     expect(alertText('Energia', 'ENERGY', '2026-09', ind).message).toBe(
-      'Energia de setembro: consumo 24% acima da média (1.380 kWh). Confira vazamento ou equipamento ligado.',
+      'Energia de setembro de 2026: consumo 24% acima da média (1.380 kWh). Confira vazamento ou equipamento ligado.',
     );
   });
 });

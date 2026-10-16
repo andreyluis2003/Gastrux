@@ -39,6 +39,9 @@ async function setup(tier) {
 }
 
 describe('contas de consumo', () => {
+  // The months below are fixed: the clock is frozen on 2026-10-16 (only Date; timers stay real for Prisma)
+  beforeAll(() => { jest.useFakeTimers({ now: new Date('2026-10-16T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] }); });
+  afterAll(() => { jest.useRealTimers(); });
   let s, p;
   beforeAll(async () => { s = await setup('starter'); p = await setup('pro'); }, 60000);
   afterAll(async () => {
@@ -131,7 +134,7 @@ describe('contas de consumo', () => {
     const alerts = await prisma.notification.findMany({ where: { restaurantId: p.rid } });
     expect(alerts.length).toBe(1);
     expect(alerts[0]).toMatchObject({ userId: null, actionUrl: '/dashboard/financeiro/contas' });
-    expect(alerts[0].message).toContain('Energia de setembro: consumo 28% acima da média (1.380 kWh)');
+    expect(alerts[0].message).toContain('Energia de setembro de 2026: consumo 28% acima da média (1.380 kWh)');
     // Correcting the bill does not ring again
     expect((await (await save({ accountId: energy.id, referenceMonth: '2026-09', amount: 1240, consumption: 1400 })).json()).alerted).toBe(false);
     expect(await prisma.notification.count({ where: { restaurantId: p.rid } })).toBe(1);
@@ -140,5 +143,15 @@ describe('contas de consumo', () => {
     const latest = sc.accounts.find((a) => a.id === energy.id).latest;
     expect(latest.referenceMonth).toBe('2026-09');
     expect(Math.round(latest.indicators.avg3.pct)).toBe(30);
+  });
+
+  it('review M5: backfilling old months never rings the bell', async () => {
+    expect(new Date().toISOString().slice(0, 10)).toBe('2026-10-16'); // the frozen clock is in place
+    as(p.owner);
+    const water = await account({ kind: 'WATER' });
+    const before = await prisma.notification.count({ where: { restaurantId: p.rid } });
+    for (const [m, m3] of [['2025-01', 10], ['2025-02', 10], ['2025-03', 10]]) await save({ accountId: water.id, referenceMonth: m, amount: 100, consumption: m3 });
+    expect((await (await save({ accountId: water.id, referenceMonth: '2025-04', amount: 300, consumption: 30 })).json()).alerted).toBe(false);
+    expect(await prisma.notification.count({ where: { restaurantId: p.rid } })).toBe(before);
   });
 });
