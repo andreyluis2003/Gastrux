@@ -264,7 +264,7 @@ function LossDialog({ row, busy, error, onCancel, onSave }: { row: Row; busy: bo
   const [reason, setReason] = useState<string>('Queimou');
   const [note, setNote] = useState('');
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center p-4">
       <Card className="w-full max-w-md p-4 space-y-3 max-h-[90dvh] overflow-y-auto">
         <h2 className="text-lg font-semibold">Perda: {row.name}</h2>
         <input className="w-full border rounded p-2 bg-background" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} aria-label="Quantidade" />
@@ -292,7 +292,7 @@ function CountDialog({ title, rows, values, onChange, busy, error, allowEmpty, c
   const bad = rows.filter((r) => { const v = values[r.recipeId] ?? ''; return allowEmpty ? v.trim() !== '' && !isCount(v) : !isCount(v); });
   const [tried, setTried] = useState(false);
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-[70] flex items-end sm:items-center justify-center p-4">
       <Card className="w-full max-w-md p-4 space-y-3 max-h-[90dvh] overflow-y-auto">
         <h2 className="text-lg font-semibold">{title}</h2>
         {rows.map((r) => {
