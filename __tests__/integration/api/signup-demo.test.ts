@@ -149,4 +149,14 @@ describe('new account: "Comece com" and address in the sign-up questions', () =>
       expect([businessType, (await res.json()).template]).toEqual([businessType, businessType]);
     }
   });
+
+  it('the espetaria template marks its espetos for the daily count', async () => {
+    const a = await newAccount(); made.push(a);
+    await answer(a.userId, { ...answers, businessType: 'espetaria', startWith: 'template' });
+    const rows = await prisma.recipe.findMany({ where: { restaurantId: a.restaurantId }, select: { name: true, dailyCount: true } });
+    expect(rows.filter((r) => r.dailyCount).map((r) => r.name).sort()).toEqual([
+      'Espeto de alcatra', 'Espeto de coração', 'Espeto de frango', 'Espeto de kafta', 'Espeto de linguiça', 'Espeto de queijo coalho', 'Pão de alho',
+    ]);
+    expect(rows.find((r) => r.name === 'Vinagrete')?.dailyCount).toBe(false);
+  });
 });

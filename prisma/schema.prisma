@@ -96,8 +96,10 @@ model User {
   referredByUser         User?                   @relation("ReferredBy", fields: [referredByUserId], references: [id])
   referrals              User[]                  @relation("ReferredBy")
 
-  printedFoodLabels FoodLabel[] @relation("FoodLabelPrintedBy")
-  settledFoodLabels FoodLabel[] @relation("FoodLabelSettledBy")
+  printedFoodLabels FoodLabel[]       @relation("FoodLabelPrintedBy")
+  dailyCountsClosed DailyCount[]      @relation("DailyCountClosedBy")
+  dailyCountEntries DailyCountEntry[] @relation("DailyCountEntryUser")
+  settledFoodLabels FoodLabel[]       @relation("FoodLabelSettledBy")
 
   @@index([role])
   @@index([active])
@@ -352,6 +354,11 @@ model Recipe {
   shelfLifeChilledDays Int?        @default(3)
   shelfLifeFrozenDays  Int?        @default(30)
   foodLabels           FoodLabel[]
+
+  /// Counted in the daily count (spec 2026-10-16 contagem de espetos): mounted, sold, loss, leftover per night
+  dailyCount        Boolean           @default(false)
+  dailyCountEntries DailyCountEntry[]
+  dailyCountLines   DailyCountLine[]
 
   @@unique([restaurantId, code])
   @@index([restaurantId])
@@ -1785,41 +1792,41 @@ model OrderPrepTime {
 }
 
 model OrderSession {
-  id                    String                @id @default(cuid())
-  restaurantId          String
-  userId                String
-  tableId               String?
-  orderId               String?               @unique
-  status                OrderSessionStatus    @default(OPEN)
-  openedAt              DateTime              @default(now())
-  sentToKitchenAt       DateTime?
-  closedAt              DateTime?
-  customerName          String?
-  tableNumber           Int?
-  notes                 String?
+  id                     String                @id @default(cuid())
+  restaurantId           String
+  userId                 String
+  tableId                String?
+  orderId                String?               @unique
+  status                 OrderSessionStatus    @default(OPEN)
+  openedAt               DateTime              @default(now())
+  sentToKitchenAt        DateTime?
+  closedAt               DateTime?
+  customerName           String?
+  tableNumber            Int?
+  notes                  String?
   /// Service charge charged, written when the bill closes (0 = not charged)
-  serviceChargeCents    Int                   @default(0)
+  serviceChargeCents     Int                   @default(0)
   /// The customer declined the service charge (every device and the pre-bill agree while the bill is open)
-  serviceChargeWaived   Boolean               @default(false)
+  serviceChargeWaived    Boolean               @default(false)
   /// Opened as a table or a named comanda (Vender, QR): only these get the service charge, never WhatsApp, delivery or the counter
-  serviceChargeEligible Boolean               @default(false)
+  serviceChargeEligible  Boolean               @default(false)
   /// Pre-bill printed: the table asked for the bill; cleared when a new item is added
-  preBillPrintedAt      DateTime?
+  preBillPrintedAt       DateTime?
   /// Merged into another comanda (it stays CANCELLED, for the history)
-  mergedIntoId          String?
+  mergedIntoId           String?
   /// The table asked to pay with the waiter (pay at the table); cleared by a payment or when the bill closes
   payAtWaiterRequestedAt DateTime?
-  onlinePayments        Payment[]             @relation("OrderSessionOnlinePayments")
+  onlinePayments         Payment[]             @relation("OrderSessionOnlinePayments")
   /// Every kitchen order of this comanda (orderId above keeps only the latest)
-  kitchenOrders         Order[]               @relation("OrderComanda")
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  items                 OrderSessionItem[]
-  order                 Order?                @relation(fields: [orderId], references: [id])
-  restaurant            Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table                 Table?                @relation("OrderSessionTable", fields: [tableId], references: [id])
-  user                  User                  @relation("OrderSessionUser", fields: [userId], references: [id])
-  whatsappConversation  WhatsAppConversation? @relation("WhatsAppOrderSession")
+  kitchenOrders          Order[]               @relation("OrderComanda")
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  items                  OrderSessionItem[]
+  order                  Order?                @relation(fields: [orderId], references: [id])
+  restaurant             Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table                  Table?                @relation("OrderSessionTable", fields: [tableId], references: [id])
+  user                   User                  @relation("OrderSessionUser", fields: [userId], references: [id])
+  whatsappConversation   WhatsAppConversation? @relation("WhatsAppOrderSession")
 
   @@index([restaurantId])
   @@index([status])
@@ -2972,8 +2979,9 @@ model Restaurant {
   metricSnapshots         MetricSnapshot[]
 
   /// Thermal label size printed by the browser: '60x40' or '40x25' (spec 2026-10-09 etiquetas)
-  labelSize  String      @default("60x40")
-  foodLabels FoodLabel[]
+  labelSize   String       @default("60x40")
+  foodLabels  FoodLabel[]
+  dailyCounts DailyCount[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -4017,6 +4025,17 @@ enum OrderStatus {
   ON_HOLD
 }
 
+enum DailyCountStatus {
+  OPEN
+  CLOSED
+}
+
+enum DailyCountEntryKind {
+  OPENING
+  MOUNTED
+  LOSS
+}
+
 enum OrderItemStatus {
   PENDING
   PREPARING
@@ -4600,4 +4619,65 @@ model FoodLabel {
   @@index([restaurantId, status, expiresAt])
   @@index([restaurantId, createdAt])
   @@map("food_labels")
+}
+
+/// A night of the daily count, from the previous close to this one (spec 2026-10-16 contagem de espetos).
+/// One OPEN night per restaurant, enforced by a partial unique index in migration 20261016120000_daily_count.
+model DailyCount {
+  id           String            @id @default(cuid())
+  restaurantId String
+  status       DailyCountStatus  @default(OPEN)
+  openedAt     DateTime          @default(now())
+  closedAt     DateTime?
+  closedById   String?
+  createdAt    DateTime          @default(now())
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  closedBy     User?             @relation("DailyCountClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  entries      DailyCountEntry[]
+  lines        DailyCountLine[]
+
+  @@index([restaurantId, status])
+  @@index([restaurantId, closedAt])
+  @@map("daily_counts")
+}
+
+/// One tap: the opening stock (first night, or the leftover copied by the close), mounted, or a loss
+model DailyCountEntry {
+  id           String              @id @default(cuid())
+  countId      String
+  restaurantId String
+  recipeId     String
+  kind         DailyCountEntryKind
+  quantity     Int
+  reason       String?
+  userId       String
+  createdAt    DateTime            @default(now())
+  count        DailyCount          @relation(fields: [countId], references: [id], onDelete: Cascade)
+  recipe       Recipe              @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  user         User                @relation("DailyCountEntryUser", fields: [userId], references: [id])
+
+  @@index([countId])
+  @@index([restaurantId])
+  @@map("daily_count_entries")
+}
+
+/// The close, frozen per item: later cancellations never change it
+model DailyCountLine {
+  id         String     @id @default(cuid())
+  countId    String
+  recipeId   String?
+  recipeName String
+  opening    Int
+  mounted    Int
+  sold       Int
+  loss       Int
+  expected   Int
+  counted    Int
+  difference Int
+  unitCost   Float      @default(0)
+  count      DailyCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  recipe     Recipe?    @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@unique([countId, recipeId])
+  @@map("daily_count_lines")
 }

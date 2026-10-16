@@ -15,6 +15,16 @@ describe('starter templates ("Comece com", lib/onboarding/starter-templates.ts)'
     expect(templateFor('pizzaria').slug).toBe('pizzaria');
   });
 
+  it('espetaria counts its espetos and pão de alho in the daily count, nothing else', () => {
+    const t = templateFor('espetaria');
+    const counted = t.recipes.filter((r) => r.dailyCount).map((r) => r.key).sort();
+    expect(counted).toEqual(['ALC', 'COR', 'FRG', 'KAF', 'LIN', 'PAO', 'QJC']);
+    for (const r of t.recipes) expect([r.key, !!r.dailyCount]).toEqual([r.key, r.menuCategory === 'Espetos']);
+    for (const other of STARTER_TEMPLATES.filter((x) => x.slug !== 'espetaria')) {
+      expect([other.slug, other.recipes.some((r) => r.dailyCount)]).toEqual([other.slug, false]);
+    }
+  });
+
   for (const t of STARTER_TEMPLATES) {
     describe(t.slug, () => {
       it('ingredient and recipe codes are unique, categories exist', () => {

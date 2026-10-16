@@ -26,6 +26,8 @@ export interface TemplateRecipe {
   price: number; // selling price, R$
   prepMinutes: number;
   items: Array<{ ingredient: string; qty: number; unit: TemplateUnit }>;
+  /** Counted in the daily count (contagem de espetos); seeded into Recipe.dailyCount */
+  dailyCount?: boolean;
 }
 
 export interface TemplateResaleItem {
@@ -344,19 +346,19 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
       { key: 'VIN', name: 'Vinagre', category: 'Temperos', unit: 'l', cost: 5 },
     ],
     recipes: [
-      { key: 'ALC', name: 'Espeto de alcatra', description: '120 g', menuCategory: 'Espetos', price: 14, prepMinutes: 12,
+      { key: 'ALC', name: 'Espeto de alcatra', description: '120 g', menuCategory: 'Espetos', price: 14, prepMinutes: 12, dailyCount: true,
         items: [{ ingredient: 'ALC', qty: 0.12, unit: 'kg' }, { ingredient: 'PAL', qty: 1, unit: 'un' }, { ingredient: 'SGR', qty: 0.003, unit: 'kg' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
-      { key: 'FRG', name: 'Espeto de frango', description: '120 g', menuCategory: 'Espetos', price: 10, prepMinutes: 12,
+      { key: 'FRG', name: 'Espeto de frango', description: '120 g', menuCategory: 'Espetos', price: 10, prepMinutes: 12, dailyCount: true,
         items: [{ ingredient: 'FRG', qty: 0.12, unit: 'kg' }, { ingredient: 'PAL', qty: 1, unit: 'un' }, { ingredient: 'SGR', qty: 0.003, unit: 'kg' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
-      { key: 'LIN', name: 'Espeto de linguiça', description: '120 g', menuCategory: 'Espetos', price: 10, prepMinutes: 12,
+      { key: 'LIN', name: 'Espeto de linguiça', description: '120 g', menuCategory: 'Espetos', price: 10, prepMinutes: 12, dailyCount: true,
         items: [{ ingredient: 'LIN', qty: 0.12, unit: 'kg' }, { ingredient: 'PAL', qty: 1, unit: 'un' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
-      { key: 'COR', name: 'Espeto de coração', description: '100 g', menuCategory: 'Espetos', price: 11, prepMinutes: 10,
+      { key: 'COR', name: 'Espeto de coração', description: '100 g', menuCategory: 'Espetos', price: 11, prepMinutes: 10, dailyCount: true,
         items: [{ ingredient: 'COR', qty: 0.1, unit: 'kg' }, { ingredient: 'PAL', qty: 1, unit: 'un' }, { ingredient: 'SGR', qty: 0.003, unit: 'kg' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
-      { key: 'KAF', name: 'Espeto de kafta', description: '120 g', menuCategory: 'Espetos', price: 13, prepMinutes: 12,
+      { key: 'KAF', name: 'Espeto de kafta', description: '120 g', menuCategory: 'Espetos', price: 13, prepMinutes: 12, dailyCount: true,
         items: [{ ingredient: 'KAF', qty: 0.12, unit: 'kg' }, { ingredient: 'PAL', qty: 1, unit: 'un' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
-      { key: 'QJC', name: 'Espeto de queijo coalho', description: '80 g', menuCategory: 'Espetos', price: 11, prepMinutes: 6,
+      { key: 'QJC', name: 'Espeto de queijo coalho', description: '80 g', menuCategory: 'Espetos', price: 11, prepMinutes: 6, dailyCount: true,
         items: [{ ingredient: 'QJC', qty: 0.08, unit: 'kg' }, { ingredient: 'PAL', qty: 1, unit: 'un' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
-      { key: 'PAO', name: 'Pão de alho', description: '1 unidade na brasa', menuCategory: 'Espetos', price: 8, prepMinutes: 6,
+      { key: 'PAO', name: 'Pão de alho', description: '1 unidade na brasa', menuCategory: 'Espetos', price: 8, prepMinutes: 6, dailyCount: true,
         items: [{ ingredient: 'PAO', qty: 1, unit: 'un' }, { ingredient: 'CAR', qty: 0.05, unit: 'kg' }] },
       { key: 'FAR', name: 'Farofa de bacon', description: 'Porção de 150 g', menuCategory: 'Acompanhamentos', price: 10, prepMinutes: 5,
         items: [{ ingredient: 'FAR', qty: 0.12, unit: 'kg' }, { ingredient: 'BAC', qty: 0.03, unit: 'kg' }, { ingredient: 'CEB', qty: 0.03, unit: 'kg' }] },

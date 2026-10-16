@@ -62,6 +62,7 @@ export async function seedStarterTemplate(restaurantId: string, businessType: st
           portionUnit: 'un',
           prepTimeMinutes: r.prepMinutes,
           sellingPrice: r.price,
+          dailyCount: r.dailyCount === true,
           ingredients: {
             create: r.items.map((i) => ({ ingredientId: ingredientId[i.ingredient], quantity: i.qty, unit: i.unit })),
           },
