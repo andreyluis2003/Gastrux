@@ -83,6 +83,7 @@ export const POST = safeHandler(async (req, context) => {
   const recipe = await prisma.recipe.create({
     data: {
       ...shelfLife,
+      dailyCount: body.dailyCount === true,
       code: body.code,
       name: body.name,
       description: body.description,

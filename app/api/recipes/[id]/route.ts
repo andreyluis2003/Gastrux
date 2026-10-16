@@ -96,6 +96,7 @@ export async function PUT(
       where: { id: params.id },
       data: {
         ...shelfLife,
+        ...(typeof body.dailyCount === 'boolean' ? { dailyCount: body.dailyCount } : {}),
         name: body.name,
         description: body.description,
         baseYield: body.baseYield,
