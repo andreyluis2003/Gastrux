@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 
-interface Question { createdAt: string; userName: string | null; role: string; question: string; answer: string | null; model: string | null; counted: boolean }
-interface Usage { plan: string; used: number; limit: number | null; questions: Question[] }
+interface Question { createdAt: string; userName: string | null; role: string; question: string; answer: string | null; model: string | null; counted: boolean; free?: boolean }
+interface Usage { plan: string; used: number; limit: number | null; free: { used: number; limit: number } | null; questions: Question[] }
 
 const ROLE_LABEL: Record<string, string> = { OWNER: 'Dono', MANAGER: 'Gerente', CASHIER: 'Caixa', COOK: 'Cozinha', ADMIN: 'Admin' };
 const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -45,6 +45,11 @@ export default function AiUsagePage() {
           Plano <span className="font-semibold capitalize">{data.plan}</span>:{' '}
           <span className="font-semibold">{data.used}</span> de {data.limit ?? 'ilimitadas'} perguntas este mês
         </p>
+        {data.free && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Implantação: {data.free.used} de {data.free.limit} perguntas grátis (primeiros 30 dias)
+          </p>
+        )}
       </Card>
 
       <Card className="p-0 overflow-x-auto">
@@ -70,7 +75,7 @@ export default function AiUsagePage() {
                   <td className="px-3 py-2 min-w-[180px]">{q.question}</td>
                   <td className="px-3 py-2 min-w-[220px] text-muted-foreground">
                     {short(q.answer)}
-                    {!q.counted && <span className="ml-1 text-xs text-amber-600">(não contou)</span>}
+                    {q.free ? <span className="ml-1 text-xs text-emerald-700">(grátis, implantação)</span> : !q.counted && <span className="ml-1 text-xs text-amber-600">(não contou)</span>}
                   </td>
                 </tr>
               ))}
