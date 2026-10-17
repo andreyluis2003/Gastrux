@@ -46,4 +46,22 @@ describe('onboarding progress', () => {
     const denied = await runTool({ userId: cook.id, restaurantId: rid, role: 'COOK' }, 'progresso_implantacao', {});
     expect(denied).toMatchObject({ ok: false, denied: true });
   });
+
+  // Homolog 2026-10-17: the AI asked the owner where to start the tables, and drafted a waiter a Starter plan can never take
+  it('progresso_implantacao shows the tables there are (example ones marked) and the users the plan allows', async () => {
+    const s = await prisma.tableSection.create({ data: { restaurantId: rid, name: 'Salão principal', capacity: 40 } });
+    await prisma.table.create({ data: { restaurantId: rid, sectionId: s.id, number: 1, capacity: 4, description: 'Mesa de exemplo' } });
+    await prisma.table.create({ data: { restaurantId: rid, sectionId: s.id, number: 7, capacity: 4 } });
+    const r = await runTool({ userId: owner.id, restaurantId: rid, role: 'OWNER' }, 'progresso_implantacao', {});
+    expect(r.data.mesas).toEqual([{ area: 'Salão principal', numeros: [1, 7], exemplo: [1] }]);
+    expect(r.data.usuarios).toEqual({ usados: 1, limite: 1 });
+  });
+
+  it('propor_equipe on a full plan answers why instead of drafting', async () => {
+    const r = await runTool({ userId: owner.id, restaurantId: rid, role: 'OWNER' }, 'propor_equipe', { pessoas: [{ nome: 'João', email: 'joao@x.test', papel: 'CAIXA' }] }, new Date(), {});
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/permite 1 usuário/);
+    expect(r.error).toMatch(/Minha assinatura/);
+    expect(await prisma.aiDraft.count({ where: { restaurantId: rid } })).toBe(0);
+  });
 });

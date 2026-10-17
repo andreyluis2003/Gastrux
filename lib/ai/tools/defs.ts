@@ -39,7 +39,7 @@ const DEFS = [
   { name: 'plano', roles: [...M, 'CASHIER', 'COOK'], schema: closed({}),
     description: 'Plano do restaurante, perguntas à IA usadas e restantes no mês.' },
   { name: 'progresso_implantacao', roles: M, schema: closed({}),
-    description: 'Etapas da implantação do restaurante (caixa, primeira venda, cardápio, mesas, equipe, endereço, NFC-e): quais estão feitas, a próxima e o link da tela de cada uma.' },
+    description: 'Etapas da implantação do restaurante (caixa, primeira venda, cardápio, mesas, equipe, endereço, NFC-e): quais estão feitas, a próxima e o link da tela de cada uma. Traz também as mesas que já existem por área (as de exemplo à parte) e quantos usuários o plano permite.' },
   { name: 'propor_cardapio', roles: M, schema: closed({
       categorias: { type: 'array', items: closed({ nome: { type: 'string' }, itens: { type: 'array', items: closed({
         nome: { type: 'string' }, descricao: { type: 'string', description: 'Pode ser vazio' }, preco: { type: 'number', description: 'Preço em reais, por exemplo 32.9' } }) } }) },

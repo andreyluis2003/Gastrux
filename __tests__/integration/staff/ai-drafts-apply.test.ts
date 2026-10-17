@@ -96,7 +96,7 @@ describe('apply AI drafts', () => {
     const [a, b] = await Promise.all([APPLY(req(body), { params: { id: d.id } }), APPLY(req(body), { params: { id: d.id } })]);
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     const ok = a.status === 200 ? await a.json() : await b.json();
-    expect(ok).toEqual({ created: [1, 3], skipped: [2] });
+    expect(ok).toEqual({ created: [1, 3], skipped: [2], removedExample: 0 });
     const tables = await prisma.table.findMany({ where: { restaurantId: rid }, select: { number: true, qrToken: true } });
     expect(tables.length).toBe(3);
     expect(tables.filter((t) => t.number !== 2).every((t) => t.qrToken)).toBe(true);
@@ -153,5 +153,55 @@ describe('apply AI drafts', () => {
     expect(g.state).toBe('PENDING');
     expect((await DISCARD(req(), { params: { id: d.id } })).status).toBe(200);
     expect((await prisma.aiDraft.findUnique({ where: { id: d.id } })).status).toBe('DISCARDED');
+  });
+
+  // Homolog 2026-10-17: the sign-up seeds 'Salão principal' with Mesas 1-2 de exemplo; the AI made 'Salão' 1-8 and the
+  // restaurant ended with two Mesa 1 and two Mesa 2
+  it('tables: remove example drops the seeded tables (and their empty area), area matched ignoring case', async () => {
+    const o = await mkUser('donamx', 'OWNER', null);
+    const rx = (await prisma.restaurant.create({ data: { name: `AdaMx ${tag}`, ownerId: o.id, status: 'ACTIVE' } })).id;
+    await prisma.user.update({ where: { id: o.id }, data: { currentRestaurantId: rx } });
+    const ox = { id: o.id, email: o.email, role: 'OWNER' };
+    try {
+      const ex = await prisma.tableSection.create({ data: { restaurantId: rx, name: 'Salão principal', capacity: 40 } });
+      for (const n of [1, 2]) await prisma.table.create({ data: { restaurantId: rx, sectionId: ex.id, number: n, capacity: 4, description: 'Mesa de exemplo' } });
+      const d = await createDraft({ userId: o.id, restaurantId: rx, role: 'OWNER' }, 'TABLES', { quantidade: 3, inicio: 1, area: 'Salão', lugares: 4 });
+      as(ox);
+      const g = await (await GET_DRAFT(req(), { params: { id: d.id } })).json();
+      expect(g.marks.exampleTables).toBe(2);
+      const res = await APPLY(req({ payload: { quantidade: 3, inicio: 1, area: 'Salão', lugares: 4 }, removeExample: true }), { params: { id: d.id } });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ created: [1, 2, 3], skipped: [], removedExample: 2 });
+      const all = await prisma.table.findMany({ where: { restaurantId: rx }, select: { number: true, section: { select: { name: true } } } });
+      expect(all.map((t) => t.section.name + ' ' + t.number).sort()).toEqual(['Salão 1', 'Salão 2', 'Salão 3']);
+      expect(await prisma.tableSection.count({ where: { restaurantId: rx, name: 'Salão principal' } })).toBe(0);
+
+      const d2 = await createDraft({ userId: o.id, restaurantId: rx, role: 'OWNER' }, 'TABLES', { quantidade: 2, inicio: 4, area: 'salão', lugares: 2 });
+      const r2 = await APPLY(req({ payload: { quantidade: 2, inicio: 4, area: 'salão', lugares: 2 } }), { params: { id: d2.id } });
+      expect(await r2.json()).toEqual({ created: [4, 5], skipped: [], removedExample: 0 });
+      expect(await prisma.tableSection.count({ where: { restaurantId: rx } })).toBe(1);
+    } finally {
+      await prisma.restaurant.delete({ where: { id: rx } });
+    }
+  });
+
+  it('menu GET marks which duplicates are example items (they go away with Remover o cardápio de exemplo)', async () => {
+    const o = await mkUser('donamk', 'OWNER', null);
+    const rx = (await prisma.restaurant.create({ data: { name: `AdaMk ${tag}`, ownerId: o.id, status: 'ACTIVE' } })).id;
+    await prisma.user.update({ where: { id: o.id }, data: { currentRestaurantId: rx } });
+    try {
+      const seedAt = new Date(Date.now() - 3600000);
+      await prisma.recipe.create({ data: { restaurantId: rx, code: `DEMO-R-k${tag}`, name: 'Pão de alho', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', createdAt: seedAt } });
+      const cat = await prisma.menuCategory.create({ data: { restaurantId: rx, name: 'Espetos', position: 0, active: true } });
+      await prisma.menuItem.create({ data: { restaurantId: rx, categoryId: cat.id, name: 'Pão de alho', price: 8, position: 0, createdAt: seedAt } });
+      await prisma.menuItem.create({ data: { restaurantId: rx, categoryId: cat.id, name: 'Queijo coalho', price: 9, position: 1 } });
+      const d = await createDraft({ userId: o.id, restaurantId: rx, role: 'OWNER' }, 'MENU', { categorias: [{ nome: 'Espetos', itens: [{ nome: 'PÃO DE ALHO', descricao: '', preco: 9 }, { nome: 'Queijo Coalho', descricao: '', preco: 9 }] }], incompleto: false });
+      as({ id: o.id, email: o.email, role: 'OWNER' });
+      const g = await (await GET_DRAFT(req(), { params: { id: d.id } })).json();
+      expect(g.marks.existingNames).toEqual(['PÃO DE ALHO', 'Queijo Coalho']);
+      expect(g.marks.exampleNames).toEqual(['PÃO DE ALHO']);
+    } finally {
+      await prisma.restaurant.delete({ where: { id: rx } });
+    }
   });
 });

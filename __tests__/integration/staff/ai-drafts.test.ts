@@ -24,7 +24,7 @@ describe('proposal tools', () => {
   let rid, owner, cook, ids = [];
   beforeAll(async () => {
     const o = await prisma.user.create({ data: { email: `aid-o-${tag}@gastrux.test`, name: 'Dona', password: 'x', role: 'OWNER' } });
-    rid = (await prisma.restaurant.create({ data: { name: `Aid ${tag}`, ownerId: o.id, status: 'ACTIVE', createdAt: new Date(Date.now() - 40 * 86400000) } })).id;
+    rid = (await prisma.restaurant.create({ data: { name: `Aid ${tag}`, ownerId: o.id, status: 'ACTIVE', subscriptionTier: 'pro', createdAt: new Date(Date.now() - 40 * 86400000) } })).id;
     const c = await prisma.user.create({ data: { email: `aid-c-${tag}@gastrux.test`, name: 'Zé', password: 'x', role: 'COOK', currentRestaurantId: rid } });
     await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: c.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
     owner = { userId: o.id, restaurantId: rid, role: 'OWNER' }; cook = { userId: c.id, restaurantId: rid, role: 'COOK' }; ids = [o.id, c.id];

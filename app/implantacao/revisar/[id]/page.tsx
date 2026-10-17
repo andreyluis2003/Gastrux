@@ -44,7 +44,11 @@ export default function ReviewDraftPage() {
         setData(body);
         const p = body.draft.payload;
         if (body.draft.kind === 'MENU') setMenu(p.categorias.map((c: any) => ({ nome: c.nome, itens: c.itens.map((i: any) => ({ nome: i.nome, descricao: i.descricao ?? '', preco: priceText(i.preco) })) })));
-        if (body.draft.kind === 'TABLES') setTables({ quantidade: String(p.quantidade), inicio: String(p.inicio), area: p.area, lugares: String(p.lugares) });
+        if (body.draft.kind === 'TABLES') {
+          setTables({ quantidade: String(p.quantidade), inicio: String(p.inicio), area: p.area, lugares: String(p.lugares) });
+          // Checked by default: kept, the example tables repeat the numbers of the new ones (homolog 2026-10-17)
+          setRemoveExample(body.marks?.exampleTables > 0);
+        }
         if (body.draft.kind === 'STAFF') setPeople(p.pessoas.map((x: any) => ({ ...x })));
       } catch {
         setError('Sem conexão. Tente de novo.');
@@ -74,6 +78,9 @@ export default function ReviewDraftPage() {
 
   const kind = data.draft.kind;
   const existing = new Set<string>((data.marks.existingNames ?? []).map(norm));
+  const exampleNames = new Set<string>((data.marks.exampleNames ?? []).map(norm));
+  const exampleNumbers: number[] = data.marks.exampleNumbers ?? [];
+  const skippedNumbers: number[] = (data.marks.existingNumbers ?? []).filter((n: number) => !(removeExample && exampleNumbers.includes(n)));
 
   const payload = () => {
     if (kind === 'MENU') return { categorias: menu.map((c) => ({ nome: c.nome, itens: c.itens.map((i) => ({ nome: i.nome, descricao: i.descricao, preco: i.preco })) })), incompleto: !!data.draft.payload.incompleto };
@@ -113,7 +120,7 @@ export default function ReviewDraftPage() {
   if (result) {
     return (
       <div className="max-w-2xl mx-auto p-4 space-y-4">
-        <h1 className="text-2xl font-semibold">Pronto</h1>
+        <h1 className="text-2xl font-semibold">{kind === 'STAFF' && !result.people?.some((p: any) => p.ok) ? 'Ninguém foi cadastrado' : 'Pronto'}</h1>
         <Card className="p-4 space-y-2 text-sm">
           {kind === 'MENU' && (
             <>
@@ -127,6 +134,7 @@ export default function ReviewDraftPage() {
             <>
               <p>Mesas criadas: <strong>{result.created?.join(', ') || 'nenhuma'}</strong></p>
               {result.skipped?.length > 0 && <p className="text-muted-foreground">Já existiam: {result.skipped.join(', ')}</p>}
+              {result.removedExample > 0 && <p className="text-muted-foreground">Removidas as mesas de exemplo ({result.removedExample}).</p>}
               <Link href="/admin/tables" className="font-medium text-primary underline">Ver mesas</Link>
             </>
           )}
@@ -226,7 +234,7 @@ export default function ReviewDraftPage() {
                         {menu.map((x, j) => <option key={j} value={j}>{x.nome}</option>)}
                       </select>
                     )}
-                    {existing.has(norm(it.nome)) && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">já existe, não será criado</span>}
+                    {existing.has(norm(it.nome)) && !(removeExample && exampleNames.has(norm(it.nome))) && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">já existe, não será criado</span>}
                     <button
                       className="ml-auto text-red-600 underline"
                       onClick={() => setMenu((m) => m.map((x, j) => (j === ci ? { ...x, itens: x.itens.filter((_, k) => k !== ii) } : x)))}
@@ -252,8 +260,14 @@ export default function ReviewDraftPage() {
           {Number.isFinite(tablesEnd) && tablesEnd >= Number(tables.inicio) && (
             <p className="text-sm">Mesas {tables.inicio} a {tablesEnd}, {tables.area}, {tables.lugares} lugares</p>
           )}
-          {data.marks.existingNumbers?.length > 0 && (
-            <p className="text-xs text-muted-foreground">Já existem e serão puladas: {data.marks.existingNumbers.join(', ')}</p>
+          {skippedNumbers.length > 0 && (
+            <p className="text-xs text-muted-foreground">Já existem e serão puladas: {skippedNumbers.join(', ')}</p>
+          )}
+          {data.marks.exampleTables > 0 && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={removeExample} onChange={(e) => setRemoveExample(e.target.checked)} className="h-4 w-4 accent-primary" />
+              Remover as mesas de exemplo ({data.marks.exampleTables})
+            </label>
           )}
         </Card>
       )}
@@ -262,7 +276,7 @@ export default function ReviewDraftPage() {
         <>
           {data.marks.usersLimit && !data.marks.usersLimit.allowed && (
             <Card className="border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Seu plano permite {data.marks.usersLimit.limit} usuários (hoje {data.marks.usersLimit.current}). Quem passar do limite não será cadastrado.
+              Seu plano permite {data.marks.usersLimit.limit} {data.marks.usersLimit.limit === 1 ? 'usuário' : 'usuários'} (hoje {data.marks.usersLimit.current}). Quem passar do limite não será cadastrado.
             </Card>
           )}
           {people.map((p, i) => {

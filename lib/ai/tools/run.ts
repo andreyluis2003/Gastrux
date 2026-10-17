@@ -6,10 +6,10 @@ import { computeDre } from '@/lib/finance/dre';
 import { itemSalesInRange } from '@/lib/finance/item-sales';
 import { salesInRange } from '@/lib/finance/month-sales';
 import { brtDay, brtDayStart } from '@/lib/staff/commission-rules';
-import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { checkTierLimit, isTierFeatureEnabled } from '@/lib/tier-guard';
 import { loadScreen } from '@/lib/utility-bills/service';
 import { onboardingStatus } from '@/lib/onboarding/first-steps';
-import { createDraft, TOOL_KIND } from '../drafts/service';
+import { createDraft, existingTables, TOOL_KIND } from '../drafts/service';
 import { validateMenu, validateStaff, validateTables } from '../drafts/validate';
 import { monthlyLimit } from '../config';
 import { questionsThisMonth } from '../usage';
@@ -149,6 +149,8 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
           etapas: st.steps.map((s) => ({ chave: s.key, rotulo: s.label, feita: s.done, opcional: !!s.optional, link: s.href })),
           proxima: st.next ? { chave: st.next.key, rotulo: st.next.label, link: st.next.href } : null,
           diasDeConta: st.daysSinceSignup,
+          mesas: await existingTables(prisma, rid),
+          usuarios: await usersOfPlan(rid),
         } };
       }
       // Proposals only create a draft the owner reviews and confirms (spec 2026-10-17 ia-implantacao §4.2)
@@ -156,6 +158,14 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
         const kind = TOOL_KIND[name];
         const v = kind === 'MENU' ? validateMenu(input) : kind === 'TABLES' ? validateTables(input) : validateStaff(input, { requireEmail: false });
         if (!v.ok) return { ok: false, error: v.error, denied: false };
+        // A draft the plan can never take only wastes the owner's time (homolog 2026-10-17, Starter = 1 user)
+        if (kind === 'STAFF') {
+          const t = await checkTierLimit(rid, 'users');
+          if (!t.allowed) {
+            const plano = t.currentTier.charAt(0).toUpperCase() + t.currentTier.slice(1);
+            return { ok: false, denied: false, error: `O plano ${plano} permite ${t.limit} ${t.limit === 1 ? 'usuário' : 'usuários'}, e o restaurante já tem ${t.current}. Para cadastrar equipe, é preciso mudar de plano em Minha assinatura.` };
+          }
+        }
         const d = await createDraft(member, kind, v.value, ctx.questionId);
         return { ok: true, data: { rascunhoId: d.id, resumo: d.resumo, proximoPasso: 'O dono revisa e confirma no botão Revisar e confirmar.' } };
       }
@@ -172,4 +182,9 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
     return { ok: false, error: 'Não foi possível consultar agora.', denied: false };
   }
   return { ok: false, error: `Ferramenta desconhecida: ${name}`, denied: false };
+}
+
+async function usersOfPlan(rid: string) {
+  const t = await checkTierLimit(rid, 'users');
+  return { usados: t.current, limite: t.limit };
 }

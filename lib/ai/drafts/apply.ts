@@ -4,7 +4,7 @@ import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { ensureMenuItemRecipes, retireProductRecipe } from '@/lib/cardapio/product-recipe';
 import { ASSIGNABLE_ROLES, createStaffMember } from '@/lib/staff/create-member';
 import { PAPEL_ROLE, validateMenu, validateStaff, validateTables, type MenuPayload, type TablesPayload } from './validate';
-import { exampleMenuItemIds, normName, stateOf } from './service';
+import { EXAMPLE_TABLE, exampleMenuItemIds, findSection, normName, stateOf } from './service';
 
 type Outcome = { status: number; body: unknown };
 
@@ -63,8 +63,16 @@ export async function applyDraft(member: RestaurantMember, id: string, body: any
       result = { created: created.length, skipped, removedExample };
     } else {
       const p = v.value as TablesPayload;
-      let section = await tx.tableSection.findFirst({ where: { restaurantId: rid, name: p.area }, select: { id: true } });
-      if (!section) section = await tx.tableSection.create({ data: { restaurantId: rid, name: p.area, capacity: p.quantidade * p.lugares }, select: { id: true } });
+      let removedExample = 0;
+      if (body?.removeExample === true) {
+        // Only example tables never used (no bill, no booking); an area left empty goes too
+        const ex = await tx.table.findMany({ where: { restaurantId: rid, description: EXAMPLE_TABLE, orderSessions: { none: {} }, reservations: { none: {} } }, select: { id: true, sectionId: true } });
+        await tx.table.deleteMany({ where: { id: { in: ex.map((t) => t.id) } } });
+        await tx.tableSection.deleteMany({ where: { restaurantId: rid, id: { in: [...new Set(ex.map((t) => t.sectionId))] }, tables: { none: {} } } });
+        removedExample = ex.length;
+      }
+      let section = await findSection(tx, rid, p.area);
+      if (!section) section = await tx.tableSection.create({ data: { restaurantId: rid, name: p.area.trim(), capacity: p.quantidade * p.lugares }, select: { id: true } });
       const taken = new Set((await tx.table.findMany({ where: { restaurantId: rid, sectionId: section.id }, select: { number: true } })).map((t) => t.number));
       const created: number[] = [];
       const skipped: number[] = [];
@@ -74,7 +82,7 @@ export async function applyDraft(member: RestaurantMember, id: string, body: any
         await tx.table.create({ data: { restaurantId: rid, sectionId: section.id, number: n, capacity: p.lugares, qrToken: randomBytes(16).toString('hex') } });
         created.push(n);
       }
-      result = { created, skipped };
+      result = { created, skipped, removedExample };
     }
     await tx.aiDraft.update({ where: { id }, data: { status: 'APPLIED', appliedAt: new Date(), appliedById: member.userId, result: result as object } });
     return { result };

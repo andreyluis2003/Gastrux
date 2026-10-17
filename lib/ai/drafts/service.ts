@@ -54,6 +54,32 @@ export async function exampleMenuItemIds(db: Db, restaurantId: string): Promise<
   return rows.map((i) => i.id);
 }
 
+/** The sign-up's example tables (lib/onboarding/seed-template.ts) */
+export const EXAMPLE_TABLE = 'Mesa de exemplo';
+
+/** The area the owner means: same name ignoring case and spaces at the ends ("salão" is "Salão") */
+export const findSection = (db: Db, restaurantId: string, area: string) =>
+  db.tableSection.findFirst({ where: { restaurantId, name: { equals: area.trim(), mode: 'insensitive' } }, select: { id: true } });
+
+/**
+ * Tables there are, per area, the example ones apart: the AI places new tables after them instead of asking the
+ * owner (homolog 2026-10-17: it made 'Salão' 1-8 next to the seeded 'Salão principal' 1-2)
+ */
+export async function existingTables(db: Db, restaurantId: string) {
+  const rows = await db.table.findMany({
+    where: { restaurantId }, orderBy: [{ section: { name: 'asc' } }, { number: 'asc' }],
+    select: { number: true, description: true, section: { select: { name: true } } },
+  });
+  const byArea = new Map<string, { area: string; numeros: number[]; exemplo: number[] }>();
+  for (const t of rows) {
+    const a = byArea.get(t.section.name) ?? { area: t.section.name, numeros: [], exemplo: [] };
+    a.numeros.push(t.number);
+    if (t.description === EXAMPLE_TABLE) a.exemplo.push(t.number);
+    byArea.set(t.section.name, a);
+  }
+  return [...byArea.values()];
+}
+
 /** Draft + marks for the review screen (spec 2026-10-17 ia-implantacao §4.4); null = not found or another restaurant */
 export async function loadDraft(member: RestaurantMember, id: string, now = new Date()) {
   const draft = await prisma.aiDraft.findFirst({ where: { id, restaurantId: member.restaurantId } });
@@ -63,15 +89,25 @@ export async function loadDraft(member: RestaurantMember, id: string, now = new 
   if (draft.kind === 'MENU') {
     const names = new Set((await prisma.menuItem.findMany({ where: { restaurantId: rid, active: true }, select: { name: true } })).map((i) => normName(i.name)));
     const p = draft.payload as unknown as MenuPayload;
+    const exampleIds = await exampleMenuItemIds(prisma, rid);
+    const exampleSet = new Set((await prisma.menuItem.findMany({ where: { id: { in: exampleIds } }, select: { name: true } })).map((i) => normName(i.name)));
+    const existingNames = p.categorias.flatMap((c) => c.itens.map((i) => i.nome)).filter((n) => names.has(normName(n)));
     marks = {
-      existingNames: p.categorias.flatMap((c) => c.itens.map((i) => i.nome)).filter((n) => names.has(normName(n))),
-      hasExample: (await exampleMenuItemIds(prisma, rid)).length > 0,
+      existingNames,
+      // Duplicates only of the example: they are created after all when the owner removes the example
+      exampleNames: existingNames.filter((n) => exampleSet.has(normName(n))),
+      hasExample: exampleIds.length > 0,
     };
   } else if (draft.kind === 'TABLES') {
     const p = draft.payload as unknown as TablesPayload;
-    const section = await prisma.tableSection.findFirst({ where: { restaurantId: rid, name: p.area }, select: { id: true } });
-    const nums = section ? (await prisma.table.findMany({ where: { restaurantId: rid, sectionId: section.id }, select: { number: true } })).map((t) => t.number) : [];
-    marks = { existingNumbers: nums.filter((n) => n >= p.inicio && n < p.inicio + p.quantidade).sort((a, b) => a - b) };
+    const section = await findSection(prisma, rid, p.area);
+    const inRange = (n: number) => n >= p.inicio && n < p.inicio + p.quantidade;
+    const here = section ? await prisma.table.findMany({ where: { restaurantId: rid, sectionId: section.id }, select: { number: true, description: true } }) : [];
+    marks = {
+      existingNumbers: here.filter((t) => inRange(t.number)).map((t) => t.number).sort((a, b) => a - b),
+      exampleNumbers: here.filter((t) => inRange(t.number) && t.description === EXAMPLE_TABLE).map((t) => t.number).sort((a, b) => a - b),
+      exampleTables: await prisma.table.count({ where: { restaurantId: rid, description: EXAMPLE_TABLE } }),
+    };
   } else {
     const p = draft.payload as unknown as StaffPayload;
     const emails = p.pessoas.map((x) => x.email).filter(Boolean);
