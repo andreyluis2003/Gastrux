@@ -164,6 +164,24 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+/** Início module cards not in the menu that a non-manager uses (the rest of the cards are for managers only) */
+const MODULE_ROLES: Record<string, NavRole[]> = {
+  '/vendas-rapidas': FRONT,
+  '/estoque-rapido': [...MANAGERS, 'COOK'],
+};
+
+/**
+ * Whether a module card of the Início shows for a role: the menu link's roles, else MODULE_ROLES, else managers
+ * only (prod audit 2026-10-17: the cook's Início listed Financeiro, DRE, CRM and campaigns)
+ */
+export function canSeeModule(href: string, role: string | undefined | null): boolean {
+  const r = (role || 'OWNER') as NavRole;
+  const path = href.split('#')[0];
+  const link = NAV_GROUPS.filter((g) => !g.platformOnly).flatMap((g) => g.links).find((l) => l.href === path);
+  const roles = link ? link.roles : MODULE_ROLES[path] ?? MANAGERS;
+  return !roles || roles.includes(r);
+}
+
 /** The groups a person sees: links filtered by role, empty groups dropped */
 export function navFor(role: string | undefined | null, isPlatformAdmin: boolean): NavGroup[] {
   const r = (role || 'OWNER') as NavRole;

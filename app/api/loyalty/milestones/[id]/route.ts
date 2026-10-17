@@ -4,10 +4,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  // Owner-and-manager data: the cook and the cashier are refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole(MANAGER_ROLES);
+  if (!gate.ok) return gate.response;
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;
   if (!session || !['OWNER', 'MANAGER', 'ADMIN'].includes(role)) {
@@ -41,6 +45,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  // Owner-and-manager data: the cook and the cashier are refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole(MANAGER_ROLES);
+  if (!gate.ok) return gate.response;
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role;
   if (!session || !['OWNER', 'MANAGER', 'ADMIN'].includes(role)) {

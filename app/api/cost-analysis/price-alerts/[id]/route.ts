@@ -4,10 +4,14 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  // Owner-and-manager data: the cook and the cashier are refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole(MANAGER_ROLES);
+  if (!gate.ok) return gate.response;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -44,6 +48,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  // Owner-and-manager data: the cook and the cashier are refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole(MANAGER_ROLES);
+  if (!gate.ok) return gate.response;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -89,6 +96,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  // Owner-and-manager data: the cook and the cashier are refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole(MANAGER_ROLES);
+  if (!gate.ok) return gate.response;
   try {
     const session = await getServerSession(authOptions);
     if (!session) {

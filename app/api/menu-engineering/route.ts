@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { lineTotal } from '@/lib/comanda/line-total';
 import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,9 @@ function buildRecommendation(cls: string, foodCostPercent: number, margin: numbe
 }
 
 export async function GET(req: NextRequest) {
+  // Owner-and-manager data: the cook and the cashier are refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole(MANAGER_ROLES);
+  if (!gate.ok) return gate.response;
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });

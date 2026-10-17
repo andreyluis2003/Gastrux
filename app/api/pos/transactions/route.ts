@@ -4,11 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
 // GET: Retrieve POS transactions with filters
 export async function GET(req: NextRequest) {
+  // Selling: owner, manager and cashier; the cook is refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole([...MANAGER_ROLES, 'CASHIER']);
+  if (!gate.ok) return gate.response;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -77,6 +81,9 @@ export async function GET(req: NextRequest) {
 
 // POST: Register POS transaction (from Square/Sumup webhook)
 export async function POST(req: NextRequest) {
+  // Selling: owner, manager and cashier; the cook is refused (prod audit 2026-10-17)
+  const gate = await requireRestaurantRole([...MANAGER_ROLES, 'CASHIER']);
+  if (!gate.ok) return gate.response;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

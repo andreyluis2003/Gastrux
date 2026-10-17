@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { NAV_GROUPS, navFor, activeHref, shellMode } from '../../lib/navigation/app-nav';
+import { NAV_GROUPS, navFor, activeHref, shellMode, canSeeModule } from '../../lib/navigation/app-nav';
 
 const hrefs = (groups: ReturnType<typeof navFor>) => groups.flatMap((g) => g.links.map((l) => l.href));
 
@@ -135,5 +135,20 @@ describe('advanced screens under "Mais recursos" (owner, 2026-10-12)', () => {
     const all = NAV_GROUPS.flatMap((g) => g.links);
     expect(all.find((l) => l.href === '/admin/pdv')).toBeUndefined();
     expect(all.find((l) => l.label === 'Maquininha')).toBeUndefined();
+  });
+});
+
+// Prod audit 2026-10-17: the cook's Início listed Financeiro, DRE, CRM and campaigns
+describe('Início modules follow the menu roles', () => {
+  it('the cook sees only kitchen screens', () => {
+    for (const h of ['/cozinha', '/receitas', '/insumos', '/estoque', '/contagem', '/desperdicio', '/planejamento', '/estoque-rapido']) expect(canSeeModule(h, 'COOK')).toBe(true);
+    for (const h of ['/dashboard/financeiro', '/dashboard/financeiro/dre', '/dashboard/crm', '/cmv', '/engenharia-cardapio', '/relatorios', '/caixa', '/vender', '/vendas-rapidas', '/admin/messaging/campaigns', '/previsoes-demanda']) expect(canSeeModule(h, 'COOK')).toBe(false);
+  });
+  it('the cashier sees selling screens, not results', () => {
+    for (const h of ['/vender', '/caixa', '/vendas-rapidas']) expect(canSeeModule(h, 'CASHIER')).toBe(true);
+    for (const h of ['/dashboard/financeiro', '/dashboard/crm', '/cmv', '/receitas']) expect(canSeeModule(h, 'CASHIER')).toBe(false);
+  });
+  it('owner and manager see everything', () => {
+    for (const r of ['OWNER', 'MANAGER']) for (const h of ['/dashboard/financeiro', '/cozinha', '/vendas-rapidas', '/survey']) expect(canSeeModule(h, r)).toBe(true);
   });
 });

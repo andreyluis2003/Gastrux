@@ -14,6 +14,7 @@ import { FirstSteps } from '@/components/dashboard/first-steps';
 import { firstSteps } from '@/lib/onboarding/first-steps';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { isPlatformAdminIdentity } from '@/lib/admin/guard';
+import { canSeeModule } from '@/lib/navigation/app-nav';
 
 // These module tiles link to pages backed by platform-admin-only APIs
 // (role === 'ADMIN', i.e. Gastrux staff managing the SaaS itself - not a
@@ -139,9 +140,11 @@ export default async function DashboardPage() {
     { id: 'ia-monitoring', iconName: 'ShieldAlert' as const, href: '/admin/ia-monitoring', color: 'bg-rose-50', accentColor: 'text-rose-600' },
   ];
 
-  const visibleModules = isPlatformAdminIdentity(user.role, user.email)
+  // Platform-only cards for Gastrux staff; every other card follows the menu roles (cook: kitchen, cashier: selling)
+  const visibleModules = (isPlatformAdminIdentity(user.role, user.email)
     ? modules
-    : modules.filter((m) => !PLATFORM_ADMIN_ONLY_MODULE_IDS.has(m.id));
+    : modules.filter((m) => !PLATFORM_ADMIN_ONLY_MODULE_IDS.has(m.id))
+  ).filter((m) => canSeeModule(m.href, user.role));
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50">
