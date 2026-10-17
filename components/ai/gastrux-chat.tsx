@@ -26,6 +26,10 @@ const SUGGESTIONS: Array<[string, string[]]> = [
 const DEFAULT_SUGGESTIONS = ['Quanto vendi ontem?', 'Quais itens mais vendem este mês?', 'O que tem no meu plano?'];
 const suggestionsFor = (path: string) => SUGGESTIONS.find(([p]) => path.startsWith(p))?.[1] ?? DEFAULT_SUGGESTIONS;
 
+/** The AI marks key numbers with **bold**: show them bold instead of the asterisks */
+const withBold = (text: string) =>
+  text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
+
 export function GastruxChat() {
   const { data: session } = useSession() || {};
   const pathname = usePathname();
@@ -179,7 +183,7 @@ export function GastruxChat() {
                     : 'mr-auto bg-muted text-foreground rounded-bl-md',
                 )}
               >
-                {msg.content}
+                {msg.role === 'assistant' ? withBold(msg.content) : msg.content}
                 {msg.link && (
                   <a href={msg.link} className="block mt-1 text-xs font-medium text-primary underline">
                     Ver planos

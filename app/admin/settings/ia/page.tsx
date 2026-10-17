@@ -8,7 +8,10 @@ interface Usage { plan: string; used: number; limit: number | null; questions: Q
 
 const ROLE_LABEL: Record<string, string> = { OWNER: 'Dono', MANAGER: 'Gerente', CASHIER: 'Caixa', COOK: 'Cozinha', ADMIN: 'Admin' };
 const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-const short = (s: string | null) => (!s ? '-' : s.length > 120 ? `${s.slice(0, 120)}…` : s);
+const short = (raw: string | null) => {
+  const s = (raw ?? '').replace(/\*\*/g, '');
+  return !s ? '-' : s.length > 120 ? `${s.slice(0, 120)}…` : s;
+};
 
 /** Uso da IA (spec 2026-10-16 ia-assistente §4.6): questions of the month, owner and managers */
 export default function AiUsagePage() {
