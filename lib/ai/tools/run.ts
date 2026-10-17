@@ -9,6 +9,8 @@ import { brtDay, brtDayStart } from '@/lib/staff/commission-rules';
 import { isTierFeatureEnabled } from '@/lib/tier-guard';
 import { loadScreen } from '@/lib/utility-bills/service';
 import { onboardingStatus } from '@/lib/onboarding/first-steps';
+import { createDraft, TOOL_KIND } from '../drafts/service';
+import { validateMenu, validateStaff, validateTables } from '../drafts/validate';
 import { monthlyLimit } from '../config';
 import { questionsThisMonth } from '../usage';
 import { isManagerRole, TOOL_ROLES, type ToolName } from './defs';
@@ -24,7 +26,7 @@ async function tierOf(restaurantId: string) {
 }
 
 /** Runs one tool for the logged member (spec 2026-10-16 ia-assistente §4.2/§4.3): read-only, scoped, role-checked again */
-export async function runTool(member: RestaurantMember, name: string, input: unknown, now = new Date()): Promise<Result> {
+export async function runTool(member: RestaurantMember, name: string, input: unknown, now = new Date(), ctx: { questionId?: string } = {}): Promise<Result> {
   const roles = TOOL_ROLES[name as ToolName];
   if (!roles) return { ok: false, error: `Ferramenta desconhecida: ${name}`, denied: false };
   if (!(roles as string[]).includes(member.role)) return { ok: false, error: 'Essa informação é do dono ou do gerente.', denied: true };
@@ -148,6 +150,14 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
           proxima: st.next ? { chave: st.next.key, rotulo: st.next.label, link: st.next.href } : null,
           diasDeConta: st.daysSinceSignup,
         } };
+      }
+      // Proposals only create a draft the owner reviews and confirms (spec 2026-10-17 ia-implantacao §4.2)
+      case 'propor_cardapio': case 'propor_mesas': case 'propor_equipe': {
+        const kind = TOOL_KIND[name];
+        const v = kind === 'MENU' ? validateMenu(input) : kind === 'TABLES' ? validateTables(input) : validateStaff(input, { requireEmail: false });
+        if (!v.ok) return { ok: false, error: v.error, denied: false };
+        const d = await createDraft(member, kind, v.value, ctx.questionId);
+        return { ok: true, data: { rascunhoId: d.id, resumo: d.resumo, proximoPasso: 'O dono revisa e confirma no botão Revisar e confirmar.' } };
       }
       case 'plano': {
         const tier = await tierOf(rid);

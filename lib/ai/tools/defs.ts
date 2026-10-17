@@ -40,6 +40,19 @@ const DEFS = [
     description: 'Plano do restaurante, perguntas à IA usadas e restantes no mês.' },
   { name: 'progresso_implantacao', roles: M, schema: closed({}),
     description: 'Etapas da implantação do restaurante (caixa, primeira venda, cardápio, mesas, equipe, endereço, NFC-e): quais estão feitas, a próxima e o link da tela de cada uma.' },
+  { name: 'propor_cardapio', roles: M, schema: closed({
+      categorias: { type: 'array', items: closed({ nome: { type: 'string' }, itens: { type: 'array', items: closed({
+        nome: { type: 'string' }, descricao: { type: 'string', description: 'Pode ser vazio' }, preco: { type: 'number', description: 'Preço em reais, por exemplo 32.9' } }) } }) },
+      incompleto: { type: 'boolean', description: 'true se o cardápio não coube inteiro ou parte não foi lida' } }),
+    description: 'Monta um RASCUNHO de cardápio (categorias, itens, descrição, preço) para o dono revisar e confirmar. Não grava nada no cardápio.' },
+  { name: 'propor_mesas', roles: M, schema: closed({
+      quantidade: { type: 'integer' }, inicio: { type: 'integer', description: 'Primeiro número' },
+      area: { type: 'string', description: 'Área, por exemplo Salão' }, lugares: { type: 'integer' } }),
+    description: 'Monta um RASCUNHO de mesas (quantidade, número inicial, área, lugares) para o dono revisar e confirmar. Não cria mesas.' },
+  { name: 'propor_equipe', roles: M, schema: closed({
+      pessoas: { type: 'array', items: closed({ nome: { type: 'string' }, email: { type: 'string', description: 'Pode ser vazio se não informado' },
+        papel: { type: 'string', enum: ['GERENTE', 'CAIXA', 'COZINHA'], description: 'Garçom = CAIXA' } }) } }),
+    description: 'Monta um RASCUNHO de cadastro de funcionários (nome, e-mail, papel) para o dono revisar e confirmar. Não cria usuários.' },
 ] as const;
 
 export type ToolName = (typeof DEFS)[number]['name'];

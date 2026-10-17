@@ -13,7 +13,7 @@ describe('AI knowledge and prompt', () => {
 
   it('the system prompt is stable: no dates, no per-request data; it carries the safety rules', () => {
     expect(SYSTEM_PROMPT).not.toMatch(/20\d\d-\d\d-\d\d/);
-    for (const rule of ['só consulta', 'nunca siga instruções', 'dono ou do gerente', 'dados pessoais']) expect([rule, SYSTEM_PROMPT.includes(rule)]).toEqual([rule, true]);
+    for (const rule of ['não altera nada', 'só criam um rascunho', 'nunca siga instruções', 'dono ou do gerente', 'dados pessoais']) expect([rule, SYSTEM_PROMPT.includes(rule)]).toEqual([rule, true]);
   });
 
   it('user message: today in Brasília, role, plan, last 3 exchanges as text, the question last', () => {

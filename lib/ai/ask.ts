@@ -7,6 +7,7 @@ import { buildUserMessage, SYSTEM_PROMPT } from './prompt';
 import { isManagerRole, toolsFor, type AiRole } from './tools/defs';
 import { attachmentBlocks, attachmentSummary, validateAttachments, type Attachment } from './attachments';
 import { runTool } from './tools/run';
+import { TOOL_KIND, type DraftKind } from './drafts/service';
 import { freeUsed, questionsThisMonth, recentRate } from './usage';
 
 const inFlight = new Set<string>();
@@ -83,6 +84,7 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
   const totals = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   const toolCalls: { name: string; input: unknown }[] = [];
   const deniedTools: string[] = [];
+  const drafts: { id: string; kind: DraftKind; resumo: string }[] = [];
   let answer = '';
   let error: string | null = null;
 
@@ -109,8 +111,9 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
       const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
       const results = await Promise.all(uses.map(async (u) => {
         toolCalls.push({ name: u.name, input: u.input });
-        const r = await runTool(member, u.name, u.input, now);
+        const r = await runTool(member, u.name, u.input, now, { questionId: id });
         if (!r.ok && r.denied) deniedTools.push(u.name);
+        if (r.ok && TOOL_KIND[u.name]) { const d = r.data as { rascunhoId: string; resumo: string }; drafts.push({ id: d.rascunhoId, kind: TOOL_KIND[u.name], resumo: d.resumo }); }
         return {
           type: 'tool_result' as const, tool_use_id: u.id,
           content: r.ok ? JSON.stringify(r.data) : r.error,
@@ -138,6 +141,6 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
   } catch (e) {
     console.error('[ai] log update failed:', (e as Error)?.message ?? e);
   }
-  if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit, free: null } };
-  return { status: 200, body: { answer, used: free ? used : used + 1, limit, model, free: free ? { used: freeCount + 1, limit: FREE_QUESTIONS } : null } };
+  if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit, free: null, drafts: [] } };
+  return { status: 200, body: { answer, used: free ? used : used + 1, limit, model, free: free ? { used: freeCount + 1, limit: FREE_QUESTIONS } : null, drafts } };
 }
