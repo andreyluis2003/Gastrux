@@ -58,14 +58,16 @@ const EMPTY_STATS = { ingredients: EMPTY_CARD, recipes: EMPTY_CARD, plansThisWee
 async function DashboardFullContent({
   modules,
   restaurantId,
+  role,
 }: {
   modules: DashboardContentProps['modules'];
   restaurantId: string;
+  role?: string;
 }) {
   // The cards come from the restaurant's data (lib/dashboard/stats.ts): no fixed trends
   const [stats, low] = await Promise.all([getDashboardStats(restaurantId), LowPriorityData(restaurantId)]);
 
-  return <DashboardContent stats={stats} recentAlerts={low.recentAlerts} modules={modules} />;
+  return <DashboardContent stats={stats} recentAlerts={low.recentAlerts} modules={modules} role={role} />;
 }
 
 export default async function DashboardPage() {
@@ -154,12 +156,12 @@ export default async function DashboardPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-6xl px-4 py-8 space-y-8">
         <AlertsBanner />
-        <FirstSteps steps={steps} />
+        <FirstSteps steps={steps} canSell={canSeeModule('/vender', user.role)} />
         <Suspense fallback={<DashboardAlertsLoadingSkeleton />}>
           {restaurantId ? (
-            <DashboardFullContent modules={visibleModules} restaurantId={restaurantId} />
+            <DashboardFullContent modules={visibleModules} restaurantId={restaurantId} role={user.role} />
           ) : (
-            <DashboardContent stats={EMPTY_STATS} recentAlerts={[]} modules={visibleModules} />
+            <DashboardContent stats={EMPTY_STATS} recentAlerts={[]} modules={visibleModules} role={user.role} />
           )}
         </Suspense>
       </main>

@@ -68,6 +68,7 @@ import type { DashboardStats, StatCard } from '@/lib/dashboard/stats';
 import { ReactNode, useState, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import type { TranslationKey } from '@/lib/i18n/translations';
+import { canSeeModule } from '@/lib/navigation/app-nav';
 
 const iconMap = {
   Package, BookOpen, TrendingUp, Calendar, Zap, Receipt, DollarSign,
@@ -89,6 +90,8 @@ export interface DashboardContentProps {
     color: string;
     accentColor: string;
   }>;
+  /** The quick actions follow the menu roles (prod audit 2026-10-17: the cook saw CMV and Eng. Cardápio) */
+  role?: string;
 }
 
 // ── Category definitions ───────────────────────────────────────
@@ -222,6 +225,7 @@ export function DashboardContent({
   stats,
   recentAlerts,
   modules,
+  role,
 }: DashboardContentProps) {
   const { t } = useI18n();
   const [isSimpleMode, setIsSimpleMode] = useState(true);
@@ -302,6 +306,7 @@ export function DashboardContent({
             {t('dashboard.quickActions')}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {canSeeModule('/desperdicio', role) && (
             <Link href="/desperdicio">
               <Card className="p-4 hover:shadow-md transition-all cursor-pointer group border-red-100 hover:border-red-300 dark:border-red-900/30">
                 <div className="flex flex-col items-center gap-2 text-center">
@@ -312,6 +317,8 @@ export function DashboardContent({
                 </div>
               </Card>
             </Link>
+            )}
+            {canSeeModule('/contagem', role) && (
             <Link href="/contagem">
               <Card className="p-4 hover:shadow-md transition-all cursor-pointer group border-primary/20 hover:border-primary/30 dark:border-brand-ink">
                 <div className="flex flex-col items-center gap-2 text-center">
@@ -322,6 +329,8 @@ export function DashboardContent({
                 </div>
               </Card>
             </Link>
+            )}
+            {canSeeModule('/cmv', role) && (
             <Link href="/cmv">
               <Card className="p-4 hover:shadow-md transition-all cursor-pointer group border-emerald-100 hover:border-emerald-300 dark:border-emerald-900/30">
                 <div className="flex flex-col items-center gap-2 text-center">
@@ -332,6 +341,8 @@ export function DashboardContent({
                 </div>
               </Card>
             </Link>
+            )}
+            {canSeeModule('/engenharia-cardapio', role) && (
             <Link href="/engenharia-cardapio">
               <Card className="p-4 hover:shadow-md transition-all cursor-pointer group border-purple-100 hover:border-purple-300 dark:border-purple-900/30">
                 <div className="flex flex-col items-center gap-2 text-center">
@@ -342,6 +353,7 @@ export function DashboardContent({
                 </div>
               </Card>
             </Link>
+            )}
           </div>
         </div>
       </FadeIn>

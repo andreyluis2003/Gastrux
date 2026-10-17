@@ -18,18 +18,21 @@ const AI_ASK: Partial<Record<FirstStep['key'], string>> = {
 };
 const askAi = (text: string) => window.dispatchEvent(new CustomEvent('gastrux:ask', { detail: { text } }));
 
-export function FirstSteps({ steps }: { steps: FirstStep[] | null }) {
+/** canSell: the "Vender" button only for who sells (owner, manager, cashier; prod audit 2026-10-17) */
+export function FirstSteps({ steps, canSell = true }: { steps: FirstStep[] | null; canSell?: boolean }) {
   // The optional step (team) never keeps the card from being done
   const required = steps?.filter((s) => !s.optional) ?? [];
   const doneCount = required.filter((s) => s.done).length;
   return (
     <div className="space-y-4">
+      {canSell && (
       <Link
         href="/vender"
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 py-4 text-lg font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-auto sm:inline-flex"
       >
         <ShoppingBag className="h-5 w-5" /> Vender
       </Link>
+      )}
       {steps && doneCount < required.length && (
         <Dismissible storageKey="gastrux-first-steps-hidden">
         <section className="rounded-lg border bg-white p-4 shadow-sm">
