@@ -2,11 +2,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@/lib/prisma';
 import type { RestaurantMember } from '@/lib/auth/restaurant-role';
 import { getAnthropic } from './client';
-import { aiModels, DETAILED_TIERS, estimateCostUsd, MAX_ROUNDS, monthlyLimit } from './config';
+import { aiModels, DETAILED_TIERS, estimateCostUsd, FREE_DAYS, FREE_QUESTIONS, MAX_ROUNDS, monthlyLimit } from './config';
 import { buildUserMessage, SYSTEM_PROMPT } from './prompt';
 import { toolsFor, type AiRole } from './tools/defs';
 import { runTool } from './tools/run';
-import { questionsThisMonth, recentRate } from './usage';
+import { freeUsed, questionsThisMonth, recentRate } from './usage';
 
 const inFlight = new Set<string>();
 const UNAVAILABLE = 'A IA está indisponível agora. Tente em instantes.';
@@ -29,33 +29,37 @@ export async function askQuestion(member: RestaurantMember, body: unknown, now =
 }
 
 async function ask(client: Anthropic, member: RestaurantMember, b: { history?: unknown; detailed?: unknown }, question: string, now: Date) {
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { name: true, subscriptionTier: true } });
+  const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { name: true, subscriptionTier: true, createdAt: true } });
   const tier = (restaurant?.subscriptionTier || 'starter').toLowerCase();
   const detailed = b.detailed === true;
   if (detailed && !DETAILED_TIERS.includes(tier)) return { status: 403, body: { error: 'A análise detalhada é do plano Pro.', upgradeUrl: '/pricing' } };
   const limit = monthlyLimit(tier);
   const models = aiModels();
   const model = detailed ? models.detailed : models.default;
+  const inFreeWindow = !!restaurant && now.getTime() - restaurant.createdAt.getTime() <= FREE_DAYS * 86_400_000;
 
   // Check the limits and reserve the question in one step, per restaurant: a question still
   // running already counts toward the month and the 10/min rate (parallel requests cannot pass)
   const gate = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'ai-ask:' + member.restaurantId}))`;
+    // A new account's first questions are free and do not touch the plan limit (spec 2026-10-17 ia-implantacao §3.4)
+    const freeCount = inFreeWindow ? await freeUsed(member.restaurantId, tx) : FREE_QUESTIONS;
+    const free = freeCount < FREE_QUESTIONS;
     const used = await questionsThisMonth(member.restaurantId, now, tx);
-    if (limit !== null && used >= limit) {
+    if (!free && limit !== null && used >= limit) {
       return { refused: { status: 429, body: { error: `Você usou as ${limit} perguntas do mês do plano ${tier}.`, used, limit, upgradeUrl: '/pricing' } } };
     }
     if ((await recentRate(member.restaurantId, now, tx)) >= 10) {
       return { refused: { status: 429, body: { error: 'Muitas perguntas em sequência. Tente em um minuto.', used, limit } } };
     }
     const row = await tx.aiQuestion.create({
-      data: { restaurantId: member.restaurantId, userId: member.userId, role: member.role, question, model, detailed, counted: true },
+      data: { restaurantId: member.restaurantId, userId: member.userId, role: member.role, question, model, detailed, counted: !free, free },
       select: { id: true },
     });
-    return { used, id: row.id };
+    return { used, id: row.id, free, freeCount };
   });
   if ('refused' in gate) return gate.refused!;
-  const { used, id } = gate as { used: number; id: string };
+  const { used, id, free, freeCount } = gate as { used: number; id: string; free: boolean; freeCount: number };
 
   const history = Array.isArray(b.history)
     ? (b.history as any[]).filter((m) => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string').map((m) => ({ role: m.role, content: m.content }))
@@ -117,12 +121,12 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
         answer: error ? null : answer,
         toolCalls: toolCalls as any, deniedTools: deniedTools.length ? (deniedTools as any) : undefined,
         inputTokens: totals.input_tokens, outputTokens: totals.output_tokens, cacheReadTokens: totals.cache_read_input_tokens, cacheWriteTokens: totals.cache_creation_input_tokens,
-        costUsd: estimateCostUsd(model, totals), counted: !error, error,
+        costUsd: estimateCostUsd(model, totals), counted: !error && !free, free: !error && free, error,
       },
     });
   } catch (e) {
     console.error('[ai] log update failed:', (e as Error)?.message ?? e);
   }
-  if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit } };
-  return { status: 200, body: { answer, used: used + 1, limit, model } };
+  if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit, free: null } };
+  return { status: 200, body: { answer, used: free ? used : used + 1, limit, model, free: free ? { used: freeCount + 1, limit: FREE_QUESTIONS } : null } };
 }

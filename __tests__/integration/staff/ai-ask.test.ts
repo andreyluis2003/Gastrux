@@ -20,10 +20,12 @@ const script = (...responses) => {
 };
 
 describe('askQuestion', () => {
-  let s, p, s2, userIds = [];
-  const mkRestaurant = async (tier, label = tier) => {
+  let s, p, s2, userIds = [], rids = [];
+  // Accounts older than the free onboarding window unless `fresh` (spec 2026-10-17 ia-implantacao §3.4)
+  const mkRestaurant = async (tier, label = tier, fresh = false) => {
     const o = await prisma.user.create({ data: { email: `aia-o-${label}-${tag}@gastrux.test`, name: 'Dona', password: 'x', role: 'OWNER' } });
-    const rid = (await prisma.restaurant.create({ data: { name: `Aia ${label} ${tag}`, ownerId: o.id, status: 'ACTIVE', subscriptionTier: tier } })).id;
+    const rid = (await prisma.restaurant.create({ data: { name: `Aia ${label} ${tag}`, ownerId: o.id, status: 'ACTIVE', subscriptionTier: tier, ...(fresh ? {} : { createdAt: new Date(Date.now() - 40 * 86400000) }) } })).id;
+    rids.push(rid);
     const c = await prisma.user.create({ data: { email: `aia-c-${label}-${tag}@gastrux.test`, name: 'Zé', password: 'x', role: 'COOK', currentRestaurantId: rid } });
     await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: c.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
     userIds.push(o.id, c.id);
@@ -31,7 +33,7 @@ describe('askQuestion', () => {
   };
   beforeAll(async () => { s = await mkRestaurant('starter'); p = await mkRestaurant('pro'); s2 = await mkRestaurant('starter', 'race'); }, 60000);
   afterAll(async () => {
-    try { await prisma.restaurant.deleteMany({ where: { id: { in: [s.rid, p.rid, s2.rid] } } }); } catch {}
+    try { await prisma.restaurant.deleteMany({ where: { id: { in: rids } } }); } catch {}
     try { await prisma.user.deleteMany({ where: { id: { in: userIds } } }); } catch {}
   });
   beforeEach(() => jest.clearAllMocks());
@@ -115,6 +117,43 @@ describe('askQuestion', () => {
     (getAnthropic as jest.Mock).mockReturnValue({ messages: { create } });
     return create;
   };
+
+  it('first 30 days: the first 100 questions are free and do not touch the plan limit', async () => {
+    const f = await mkRestaurant('starter', 'free', true);
+    await prisma.aiQuestion.createMany({ data: Array.from({ length: 99 }, () => ({ restaurantId: f.rid, userId: f.owner.userId, role: 'OWNER', question: 'q', counted: false, free: true, createdAt: new Date(Date.now() - 120_000) })) });
+    script(text('ok'));
+    const r = await askQuestion(f.owner, { question: 'a centésima' });
+    expect(r).toMatchObject({ status: 200, body: { free: { used: 100, limit: 100 } } });
+    const last = await prisma.aiQuestion.findFirst({ where: { restaurantId: f.rid }, orderBy: { createdAt: 'desc' } });
+    expect(last).toMatchObject({ free: true, counted: false });
+    script(text('ok'));
+    const r2 = await askQuestion(f.owner, { question: 'a 101ª' });
+    expect(r2.body.free).toBeNull();
+    expect((await prisma.aiQuestion.findFirst({ where: { restaurantId: f.rid }, orderBy: { createdAt: 'desc' } })).counted).toBe(true);
+  });
+
+  it('day 31: nothing is free', async () => {
+    const o = await mkRestaurant('starter', 'old', true);
+    await prisma.restaurant.update({ where: { id: o.rid }, data: { createdAt: new Date(Date.now() - 31 * 86400000) } });
+    script(text('ok'));
+    const r = await askQuestion(o.owner, { question: 'oi' });
+    expect(r.body.free).toBeNull();
+  });
+
+  it('an API error does not spend the free quota', async () => {
+    const e = await mkRestaurant('starter', 'err', true);
+    (getAnthropic as jest.Mock).mockReturnValue({ messages: { create: jest.fn().mockRejectedValue(new Error('500')) } });
+    await askQuestion(e.owner, { question: 'oi' });
+    expect(await prisma.aiQuestion.count({ where: { restaurantId: e.rid, free: true } })).toBe(0);
+  });
+
+  it('two users at 99 free at the same instant: exactly one more free', async () => {
+    const t = await mkRestaurant('starter', 'freerace', true);
+    await prisma.aiQuestion.createMany({ data: Array.from({ length: 99 }, () => ({ restaurantId: t.rid, userId: t.owner.userId, role: 'OWNER', question: 'q', counted: false, free: true, createdAt: new Date(Date.now() - 120_000) })) });
+    slowClient();
+    await Promise.all([askQuestion(t.owner, { question: 'a' }), askQuestion(t.cook, { question: 'b' })]);
+    expect(await prisma.aiQuestion.count({ where: { restaurantId: t.rid, free: true } })).toBe(100);
+  });
 
   it('the same user asking twice at once: one answer, one 409', async () => {
     const create = slowClient();

@@ -3,6 +3,9 @@
 export const AI_LIMITS: Record<string, number | null> = { starter: 30, pro: 150, business: 350, enterprise: null };
 export const DETAILED_TIERS = ['pro', 'business', 'enterprise'];
 export const MAX_ROUNDS = 6;
+/** Onboarding: the first questions of a new account are free (spec 2026-10-17 ia-implantacao §3.4) */
+export const FREE_DAYS = 30;
+export const FREE_QUESTIONS = 100;
 
 export function monthlyLimit(tier: string | null | undefined): number | null {
   const t = (tier || 'starter').toLowerCase();

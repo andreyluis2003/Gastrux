@@ -33,6 +33,7 @@ describe('AI usage', () => {
       { restaurantId: rid, userId: c.id, role: 'COOK', question: 'O que vence hoje?', answer: 'Nada vence hoje.', model: 'claude-haiku-5-5', counted: true },
       { restaurantId: rid, userId: o.id, role: 'OWNER', question: 'Quanto vendi?', answer: null, model: 'claude-haiku-5-5', counted: false, error: '500' },
       { restaurantId: otherRid, userId: o.id, role: 'OWNER', question: 'pergunta de outro restaurante', counted: true },
+      { restaurantId: rid, userId: o.id, role: 'OWNER', question: 'Como cadastro mesas?', answer: 'Em Vender > Mesas.', model: 'claude-haiku-5-5', counted: false, free: true },
     ] });
   });
   afterAll(async () => {
@@ -46,7 +47,9 @@ describe('AI usage', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ plan: 'pro', used: 1, limit: 150 });
-    expect(body.questions.map((q) => q.question).sort()).toEqual(['O que vence hoje?', 'Quanto vendi?']);
+    expect(body.questions.map((q) => q.question).sort()).toEqual(['Como cadastro mesas?', 'O que vence hoje?', 'Quanto vendi?']);
+    expect(body.free).toEqual({ used: 1, limit: 100 });
+    expect(body.questions.find((q) => q.question === 'Como cadastro mesas?')).toMatchObject({ free: true, counted: false });
     expect(body.questions.find((q) => q.question === 'O que vence hoje?')).toMatchObject({ userName: 'Zé', role: 'COOK', counted: true });
   });
 

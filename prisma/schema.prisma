@@ -2992,6 +2992,7 @@ model Restaurant {
   utilityAccounts UtilityAccount[]
   utilityBills    UtilityBill[]
   aiQuestions     AiQuestion[]
+  aiDrafts        AiDraft[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -4758,12 +4759,35 @@ model AiQuestion {
   cacheWriteTokens Int        @default(0)
   costUsd          Float      @default(0)
   counted          Boolean    @default(true)
+  free             Boolean    @default(false)
+  attachments      Json?
   error            String?
   createdAt        DateTime   @default(now())
   restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drafts           AiDraft[]
 
   @@index([restaurantId, createdAt])
   @@index([userId, createdAt])
   @@map("ai_questions")
+}
+
+model AiDraft {
+  id           String      @id @default(cuid())
+  restaurantId String
+  createdById  String
+  questionId   String?
+  kind         String
+  payload      Json
+  status       String      @default("PENDING")
+  expiresAt    DateTime
+  appliedAt    DateTime?
+  appliedById  String?
+  result       Json?
+  createdAt    DateTime    @default(now())
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  question     AiQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([restaurantId, createdAt])
+  @@map("ai_drafts")
 }
