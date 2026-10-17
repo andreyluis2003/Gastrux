@@ -11,7 +11,20 @@ import { cn } from '@/lib/utils';
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Shown under an error answer (limit reached, detailed analysis outside the plan) */
+  link?: string;
 }
+
+const SUGGESTIONS: Array<[string, string[]]> = [
+  ['/contagem-do-dia', ['Qual espeto mais faltou esta semana?', 'Quantos espetos de frango vendi ontem?', 'Como fecho a contagem?']],
+  ['/caixa', ['Quanto vendi hoje no caixa?', 'Quais despesas saíram hoje?', 'Como faço uma sangria?']],
+  ['/vender', ['Quais mesas estão abertas há mais tempo?', 'Quanto tem em aberto nas mesas?', 'Como transfiro itens entre mesas?']],
+  ['/dashboard/financeiro', ['Como está meu resultado este mês?', 'Quanto gastei de energia no mês passado?', 'Qual meu CMV em setembro?']],
+  ['/etiquetas', ['O que vence hoje?', 'Como imprimo uma etiqueta?', 'Validades estão no meu plano?']],
+  ['/receitas', ['Qual a margem do meu item mais vendido?', 'Como cadastro uma ficha técnica?', 'Quais insumos estão abaixo do mínimo?']],
+];
+const DEFAULT_SUGGESTIONS = ['Quanto vendi ontem?', 'Quais itens mais vendem este mês?', 'O que tem no meu plano?'];
+const suggestionsFor = (path: string) => SUGGESTIONS.find(([p]) => path.startsWith(p))?.[1] ?? DEFAULT_SUGGESTIONS;
 
 export function GastruxChat() {
   const { data: session } = useSession() || {};
@@ -20,6 +33,9 @@ export function GastruxChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [detailed, setDetailed] = useState(false);
+  const [usage, setUsage] = useState<{ used: number; limit: number | null } | null>(null);
+  const [notConfigured, setNotConfigured] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -42,7 +58,7 @@ export function GastruxChat() {
 
   const handleSend = async () => {
     const question = input.trim();
-    if (!question || loading) return;
+    if (!question || loading || notConfigured) return;
 
     const userMsg: ChatMessage = { role: 'user', content: question };
     setMessages(prev => [...prev, userMsg]);
@@ -50,20 +66,29 @@ export function GastruxChat() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/ai-insights/chat', {
+      const res = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question,
-          history: messages.slice(-6),
+          history: messages.slice(-6).map(({ role, content }) => ({ role, content })),
+          detailed,
         }),
       });
 
-      const data = await res.json();
-      if (data.answer) {
+      const data = await res.json().catch(() => ({}));
+      if (typeof data.used === 'number') setUsage({ used: data.used, limit: data.limit ?? null });
+      if (res.ok && data.answer) {
         setMessages(prev => [...prev, { role: 'assistant', content: data.answer }]);
+      } else if (res.status === 503 && data.notConfigured) {
+        setNotConfigured(true);
+        setMessages(prev => [...prev, { role: 'assistant', content: 'A IA ainda não foi configurada.' }]);
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Desculpe, não consegui processar sua pergunta. Tente novamente.' }]);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: data.error || 'Desculpe, não consegui processar sua pergunta. Tente novamente.',
+          link: (res.status === 429 || res.status === 403) ? data.upgradeUrl : undefined,
+        }]);
       }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Erro de conexão. Verifique sua internet e tente novamente.' }]);
@@ -126,13 +151,9 @@ export function GastruxChat() {
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <Sparkles className="w-10 h-10 text-primary/40 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">Olá! Sou o assistente Gastrux.</p>
-                <p className="text-xs text-muted-foreground mt-1">Pergunte sobre vendas, CMV, cardápio, estoque...</p>
+                <p className="text-xs text-muted-foreground mt-1">Pergunte sobre vendas, caixa, estoque ou como usar o sistema.</p>
                 <div className="mt-4 space-y-2 w-full">
-                  {[
-                    'Qual meu CMV atual?',
-                    'Quais pratos mais vendem?',
-                    'Como reduzir meu custo?',
-                  ].map((suggestion) => (
+                  {suggestionsFor(pathname).map((suggestion) => (
                     <button
                       key={suggestion}
                       className="w-full text-left text-xs px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors"
@@ -159,6 +180,11 @@ export function GastruxChat() {
                 )}
               >
                 {msg.content}
+                {msg.link && (
+                  <a href={msg.link} className="block mt-1 text-xs font-medium text-primary underline">
+                    Ver planos
+                  </a>
+                )}
               </div>
             ))}
 
@@ -180,19 +206,36 @@ export function GastruxChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Pergunte algo sobre seu restaurante..."
+                placeholder={notConfigured ? 'A IA ainda não foi configurada.' : 'Pergunte algo sobre seu restaurante...'}
                 className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-[80px] min-h-[40px]"
                 rows={1}
-                disabled={loading}
+                disabled={loading || notConfigured}
               />
               <Button
                 size="icon"
                 className="h-10 w-10 rounded-xl shrink-0"
                 onClick={handleSend}
-                disabled={!input.trim() || loading}
+                disabled={!input.trim() || loading || notConfigured}
               >
                 <Send className="w-4 h-4" />
               </Button>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={detailed}
+                  onChange={(e) => setDetailed(e.target.checked)}
+                  disabled={loading || notConfigured}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+                Análise detalhada
+              </label>
+              {usage && (
+                <span>
+                  {usage.limit === null ? 'Perguntas ilimitadas' : `${usage.used} de ${usage.limit} perguntas este mês`}
+                </span>
+              )}
             </div>
           </div>
         </div>

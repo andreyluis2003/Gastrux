@@ -142,6 +142,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Minha assinatura', href: '/dashboard/billing', roles: ['OWNER', 'ADMIN'] },
       { label: 'WhatsApp', href: '/admin/integrations/whatsapp', roles: MANAGERS },
       { label: 'Várias lojas', href: '/admin/multi-location', roles: MANAGERS },
+      { label: 'Uso da IA', href: '/admin/settings/ia', roles: MANAGERS },
       { label: 'Todos os recursos', href: '/dashboard#modulos', roles: MANAGERS },
     ],
   },

@@ -60,6 +60,13 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
     expect(hrefs(navFor('COOK', false))).not.toContain('/dashboard/financeiro/contas');
   });
 
+  it('the AI usage screen sits in Configurações for owner and manager only', () => {
+    const link = NAV_GROUPS.find((g) => g.id === 'config')?.links.find((l) => l.href === '/admin/settings/ia');
+    expect(link?.label).toBe('Uso da IA');
+    for (const role of ['OWNER', 'MANAGER']) expect(hrefs(navFor(role, false))).toContain('/admin/settings/ia');
+    for (const role of ['CASHIER', 'COOK']) expect(hrefs(navFor(role, false))).not.toContain('/admin/settings/ia');
+  });
+
   it('a cook sees recipes and stock, not money', () => {
     const h = hrefs(navFor('COOK', false));
     expect(h).toEqual(expect.arrayContaining(['/cozinha', '/receitas', '/estoque', '/contagem']));
