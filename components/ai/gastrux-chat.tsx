@@ -9,6 +9,7 @@ import { MessageCircle, X, Send, Sparkles, Loader2, Trash2, Paperclip, FileText,
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { fileToBase64, resizeImage } from '@/lib/ai/resize-image';
+import { suggestionsFor } from '@/lib/ai/suggestions';
 
 interface DraftLink { id: string; kind: string; resumo: string }
 
@@ -26,17 +27,7 @@ interface ChatMessage {
 interface PendingFile { type: 'image' | 'pdf'; mediaType: string; data: string; name: string }
 interface Onboarding { active: boolean; done: number; total: number; next: { label: string; href: string } | null; free: { used: number; limit: number } | null }
 
-const SUGGESTIONS: Array<[string, string[]]> = [
-  ['/contagem-do-dia', ['Qual espeto mais faltou esta semana?', 'Quantos espetos de frango vendi ontem?', 'Como fecho a contagem?']],
-  ['/caixa', ['Quanto vendi hoje no caixa?', 'Quais despesas saíram hoje?', 'Como faço uma sangria?']],
-  ['/vender', ['Quais mesas estão abertas há mais tempo?', 'Quanto tem em aberto nas mesas?', 'Como transfiro itens entre mesas?']],
-  ['/dashboard/financeiro', ['Como está meu resultado este mês?', 'Quanto gastei de energia no mês passado?', 'Qual meu CMV em setembro?']],
-  ['/etiquetas', ['O que vence hoje?', 'Como imprimo uma etiqueta?', 'Validades estão no meu plano?']],
-  ['/receitas', ['Qual a margem do meu item mais vendido?', 'Como cadastro uma ficha técnica?', 'Quais insumos estão abaixo do mínimo?']],
-];
-const DEFAULT_SUGGESTIONS = ['Quanto vendi ontem?', 'Quais itens mais vendem este mês?', 'O que tem no meu plano?'];
 const ONBOARDING_SUGGESTIONS = ['Importar meu cardápio por foto', 'Criar minhas mesas', 'Cadastrar minha equipe'];
-const suggestionsFor = (path: string) => SUGGESTIONS.find(([p]) => path.startsWith(p))?.[1] ?? DEFAULT_SUGGESTIONS;
 const MAX_IMAGES = 4;
 
 /** The AI marks key numbers with **bold**: show them bold instead of the asterisks */
@@ -254,7 +245,7 @@ export function GastruxChat() {
                   <p className="text-xs text-muted-foreground mt-1">Pergunte sobre vendas, caixa, estoque ou como usar o sistema.</p>
                 )}
                 <div className="mt-4 space-y-2 w-full">
-                  {(showOnboarding ? ONBOARDING_SUGGESTIONS : suggestionsFor(pathname)).map((suggestion) => (
+                  {(showOnboarding ? ONBOARDING_SUGGESTIONS : suggestionsFor(pathname, (session?.user as any)?.role)).map((suggestion) => (
                     <button
                       key={suggestion}
                       className="w-full text-left text-xs px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors"
