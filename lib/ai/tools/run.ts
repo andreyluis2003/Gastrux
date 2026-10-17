@@ -114,9 +114,14 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
       case 'dre_resumo': {
         const p = parsePeriod(input);
         const { dre } = await computeDre(rid, p.startDate, p.endDate);
-        return { ok: true, data: { periodo: `${p.startDate} a ${p.endDate}`, receitaBruta: dre.receitaBruta, taxaServicoIncluida: dre.taxaServico, deducoes: dre.deducoes.total,
-          receitaLiquida: dre.receitaLiquida, cmv: dre.cmv, lucroBruto: dre.lucroBruto, despesas: dre.despesasOperacionais, resultadoOperacional: dre.resultadoOperacional,
-          resultadoLiquido: dre.resultadoLiquido, margemLiquidaPct: dre.margemLiquida } };
+        const r2 = (n: number) => Math.round(n * 100) / 100;
+        const d = dre.despesasOperacionais;
+        return { ok: true, data: { periodo: `${p.startDate} a ${p.endDate}`, receitaBruta: r2(dre.receitaBruta), taxaServicoIncluida: r2(dre.taxaServico), deducoes: r2(dre.deducoes.total),
+          receitaLiquida: r2(dre.receitaLiquida), cmv: r2(dre.cmv), lucroBruto: r2(dre.lucroBruto),
+          despesas: { operacional: r2(d.operacional), pessoal: r2(d.pessoal), contasConsumo: r2(d.contasConsumo), taxasGateway: r2(d.taxasGateway), total: r2(d.total) },
+          // true: the utility bills are whole-month values inside a partial period
+          contasConsumoMesInteiro: dre.contasConsumoMesInteiro,
+          resultadoOperacional: r2(dre.resultadoOperacional), resultadoLiquido: r2(dre.resultadoLiquido), margemLiquidaPct: dre.margemLiquida } };
       }
       case 'contas_consumo': {
         const screen = await loadScreen(member, now);
