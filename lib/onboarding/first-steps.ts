@@ -24,7 +24,8 @@ export async function firstSteps(restaurantId: string): Promise<FirstStep[]> {
     prisma.recipe.count({ where: { restaurantId, code: { startsWith: 'DEMO-' } } }),
     prisma.nFeConfig.count({ where: { restaurantId, active: true, nfeApiKey: { not: '' } } }),
     // The sign-up example comes with two tables described 'Mesa de exemplo' (lib/onboarding/seed-template.ts)
-    prisma.table.count({ where: { restaurantId, NOT: { description: 'Mesa de exemplo' } } }),
+    // (SQL NOT leaves out a NULL description, so the null case is spelled out)
+    prisma.table.count({ where: { restaurantId, OR: [{ description: null }, { description: { not: 'Mesa de exemplo' } }] } }),
     prisma.restaurantUser.count({ where: { restaurantId, isActive: true, NOT: { userId: ownerId } } }),
   ]);
   return [
