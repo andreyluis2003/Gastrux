@@ -38,6 +38,8 @@ const DEFS = [
     description: 'Notas fiscais (NFC-e) do período: quantas emitidas, rejeitadas e canceladas, e o motivo das últimas rejeitadas.' },
   { name: 'plano', roles: [...M, 'CASHIER', 'COOK'], schema: closed({}),
     description: 'Plano do restaurante, perguntas à IA usadas e restantes no mês.' },
+  { name: 'progresso_implantacao', roles: M, schema: closed({}),
+    description: 'Etapas da implantação do restaurante (caixa, primeira venda, cardápio, mesas, equipe, endereço, NFC-e): quais estão feitas, a próxima e o link da tela de cada uma.' },
 ] as const;
 
 export type ToolName = (typeof DEFS)[number]['name'];

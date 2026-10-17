@@ -8,6 +8,7 @@ import { salesInRange } from '@/lib/finance/month-sales';
 import { brtDay, brtDayStart } from '@/lib/staff/commission-rules';
 import { isTierFeatureEnabled } from '@/lib/tier-guard';
 import { loadScreen } from '@/lib/utility-bills/service';
+import { onboardingStatus } from '@/lib/onboarding/first-steps';
 import { monthlyLimit } from '../config';
 import { questionsThisMonth } from '../usage';
 import { isManagerRole, TOOL_ROLES, type ToolName } from './defs';
@@ -139,6 +140,14 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
         const rejected = await prisma.nFeDocument.findMany({ where: { ...where, status: 'rejected' }, orderBy: { createdAt: 'desc' }, take: 5, select: { documentNumber: true, statusDescription: true, createdAt: true } });
         return { ok: true, data: { periodo: `${p.startDate} a ${p.endDate}`, porSituacao: Object.fromEntries(groups.map((g) => [g.status, g._count._all])),
           ultimasRejeitadas: rejected.map((r) => ({ numero: r.documentNumber, motivo: r.statusDescription, em: hhmm(r.createdAt) })) } };
+      }
+      case 'progresso_implantacao': {
+        const st = await onboardingStatus(rid, now);
+        return { ok: true, data: {
+          etapas: st.steps.map((s) => ({ chave: s.key, rotulo: s.label, feita: s.done, opcional: !!s.optional, link: s.href })),
+          proxima: st.next ? { chave: st.next.key, rotulo: st.next.label, link: st.next.href } : null,
+          diasDeConta: st.daysSinceSignup,
+        } };
       }
       case 'plano': {
         const tier = await tierOf(rid);

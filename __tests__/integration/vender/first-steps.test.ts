@@ -1,7 +1,7 @@
 // @ts-nocheck
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { firstSteps } from '../../../lib/onboarding/first-steps';
+import { firstSteps, onboardingStatus } from '../../../lib/onboarding/first-steps';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -19,8 +19,8 @@ describe('primeiros passos', () => {
   const done = async () => Object.fromEntries((await firstSteps(rid)).map((s) => [s.key, s.done]));
 
   it('a new account has every step to do, in order', async () => {
-    expect((await firstSteps(rid)).map((s) => s.key)).toEqual(['caixa', 'venda', 'cardapio', 'endereco', 'nfce']);
-    expect(await done()).toEqual({ caixa: false, venda: false, cardapio: false, endereco: false, nfce: false });
+    expect((await firstSteps(rid)).map((s) => s.key)).toEqual(['caixa', 'venda', 'cardapio', 'mesas', 'equipe', 'endereco', 'nfce']);
+    expect(await done()).toEqual({ caixa: false, venda: false, cardapio: false, mesas: false, equipe: false, endereco: false, nfce: false });
   });
 
   it('each step is done by what the restaurant actually did', async () => {
@@ -52,5 +52,28 @@ describe('primeiros passos', () => {
       await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId: demo } } });
       await prisma.restaurant.delete({ where: { id: demo } });
     }
+  });
+
+  it('tables and team are done by real rows; the example tables do not count; team is optional', async () => {
+    const s = await prisma.tableSection.create({ data: { restaurantId: rid, name: `Salão ${tag}`, capacity: 40 } });
+    await prisma.table.create({ data: { restaurantId: rid, sectionId: s.id, number: 1, capacity: 4, description: 'Mesa de exemplo' } });
+    expect((await firstSteps(rid)).find((x) => x.key === 'mesas').done).toBe(false);
+    await prisma.table.create({ data: { restaurantId: rid, sectionId: s.id, number: 3, capacity: 4 } });
+    expect((await firstSteps(rid)).find((x) => x.key === 'mesas').done).toBe(true);
+    const equipe = (await firstSteps(rid)).find((x) => x.key === 'equipe');
+    expect(equipe).toMatchObject({ done: false, optional: true });
+    const u = await prisma.user.create({ data: { email: `fs-c-${tag}@gastrux.test`, name: 'Zé', password: 'x', role: 'COOK' } });
+    await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: u.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
+    expect((await firstSteps(rid)).find((x) => x.key === 'equipe').done).toBe(true);
+    await prisma.restaurantUser.deleteMany({ where: { userId: u.id } }); await prisma.user.delete({ where: { id: u.id } });
+  });
+
+  it('onboardingStatus: required steps only, active for 30 days', async () => {
+    const st = await onboardingStatus(rid);
+    expect(st.total).toBe(6);
+    expect(st.active).toBe(true);
+    expect(st.next).toMatchObject({ key: 'caixa' });
+    const later = new Date(Date.now() + 31 * 86400000);
+    expect((await onboardingStatus(rid, later)).active).toBe(false);
   });
 });
