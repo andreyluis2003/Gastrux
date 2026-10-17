@@ -4,7 +4,8 @@ import type { RestaurantMember } from '@/lib/auth/restaurant-role';
 import { getAnthropic } from './client';
 import { aiModels, DETAILED_TIERS, estimateCostUsd, FREE_DAYS, FREE_QUESTIONS, MAX_ROUNDS, monthlyLimit } from './config';
 import { buildUserMessage, SYSTEM_PROMPT } from './prompt';
-import { toolsFor, type AiRole } from './tools/defs';
+import { isManagerRole, toolsFor, type AiRole } from './tools/defs';
+import { attachmentBlocks, attachmentSummary, validateAttachments, type Attachment } from './attachments';
 import { runTool } from './tools/run';
 import { freeUsed, questionsThisMonth, recentRate } from './usage';
 
@@ -13,29 +14,35 @@ const UNAVAILABLE = 'A IA está indisponível agora. Tente em instantes.';
 
 /** One question: checks, the tool loop, the log (spec 2026-10-16 ia-assistente §4.1-§4.6) */
 export async function askQuestion(member: RestaurantMember, body: unknown, now = new Date()) {
-  const b = (body ?? {}) as { question?: unknown; history?: unknown; detailed?: unknown };
+  const b = (body ?? {}) as { question?: unknown; history?: unknown; detailed?: unknown; attachments?: unknown };
   const question = typeof b.question === 'string' ? b.question.trim() : '';
   if (!question || question.length > 1000) return { status: 400, body: { error: 'Escreva uma pergunta de até 1.000 caracteres.' } };
+  // Photos or a PDF of the menu: owner and manager only, checked before any AI call (spec 2026-10-17 ia-implantacao §4.1)
+  const att = validateAttachments(b.attachments);
+  if (!att.ok) return { status: 400, body: { error: att.error } };
+  if (att.list.length && !isManagerRole(member.role)) return { status: 403, body: { error: 'Anexos são do dono e do gerente.' } };
   const client = getAnthropic();
   if (!client) return { status: 503, body: { notConfigured: true, error: 'IA ainda não configurada.' } };
   // Taken before any await, so two requests of the same user can never both pass
   if (inFlight.has(member.userId)) return { status: 409, body: { error: 'Aguarde a resposta anterior.' } };
   inFlight.add(member.userId);
   try {
-    return await ask(client, member, b, question, now);
+    return await ask(client, member, b, question, att.list, now);
   } finally {
     inFlight.delete(member.userId);
   }
 }
 
-async function ask(client: Anthropic, member: RestaurantMember, b: { history?: unknown; detailed?: unknown }, question: string, now: Date) {
+async function ask(client: Anthropic, member: RestaurantMember, b: { history?: unknown; detailed?: unknown }, question: string, attachments: Attachment[], now: Date) {
   const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { name: true, subscriptionTier: true, createdAt: true } });
   const tier = (restaurant?.subscriptionTier || 'starter').toLowerCase();
   const detailed = b.detailed === true;
   if (detailed && !DETAILED_TIERS.includes(tier)) return { status: 403, body: { error: 'A análise detalhada é do plano Pro.', upgradeUrl: '/pricing' } };
   const limit = monthlyLimit(tier);
   const models = aiModels();
-  const model = detailed ? models.detailed : models.default;
+  // Reading a menu needs the detailed model on any plan: one-off, and prices must be right
+  const withFiles = attachments.length > 0;
+  const model = detailed || withFiles ? models.detailed : models.default;
   const inFreeWindow = !!restaurant && now.getTime() - restaurant.createdAt.getTime() <= FREE_DAYS * 86_400_000;
 
   // Check the limits and reserve the question in one step, per restaurant: a question still
@@ -53,7 +60,8 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
       return { refused: { status: 429, body: { error: 'Muitas perguntas em sequência. Tente em um minuto.', used, limit } } };
     }
     const row = await tx.aiQuestion.create({
-      data: { restaurantId: member.restaurantId, userId: member.userId, role: member.role, question, model, detailed, counted: !free, free },
+      data: { restaurantId: member.restaurantId, userId: member.userId, role: member.role, question, model, detailed, counted: !free, free,
+        attachments: attachmentSummary(attachments) ?? undefined },
       select: { id: true },
     });
     return { used, id: row.id, free, freeCount };
@@ -67,7 +75,10 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
   const tools = toolsFor(member.role as AiRole);
   const messages: Anthropic.MessageParam[] = [{
     role: 'user',
-    content: buildUserMessage({ question, history, role: member.role, restaurantName: restaurant?.name ?? 'Restaurante', plan: tier, now }),
+    content: (() => {
+      const text = buildUserMessage({ question, history, role: member.role, restaurantName: restaurant?.name ?? 'Restaurante', plan: tier, now });
+      return withFiles ? [...attachmentBlocks(attachments), { type: 'text' as const, text }] : text;
+    })(),
   }];
   const totals = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   const toolCalls: { name: string; input: unknown }[] = [];
@@ -80,10 +91,10 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
       if (round >= MAX_ROUNDS) { answer = 'Não consegui concluir a consulta. Tente uma pergunta mais específica.'; break; }
       const response = await client.messages.create({
         model,
-        max_tokens: detailed ? 3000 : 1500,
+        max_tokens: withFiles ? 8000 : detailed ? 3000 : 1500,
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         tools,
-        output_config: { effort: detailed ? 'medium' : 'low' },
+        output_config: { effort: detailed || withFiles ? 'medium' : 'low' },
         messages,
       } as Anthropic.MessageCreateParamsNonStreaming);
       totals.input_tokens += response.usage.input_tokens;

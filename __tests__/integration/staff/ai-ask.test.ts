@@ -155,6 +155,25 @@ describe('askQuestion', () => {
     expect(await prisma.aiQuestion.count({ where: { restaurantId: t.rid, free: true } })).toBe(100);
   });
 
+  it('attachments: cook gets 403 before the AI; owner uses the detailed model with 8000 tokens', async () => {
+    const create = script(text('Li o cardápio.'));
+    const photo = { type: 'image', mediaType: 'image/jpeg', data: Buffer.alloc(500, 1).toString('base64') };
+    expect((await askQuestion(p.cook, { question: 'leia', attachments: [photo] })).status).toBe(403);
+    expect(create).not.toHaveBeenCalled();
+    await askQuestion(p.owner, { question: 'leia', attachments: [photo] });
+    const call = create.mock.calls[0][0];
+    expect(call).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 8000 });
+    expect(call.messages[0].content[0]).toMatchObject({ type: 'image' });
+    const log = await prisma.aiQuestion.findFirst({ where: { restaurantId: p.rid }, orderBy: { createdAt: 'desc' } });
+    expect(log.attachments).toEqual({ images: 1, pdf: false });
+  });
+
+  it('bad attachments: 400 before the AI', async () => {
+    const create = script(text('x'));
+    expect((await askQuestion(p.owner, { question: 'leia', attachments: [{ type: 'image', mediaType: 'image/gif', data: 'AAAA' }] })).status).toBe(400);
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('the same user asking twice at once: one answer, one 409', async () => {
     const create = slowClient();
     const rs = await Promise.all([askQuestion(s2.owner, { question: 'a' }), askQuestion(s2.owner, { question: 'b' })]);
