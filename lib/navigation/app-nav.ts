@@ -220,6 +220,8 @@ export function shellMode(pathname: string | null | undefined): ShellMode {
 export function showsAssistant(pathname: string | null | undefined): boolean {
   const p = pathname || '/';
   if (p === '/' || p === '/pricing' || p.startsWith('/para/')) return false;
+  // The draft review has its own bottom bar; the panel and the bubble covered it at phone size
+  if (p.startsWith('/implantacao/')) return false;
   return shellMode(p) !== 'drawer';
 }
 

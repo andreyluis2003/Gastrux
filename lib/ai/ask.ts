@@ -93,19 +93,26 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
       if (round >= MAX_ROUNDS) { answer = 'Não consegui concluir a consulta. Tente uma pergunta mais específica.'; break; }
       const response = await client.messages.create({
         model,
-        max_tokens: withFiles ? 8000 : detailed ? 3000 : 1500,
+        max_tokens: withFiles ? 16000 : detailed ? 3000 : 1500,
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         tools,
         output_config: { effort: detailed || withFiles ? 'medium' : 'low' },
         messages,
-      } as Anthropic.MessageCreateParamsNonStreaming);
+      } as Anthropic.MessageCreateParamsNonStreaming,
+      // A menu read from photos/PDF takes longer than the client's 60 s, and a retry would be billed twice
+      withFiles ? { timeout: 180_000, maxRetries: 0 } : undefined);
       totals.input_tokens += response.usage.input_tokens;
       totals.output_tokens += response.usage.output_tokens;
       totals.cache_read_input_tokens += response.usage.cache_read_input_tokens ?? 0;
       totals.cache_creation_input_tokens += response.usage.cache_creation_input_tokens ?? 0;
       const textOut = response.content.filter((c): c is Anthropic.TextBlock => c.type === 'text').map((c) => c.text).join('\n').trim();
       if (response.stop_reason === 'refusal') { answer = 'Não consigo responder isso.'; break; }
-      if (response.stop_reason === 'max_tokens') { answer = textOut ? `${textOut} (resposta cortada)` : 'Não consegui concluir a resposta (resposta cortada).'; break; }
+      if (response.stop_reason === 'max_tokens') {
+        answer = withFiles
+          ? 'O cardápio é grande demais para uma vez só. Mande menos páginas por vez (por exemplo, uma foto de cada vez).'
+          : textOut ? `${textOut} (resposta cortada)` : 'Não consegui concluir a resposta (resposta cortada).';
+        break;
+      }
       if (response.stop_reason !== 'tool_use') { answer = textOut || 'Não encontrei uma resposta.'; break; }
       messages.push({ role: 'assistant', content: response.content });
       const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');

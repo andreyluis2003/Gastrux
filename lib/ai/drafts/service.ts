@@ -38,11 +38,15 @@ export const normName = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '')
 export const stateOf = (d: { status: string; expiresAt: Date }, now = new Date()): DraftState =>
   d.status === 'PENDING' && d.expiresAt.getTime() < now.getTime() ? 'EXPIRED' : (d.status as DraftState);
 
-/** The sign-up example menu: items made in the first 10 minutes while DEMO- recipes exist (same rule as first-steps) */
+/**
+ * The sign-up example menu: items linked to a DEMO- recipe, or made in the same seed (lib/onboarding/seed-template.ts
+ * writes recipes, items and the drinks' fichas simples in one transaction). Anchored on the seed, not on the account
+ * age: an owner importing the menu minutes after sign-up must never lose those items (final review 2026-10-17).
+ */
 export async function exampleMenuItemIds(db: Db, restaurantId: string): Promise<string[]> {
-  const r = await db.restaurant.findUnique({ where: { id: restaurantId }, select: { createdAt: true } });
-  if (!r || (await db.recipe.count({ where: { restaurantId, code: { startsWith: 'DEMO-' } } })) === 0) return [];
-  const until = new Date(r.createdAt.getTime() + 10 * 60_000);
+  const seed = await db.recipe.aggregate({ where: { restaurantId, code: { startsWith: 'DEMO-' } }, _max: { createdAt: true } });
+  if (!seed._max.createdAt) return [];
+  const until = new Date(seed._max.createdAt.getTime() + 60_000);
   const rows = await db.menuItem.findMany({
     where: { restaurantId, active: true, OR: [{ createdAt: { lte: until } }, { recipe: { code: { startsWith: 'DEMO-' } } }] },
     select: { id: true },

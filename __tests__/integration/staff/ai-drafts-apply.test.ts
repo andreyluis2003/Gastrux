@@ -66,6 +66,27 @@ describe('apply AI drafts', () => {
     expect((await prisma.aiDraft.findUnique({ where: { id: d.id } })).status).toBe('APPLIED');
   });
 
+  it('remove example: only the seeded items, never an item the owner made minutes later', async () => {
+    const o = await mkUser('donaex', 'OWNER', null);
+    const rx = (await prisma.restaurant.create({ data: { name: `AdaEx ${tag}`, ownerId: o.id, status: 'ACTIVE' } })).id;
+    await prisma.user.update({ where: { id: o.id }, data: { currentRestaurantId: rx } });
+    try {
+      const seedAt = new Date();
+      await prisma.recipe.create({ data: { restaurantId: rx, code: `DEMO-R-x${tag}`, name: 'Burger exemplo', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', createdAt: seedAt } });
+      const cat = await prisma.menuCategory.create({ data: { restaurantId: rx, name: 'Bebidas', position: 0, active: true } });
+      const demoDrink = await prisma.menuItem.create({ data: { restaurantId: rx, categoryId: cat.id, name: 'Refri exemplo', price: 5, position: 0, createdAt: seedAt } });
+      const own = await prisma.menuItem.create({ data: { restaurantId: rx, categoryId: cat.id, name: 'Suco da casa', price: 9, position: 1, createdAt: new Date(seedAt.getTime() + 3 * 60_000) } });
+      const d = await createDraft({ userId: o.id, restaurantId: rx, role: 'OWNER' }, 'MENU', { categorias: [{ nome: 'Bebidas', itens: [{ nome: 'Água', descricao: '', preco: 4 }] }], incompleto: false });
+      as({ id: o.id, email: o.email, role: 'OWNER' });
+      const res = await APPLY(req({ payload: { categorias: [{ nome: 'Bebidas', itens: [{ nome: 'Água', descricao: '', preco: 4 }] }], incompleto: false }, removeExample: true }), { params: { id: d.id } });
+      expect(res.status).toBe(200);
+      expect((await prisma.menuItem.findUnique({ where: { id: demoDrink.id } })).active).toBe(false);
+      expect((await prisma.menuItem.findUnique({ where: { id: own.id } })).active).toBe(true);
+    } finally {
+      await prisma.restaurant.delete({ where: { id: rx } });
+    }
+  });
+
   it('tables: creates with QR and skips existing numbers; double confirm applies once', async () => {
     const s = await prisma.tableSection.create({ data: { restaurantId: rid, name: 'Salão', capacity: 40 } });
     await prisma.table.create({ data: { restaurantId: rid, sectionId: s.id, number: 2, capacity: 4 } });

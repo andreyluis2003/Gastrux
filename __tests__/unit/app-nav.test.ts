@@ -106,6 +106,8 @@ describe('floating helpers on full-screen operation (homolog check of tela Vende
   const { showsAssistant, toastPosition } = require('../../lib/navigation/app-nav');
   it('the assistant bubble stays off the sales, comanda and kitchen screens (it covered "Lançar")', () => {
     expect(showsAssistant('/vender')).toBe(false);
+    // The review screen has its own bottom bar; the chat panel/button would cover it (final review 2026-10-17)
+    expect(showsAssistant('/implantacao/revisar/abc')).toBe(false);
     expect(showsAssistant('/vender/abc')).toBe(false);
     expect(showsAssistant('/cozinha')).toBe(false);
     expect(showsAssistant('/dashboard')).toBe(true);

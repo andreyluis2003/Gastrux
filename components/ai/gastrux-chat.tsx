@@ -292,6 +292,7 @@ export function GastruxChat() {
                   <Link
                     key={d.id}
                     href={`/implantacao/revisar/${d.id}`}
+                    onClick={() => setIsOpen(false)}
                     className="block rounded-xl bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     Revisar e confirmar: {d.resumo}

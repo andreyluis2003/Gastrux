@@ -155,17 +155,26 @@ describe('askQuestion', () => {
     expect(await prisma.aiQuestion.count({ where: { restaurantId: t.rid, free: true } })).toBe(100);
   });
 
-  it('attachments: cook gets 403 before the AI; owner uses the detailed model with 8000 tokens', async () => {
+  it('attachments: cook gets 403 before the AI; owner uses the detailed model with 16000 tokens', async () => {
     const create = script(text('Li o cardápio.'));
     const photo = { type: 'image', mediaType: 'image/jpeg', data: Buffer.alloc(500, 1).toString('base64') };
     expect((await askQuestion(p.cook, { question: 'leia', attachments: [photo] })).status).toBe(403);
     expect(create).not.toHaveBeenCalled();
     await askQuestion(p.owner, { question: 'leia', attachments: [photo] });
     const call = create.mock.calls[0][0];
-    expect(call).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 8000 });
+    expect(call).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000 });
+    expect(create.mock.calls[0][1]).toEqual({ timeout: 180_000, maxRetries: 0 });
     expect(call.messages[0].content[0]).toMatchObject({ type: 'image' });
     const log = await prisma.aiQuestion.findFirst({ where: { restaurantId: p.rid }, orderBy: { createdAt: 'desc' } });
     expect(log.attachments).toEqual({ images: 1, pdf: false });
+  });
+
+  it('a menu too big for one answer asks for fewer pages', async () => {
+    const big = await mkRestaurant('pro', 'bigmenu');
+    script({ stop_reason: 'max_tokens', content: [], usage });
+    const photo = { type: 'image', mediaType: 'image/jpeg', data: Buffer.alloc(500, 1).toString('base64') };
+    const r = await askQuestion(big.owner, { question: 'leia', attachments: [photo] });
+    expect(r.body.answer).toBe('O cardápio é grande demais para uma vez só. Mande menos páginas por vez (por exemplo, uma foto de cada vez).');
   });
 
   it('bad attachments: 400 before the AI', async () => {
