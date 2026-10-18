@@ -2,13 +2,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@/lib/prisma';
 import type { RestaurantMember } from '@/lib/auth/restaurant-role';
 import { getAnthropic } from './client';
-import { aiModels, DETAILED_TIERS, estimateCostUsd, FREE_DAYS, FREE_QUESTIONS, MAX_ROUNDS, monthlyLimit } from './config';
+import { aiModels, DETAILED_TIERS, estimateCostUsd, MAX_ROUNDS, monthlyLimit } from './config';
 import { buildUserMessage, SYSTEM_PROMPT } from './prompt';
 import { isManagerRole, toolsFor, type AiRole } from './tools/defs';
 import { attachmentBlocks, attachmentSummary, validateAttachments, type Attachment } from './attachments';
 import { runTool } from './tools/run';
 import { TOOL_KIND, type DraftKind } from './drafts/service';
-import { freeUsed, questionsThisMonth, recentRate } from './usage';
+import { questionsThisMonth, recentRate } from './usage';
 
 const inFlight = new Set<string>();
 const UNAVAILABLE = 'A IA está indisponível agora. Tente em instantes.';
@@ -44,31 +44,28 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
   // Reading a menu needs the detailed model on any plan: one-off, and prices must be right
   const withFiles = attachments.length > 0;
   const model = detailed || withFiles ? models.detailed : models.default;
-  const inFreeWindow = !!restaurant && now.getTime() - restaurant.createdAt.getTime() <= FREE_DAYS * 86_400_000;
 
   // Check the limits and reserve the question in one step, per restaurant: a question still
   // running already counts toward the month and the 10/min rate (parallel requests cannot pass)
   const gate = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'ai-ask:' + member.restaurantId}))`;
-    // A new account's first questions are free and do not touch the plan limit (spec 2026-10-17 ia-implantacao §3.4)
-    const freeCount = inFreeWindow ? await freeUsed(member.restaurantId, tx) : FREE_QUESTIONS;
-    const free = freeCount < FREE_QUESTIONS;
+    // Plans of 2026-10-18: no free onboarding questions any more, the trial already has the Business 350
     const used = await questionsThisMonth(member.restaurantId, now, tx);
-    if (!free && limit !== null && used >= limit) {
+    if (limit !== null && used >= limit) {
       return { refused: { status: 429, body: { error: `Você usou as ${limit} perguntas do mês do plano ${tier}.`, used, limit, upgradeUrl: '/pricing' } } };
     }
     if ((await recentRate(member.restaurantId, now, tx)) >= 10) {
       return { refused: { status: 429, body: { error: 'Muitas perguntas em sequência. Tente em um minuto.', used, limit } } };
     }
     const row = await tx.aiQuestion.create({
-      data: { restaurantId: member.restaurantId, userId: member.userId, role: member.role, question, model, detailed, counted: !free, free,
+      data: { restaurantId: member.restaurantId, userId: member.userId, role: member.role, question, model, detailed, counted: true, free: false,
         attachments: attachmentSummary(attachments) ?? undefined },
       select: { id: true },
     });
-    return { used, id: row.id, free, freeCount };
+    return { used, id: row.id };
   });
   if ('refused' in gate) return gate.refused!;
-  const { used, id, free, freeCount } = gate as { used: number; id: string; free: boolean; freeCount: number };
+  const { used, id } = gate as { used: number; id: string };
 
   const history = Array.isArray(b.history)
     ? (b.history as any[]).filter((m) => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string').map((m) => ({ role: m.role, content: m.content }))
@@ -142,12 +139,12 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
         answer: error ? null : answer,
         toolCalls: toolCalls as any, deniedTools: deniedTools.length ? (deniedTools as any) : undefined,
         inputTokens: totals.input_tokens, outputTokens: totals.output_tokens, cacheReadTokens: totals.cache_read_input_tokens, cacheWriteTokens: totals.cache_creation_input_tokens,
-        costUsd: estimateCostUsd(model, totals), counted: !error && !free, free: !error && free, error,
+        costUsd: estimateCostUsd(model, totals), counted: !error, free: false, error,
       },
     });
   } catch (e) {
     console.error('[ai] log update failed:', (e as Error)?.message ?? e);
   }
   if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit, free: null, drafts: [] } };
-  return { status: 200, body: { answer, used: free ? used : used + 1, limit, model, free: free ? { used: freeCount + 1, limit: FREE_QUESTIONS } : null, drafts } };
+  return { status: 200, body: { answer, used: used + 1, limit, model, free: null, drafts } };
 }

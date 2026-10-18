@@ -87,17 +87,18 @@ export function isTierFeatureEnabled(
     // every plan; the paid plans keep more stations (limits.kitchenStations), notes and campaigns
     kds: ['starter', 'pro', 'business', 'enterprise'],
     qrMenu: ['starter', 'pro', 'business', 'enterprise'],
-    // Owner decision 2026-10-12: pay at the table by phone (bill, split, PIX) from Pro
-    tablePayment: ['pro', 'business', 'enterprise'],
+    // Owner decision 2026-10-12: pay at the table by phone (bill, split, PIX). Plans of 2026-10-18: what earns or
+    // saves money (pay at the table, expiry control, utility indicators, daily-count alert) is Business and up
+    tablePayment: ['business', 'enterprise'],
     crm: ['starter', 'pro', 'business', 'enterprise'],
     crmNotes: ['pro', 'business', 'enterprise'],
     crmCampaigns: ['business', 'enterprise'],
-    // Owner decision 2026-10-09: label printing on every plan; the expiry control from Pro
-    labelExpiry: ['pro', 'business', 'enterprise'],
-    // Owner decision 2026-10-16: the daily count (espetos) on every plan; the bell alert on a difference from Pro
-    dailyCountAlert: ['pro', 'business', 'enterprise'],
-    // Owner decision 2026-10-16: utility bills and their DRE line on every plan; indicators and alert from Pro
-    utilityInsights: ['pro', 'business', 'enterprise'],
+    // Owner decision 2026-10-09: label printing on every plan; the expiry control Business and up (2026-10-18)
+    labelExpiry: ['business', 'enterprise'],
+    // Owner decision 2026-10-16: the daily count (espetos) on every plan; the bell alert on a difference Business and up (2026-10-18)
+    dailyCountAlert: ['business', 'enterprise'],
+    // Owner decision 2026-10-16: utility bills and their DRE line on every plan; indicators and alert Business and up (2026-10-18)
+    utilityInsights: ['business', 'enterprise'],
     loyalty: ['business', 'enterprise'],
     // Owner decision 2026-10-09: the NFC-e on every plan (a restaurant must issue the consumer note)
     nfe: ['starter', 'pro', 'business', 'enterprise'],

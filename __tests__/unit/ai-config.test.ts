@@ -1,13 +1,13 @@
 import { aiModels, estimateCostUsd, monthlyLimit } from '../../lib/ai/config';
 
 describe('AI config (lib/ai/config.ts)', () => {
-  it('monthly limits per plan (owner 2026-10-16); unknown plans get the starter limit', () => {
-    expect(monthlyLimit('starter')).toBe(30);
-    expect(monthlyLimit('pro')).toBe(150);
+  it('monthly limits per plan (plans of 2026-10-18); no plan (starter) and unknown get 0', () => {
+    expect(monthlyLimit('starter')).toBe(0);
+    expect(monthlyLimit('pro')).toBe(50);
     expect(monthlyLimit('business')).toBe(350);
     expect(monthlyLimit('enterprise')).toBeNull();
-    expect(monthlyLimit(undefined)).toBe(30);
-    expect(monthlyLimit('PRO')).toBe(150);
+    expect(monthlyLimit(undefined)).toBe(0);
+    expect(monthlyLimit('PRO')).toBe(50);
   });
 
   it('models come from the environment, with Haiku and Sonnet 5.5 by default', () => {

@@ -1,0 +1,51 @@
+import { prisma } from '@/lib/prisma';
+
+/**
+ * Who may write (spec 2026-10-18 §5): internal accounts, a trial in time, or a paid plan. Everything else
+ * is the read-only lock. 'starter' in the database now means "no plan".
+ */
+export type PlanState = 'internal' | 'trial' | 'paid' | 'locked';
+export interface PlanFields { isInternal: boolean; subscriptionTier: string | null; subscriptionStatus: string | null; trialEndsAt: Date | null }
+
+export const TRIAL_DAYS = 30;
+// The texts live in an edge-safe file (no prisma) because middleware.ts imports them
+export { LOCK_CODE, LOCK_MESSAGE } from './plan-lock-text';
+const PAID_TIERS = ['pro', 'business', 'enterprise'];
+const DAY_MS = 86_400_000;
+
+export function trialEnd(from = new Date()): Date {
+  return new Date(from.getTime() + TRIAL_DAYS * DAY_MS);
+}
+
+export function planAccess(r: PlanFields, now = new Date()): { state: PlanState; locked: boolean; daysLeft: number | null } {
+  if (r.isInternal) return { state: 'internal', locked: false, daysLeft: null };
+  if (r.subscriptionStatus === 'trialing') {
+    if (r.trialEndsAt && r.trialEndsAt.getTime() > now.getTime()) {
+      return { state: 'trial', locked: false, daysLeft: Math.ceil((r.trialEndsAt.getTime() - now.getTime()) / DAY_MS) };
+    }
+    return { state: 'locked', locked: true, daysLeft: 0 };
+  }
+  if (PAID_TIERS.includes(String(r.subscriptionTier)) && (r.subscriptionStatus === 'active' || r.subscriptionStatus === 'past_due')) {
+    return { state: 'paid', locked: false, daysLeft: null };
+  }
+  return { state: 'locked', locked: true, daysLeft: null };
+}
+
+const PLAN_SELECT = { isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true } as const;
+
+export async function restaurantPlanAccess(restaurantId: string, now = new Date()) {
+  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: PLAN_SELECT });
+  return r ? planAccess(r, now) : null;
+}
+
+/**
+ * The restaurant a user works in: currentRestaurantId, else the first active membership (the choice of
+ * lib/whatsapp/get-restaurant.ts). It only decides which plan to read; access itself is checked by each route.
+ */
+export async function currentRestaurantIdOf(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { currentRestaurantId: true, restaurants: { where: { isActive: true }, select: { restaurantId: true }, orderBy: { restaurantId: 'asc' }, take: 1 } },
+  });
+  return user?.currentRestaurantId ?? user?.restaurants[0]?.restaurantId ?? null;
+}

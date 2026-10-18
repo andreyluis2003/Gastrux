@@ -50,7 +50,7 @@ export default function BillingPage() {
     ? Object.values(STRIPE_PRICING_TIERS).find(
         t => t.id === subscription.subscriptionTier
       )
-    : STRIPE_PRICING_TIERS.STARTER;
+    : undefined;
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {

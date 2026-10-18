@@ -1,0 +1,31 @@
+import { planAccess, trialEnd, TRIAL_DAYS } from '@/lib/billing/plan-access';
+
+const NOW = new Date('2026-10-18T12:00:00Z');
+const day = 86_400_000;
+const base = { isInternal: false, subscriptionTier: 'business', subscriptionStatus: 'trialing', trialEndsAt: new Date(NOW.getTime() + 10 * day) };
+
+describe('planAccess (spec 2026-10-18 §5)', () => {
+  it('internal is never locked, whatever the plan says', () => {
+    expect(planAccess({ ...base, isInternal: true, subscriptionTier: 'starter', subscriptionStatus: 'canceled', trialEndsAt: null }, NOW)).toEqual({ state: 'internal', locked: false, daysLeft: null });
+  });
+  it('trial in time: free, with the days left rounded up', () => {
+    expect(planAccess(base, NOW)).toEqual({ state: 'trial', locked: false, daysLeft: 10 });
+    expect(planAccess({ ...base, trialEndsAt: new Date(NOW.getTime() + 1) }, NOW).daysLeft).toBe(1);
+  });
+  it('trial over or without a date: locked', () => {
+    expect(planAccess({ ...base, trialEndsAt: new Date(NOW.getTime() - 1) }, NOW).state).toBe('locked');
+    expect(planAccess({ ...base, trialEndsAt: null }, NOW).state).toBe('locked');
+  });
+  it.each(['pro', 'business', 'enterprise'])('paid %s (active or past_due) is free', (tier) => {
+    expect(planAccess({ ...base, subscriptionTier: tier, subscriptionStatus: 'active', trialEndsAt: null }, NOW).state).toBe('paid');
+    expect(planAccess({ ...base, subscriptionTier: tier, subscriptionStatus: 'past_due', trialEndsAt: null }, NOW).state).toBe('paid');
+  });
+  it('ended plan ("starter" or canceled) is locked', () => {
+    expect(planAccess({ ...base, subscriptionTier: 'starter', subscriptionStatus: 'active', trialEndsAt: null }, NOW).state).toBe('locked');
+    expect(planAccess({ ...base, subscriptionTier: 'pro', subscriptionStatus: 'canceled', trialEndsAt: null }, NOW).state).toBe('locked');
+  });
+  it('trialEnd is 30 days later', () => {
+    expect(TRIAL_DAYS).toBe(30);
+    expect(trialEnd(NOW).getTime() - NOW.getTime()).toBe(30 * day);
+  });
+});

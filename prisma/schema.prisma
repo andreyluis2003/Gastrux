@@ -2899,6 +2899,8 @@ model Restaurant {
   billingCycleStart       DateTime?
   billingCycleEnd         DateTime?
   trialEndsAt             DateTime?
+  /// Gastrux's own and test accounts (spec 2026-10-18): never locked, behave as Business
+  isInternal              Boolean                   @default(false)
   accountingMethod        String                    @default("SIMPLIFIED")
   stripeAccountId         String?
   mercadoPagoAccountId    String?

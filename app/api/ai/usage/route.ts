@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { prisma } from '@/lib/prisma';
 import { monthlyLimit } from '@/lib/ai/config';
-import { freeQuota, questionsThisMonth } from '@/lib/ai/usage';
+import { questionsThisMonth } from '@/lib/ai/usage';
 import { brtDayStart } from '@/lib/staff/commission-rules';
 import { currentMonth } from '@/lib/utility-bills/rules';
 
@@ -20,7 +20,7 @@ export async function GET() {
     select: { createdAt: true, role: true, question: true, answer: true, model: true, counted: true, free: true, user: { select: { name: true } } },
   });
   return NextResponse.json({
-    plan: tier, used: await questionsThisMonth(rid), limit: monthlyLimit(tier), free: await freeQuota(rid),
+    plan: tier, used: await questionsThisMonth(rid), limit: monthlyLimit(tier), free: null,
     questions: rows.map((r) => ({ createdAt: r.createdAt.toISOString(), userName: r.user?.name ?? null, role: r.role, question: r.question, answer: r.answer, model: r.model, counted: r.counted, free: r.free })),
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

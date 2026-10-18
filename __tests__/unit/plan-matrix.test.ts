@@ -1,50 +1,23 @@
-/**
- * Plans (owner decision 2026-10-09): KDS, QR menu and the basic CRM on every plan, with limits that
- * keep the paid plans worth it: kitchen stations Starter 1 / Pro 3 / Business+ unlimited; customer
- * notes from Pro; campaigns, loyalty, multi-location and advanced reports from Business.
- */
-import { isTierFeatureEnabled } from '@/lib/tier-guard';
+/** Plans of 2026-10-18 (spec planos-teste-business §4) */
 import { BASE_PRICING_TIERS } from '@/lib/billing/pricing-tiers';
+import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { monthlyLimit } from '@/lib/ai/config';
 
-const on = (tier: string, f: any) => isTierFeatureEnabled(tier, f);
-
-describe('plan matrix', () => {
-  it.each(['starter', 'pro', 'business', 'enterprise'])('%s has the KDS, the QR menu and the basic CRM', (tier) => {
-    expect([on(tier, 'kds'), on(tier, 'qrMenu'), on(tier, 'crm')]).toEqual([true, true, true]);
+describe('plans of 2026-10-18', () => {
+  it('prices and limits', () => {
+    const { PRO, BUSINESS, ENTERPRISE } = BASE_PRICING_TIERS as any;
+    expect([PRO.priceMonthly, PRO.priceAnnual, BUSINESS.priceMonthly, BUSINESS.priceAnnual]).toEqual([149, 1639, 199, 2189]);
+    expect([PRO.limits.monthlySales, BUSINESS.limits.monthlySales]).toEqual([1000, 3500]);
+    expect([PRO.limits.users, BUSINESS.limits.users]).toEqual([2, 5]);
+    expect([PRO.limits.kitchenStations, BUSINESS.limits.kitchenStations, ENTERPRISE.limits.kitchenStations]).toEqual([2, 5, 999999]);
+    expect((BASE_PRICING_TIERS as any).STARTER).toBeUndefined();
   });
-
-  it('customer notes from Pro, campaigns from Business', () => {
-    expect(['starter', 'pro', 'business', 'enterprise'].map((t) => on(t, 'crmNotes'))).toEqual([false, true, true, true]);
-    expect(['starter', 'pro', 'business', 'enterprise'].map((t) => on(t, 'crmCampaigns'))).toEqual([false, false, true, true]);
+  it.each(['tablePayment', 'labelExpiry', 'utilityInsights', 'dailyCountAlert'])('%s is Business and up', (f) => {
+    expect(isTierFeatureEnabled('pro', f as any)).toBe(false);
+    expect(isTierFeatureEnabled('business', f as any)).toBe(true);
+    expect(isTierFeatureEnabled('enterprise', f as any)).toBe(true);
   });
-
-  it('loyalty, multi-location and advanced reports stay on Business and up', () => {
-    for (const f of ['loyalty', 'multiLocation', 'advancedReports']) {
-      expect(['starter', 'pro', 'business', 'enterprise'].map((t) => on(t, f))).toEqual([false, false, true, true]);
-    }
-  });
-
-  it('sales per month: Starter 300, Pro 1.500, Business doubles Pro, Enterprise unlimited', () => {
-    expect([BASE_PRICING_TIERS.STARTER, BASE_PRICING_TIERS.PRO, BASE_PRICING_TIERS.BUSINESS, BASE_PRICING_TIERS.ENTERPRISE].map((t) => t.limits.monthlySales))
-      .toEqual([300, 1500, 3000, 999999]);
-    expect(BASE_PRICING_TIERS.BUSINESS.limits.monthlySales).toBe(2 * BASE_PRICING_TIERS.PRO.limits.monthlySales);
-  });
-
-  it('the plans tell about labels: printing on every plan, expiry control from Pro', () => {
-    expect(BASE_PRICING_TIERS.STARTER.features).toContain('Etiquetas de manipulação');
-    expect(BASE_PRICING_TIERS.PRO.features).toContain('Etiquetas com controle de validades');
-  });
-
-  it('label printing on every plan; the expiry control (labelExpiry) from Pro', () => {
-    expect(['starter', 'pro', 'business', 'enterprise'].map((t) => on(t, 'labelExpiry'))).toEqual([false, true, true, true]);
-  });
-
-  it('kitchen stations: Starter 1, Pro 3, Business and Enterprise unlimited', () => {
-    expect([
-      BASE_PRICING_TIERS.STARTER.limits.kitchenStations,
-      BASE_PRICING_TIERS.PRO.limits.kitchenStations,
-      BASE_PRICING_TIERS.BUSINESS.limits.kitchenStations,
-      BASE_PRICING_TIERS.ENTERPRISE.limits.kitchenStations,
-    ]).toEqual([1, 3, 999999, 999999]);
+  it('AI questions per month', () => {
+    expect([monthlyLimit('pro'), monthlyLimit('business'), monthlyLimit('enterprise')]).toEqual([50, 350, null]);
   });
 });

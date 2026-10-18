@@ -8,11 +8,6 @@
 import { BASE_PRICING_TIERS } from './billing/pricing-tiers';
 
 export const STRIPE_PRICING_TIERS = {
-  STARTER: {
-    ...BASE_PRICING_TIERS.STARTER,
-    stripeProductId: process.env.STRIPE_PRODUCT_ID_STARTER || 'prod_UMhvXBiW8fIux4',
-    stripePriceId: undefined, // Plano grátis
-  },
   PRO: {
     ...BASE_PRICING_TIERS.PRO,
     stripeProductId: process.env.STRIPE_PRODUCT_ID_PRO || 'prod_UMH4qOvOKXJHbC',
@@ -46,5 +41,6 @@ export function getTierById(tierId: string) {
 
 export function getTierLimits(tierId: string) {
   const tier = getTierById(tierId);
-  return tier?.limits || STRIPE_PRICING_TIERS.STARTER.limits;
+  // 'starter' = no plan (spec 2026-10-18): the lock stops writes, reads use the Pro limits
+  return tier?.limits || STRIPE_PRICING_TIERS.PRO.limits;
 }

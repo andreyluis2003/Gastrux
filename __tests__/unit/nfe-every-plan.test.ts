@@ -11,7 +11,6 @@ describe('NFC-e on every plan', () => {
   });
 
   it('the plans that list their own features say so (Business and Enterprise inherit it)', () => {
-    expect(BASE_PRICING_TIERS.STARTER.features).toContain('NFC-e (nota do consumidor)');
     expect(BASE_PRICING_TIERS.PRO.features).toContain('NFC-e (nota do consumidor)');
   });
 });

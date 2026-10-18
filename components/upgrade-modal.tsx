@@ -60,7 +60,7 @@ export function UpgradeModal({
           {/* Current Status */}
           <div className="rounded-lg bg-red-50 border border-red-200 p-4">
             <p className="text-sm text-gray-600 mb-2">
-              Seu plano <strong>{STRIPE_PRICING_TIERS.STARTER.name}</strong> permite:
+              Seu plano atual permite:
             </p>
             <p className="text-2xl font-bold text-red-600">
               {limit} vendas por mês
