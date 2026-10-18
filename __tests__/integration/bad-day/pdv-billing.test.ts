@@ -202,7 +202,8 @@ describe('PDV and billing screens', () => {
       });
 
     beforeAll(async () => {
-      await prisma.restaurant.updateMany({ where: { id: { in: [A.restaurantId, B.restaurantId] } }, data: { subscriptionTier: 'starter', subscriptionStatus: 'active' } });
+      // Plans of 2026-10-18: the restaurant is in the in-app trial with 12 days left
+      await prisma.restaurant.updateMany({ where: { id: { in: [A.restaurantId, B.restaurantId] } }, data: { subscriptionTier: 'business', subscriptionStatus: 'trialing', trialEndsAt: new Date(Date.now() + 12 * DAY - 60_000) } });
     });
 
     it('only the owner subscribes, and the subscription belongs to the restaurant being worked in', async () => {
@@ -219,14 +220,18 @@ describe('PDV and billing screens', () => {
       const sub = await prisma.subscription.findFirst({ where: { gatewaySubscriptionId: `pre-${tag}-1` } });
       expect(sub.restaurantId).toBe(A.restaurantId);
       expect(sub.userId).toBe(A.ownerId);
-      expect(sub.trialEnd.getTime()).toBeGreaterThan(Date.now() + 29 * DAY);
-      expect((createPreApproval as jest.Mock).mock.calls[0][0].autoRecurring.freeTrial).toEqual({ frequency: 30, frequencyType: 'days' });
+      // Final review I-3: the gateway trial is only what is left of the in-app trial, never 30 more days
+      expect(sub.trialEnd.getTime()).toBeGreaterThan(Date.now() + 11 * DAY);
+      expect(sub.trialEnd.getTime()).toBeLessThan(Date.now() + 13 * DAY);
+      expect((createPreApproval as jest.Mock).mock.calls[0][0].autoRecurring.freeTrial).toEqual({ frequency: 12, frequencyType: 'days' });
     });
 
     it('a checkout opened and abandoned gives no plan; the authorized one does', async () => {
       const sub = await prisma.subscription.findFirst({ where: { gatewaySubscriptionId: `pre-${tag}-1` } });
       await mpEvent(sub, 'incomplete'); // Mercado Pago "pending": no card authorized
-      expect(await tierOf(A.restaurantId)).toBe('starter');
+      // Nothing changes: the restaurant stays in its in-app Business trial (plans of 2026-10-18)
+      expect(await tierOf(A.restaurantId)).toBe('business');
+      expect((await prisma.restaurant.findUnique({ where: { id: A.restaurantId } })).subscriptionStatus).toBe('trialing');
 
       await mpEvent(sub, 'active'); // "authorized", inside the free trial
       expect(await tierOf(A.restaurantId)).toBe('business');

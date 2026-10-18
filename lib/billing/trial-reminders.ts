@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { sendTransactionalEmail } from '@/lib/email/transactional';
+import { GRANTING_STATUSES } from '@/lib/billing/subscription-sync';
 
 /**
  * End-of-trial reminders (spec 2026-10-18 §5): with 7, 3 and 1 days left (days 23, 27 and 30 of 30) the
@@ -31,7 +32,10 @@ export async function sendTrialReminders(now = new Date()): Promise<{ sent: numb
     const daysLeft = Math.ceil((r.trialEndsAt!.getTime() - now.getTime()) / DAY_MS);
     const milestone = MILESTONES.find((m) => m >= daysLeft);
     if (!milestone) continue;
-    const dedupeKey = `trial-reminder:${r.id}:${milestone}`;
+    // Already subscribed during the trial: nothing to choose (final review I-3)
+    if (await prisma.subscription.findFirst({ where: { userId: r.ownerId, status: { in: GRANTING_STATUSES } }, select: { id: true } })) continue;
+    // The end date is in the key, so an extended trial gets its reminders again (final review M-3)
+    const dedupeKey = `trial-reminder:${r.id}:${r.trialEndsAt!.toISOString().slice(0, 10)}:${milestone}`;
     const existing = await prisma.notification.findFirst({ where: { restaurantId: r.id, data: { path: ['dedupeKey'], equals: dedupeKey } }, select: { id: true } });
     if (existing) continue;
     const title = titleFor(milestone);

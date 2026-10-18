@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import Stripe from 'stripe';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { remainingTrialDays } from '@/lib/billing/plan-access';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { findPayingSubscription } from '@/lib/billing/cancel';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
@@ -69,6 +70,9 @@ export async function POST(request: NextRequest) {
     const hadTrial = (await prisma.subscription.count({
       where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },
     })) > 0;
+    // Plans of 2026-10-18: the gateway trial is only what is left of the in-app trial (never 30 more days)
+    const inApp = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { subscriptionStatus: true, trialEndsAt: true } });
+    const trialDays = hadTrial || !inApp ? 0 : remainingTrialDays(inApp);
 
     const isAnnual = billing === 'annual';
     const stripePriceId = isAnnual ? tier.stripePriceIdAnnual : tier.stripePriceId;
@@ -128,7 +132,7 @@ export async function POST(request: NextRequest) {
       ...(isSubscription
         ? {
             subscription_data: {
-              ...(hadTrial ? {} : { trial_period_days: 30 }),
+              ...(trialDays ? { trial_period_days: trialDays } : {}),
               // The restaurant is fixed at checkout: the webhook used to take whichever restaurant
               // the owner had open when Stripe called back
               metadata: { userId: user.id, restaurantId: member.restaurantId, tierId, billing: isAnnual ? 'annual' : 'monthly' },

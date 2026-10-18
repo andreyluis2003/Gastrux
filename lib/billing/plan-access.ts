@@ -24,6 +24,15 @@ export function trialEnd(from = new Date()): Date {
   return new Date(from.getTime() + TRIAL_DAYS * DAY_MS);
 }
 
+/**
+ * What is left of the in-app trial, in whole days: a checkout made during the trial charges only when it
+ * ends, and one made after it charges at once (final review I-3: it used to add 30 more days)
+ */
+export function remainingTrialDays(r: Pick<PlanFields, 'subscriptionStatus' | 'trialEndsAt'>, now = new Date()): number {
+  if (r.subscriptionStatus !== 'trialing' || !r.trialEndsAt || r.trialEndsAt.getTime() <= now.getTime()) return 0;
+  return Math.ceil((r.trialEndsAt.getTime() - now.getTime()) / DAY_MS);
+}
+
 export function planAccess(r: PlanFields, now = new Date()): { state: PlanState; locked: boolean; daysLeft: number | null } {
   if (r.isInternal) return { state: 'internal', locked: false, daysLeft: null };
   if (r.subscriptionStatus === 'trialing') {

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { remainingTrialDays } from '@/lib/billing/plan-access';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { findPayingSubscription } from '@/lib/billing/cancel';
 import { getTierById } from '@/lib/stripe-config';
@@ -15,7 +16,6 @@ import { createPreApproval, getMPAutoRecurringForBillingCycle } from '@/lib/merc
 
 export const dynamic = 'force-dynamic';
 
-const TRIAL_DAYS = 30;
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,6 +62,9 @@ export async function POST(request: NextRequest) {
     const hadTrial = (await prisma.subscription.count({
       where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },
     })) > 0;
+    // Plans of 2026-10-18: the gateway trial is only what is left of the in-app trial (never 30 more days)
+    const inApp = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { subscriptionStatus: true, trialEndsAt: true } });
+    const trialDays = hadTrial || !inApp ? 0 : remainingTrialDays(inApp);
 
     const isAnnual = billing === 'annual';
     const amount = isAnnual ? tier.priceAnnual : tier.priceMonthly;
@@ -87,8 +90,8 @@ export async function POST(request: NextRequest) {
         amount,
         currency: 'BRL',
         status: 'incomplete',
-        trialStart: hadTrial ? null : new Date(),
-        trialEnd: hadTrial ? null : new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+        trialStart: trialDays ? new Date() : null,
+        trialEnd: trialDays ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000) : null,
       },
     });
 
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
           transactionAmount: amount,
           currencyId: 'BRL',
           billingDayProportional: true,
-          ...(hadTrial ? {} : { freeTrial: { frequency: TRIAL_DAYS, frequencyType: 'days' } }),
+          ...(trialDays ? { freeTrial: { frequency: trialDays, frequencyType: 'days' } } : {}),
         },
       });
     } catch (mpError) {

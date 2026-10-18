@@ -39,11 +39,16 @@ describe('trial reminders', () => {
     await make('far', 20);
     await make('internal', 2.5, { isInternal: true });
     await make('locked', -1);
+    // Subscribed during the trial (final review I-3): no 'escolha um plano' e-mail
+    await make('subscribed', 2.5);
+    const subOwner = (await prisma.restaurant.findUnique({ where: { id: ids.subscribed } })).ownerId;
+    await prisma.subscription.create({ data: { userId: subOwner, restaurantId: ids.subscribed, gateway: 'MERCADO_PAGO', gatewaySubscriptionId: `pre-tr-${tag}`, tier: 'business', billingCycle: 'monthly', amount: 199, status: 'trialing' } });
   });
 
   afterAll(async () => {
     process.env.CRON_SECRET = secret;
     await prisma.notification.deleteMany({ where: { restaurantId: { in: Object.values(ids) } } });
+    await prisma.subscription.deleteMany({ where: { userId: { in: owners } } });
     await prisma.restaurant.deleteMany({ where: { id: { in: Object.values(ids) } } });
     await prisma.user.deleteMany({ where: { id: { in: owners } } });
   });
@@ -65,11 +70,18 @@ describe('trial reminders', () => {
     expect(byRest[ids.far]).toBeUndefined();
     expect(byRest[ids.internal]).toBeUndefined();
     expect(byRest[ids.locked]).toBeUndefined();
+    expect(byRest[ids.subscribed]).toBeUndefined();
     const ours = mails.filter((m) => m.to.endsWith(`${tag}@gastrux.test`));
     expect(ours.map((m) => m.to).sort()).toEqual([`tr-d1-${tag}@gastrux.test`, `tr-d3-${tag}@gastrux.test`, `tr-d7-${tag}@gastrux.test`]);
 
     await sendTrialReminders();
     expect(await alerts()).toHaveLength(3);
     expect(mails.filter((m) => m.to.endsWith(`${tag}@gastrux.test`))).toHaveLength(3);
+  });
+
+  it('an extended trial gets its reminders again (final review M-3)', async () => {
+    await prisma.restaurant.update({ where: { id: ids.d3 }, data: { trialEndsAt: new Date(Date.now() + 2.2 * DAY) } });
+    await sendTrialReminders();
+    expect((await alerts()).filter((n) => n.restaurantId === ids.d3)).toHaveLength(2);
   });
 });
