@@ -1,6 +1,7 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
     if (!restaurant) {
       return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
     }
+    // Plans of 2026-10-18: no new customer orders while the plan is locked
+    if (!(await restaurantAcceptsOrders(restaurantId))) return NextResponse.json(ORDER_REFUSAL, { status: 403 });
 
 
     // Resolve menu items and compute totals (scoped to this restaurant - a

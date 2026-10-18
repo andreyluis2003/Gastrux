@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { createOrderFromExternalOrder } from '@/lib/kds-integration';
 import { canMoveExternalOrderStatus, isExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
 import crypto from 'crypto';
@@ -76,6 +77,8 @@ export async function POST(req: NextRequest) {
 
     // Handle different webhook types
     if (data.type === 'order.new' || data.type === 'ORDER_RECEIVED') {
+      // Plans of 2026-10-18: no new customer orders while the plan is locked
+      if (!(await restaurantAcceptsOrders(restaurantId))) return NextResponse.json(ORDER_REFUSAL, { status: 403 });
       const platformOrderId = data.orderId || data.id;
       if (!platformOrderId) {
         return NextResponse.json({ error: 'orderId ausente no payload' }, { status: 400 });

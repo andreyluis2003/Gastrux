@@ -2,6 +2,7 @@
 // No authentication required - creates or appends items to an active OrderSession
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { OPEN_STATUSES as OPEN } from '@/lib/comanda/transfer';
@@ -66,6 +67,8 @@ export async function POST(
     if (!table) {
       return NextResponse.json({ error: 'Table not found' }, { status: 404 });
     }
+    // Plans of 2026-10-18: no new customer orders while the plan is locked
+    if (!(await restaurantAcceptsOrders(table.restaurantId))) return NextResponse.json(ORDER_REFUSAL, { status: 403 });
 
     // Get the restaurant owner as the userId (for the session)
     const ownerId = table.restaurant.ownerId;

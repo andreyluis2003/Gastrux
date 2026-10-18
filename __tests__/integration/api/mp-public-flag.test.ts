@@ -60,12 +60,15 @@ describe('acceptsOnlinePayment flag on the public menus', () => {
     expect((await qr()).restaurant.acceptsOnlinePayment).toBe(true);
   });
 
-  it('is false on the QR menu of a Starter restaurant, even with Mercado Pago connected (2026-10-12)', async () => {
+  // Pay at the table is Business and up since the plans of 2026-10-18 (was Pro and up, 2026-10-12)
+  it('is false on the QR menu below Business, even with Mercado Pago connected', async () => {
     await saveConnection(A.restaurantId, TOKENS);
     await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'starter' } });
     try {
       expect((await qr()).restaurant.acceptsOnlinePayment).toBe(false);
       await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'pro' } });
+      expect((await qr()).restaurant.acceptsOnlinePayment).toBe(false);
+      await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'business' } });
       expect((await qr()).restaurant.acceptsOnlinePayment).toBe(true);
     } finally {
       await prisma.restaurant.update({ where: { id: A.restaurantId }, data: { subscriptionTier: 'business' } });

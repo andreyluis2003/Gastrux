@@ -20,7 +20,8 @@ describe('QR-code order on a table', () => {
   beforeAll(async () => {
     const u = await prisma.user.create({ data: { email: `qr-${tag}@gastrux.test`, name: 'Ana', password: 'x', role: 'OWNER' } });
     ownerId = u.id;
-    rid = (await prisma.restaurant.create({ data: { name: `QR ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    // Internal: a restaurant without a plan is locked for customer orders since the plans of 2026-10-18
+    rid = (await prisma.restaurant.create({ data: { name: `QR ${tag}`, ownerId, status: 'ACTIVE', isInternal: true } })).id;
     otherRid = (await prisma.restaurant.create({ data: { name: `Outro ${tag}`, ownerId, status: 'ACTIVE' } })).id;
     const sec = await prisma.tableSection.create({ data: { restaurantId: rid, name: 'Salão', capacity: 20 } });
     tableId = (await prisma.table.create({ data: { restaurantId: rid, number: 3, sectionId: sec.id, capacity: 4, qrToken: `qr${tag}` } })).id;

@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { MetaCloudClient, normalizePhone } from './meta-client';
 import { sendSessionToKitchen } from '@/lib/kds/send-session';
@@ -545,6 +546,8 @@ async function handleConfirmOrder(ctx: BotContext) {
   if (cart.length === 0) {
     return safeSendText(ctx, 'Seu carrinho está vazio.');
   }
+  // Plans of 2026-10-18: no new customer orders while the plan is locked
+  if (!(await restaurantAcceptsOrders(ctx.restaurantId))) return safeSendText(ctx, ORDER_REFUSAL.error);
 
   // Obter owner do restaurante para userId
   const restaurant = await prisma.restaurant.findUnique({
