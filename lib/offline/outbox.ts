@@ -7,7 +7,9 @@
  * - every change has ONE Idempotency-Key, used on every attempt: when the first attempt reached the
  *   server and only the answer was lost, the replay gets the stored answer (lib/api/idempotency.ts)
  *   instead of adding the item twice;
- * - network error, 408, 409 (still running), 429 or 5xx: kept and retried later, in order;
+ * - network error, 408, 429, 5xx or the idempotency 409 "still running" (header Idempotency-Status:
+ *   in-progress): kept and retried later, in order. Any other 409 is a business refusal (the bill has a
+ *   payment, the kitchen has the item): an answer for the screen, never retried (prod test 2026-10-18);
  * - any other 4xx will never succeed by repeating it: marked "failed", shown to the operator, who
  *   can discard it (it is never retried silently at every reconnect);
  * - only changes marked `queueable` are kept: anything else (PIX, delivery, reports, registrations)
@@ -70,7 +72,11 @@ export interface FlushResult {
 
 export type OutboxListener = (entries: OutboxEntry[]) => void;
 
-const RETRYABLE = (status: number) => status === 408 || status === 409 || status === 429 || status >= 500;
+const RETRYABLE = (response: Response) =>
+  response.status === 408 ||
+  response.status === 429 ||
+  response.status >= 500 ||
+  (response.status === 409 && response.headers.get('Idempotency-Status') === 'in-progress');
 
 export function createOutbox(deps: {
   store: OutboxStore;
@@ -140,7 +146,7 @@ export function createOutbox(deps: {
           await deps.store.remove(entry.id);
           sent++;
           deps.onSent?.(entry, response);
-        } else if (RETRYABLE(response.status)) {
+        } else if (RETRYABLE(response)) {
           await deps.store.put({ ...entry, attempts: entry.attempts + 1, lastError: `HTTP ${response.status}` });
           break;
         } else {
@@ -179,7 +185,7 @@ export function createOutbox(deps: {
       }
       try {
         const response = await attempt({ id, ...request });
-        if (request.queueable && RETRYABLE(response.status)) {
+        if (request.queueable && RETRYABLE(response)) {
           return { queued: true, entry: await enqueue(request, id, `HTTP ${response.status}`) };
         }
         return { queued: false, response };

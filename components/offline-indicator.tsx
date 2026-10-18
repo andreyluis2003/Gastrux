@@ -1,7 +1,10 @@
 'use client';
 
 import { WifiOff, CloudUpload, AlertTriangle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useOutbox } from '@/components/offline/outbox-provider';
+import { shellMode } from '@/lib/navigation/app-nav';
+import { cn } from '@/lib/utils';
 
 /**
  * Honest offline banner (owner decision 2026-09-24, offline option (a)): says what keeps working on
@@ -10,13 +13,23 @@ import { useOutbox } from '@/components/offline/outbox-provider';
  */
 export function OfflineIndicator() {
   const { online, entries, outbox } = useOutbox();
+  const mode = shellMode(usePathname() || '/');
   const pending = entries.filter((e) => e.status === 'pending');
   const failed = entries.filter((e) => e.status === 'failed');
 
   if (online && pending.length === 0 && failed.length === 0) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 text-white text-sm shadow-md" role="status" aria-live="polite">
+    // Below the app's top bar and beside the computer menu: it covered the menu button (prod, 2026-10-18)
+    <div
+      className={cn(
+        'fixed left-0 right-0 z-40 text-white text-sm shadow-md',
+        mode === 'none' ? 'top-0' : 'top-14',
+        mode === 'sidebar' && 'md:top-0 md:left-64'
+      )}
+      role="status"
+      aria-live="polite"
+    >
       {!online && (
         <div className="bg-red-600 px-4 py-2 flex flex-wrap items-center gap-2 justify-center text-center">
           <WifiOff className="w-4 h-4 shrink-0" />

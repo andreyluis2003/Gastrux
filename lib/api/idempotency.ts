@@ -3,6 +3,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 
+/** Marks the 409 "same key still running": the device outbox retries only this 409 (lib/offline/outbox.ts) */
+const IN_PROGRESS = { 'Idempotency-Status': 'in-progress' };
+
 /**
  * Idempotency-Key support for the requests the offline queue may replay (market practice for POS
  * sync): the device sends the same key on every attempt, so when the first attempt reached the
@@ -12,7 +15,8 @@ import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
  * - no key: the handler just runs (normal online use);
  * - known key, same method + path: the stored answer is returned (header Idempotent-Replayed: true);
  * - known key, other request: 422 (a key belongs to one request);
- * - key still running (two attempts at once): 409, the device retries later;
+ * - key still running (two attempts at once): 409 with Idempotency-Status: in-progress, the device
+ *   retries later (the outbox retries no other 409: those are business refusals);
  * - a 5xx or a thrown error is NOT stored, so a later attempt runs again.
  */
 
@@ -42,12 +46,12 @@ export async function withIdempotency(
     const existing = await prisma.idempotencyRecord.findUnique({
       where: { restaurantId_key: { restaurantId: scope.restaurantId, key } },
     });
-    if (!existing) return NextResponse.json({ error: 'Tente novamente' }, { status: 409 });
+    if (!existing) return NextResponse.json({ error: 'Tente novamente' }, { status: 409, headers: IN_PROGRESS });
     if (existing.method !== method || existing.path !== path) {
       return NextResponse.json({ error: 'Idempotency-Key já usada em outra operação' }, { status: 422 });
     }
     if (existing.statusCode === 0) {
-      return NextResponse.json({ error: 'Operação ainda em processamento' }, { status: 409, headers: { 'Retry-After': '2' } });
+      return NextResponse.json({ error: 'Operação ainda em processamento' }, { status: 409, headers: { 'Retry-After': '2', ...IN_PROGRESS } });
     }
     return NextResponse.json(existing.responseBody ?? null, {
       status: existing.statusCode,
