@@ -244,6 +244,8 @@ model Supplier {
   priceSyncs    SupplierPriceSync[]
   restaurant    Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  payables Payable[]
+
   @@unique([restaurantId, code])
   @@unique([restaurantId, cnpj])
   @@index([restaurantId])
@@ -1931,7 +1933,11 @@ model CashSessionEntry {
   createdAt      DateTime       @default(now())
   cashSession    CashSession    @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
 
+  /// The bill this drawer expense paid (spec 2026-10-18 contas a pagar): the DRE counts the bill, not this entry
+  payableId String?
+
   @@index([cashSessionId])
+  @@index([payableId])
   @@index([restaurantId])
   @@index([orderSessionId])
   @@map("cash_session_entries")
@@ -2995,6 +3001,9 @@ model Restaurant {
   utilityBills    UtilityBill[]
   aiQuestions     AiQuestion[]
   aiDrafts        AiDraft[]
+
+  payables      Payable[]
+  payableSeries PayableSeries[]
 
   @@index([status])
   @@index([subscriptionStatus])
@@ -4738,6 +4747,8 @@ model UtilityBill {
   createdBy      User           @relation("UtilityBillCreatedBy", fields: [createdById], references: [id])
   updatedBy      User?          @relation("UtilityBillUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
+  payable Payable?
+
   @@unique([accountId, referenceMonth])
   @@index([restaurantId, referenceMonth])
   @@map("utility_bills")
@@ -4792,4 +4803,93 @@ model AiDraft {
 
   @@index([restaurantId, createdAt])
   @@map("ai_drafts")
+}
+
+enum PayableCategory {
+  MERCHANDISE
+  RENT
+  UTILITIES
+  PAYROLL
+  TAXES
+  SERVICES
+  LOANS
+  OTHER
+}
+
+enum PayableStatus {
+  OPEN
+  PAID
+  CANCELED
+}
+
+enum PayableSource {
+  MANUAL
+  SERIES
+  INSTALLMENT
+  UTILITY
+  NFE
+}
+
+/// "Repete todo mês" (spec 2026-10-18 contas a pagar §5)
+model PayableSeries {
+  id           String          @id @default(cuid())
+  restaurantId String
+  description  String
+  category     PayableCategory
+  supplierId   String?
+  amountCents  Int
+  dueDay       Int
+  active       Boolean         @default(true)
+  createdById  String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  restaurant   Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  payables     Payable[]
+
+  @@index([restaurantId, active])
+  @@map("payable_series")
+}
+
+/// One bill to pay (spec 2026-10-18 contas a pagar §4): the DRE counts it by competenceMonth
+model Payable {
+  id                String          @id @default(cuid())
+  restaurantId      String
+  description       String
+  category          PayableCategory
+  supplierId        String?
+  amountCents       Int
+  competenceMonth   DateTime        @db.Date
+  dueDate           DateTime        @db.Date
+  status            PayableStatus   @default(OPEN)
+  notes             String?
+  source            PayableSource   @default(MANUAL)
+  seriesId          String?
+  installmentGroup  String?
+  installmentNumber Int?
+  installmentTotal  Int?
+  utilityBillId     String?         @unique
+  nfeKey            String?
+  nfeDupNumber      String?
+  paidAt            DateTime?       @db.Date
+  paidMethod        String?
+  paidFrom          String?
+  cashEntryId       String?         @unique
+  paidById          String?
+  canceledAt        DateTime?
+  canceledById      String?
+  cancelReason      String?
+  createdById       String
+  updatedById       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  restaurant        Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  series            PayableSeries?  @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  supplier          Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  utilityBill       UtilityBill?    @relation(fields: [utilityBillId], references: [id], onDelete: SetNull)
+
+  @@unique([seriesId, competenceMonth])
+  @@unique([restaurantId, nfeKey, nfeDupNumber])
+  @@index([restaurantId, status, dueDate])
+  @@index([restaurantId, competenceMonth])
+  @@map("payables")
 }
