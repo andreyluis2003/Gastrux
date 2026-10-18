@@ -18,7 +18,8 @@ describe('onboarding progress', () => {
   let rid, owner, cook, ids = [];
   beforeAll(async () => {
     const o = await prisma.user.create({ data: { email: `aio-o-${tag}@gastrux.test`, name: 'Dona', password: 'x', role: 'OWNER' } });
-    rid = (await prisma.restaurant.create({ data: { name: `Aio ${tag}`, ownerId: o.id, status: 'ACTIVE' } })).id;
+    // Pro: 2 users (plans of 2026-10-18)
+    rid = (await prisma.restaurant.create({ data: { name: `Aio ${tag}`, ownerId: o.id, status: 'ACTIVE', subscriptionTier: 'pro', subscriptionStatus: 'active' } })).id;
     await prisma.user.update({ where: { id: o.id }, data: { currentRestaurantId: rid } });
     const c = await prisma.user.create({ data: { email: `aio-c-${tag}@gastrux.test`, name: 'Zé', password: 'x', role: 'COOK', currentRestaurantId: rid } });
     await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: c.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
@@ -54,13 +55,16 @@ describe('onboarding progress', () => {
     await prisma.table.create({ data: { restaurantId: rid, sectionId: s.id, number: 7, capacity: 4 } });
     const r = await runTool({ userId: owner.id, restaurantId: rid, role: 'OWNER' }, 'progresso_implantacao', {});
     expect(r.data.mesas).toEqual([{ area: 'Salão principal', numeros: [1, 7], exemplo: [1] }]);
-    expect(r.data.usuarios).toEqual({ usados: 1, limite: 1 });
+    expect(r.data.usuarios).toEqual({ usados: 1, limite: 2 });
   });
 
   it('propor_equipe on a full plan answers why instead of drafting', async () => {
+    const x = await prisma.user.create({ data: { email: `aio-x-${tag}@gastrux.test`, name: 'Bia', password: 'x', role: 'CASHIER' } });
+    ids.push(x.id);
+    await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: x.id, role: 'CASHIER', permissions: [], acceptedAt: new Date() } });
     const r = await runTool({ userId: owner.id, restaurantId: rid, role: 'OWNER' }, 'propor_equipe', { pessoas: [{ nome: 'João', email: 'joao@x.test', papel: 'CAIXA' }] }, new Date(), {});
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/permite 1 usuário/);
+    expect(r.error).toMatch(/permite 2 usuários/);
     expect(r.error).toMatch(/Minha assinatura/);
     expect(await prisma.aiDraft.count({ where: { restaurantId: rid } })).toBe(0);
   });

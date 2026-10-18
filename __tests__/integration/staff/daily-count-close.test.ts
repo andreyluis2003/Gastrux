@@ -46,7 +46,7 @@ const sell = (rid, recipeId, quantity, at = new Date()) =>
 
 describe('daily count: close', () => {
   let s, p;
-  beforeAll(async () => { s = await setup('starter'); p = await setup('pro'); }, 60000);
+  beforeAll(async () => { s = await setup('pro'); p = await setup('business'); }, 60000);
   afterAll(async () => {
     for (const x of [s, p]) {
       try { await prisma.notification.deleteMany({ where: { restaurantId: x.rid } }); } catch {}
@@ -62,7 +62,7 @@ describe('daily count: close', () => {
     expect((await close([{ recipeId: s.frango, counted: 0 }, { recipeId: s.kafta, counted: 0 }])).status).toBe(403);
   });
 
-  it('close freezes the lines with cost, opens the next night with the leftover as opening, Starter gets no alert', async () => {
+  it('close freezes the lines with cost, opens the next night with the leftover as opening, Pro gets no alert', async () => {
     as(s.cook);
     await add({ recipeId: s.frango, kind: 'OPENING', quantity: 8 });
     await add({ recipeId: s.frango, kind: 'MOUNTED', quantity: 40 });
@@ -143,7 +143,7 @@ describe('daily count: close', () => {
     }
   });
 
-  it('Pro: a difference becomes one bell alert for the managers with the missing value', async () => {
+  it('Business: a difference becomes one bell alert for the managers with the missing value', async () => {
     as(p.cook);
     await board();
     await add({ recipeId: p.frango, kind: 'MOUNTED', quantity: 20 });

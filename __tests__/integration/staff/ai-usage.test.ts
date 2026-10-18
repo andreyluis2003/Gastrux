@@ -46,9 +46,10 @@ describe('AI usage', () => {
     const res = await USAGE();
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ plan: 'pro', used: 1, limit: 150 });
+    expect(body).toMatchObject({ plan: 'pro', used: 1, limit: 50 });
     expect(body.questions.map((q) => q.question).sort()).toEqual(['Como cadastro mesas?', 'O que vence hoje?', 'Quanto vendi?']);
-    expect(body.free).toEqual({ used: 1, limit: 100 });
+    // Plans of 2026-10-18: no free onboarding quota any more (old free rows still listed as history)
+    expect(body.free).toBeNull();
     expect(body.questions.find((q) => q.question === 'Como cadastro mesas?')).toMatchObject({ free: true, counted: false });
     expect(body.questions.find((q) => q.question === 'O que vence hoje?')).toMatchObject({ userName: 'Zé', role: 'COOK', counted: true });
   });

@@ -27,12 +27,12 @@ describe('labels: expiry control', () => {
   const label = (data: any) => prisma.foodLabel.create({ data: { restaurantId: rid, itemName: 'X', storage: 'CHILLED', preparedAt: new Date(Date.now() - 864e5), printedById: cook.id, ...data } });
   beforeAll(async () => {
     const owner = await prisma.user.create({ data: { email: `le-o-${tag}@gastrux.test`, name: 'Ana', password: 'x', role: 'OWNER' } });
-    rid = (await prisma.restaurant.create({ data: { name: `Le ${tag}`, ownerId: owner.id, status: 'ACTIVE', subscriptionTier: 'pro' } })).id;
+    rid = (await prisma.restaurant.create({ data: { name: `Le ${tag}`, ownerId: owner.id, status: 'ACTIVE', subscriptionTier: 'business' } })).id;
     const c = await prisma.user.create({ data: { email: `le-c-${tag}@gastrux.test`, name: 'Caio', password: 'x', role: 'COOK', currentRestaurantId: rid } });
     await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: c.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
     cook = { id: c.id, email: c.email, role: 'COOK' };
     const oo = await prisma.user.create({ data: { email: `le-x-${tag}@gastrux.test`, name: 'X', password: 'x', role: 'OWNER' } });
-    otherRid = (await prisma.restaurant.create({ data: { name: `Le2 ${tag}`, ownerId: oo.id, status: 'ACTIVE', subscriptionTier: 'pro' } })).id;
+    otherRid = (await prisma.restaurant.create({ data: { name: `Le2 ${tag}`, ownerId: oo.id, status: 'ACTIVE', subscriptionTier: 'business' } })).id;
     const oc = await prisma.user.create({ data: { email: `le-oc-${tag}@gastrux.test`, name: 'Y', password: 'x', role: 'COOK', currentRestaurantId: otherRid } });
     await prisma.restaurantUser.create({ data: { restaurantId: otherRid, userId: oc.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
     otherCook = { id: oc.id, email: oc.email, role: 'COOK' };
@@ -108,8 +108,8 @@ describe('labels: expiry control', () => {
     expect((await settle(late.id, 'USED')).status).toBe(404);
   });
 
-  it('Starter: reads the label but cannot settle it or open the board', async () => {
-    await prisma.restaurant.update({ where: { id: rid }, data: { subscriptionTier: 'starter' } });
+  it('Pro: reads the label but cannot settle it or open the board (validades are Business, 2026-10-18)', async () => {
+    await prisma.restaurant.update({ where: { id: rid }, data: { subscriptionTier: 'pro' } });
     try {
       as(cook);
       const l = await label({ itemType: 'INGREDIENT', ingredientId: oilId, itemName: 'Azeite', expiresAt: new Date(Date.now() + 864e5) });
@@ -121,7 +121,7 @@ describe('labels: expiry control', () => {
       expect((await prisma.foodLabel.findUnique({ where: { id: l.id } })).status).toBe('ACTIVE');
       expect((await BOARD(new NextRequest('http://x'))).status).toBe(403);
     } finally {
-      await prisma.restaurant.update({ where: { id: rid }, data: { subscriptionTier: 'pro' } });
+      await prisma.restaurant.update({ where: { id: rid }, data: { subscriptionTier: 'business' } });
     }
   });
 });

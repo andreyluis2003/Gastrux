@@ -43,7 +43,7 @@ describe('contas de consumo', () => {
   beforeAll(() => { jest.useFakeTimers({ now: new Date('2026-10-16T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] }); });
   afterAll(() => { jest.useRealTimers(); });
   let s, p;
-  beforeAll(async () => { s = await setup('starter'); p = await setup('pro'); }, 60000);
+  beforeAll(async () => { s = await setup('pro'); p = await setup('business'); }, 60000);
   afterAll(async () => {
     for (const x of [s, p]) {
       try { await prisma.notification.deleteMany({ where: { restaurantId: x.rid } }); } catch {}
@@ -111,7 +111,7 @@ describe('contas de consumo', () => {
     expect(sc.accounts.find((a) => a.id === rent.id).bills.length).toBe(1);
   });
 
-  it('Starter gets the list without indicators and never an alert', async () => {
+  it('Pro gets the list without indicators and never an alert (indicators are Business, 2026-10-18)', async () => {
     as(s.owner);
     const energy = await prisma.utilityAccount.findFirst({ where: { restaurantId: s.rid, kind: 'ENERGY' } });
     for (const [m, kwh] of [['2026-06', 1000], ['2026-07', 1000], ['2026-08', 1000]]) await save({ accountId: energy.id, referenceMonth: m, amount: 1000, consumption: kwh });
@@ -122,7 +122,7 @@ describe('contas de consumo', () => {
     expect(await prisma.notification.count({ where: { restaurantId: s.rid } })).toBe(0);
   });
 
-  it('Pro: indicators on the screen; a late bill compares with the months before its own; one alert per account and month', async () => {
+  it('Business: indicators on the screen; a late bill compares with the months before its own; one alert per account and month', async () => {
     as(p.owner);
     const energy = await account({ kind: 'ENERGY' });
     for (const [m, kwh] of [['2026-05', 5000], ['2026-06', 1000], ['2026-07', 1100], ['2026-08', 1135]]) {

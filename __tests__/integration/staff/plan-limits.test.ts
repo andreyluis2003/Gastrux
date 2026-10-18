@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * Plans (owner decision 2026-10-09): the KDS on every plan with Starter 1 / Pro 3 kitchen stations;
+ * Plans of 2026-10-18: kitchen stations Pro 2 / Business 5 / Enterprise unlimited;
  * customer notes from Pro; restaurant campaigns from Business.
  */
 import crypto from 'crypto';
@@ -39,20 +39,20 @@ describe('plan limits: kitchen stations, customer notes, campaigns', () => {
     try { await prisma.user.delete({ where: { id: ownerId } }); } catch {}
   });
 
-  it('Starter opens one kitchen station, Pro three', async () => {
-    await plan('starter');
-    expect((await NEW_STATION(post({ name: 'Cozinha' }))).status).toBeLessThan(300);
-    const second = await NEW_STATION(post({ name: 'Bar' }));
-    expect(second.status).toBe(403);
-    expect((await second.json()).error).toMatch(/estações da cozinha/);
-
+  it('Pro opens two kitchen stations, Business five, Enterprise more', async () => {
     await plan('pro');
+    expect((await NEW_STATION(post({ name: 'Cozinha' }))).status).toBeLessThan(300);
     expect((await NEW_STATION(post({ name: 'Bar' }))).status).toBeLessThan(300);
-    expect((await NEW_STATION(post({ name: 'Forno' }))).status).toBeLessThan(300);
-    expect((await NEW_STATION(post({ name: 'Sobremesa' }))).status).toBe(403);
+    const third = await NEW_STATION(post({ name: 'Forno' }));
+    expect(third.status).toBe(403);
+    expect((await third.json()).error).toMatch(/estações da cozinha/);
 
     await plan('business');
-    expect((await NEW_STATION(post({ name: 'Sobremesa' }))).status).toBeLessThan(300);
+    for (const name of ['Forno', 'Sobremesa', 'Grelha']) expect((await NEW_STATION(post({ name }))).status).toBeLessThan(300);
+    expect((await NEW_STATION(post({ name: 'Fritura' }))).status).toBe(403);
+
+    await plan('enterprise');
+    expect((await NEW_STATION(post({ name: 'Fritura' }))).status).toBeLessThan(300);
   });
 
   it('customer notes from Pro', async () => {

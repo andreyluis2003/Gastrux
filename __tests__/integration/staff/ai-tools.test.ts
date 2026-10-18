@@ -80,7 +80,7 @@ describe('AI tools', () => {
   });
 
   it('plano: plan, used and remaining questions', async () => {
-    expect((await runTool(m(cashier), 'plano', {})).data).toMatchObject({ plano: 'pro', limiteMensal: 150, usadas: 0, restantes: 150 });
+    expect((await runTool(m(cashier), 'plano', {})).data).toMatchObject({ plano: 'pro', limiteMensal: 50, usadas: 0, restantes: 50 });
   });
 
   it('bad input becomes a tool error, not an exception', async () => {
