@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
+import { trialEnd } from '@/lib/billing/plan-access';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +31,9 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcryptjs.hash(password, 10);
 
+    // Plans of 2026-10-18: 30 days of Business, no card (lib/billing/plan-access.ts)
+    const ends = trialEnd();
+
     // Create user as OWNER with auto-provisioned restaurant
     const restaurantName = name ? `Restaurante ${name}` : 'Meu Restaurante';
 
@@ -39,9 +43,9 @@ export async function POST(req: NextRequest) {
         password: hashedPassword,
         name: name || email.split('@')[0],
         role: 'OWNER',
-        subscriptionTier: 'starter',
-        subscriptionStatus: 'active',
-        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-day trial
+        subscriptionTier: 'business',
+        subscriptionStatus: 'trialing',
+        trialEndsAt: ends,
         acceptedTermsAt: acceptedTerms ? new Date() : null,
       },
     });
@@ -53,9 +57,9 @@ export async function POST(req: NextRequest) {
         email: email,
         ownerId: user.id,
         status: 'TRIAL',
-        subscriptionTier: 'starter',
-        subscriptionStatus: 'active',
-        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        subscriptionTier: 'business',
+        subscriptionStatus: 'trialing',
+        trialEndsAt: ends,
       },
     });
 

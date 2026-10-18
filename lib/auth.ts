@@ -6,6 +6,7 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { prisma } from './prisma';
 import { resolveEffectiveRole } from './auth/effective-role';
 import bcryptjs from 'bcryptjs';
+import { trialEnd } from '@/lib/billing/plan-access';
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? process.env.NODE_ENV === 'production';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
@@ -180,7 +181,8 @@ export const authOptions: NextAuthOptions = {
         // Update user role to OWNER
         await prisma.user.update({
           where: { id: user.id },
-          data: { role: 'OWNER', subscriptionTier: 'starter', subscriptionStatus: 'active' },
+          // Plans of 2026-10-18: 30 days of Business, like the e-mail sign-up (app/api/signup)
+          data: { role: 'OWNER', subscriptionTier: 'business', subscriptionStatus: 'trialing', trialEndsAt: trialEnd() },
         });
 
         // Create default restaurant
@@ -188,8 +190,10 @@ export const authOptions: NextAuthOptions = {
           data: {
             name: user.name ? `Restaurante de ${user.name}` : 'Meu Restaurante',
             ownerId: user.id,
-            status: 'ACTIVE',
-            subscriptionStatus: 'active',
+            status: 'TRIAL',
+            subscriptionTier: 'business',
+            subscriptionStatus: 'trialing',
+            trialEndsAt: trialEnd(),
           },
         });
 
