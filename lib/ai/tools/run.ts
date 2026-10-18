@@ -121,7 +121,7 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
         const d = dre.despesasOperacionais;
         return { ok: true, data: { periodo: `${p.startDate} a ${p.endDate}`, receitaBruta: r2(dre.receitaBruta), taxaServicoIncluida: r2(dre.taxaServico), deducoes: r2(dre.deducoes.total),
           receitaLiquida: r2(dre.receitaLiquida), cmv: r2(dre.cmv), lucroBruto: r2(dre.lucroBruto),
-          despesas: { operacional: r2(d.operacional), pessoal: r2(d.pessoal), contasConsumo: r2(d.contasConsumo), taxasGateway: r2(d.taxasGateway), total: r2(d.total) },
+          despesas: { operacional: r2(d.operacional), pessoal: r2(d.pessoal), pessoalOrigem: dre.pessoalOrigem, contasConsumo: r2(d.contasConsumo), contasAPagar: r2(d.contasAPagar ?? 0), taxasGateway: r2(d.taxasGateway), total: r2(d.total) },
           // true: the utility bills are whole-month values inside a partial period
           contasConsumoMesInteiro: dre.contasConsumoMesInteiro,
           resultadoOperacional: r2(dre.resultadoOperacional), resultadoLiquido: r2(dre.resultadoLiquido), margemLiquidaPct: dre.margemLiquida } };

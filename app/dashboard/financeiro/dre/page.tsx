@@ -27,8 +27,9 @@ interface DREData {
     cmv: number;
     lucroBruto: number;
     margemBruta: number;
-    despesasOperacionais: { operacional: number; pessoal: number; taxasGateway: number; contasConsumo: number; total: number };
+    despesasOperacionais: { operacional: number; pessoal: number; taxasGateway: number; contasConsumo: number; contasAPagar?: number; total: number };
     contasConsumoMesInteiro?: boolean;
+    pessoalOrigem?: 'contas' | 'estimativa';
     resultadoOperacional: number;
     margemOperacional: number;
     resultadoLiquido: number;
@@ -296,7 +297,8 @@ export default function DREPage() {
             {expandedSections.despesas && (
               <div className="mb-4 border-l-2 border-purple-200 pl-4">
                 <DRELine label="Despesas Gerais" value={d.despesasOperacionais.operacional} negative />
-                <DRELine label="Folha de Pagamento" value={d.despesasOperacionais.pessoal} negative />
+                <DRELine label={d.pessoalOrigem === 'contas' ? 'Folha de Pagamento (contas lançadas)' : 'Folha de Pagamento (estimada pela Equipe)'} value={d.despesasOperacionais.pessoal} negative />
+                <DRELine label="Contas a pagar" value={d.despesasOperacionais.contasAPagar ?? 0} negative />
                 <DRELine label="Contas de consumo" value={d.despesasOperacionais.contasConsumo ?? 0} negative />
                 {d.contasConsumoMesInteiro && <p className="text-xs text-muted-foreground pl-4">Contas de consumo entram pelo mês inteiro.</p>}
                 <DRELine label="Taxas de Gateway" value={d.despesasOperacionais.taxasGateway} negative />

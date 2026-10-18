@@ -4,6 +4,7 @@ import { monthDate } from '@/lib/utility-bills/rules';
 import { salesInRange } from '@/lib/finance/month-sales';
 import { soldByRecipe } from '@/lib/daily-count/sold';
 import { brtDayStart } from '@/lib/staff/commission-rules';
+import { dreLine, type PayableCategory } from '@/lib/payables/rules';
 
 /**
  * The DRE of a period of Brasília days (startDate and endDate as AAAA-MM-DD, end included): the screen
@@ -54,7 +55,8 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   // moved to the safe, not an expense. Plus the legacy register payments (before 2026-10-05).
   const [drawerExpenses, cashMovements] = await Promise.all([
     prisma.cashSessionEntry.aggregate({
-      where: { restaurantId, type: 'EXPENSE', createdAt: { gte: start, lt: endExclusive } },
+      // A drawer expense that paid a bill is counted by the bill, in its month (spec 2026-10-18 contas a pagar)
+      where: { restaurantId, type: 'EXPENSE', payableId: null, createdAt: { gte: start, lt: endExclusive } },
       _sum: { amountCents: true },
     }),
     prisma.cashMovement.findMany({
@@ -70,7 +72,7 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
     select: { basesalary: true },
   });
   const monthsInRange = Math.max(1, (end.getTime() - start.getTime()) / (30 * 24 * 60 * 60 * 1000));
-  const despesasPessoal = staff.reduce((sum, s) => sum + Number(s.basesalary || 0), 0) * monthsInRange;
+  const estimativaPessoal = staff.reduce((sum, s) => sum + Number(s.basesalary || 0), 0) * monthsInRange;
 
   // 5b. CONTAS DE CONSUMO - by reference month, whole months (spec 2026-10-16 contas de consumo, 4.6)
   const startMonth = startDate.slice(0, 7);
@@ -80,11 +82,29 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
     _sum: { amountCents: true },
   });
   const contasConsumo = (utility._sum.amountCents ?? 0) / 100;
+
+  // 5c. CONTAS A PAGAR by competence (spec 2026-10-18): merchandise is in the CMV and utilities in their own line,
+  // so only the other categories count here; payroll bills replace the estimate from the staff salaries
+  const payables = await prisma.payable.groupBy({
+    by: ['category'],
+    where: { restaurantId, status: { not: 'CANCELED' }, competenceMonth: { gte: monthDate(startMonth), lte: monthDate(endMonth) } },
+    _sum: { amountCents: true },
+  });
+  let contasAPagarCents = 0;
+  let payrollCents = 0;
+  for (const g of payables) {
+    const line = dreLine(g.category as PayableCategory);
+    if (line === 'OPERATIONAL') contasAPagarCents += g._sum.amountCents ?? 0;
+    if (line === 'PAYROLL') payrollCents += g._sum.amountCents ?? 0;
+  }
+  const contasAPagar = contasAPagarCents / 100;
+  const pessoalOrigem: 'contas' | 'estimativa' = payrollCents > 0 ? 'contas' : 'estimativa';
+  const despesasPessoal = payrollCents > 0 ? payrollCents / 100 : estimativaPessoal;
   const lastDay = new Date(Date.UTC(Number(endMonth.slice(0, 4)), Number(endMonth.slice(5, 7)), 0)).getUTCDate();
   const contasConsumoMesInteiro = contasConsumo > 0 && (!startDate.endsWith('-01') || Number(endDate.slice(8, 10)) !== lastDay);
 
   // 6. RESULTADO
-  const despesasTotais = despesasOperacionais + despesasPessoal + contasConsumo;
+  const despesasTotais = despesasOperacionais + despesasPessoal + contasConsumo + contasAPagar;
   const resultadoOperacional = lucroBruto - despesasTotais;
   const margemOperacional = receitaLiquida > 0 ? (resultadoOperacional / receitaLiquida) * 100 : 0;
 
@@ -127,10 +147,12 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
         operacional: despesasOperacionais,
         pessoal: despesasPessoal,
         contasConsumo,
+        contasAPagar,
         taxasGateway,
         total: despesasTotais + taxasGateway,
       },
       contasConsumoMesInteiro,
+      pessoalOrigem,
       resultadoOperacional,
       margemOperacional: Math.round(margemOperacional * 100) / 100,
       resultadoLiquido,
