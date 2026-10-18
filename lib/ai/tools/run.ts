@@ -8,6 +8,7 @@ import { salesInRange } from '@/lib/finance/month-sales';
 import { brtDay, brtDayStart } from '@/lib/staff/commission-rules';
 import { checkTierLimit, isTierFeatureEnabled } from '@/lib/tier-guard';
 import { loadScreen } from '@/lib/utility-bills/service';
+import { listPayables } from '@/lib/payables/service';
 import { onboardingStatus } from '@/lib/onboarding/first-steps';
 import { createDraft, existingTables, TOOL_KIND } from '../drafts/service';
 import { validateMenu, validateStaff, validateTables } from '../drafts/validate';
@@ -89,7 +90,7 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
         } };
       }
       case 'validades': {
-        if (!isTierFeatureEnabled(await tierOf(rid), 'labelExpiry')) return { ok: true, data: { indisponivel: 'O controle de validades é do plano Pro.' } };
+        if (!isTierFeatureEnabled(await tierOf(rid), 'labelExpiry')) return { ok: true, data: { indisponivel: 'O controle de validades é do plano Business.' } };
         // End of today in Brasília (same helpers as lib/labels/morning-alert.ts)
         const endToday = brtDayStart(new Date(Date.parse(`${brtDay(now)}T00:00:00.000Z`) + 864e5).toISOString().slice(0, 10));
         const labels = await prisma.foodLabel.findMany({ where: { restaurantId: rid, status: 'ACTIVE', expiresAt: { lt: endToday } }, orderBy: { expiresAt: 'asc' }, take: 30, select: { itemName: true, expiresAt: true } });
@@ -133,7 +134,15 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
           const ind = a.latest?.indicators;
           return { conta: a.name, mes: last?.referenceMonth ?? null, valor: last ? reais(last.amountCents) : null, consumo: last?.consumption ?? null, unidade: a.unit,
             ...(ind ? { vsMesAnteriorPct: ind.prev ? Math.round(ind.prev.measurePct) : null, vsMedia3MesesPct: ind.avg3 ? Math.round(ind.avg3.pct) : null } : {}) };
-        }), indicadores: screen.insights ? 'Pro' : 'disponíveis no plano Pro' } };
+        }), indicadores: screen.insights ? 'Business' : 'disponíveis no plano Business' } };
+      }
+      case 'contas_a_pagar': {
+        const out = await listPayables(member, { status: 'OPEN' }, now);
+        const card = (v: { count: number; cents: number }) => ({ quantidade: v.count, valor: reais(v.cents) });
+        return { ok: true, data: {
+          atrasadas: card(out.summary.overdue), vencemHoje: card(out.summary.today), proximos7Dias: card(out.summary.week), totalMes: card(out.summary.month),
+          proximas: out.items.slice(0, 10).map((i) => ({ descricao: i.description, vencimento: i.dueDate.split('-').reverse().join('/'), valor: reais(i.amountCents) })),
+        } };
       }
       case 'notas_fiscais': {
         const p = parsePeriod(input);

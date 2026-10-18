@@ -153,6 +153,49 @@ Pro 50 perguntas por mês, Business 350 (no teste grátis, 350). O uso aparece e
   },
   {
     categorySlug: 'pdv-e-caixa',
+    slug: 'contas-a-pagar',
+    title: 'Como controlo as contas a pagar?',
+    summary: 'Lance aluguel, contador, boletos e impostos, veja o que vence e marque como paga pelo banco ou pela gaveta.',
+    keywords: 'contas a pagar, boleto, aluguel, vencimento, parcela, fornecedor, despesa, folha, imposto, atrasada',
+    order: 20,
+    content: `## Onde fica
+
+**Caixa e pagamentos > Contas a pagar**, só para o dono e o gerente. No topo: Atrasadas, Vencem hoje, Próximos 7 dias e Total do mês.
+
+## Nova conta
+
+Toque em **Nova conta** e escolha:
+
+- **Uma vez**: uma conta só. Se ela se refere a outro mês (a conta de setembro que vence em outubro), informe o mês da conta (competência).
+- **Parcelar**: informe o valor total e de 2 a 24 parcelas. A sobra de centavos vai na última.
+- **Repetir todo mês** (plano Business): aluguel, contador e outras contas fixas. A conta do mês e dos 2 seguintes aparece sozinha.
+
+## Pagar
+
+Na conta, toque em **Pagar** e escolha de onde saiu o dinheiro:
+
+- **Banco / outro**: Pix, boleto, cartão ou débito automático.
+- **Dinheiro da gaveta**: sai do caixa aberto como despesa ligada à conta. Se houver mais de um caixa aberto, escolha qual.
+
+Errou? **Desfazer pagamento** pede um motivo. Se o dinheiro saiu da gaveta, ele volta para o caixa aberto.
+
+## Editar e cancelar
+
+Só contas a pagar podem ser editadas. Numa conta que repete, escolha "Só esta" ou "Esta e as próximas". **Cancelar** pede um motivo e a conta fica no histórico.
+
+As contas de consumo com vencimento aparecem aqui sozinhas; valor e vencimento delas se editam em Contas de consumo.
+
+## Avisos e nota de compra (Business)
+
+- Todo dia às 7h, o sino e o e-mail do dono avisam as contas que vencem hoje, as atrasadas e as que vencem em 3 dias.
+- Ao importar o XML da nota de compra, os boletos dela viram contas a pagar.
+
+## Na DRE
+
+Cada conta entra no mês da competência (o mês a que ela se refere), na linha **Contas a pagar**. A folha lançada aqui substitui a estimativa da Equipe. Compras de mercadoria ficam fora, porque o custo já está no CMV, e pagar pela gaveta não conta duas vezes.`,
+  },
+  {
+    categorySlug: 'pdv-e-caixa',
     slug: 'abrir-comanda-lancar-pedido',
     title: 'Como abro uma mesa e lanço um pedido?',
     summary: 'Na tela Vender, toque na mesa, toque nos itens e envie para a cozinha.',

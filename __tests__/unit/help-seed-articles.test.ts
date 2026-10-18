@@ -23,6 +23,12 @@ jest.mock('@/lib/prisma', () => ({
 }));
 
 import { HELP_ARTICLES, syncHelpContent } from '@/lib/help/seed-articles';
+
+it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a pagar)', () => {
+  const a = HELP_ARTICLES.find((x) => x.slug === 'contas-a-pagar');
+  expect(a?.categorySlug).toBe('pdv-e-caixa');
+  for (const fact of ['Nova conta', 'Parcelar', 'Repetir todo mês', 'gaveta', 'Desfazer pagamento', 'competência', 'CMV']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+});
 import { prisma } from '@/lib/prisma';
 
 // Exact 2026-10-11 texts (their hashes are in LEGACY_DEFAULT_HASHES)

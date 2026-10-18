@@ -1,7 +1,7 @@
 /** Knowledge: utility bills (spec 2026-10-16 contas-de-consumo). */
 export default `## Contas de consumo
 Menu: Relatórios > Contas de consumo. Só dono e gerente.
-- Contas: Energia (R$ e kWh), Água (R$ e m³), Gás encanado (R$ e m³), Gás P13 e Gás P45 (R$ e número de botijões), Telefone/Internet (só R$) e Outra conta com nome livre, como aluguel e condomínio (só R$).
+- Contas: Energia (R$ e kWh), Água (R$ e m³), Gás encanado (R$ e m³), Gás P13 e Gás P45 (R$ e número de botijões), Telefone/Internet (só R$) e Outra conta com nome livre (só R$). Aluguel, contador e boletos de fornecedor ficam em Contas a pagar.
 - Lançar conta: escolha o mês de referência (o padrão é o mês anterior), o valor e o consumo como estão na conta. O valor aceita "1.240" e "1.240,00". Uma conta por mês; lançar de novo o mesmo mês corrige.
 - Entra na DRE pelo mês de referência, na linha "Contas de consumo", em todos os planos.
 - No plano Business: comparação com o mês anterior, com a média de 3 meses e com o mesmo mês do ano anterior, preço por kWh ou m³, % do faturamento e barras no histórico.

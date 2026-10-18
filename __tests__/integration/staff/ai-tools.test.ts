@@ -63,6 +63,16 @@ describe('AI tools', () => {
     expect(Object.keys(ck.data.mesas[0]).sort()).toEqual(['abertaHaMinutos', 'mesa']);
   });
 
+  it('contas_a_pagar: the summary for the manager; refused for the cook (spec 2026-10-18 contas a pagar)', async () => {
+    const today = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+    const day = (s) => new Date(s + 'T00:00:00.000Z');
+    await prisma.payable.create({ data: { restaurantId: rid, description: 'Aluguel', category: 'RENT', amountCents: 250000, competenceMonth: day(today.slice(0, 7) + '-01'), dueDate: day(today), createdById: owner.id } });
+    const r = await runTool(m(owner), 'contas_a_pagar', {});
+    expect(r).toMatchObject({ ok: true, data: { vencemHoje: { quantidade: 1, valor: 2500 } } });
+    expect(r.data.proximas[0]).toEqual({ descricao: 'Aluguel', vencimento: today.split('-').reverse().join('/'), valor: 2500 });
+    expect(await runTool(m(cook), 'contas_a_pagar', {})).toMatchObject({ ok: false, denied: true });
+  });
+
   it('contagem_dia never opens a night (read-only)', async () => {
     const before = await prisma.dailyCount.count({ where: { restaurantId: rid } });
     const r = await runTool(m(cook), 'contagem_dia', {});
