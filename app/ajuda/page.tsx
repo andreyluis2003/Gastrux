@@ -184,7 +184,7 @@ export default function HelpIndexPage() {
         {/* CTA Support */}
         <section className="mt-12 text-center py-10 rounded-2xl bg-brand-green text-white">
           <h3 className="text-2xl font-bold mb-2">Não encontrou o que procurava?</h3>
-          <p className="mb-5 opacity-90">Fale com a gente diretamente: atendemos em até 4 horas úteis</p>
+          <p className="mb-5 opacity-90">Fale com a gente: atendemos de segunda a sábado, das 10h às 23h</p>
           <Link
             href="/suporte"
             className="inline-flex items-center gap-2 px-6 py-3 bg-white text-brand-green rounded-lg font-semibold hover:bg-gray-100 transition"

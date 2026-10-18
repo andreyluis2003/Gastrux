@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { GastruxLogo } from '@/components/brand/logo';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ChevronDown, CreditCard, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
+import { ChevronDown, CreditCard, LifeBuoy, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
 import { openFeedback } from '@/components/feedback/feedback-widget';
 import { signOutSafely } from '@/lib/offline/sign-out';
@@ -96,6 +96,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-3 border-t border-white/10 space-y-1 shrink-0">
+          {/* The public help center (app/ajuda), in a new tab so the work on screen stays open */}
+          <a
+            href="/ajuda"
+            target="_blank"
+            rel="noopener"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10"
+          >
+            <LifeBuoy className="h-4 w-4" /> Central de ajuda
+          </a>
           <button
             onClick={() => {
               setOpen(false);

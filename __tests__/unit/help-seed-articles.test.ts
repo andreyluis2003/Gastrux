@@ -1,0 +1,74 @@
+/**
+ * Help center sync (lib/help/seed-articles.ts, 2026-10-17): the 2026-10-11 articles promised an iFood
+ * integration and a card machine connection that do not exist. The sync removes and replaces the old
+ * defaults, but an article the team edited in Base de conhecimento is never overwritten or deleted.
+ */
+const articles = new Map<string, { id: string; slug: string; content: string }>();
+
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    helpCategory: { upsert: jest.fn(async ({ create }: any) => ({ id: 'cat-' + create.slug })) },
+    helpArticle: {
+      findMany: jest.fn(async ({ where }: any) => [...articles.values()].filter((a) => where.slug.in.includes(a.slug))),
+      findUnique: jest.fn(async ({ where }: any) => articles.get(where.slug) ?? null),
+      delete: jest.fn(async ({ where }: any) => {
+        for (const [k, v] of articles) if (v.id === where.id) articles.delete(k);
+      }),
+      create: jest.fn(async ({ data }: any) => articles.set(data.slug, { id: 'new-' + data.slug, ...data })),
+      update: jest.fn(async ({ where, data }: any) => {
+        for (const [k, v] of articles) if (v.id === where.id) articles.set(k, { ...v, ...data });
+      }),
+    },
+  },
+}));
+
+import { HELP_ARTICLES, syncHelpContent } from '@/lib/help/seed-articles';
+import { prisma } from '@/lib/prisma';
+
+// Exact 2026-10-11 texts (their hashes are in LEGACY_DEFAULT_HASHES)
+const OLD_IFOOD =
+  '## Integração com iFood\n\n1. Em **Admin → Integrações**, clique em **iFood**\n2. Informe seu token de merchant (painel iFood)\n3. Mapeie o cardápio (automático ou manual)\n4. Ative a sincronização\n\n### Fluxo\n\n- Pedidos chegam no KDS automaticamente\n- Status (aceito, em preparo, pronto, em entrega) sincroniza\n- Comprovantes e faturas em **Pedidos Externos**';
+const OLD_BAIXAR_FATURA =
+  '## Baixando faturas\n\n1. Acesse **Configurações → Assinatura**\n2. Vá até o histórico de faturas\n3. Baixe a fatura que precisar\n\nSe não encontrar uma fatura específica ou tiver dúvida sobre uma cobrança, abra um ticket de suporte — a equipe confirma os detalhes com você.';
+
+beforeEach(() => {
+  articles.clear();
+  jest.clearAllMocks();
+});
+
+it('replaces an untouched old default and removes the false iFood article', async () => {
+  articles.set('baixar-fatura', { id: 'a1', slug: 'baixar-fatura', content: OLD_BAIXAR_FATURA });
+  articles.set('conectar-ifood', { id: 'a2', slug: 'conectar-ifood', content: OLD_IFOOD });
+
+  const r = await syncHelpContent();
+
+  expect(articles.has('conectar-ifood')).toBe(false);
+  expect(articles.get('baixar-fatura')!.content).toContain('Gerenciar assinatura');
+  expect(r.removed).toBe(1);
+  expect(r.updated).toBe(1);
+  expect(r.created).toBe(HELP_ARTICLES.length - 1);
+});
+
+it('keeps an article the team edited, even an obsolete one', async () => {
+  articles.set('baixar-fatura', { id: 'a1', slug: 'baixar-fatura', content: 'Texto da equipe' });
+  articles.set('conectar-ifood', { id: 'a2', slug: 'conectar-ifood', content: 'Integração iFood nova, escrita pela equipe' });
+
+  await syncHelpContent();
+
+  expect(articles.get('baixar-fatura')!.content).toBe('Texto da equipe');
+  expect(articles.has('conectar-ifood')).toBe(true);
+});
+
+it('a second run changes nothing', async () => {
+  await syncHelpContent();
+  jest.clearAllMocks();
+  const r = await syncHelpContent();
+  expect(r).toMatchObject({ created: 0, updated: 0, removed: 0 });
+  expect(prisma.helpArticle.update).not.toHaveBeenCalled();
+});
+
+it('no article promises iFood, a card machine or the old Admin menu', () => {
+  for (const a of HELP_ARTICLES) {
+    expect(a.content).not.toMatch(/Admin →|SumUp|token de merchant|maquininha/i);
+  }
+});

@@ -1,208 +1,462 @@
+import { createHash } from 'crypto';
 import { prisma } from '@/lib/prisma';
 
 /**
- * Seeds/updates default help categories and articles.
- * Idempotent - upserts by slug, so re-running keeps content in sync with
- * this file (categories were already upserted unconditionally; articles
- * used to be created once and never touched again - fixed here).
+ * Default help center content (public /ajuda). Rewritten 2026-10-17 against the current menu: the
+ * first version (2026-10-11) promised an iFood integration and a card machine connection that do not
+ * exist, and pointed to an "Admin" menu that was reorganized.
+ *
+ * It runs on the first GET /api/help/categories of each server process. It creates what is missing
+ * and never overwrites the team's work: an existing article is only replaced while its text is still a
+ * default this file wrote before (LEGACY_DEFAULT_HASHES or the current default), so an article edited
+ * in Plataforma Gastrux > Base de conhecimento stays as edited.
  */
-export async function seedDefaultHelpContent() {
-  const categories = [
-    { slug: 'primeiros-passos', name: 'Primeiros Passos', icon: 'Rocket', order: 1, description: 'Como começar a usar o Gastrux' },
-    { slug: 'cardapio-e-receitas', name: 'Cardápio & Receitas', icon: 'ChefHat', order: 2, description: 'Cadastrar itens, calcular CMV, gerenciar receitas' },
-    { slug: 'estoque-e-insumos', name: 'Estoque & Insumos', icon: 'Package', order: 3, description: 'Movimentações, alertas e inventário' },
-    { slug: 'pdv-e-caixa', name: 'PDV & Caixa', icon: 'CreditCard', order: 4, description: 'Maquininha, vendas e reconciliação' },
-    { slug: 'comanda-e-kds', name: 'Comanda & KDS', icon: 'Utensils', order: 5, description: 'Mesa, KDS, despacho para cozinha' },
-    { slug: 'faturamento-e-assinatura', name: 'Faturamento & Assinatura', icon: 'Receipt', order: 6, description: 'Planos, pagamento, faturas' },
-    { slug: 'integracao-delivery', name: 'Integrações Delivery', icon: 'Truck', order: 7, description: 'iFood, Rappi, Uber Eats' },
-  ];
 
-  const catIds: Record<string, string> = {};
-  for (const c of categories) {
-    const cat = await prisma.helpCategory.upsert({
-      where: { slug: c.slug },
-      update: c,
-      create: c,
+/** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
+const LEGACY_DEFAULT_HASHES = new Set([
+  '00ae95b1cbaec17ccfa675598c4511a75c6ef19b287ab2c4d2011d5ac34477c9', // como-criar-restaurante
+  'b24e6588fbc264022b24b2a9c0141c14c31037677073a78f516c96f3b81e03b7', // convidar-equipe
+  '5ceb36b37ddbf804c4160078f30140d111d636d4ee0487e05cb3d1e4e9ea69c4', // configurar-mesas-qrcode
+  '0836f98eb56d96f228f061725bd39e649da04bb00e90d428808cc82195575794', // cadastrar-receita
+  'f466ca793e08843bff919387687ddd97ae79ca5cf4e047c47b3887f7d69743e6', // calcular-cmv
+  '3ea137627bd550f8eb402964a3bb4bb079f87bfe007906ab628e2375e0dc79bf', // cadastrar-insumos
+  'd8811068d305a4c6e15949f4f912c6b390b7c1332f6906649db6aaad8a091bc4', // controle-estoque-alertas
+  '015d5cde058ad3cc75981c41be848c61061aeb9eef4efeac6dd1930f60587656', // conectar-maquininha-cartao
+  '13655ae7c597f0a20a2bc70039f6b4ad33a76a8399152b34c68bf33fdb7fe042', // abrir-comanda-lancar-pedido
+  '1b9162f4cab8d3daf663d085e18bee9b8c848fc68c08e9958922794141ff220c', // usar-kds
+  '84fb0e79510d1cdefe042475737061534b07c15c580b647203840a5dc89f5f8b', // como-cancelar
+  '77cc38e8218f43b95013fac7ebbbb782a2304e9085515b172ba65b95855ca466', // baixar-fatura
+  '4b229bf0f3212dac1a5d9d60e9d3eebf3a6d9745d4fb899983ebbcd4ab80c287', // conectar-ifood
+]);
+
+/** Articles that described features Gastrux does not have; removed while nobody rewrote them */
+const OBSOLETE_SLUGS = ['conectar-ifood', 'conectar-maquininha-cartao', 'importar-csv'];
+
+export const contentHash = (content: string) => createHash('sha256').update(content).digest('hex');
+
+export const HELP_CATEGORIES = [
+  { slug: 'primeiros-passos', name: 'Primeiros passos', icon: 'Rocket', order: 1, description: 'Configurar o restaurante, a equipe e as mesas' },
+  { slug: 'pdv-e-caixa', name: 'Vendas e caixa', icon: 'CreditCard', order: 2, description: 'Mesas, balcão, caixa e pagamentos' },
+  { slug: 'comanda-e-kds', name: 'Cozinha', icon: 'Utensils', order: 3, description: 'Tela da cozinha (KDS) e estações' },
+  { slug: 'cardapio-e-receitas', name: 'Cardápio e fichas técnicas', icon: 'ChefHat', order: 4, description: 'Produtos, fichas técnicas e CMV' },
+  { slug: 'estoque-e-insumos', name: 'Estoque e insumos', icon: 'Package', order: 5, description: 'Insumos, entradas, contagem e alertas' },
+  { slug: 'fiscal', name: 'Nota fiscal', icon: 'FileText', order: 6, description: 'NFC-e: o que é preciso e como configurar' },
+  { slug: 'integracao-delivery', name: 'Delivery', icon: 'Truck', order: 7, description: 'Site de delivery próprio e pedidos' },
+  { slug: 'faturamento-e-assinatura', name: 'Assinatura', icon: 'Receipt', order: 8, description: 'Planos, faturas e cancelamento' },
+];
+
+export const HELP_ARTICLES = [
+  {
+    categorySlug: 'primeiros-passos',
+    slug: 'como-criar-restaurante',
+    title: 'Como configuro meu restaurante pela primeira vez?',
+    summary: 'O cartão "Primeiros passos" do Início mostra o que falta, na ordem, até a primeira venda.',
+    keywords: 'cadastro, setup, configuração, inicial, começar, novo, dados do restaurante, primeiros passos',
+    featured: true,
+    order: 1,
+    content: `## Siga o cartão "Primeiros passos"
+
+Ao entrar no Gastrux, o **Início** mostra o cartão **Primeiros passos** com o que falta para começar a vender:
+
+1. **Abrir o caixa**: Caixa e pagamentos > Caixa, com o troco inicial
+2. **Fazer a primeira venda**: Vender > Mesas e balcão
+3. **Cadastrar seus produtos e preços**: Cardápio e produtos > Cardápio digital
+4. **Cadastrar as mesas**: Vender > Mesas
+5. **Cadastrar a equipe** (opcional para quem trabalha sozinho): Equipe > Equipe e acessos
+6. **Completar o endereço**: Configurações > Configurações do restaurante
+7. **Configurar a nota fiscal (NFC-e)**: Fiscal > Notas fiscais (NFC-e)
+
+Cada etapa fica marcada quando está pronta.
+
+## Faça o cadastro pesado com a IA
+
+Nos passos de produtos, mesas e equipe aparece o botão **Fazer com a IA**. Mande fotos do cardápio impresso (até 4), um PDF ou o texto do cardápio, e a IA monta um rascunho. Você revisa nome, preço e categoria e só então confirma; nada entra no sistema antes disso.
+
+> **Dica**: a conta começa com um cardápio de exemplo do seu tipo de negócio. Na revisão do cardápio feito pela IA, marque "Remover o cardápio de exemplo".`,
+  },
+  {
+    categorySlug: 'primeiros-passos',
+    slug: 'convidar-equipe',
+    title: 'Como cadastro minha equipe?',
+    summary: 'Cadastre gerente, caixa e cozinha, cada um com o acesso certo.',
+    keywords: 'usuário, equipe, colaborador, permissão, função, convidar, staff, garçom, caixa, cozinha, gerente',
+    order: 2,
+    content: `## Cadastrando uma pessoa
+
+1. Abra **Equipe > Equipe e acessos**
+2. Clique em **Adicionar Funcionário**
+3. Preencha nome e e-mail e escolha o perfil
+4. Salve. O Gastrux mostra uma **senha provisória**: passe para a pessoa. No primeiro acesso ela cria a senha dela.
+
+## Perfis
+
+- **Gerente**: vê e faz tudo do dia a dia, inclusive valores e relatórios
+- **Caixa**: vende, recebe, abre e fecha o caixa. Use este perfil para o garçom
+- **Cozinha**: tela da cozinha, fichas técnicas, insumos, estoque e etiquetas; não vê faturamento
+
+Ações sensíveis, como cancelar uma comanda, reabrir uma conta ou estornar um pagamento, pedem dono ou gerente.
+
+## Desligando alguém
+
+Na lista de **Equipe e acessos**, desligue a pessoa. O acesso termina na hora e o histórico dela continua registrado.
+
+> O número de usuários depende do plano: Starter tem 1 (só o dono), Pro 3 e Business 5.`,
+  },
+  {
+    categorySlug: 'primeiros-passos',
+    slug: 'configurar-mesas-qrcode',
+    title: 'Como configuro mesas e QR Code para os clientes?',
+    summary: 'Cadastre as mesas por setor e imprima o QR Code de cada uma.',
+    keywords: 'mesa, qr code, setor, salão, cardápio digital',
+    order: 3,
+    content: `## Cadastrando as mesas
+
+1. Abra **Vender > Mesas**
+2. Cadastre cada mesa com número e setor (por exemplo Salão, Varanda)
+3. Uma mesa fora de uso pode ficar **em manutenção**: ela não aparece como livre na hora de vender
+
+Também dá para pedir à IA: "crie 10 mesas no salão".
+
+## QR Code de cada mesa
+
+1. Abra **Cardápio e produtos > QR Codes das mesas**
+2. Imprima o código de cada mesa e cole na mesa
+
+O cliente lê o QR Code com o celular e vê o cardápio daquela mesa. O que ele pedir por ali entra na comanda da mesa certa.`,
+  },
+  {
+    categorySlug: 'primeiros-passos',
+    slug: 'pergunte-ao-gastrux',
+    title: 'O que é o "Pergunte ao Gastrux"?',
+    summary: 'O assistente com IA que responde sobre o sistema e sobre os números do seu restaurante.',
+    keywords: 'ia, assistente, inteligência artificial, chat, pergunta, ajuda',
+    order: 4,
+    content: `## O que ele faz
+
+O botão redondo no canto da tela abre o **Pergunte ao Gastrux**. Ele responde:
+
+- como fazer algo no sistema ("como fecho o caixa?")
+- perguntas sobre os números do seu restaurante ("quanto vendi ontem?", "qual o CMV do mês?")
+- e monta rascunhos de cardápio, mesas e equipe na implantação
+
+Ele só lê; nada muda no sistema sem você confirmar. Cada pessoa vê só o que o perfil dela permite: a cozinha, por exemplo, não recebe valores de venda.
+
+## Limites por plano
+
+Starter 30 perguntas por mês, Pro 150, Business 350. Nos primeiros 30 dias da conta, as primeiras 100 perguntas são grátis. O uso aparece em **Configurações > Uso da IA**.`,
+  },
+  {
+    categorySlug: 'pdv-e-caixa',
+    slug: 'abrir-comanda-lancar-pedido',
+    title: 'Como abro uma mesa e lanço um pedido?',
+    summary: 'Na tela Vender, toque na mesa, toque nos itens e envie para a cozinha.',
+    keywords: 'comanda, pedido, mesa, garçom, lançar, balcão, vender, conta, dividir',
+    featured: true,
+    order: 1,
+    content: `## Lançando na mesa
+
+1. Abra **Vender > Mesas e balcão**
+2. Toque numa mesa livre: a comanda dela abre
+3. Toque nos itens do cardápio (cada toque soma 1). Para "sem cebola" e afins, use a observação do item
+4. Toque em **Enviar para a cozinha**. Só os itens novos são enviados
+
+## Fechando a conta
+
+Na comanda, abra a **Conta**: ela mostra o subtotal, a taxa de serviço (o cliente pode recusar), o que já foi pago e o que falta. Dá para imprimir a pré-conta, receber em mais de uma forma de pagamento e dividir.
+
+Também dá para transferir itens entre comandas e juntar mesas.
+
+## Venda de balcão
+
+Na mesma tela, a **venda de balcão** vende e recebe na hora. A opção "Enviar para a cozinha" vem desmarcada; marque quando o item precisar ser preparado.
+
+> O caixa precisa estar aberto para receber (Caixa e pagamentos > Caixa).`,
+  },
+  {
+    categorySlug: 'pdv-e-caixa',
+    slug: 'abrir-fechar-caixa',
+    title: 'Como abro e fecho o caixa?',
+    summary: 'Abra com o troco, registre sangrias e despesas e feche contando o que tem.',
+    keywords: 'caixa, abrir, fechar, troco, sangria, suprimento, despesa, turno, fechamento',
+    featured: true,
+    order: 2,
+    content: `## Abrindo
+
+Abra **Caixa e pagamentos > Caixa** e informe o troco inicial. Cada caixa tem um turno aberto por vez.
+
+## Durante o turno
+
+As vendas pagas entram sozinhas, por forma de pagamento (Dinheiro, PIX, Crédito, Débito, Outros). Pelo caixa você também registra:
+
+- **Despesa**: dinheiro que sai da gaveta para pagar algo; entra como despesa na DRE
+- **Sangria**: dinheiro retirado para guardar (cofre, banco); não é despesa
+- **Suprimento**: dinheiro colocado na gaveta
+
+## Fechando
+
+Conte o que tem em cada forma de pagamento. Depois da contagem, o Gastrux mostra o esperado e a diferença; uma diferença pede o motivo. Você pode imprimir o fechamento.
+
+O histórico de todos os turnos fica em **Caixa e pagamentos > Histórico de caixas** (dono e gerente).`,
+  },
+  {
+    categorySlug: 'comanda-e-kds',
+    slug: 'usar-kds',
+    title: 'Como uso a tela da cozinha (KDS)?',
+    summary: 'Os pedidos enviados pelas mesas e pelo balcão aparecem na tela da cozinha, por estação.',
+    keywords: 'kds, cozinha, tablet, pedido, tempo real, estação',
+    order: 1,
+    content: `## Abrindo a tela
+
+Abra **Vender > Cozinha (KDS)** num tablet ou monitor da cozinha. O perfil **Cozinha** já entra com essa opção no menu.
+
+## No dia a dia
+
+Cada pedido tem um botão por etapa:
+
+1. **Iniciar**: o pedido passa a Em preparo
+2. **Pronto**: quando terminar
+3. **Completar**: quando sai da cozinha; o pedido some da tela
+
+O ícone de impressora imprime o ticket da cozinha. Um item riscado com "CANCELADO: não fazer" foi tirado da comanda.
+
+## Estações
+
+As abas **Todos Pedidos** e **Por Estação** mudam a visão. Quantas estações você pode ter depende do plano: Starter 1, Pro até 3, Business ilimitadas. Só o dono configura as estações.
+
+> **Dica**: crie uma estação por praça real da cozinha (grelha, fritura, bebidas), não por categoria do cardápio.`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
+    slug: 'cadastrar-receita',
+    title: 'Como cadastro uma ficha técnica?',
+    summary: 'A ficha técnica lista os insumos de uma porção; o custo sai do preço dos insumos.',
+    keywords: 'receita, ficha técnica, ingredientes, rendimento, porção, prato, cardápio, custo',
+    order: 1,
+    content: `## Para que serve
+
+A ficha técnica diz quais insumos, e quanto de cada um, vão numa porção. Com ela o Gastrux calcula o custo do prato e dá baixa no estoque quando o prato é vendido.
+
+## Cadastrando
+
+1. Abra **Cardápio e produtos > Fichas técnicas** e crie uma nova
+2. Dê o nome e o rendimento
+3. Adicione os insumos com a quantidade usada
+4. Salve. O custo por porção aparece na hora
+
+Na ficha também ficam a validade por conservação (usada nas etiquetas) e a opção "Contar na contagem do dia".
+
+## Ficha técnica é opcional para vender
+
+Um produto sem ficha (um refrigerante, por exemplo) vende normalmente na mesa, no balcão e no QR Code. Só não entra no custo nem baixa insumos.
+
+> Se um insumo estiver sem custo de referência, o custo da ficha fica abaixo do real. Mantenha os custos em dia em Cardápio e produtos > Insumos.`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
+    slug: 'calcular-cmv',
+    title: 'Como o Gastrux calcula o CMV?',
+    summary: 'O CMV junta o custo das fichas técnicas com o que foi vendido no período.',
+    keywords: 'cmv, custo, margem, food cost, receita, preço, lucro, engenharia de cardápio',
+    featured: true,
+    order: 2,
+    content: `## De onde vem o número
+
+- O **custo de cada porção** vem da ficha técnica: quantidade de cada insumo × custo de referência do insumo
+- O **CMV** soma o custo das porções vendidas no período e compara com as vendas
+
+Veja em **Relatórios > CMV**. Produtos sem ficha técnica não entram no custo.
+
+## Engenharia de cardápio
+
+Em **Mais recursos > Engenharia de cardápio**, cada item é classificado por popularidade e margem, para você ver o que destacar, revisar ou tirar do cardápio.
+
+## Como manter o número certo
+
+1. Atualize o custo dos insumos quando o fornecedor reajustar, ou importe a nota de compra (Estoque e compras > Importar nota de compra)
+2. Mantenha as quantidades das fichas iguais ao que a cozinha realmente usa
+
+> Referência de mercado: muitos restaurantes buscam CMV entre 28% e 35% das vendas.`,
+  },
+  {
+    categorySlug: 'estoque-e-insumos',
+    slug: 'cadastrar-insumos',
+    title: 'Como cadastro meus insumos?',
+    summary: 'Insumos com unidade e custo de referência são a base do custo das fichas e do estoque.',
+    keywords: 'insumo, ingrediente, cadastro, unidade, categoria, fornecedor, preço, custo',
+    featured: true,
+    order: 1,
+    content: `## Cadastrando
+
+Abra **Cardápio e produtos > Insumos** e cadastre cada insumo com:
+
+- nome e categoria
+- **unidade** (kg, g, l, ml, un)
+- **custo de referência** por unidade
+- **estoque mínimo**, se quiser ser avisado antes de faltar
+- fornecedores, se quiser saber de quem compra cada item
+
+## Mantendo o custo em dia
+
+O custo das fichas técnicas e o CMV usam o custo de referência daqui. Ao importar o XML da nota de compra em **Estoque e compras > Importar nota de compra**, os insumos vinculados recebem o custo e a entrada no estoque.
+
+O número de insumos depende do plano: Starter 100, Pro 500.`,
+  },
+  {
+    categorySlug: 'estoque-e-insumos',
+    slug: 'controle-estoque-alertas',
+    title: 'Como funciona o estoque e os alertas?',
+    summary: 'As vendas dão baixa pelos insumos da ficha técnica; entradas, compras e contagem ajustam o resto.',
+    keywords: 'estoque, alerta, baixo, mínimo, entrada, contagem, inventário, compra, desperdício',
+    order: 2,
+    content: `## O que mexe no estoque
+
+- **Vendas**: ao fechar a conta ou a venda de balcão, o Gastrux dá baixa nos insumos da ficha técnica de cada item, mesmo sem usar a tela da cozinha. Cancelar uma venda fechada devolve o estoque
+- **Entradas**: em **Estoque e compras > Estoque**, registre uma movimentação de entrada. A primeira entrada de um insumo começa o controle dele
+- **Compras**: em **Estoque e compras > Compras**, marcar uma lista como Recebido (ou Parcial) dá entrada nos itens recebidos
+- **Nota de compra**: **Estoque e compras > Importar nota de compra** lê o XML da NF-e do fornecedor
+- **Contagem**: em **Estoque e compras > Contagem**, confira o estoque físico e ajuste
+- **Desperdício**: registre perdas com motivo em **Estoque e compras > Desperdício**
+
+## Alertas
+
+Insumos abaixo do estoque mínimo aparecem como estoque baixo. O mínimo de cada insumo fica no cadastro do insumo.
+
+> **Dica**: comece com uma Contagem dos insumos principais. A partir dela, as vendas e as compras mantêm o número em dia.`,
+  },
+  {
+    categorySlug: 'fiscal',
+    slug: 'configurar-nfce',
+    title: 'Como configuro a nota fiscal (NFC-e)?',
+    summary: 'O Gastrux emite a NFC-e pela Focus NFe; veja o que pedir ao contador.',
+    keywords: 'nfc-e, nota fiscal, cupom, sefaz, csc, certificado, contador, fiscal',
+    order: 1,
+    content: `## O que é preciso
+
+- CNPJ com inscrição estadual
+- certificado digital **A1**
+- **CSC** (código de segurança do contribuinte) da SEFAZ do seu estado
+- token da Focus NFe
+- dados fiscais de cada produto (NCM, CFOP, CSOSN), definidos pelo seu contador
+
+## Onde configurar
+
+Abra **Fiscal > Notas fiscais (NFC-e)** (dono e gerente). As notas emitidas ficam em **Fiscal > Notas emitidas**. A NFC-e está em todos os planos.
+
+## No dia a dia
+
+A nota pode sair automaticamente ao fechar a conta. Uma nota rejeitada gera aviso no sino com o motivo. O cancelamento é feito pelo Gastrux, dentro do prazo da SEFAZ.
+
+> Dúvidas sobre impostos e sobre quando é obrigatório emitir: o contador do restaurante orienta.`,
+  },
+  {
+    categorySlug: 'integracao-delivery',
+    slug: 'site-de-delivery',
+    title: 'Como recebo pedidos de delivery?',
+    summary: 'Pelo site de delivery próprio do restaurante; os pedidos chegam na tela de pedidos.',
+    keywords: 'delivery, entrega, retirada, site, pedido online, ifood',
+    order: 1,
+    content: `## Site de delivery próprio
+
+Em **Clientes e marketing > Site de delivery** você configura o site do restaurante para pedidos de entrega e retirada, com o seu cardápio.
+
+Os pedidos chegam em **Vender > Pedidos de delivery**.
+
+## Pagamento online
+
+Com a conta do Mercado Pago do restaurante conectada, o cliente pode pagar pelo site. Os pagamentos aparecem em **Caixa e pagamentos > Pagamentos online**.
+
+## iFood e outros aplicativos
+
+Hoje o Gastrux não recebe pedidos direto do iFood ou de outros aplicativos de entrega.`,
+  },
+  {
+    categorySlug: 'faturamento-e-assinatura',
+    slug: 'como-cancelar',
+    title: 'Como cancelo minha assinatura?',
+    summary: 'O dono cancela em Minha assinatura, sem multa.',
+    keywords: 'cancelar, assinatura, plano, churn',
+    order: 1,
+    content: `## Cancelando
+
+1. No rodapé do menu, abra **Minha assinatura** (só o dono vê)
+2. Clique em **Gerenciar assinatura**
+3. Clique em **Cancelar assinatura** e confirme
+
+Nada mais é cobrado. O plano continua até o fim do período já pago; no período de teste, termina na hora e o restaurante volta para o plano **Starter**, que é grátis.`,
+  },
+  {
+    categorySlug: 'faturamento-e-assinatura',
+    slug: 'baixar-fatura',
+    title: 'Onde baixo minhas faturas?',
+    summary: 'Em Minha assinatura > Gerenciar assinatura, em PDF.',
+    keywords: 'fatura, nota, pdf, recibo, invoice, cobrança, pagamento',
+    order: 2,
+    content: `## Baixando faturas
+
+1. No rodapé do menu, abra **Minha assinatura** (só o dono vê)
+2. Clique em **Gerenciar assinatura**
+3. Em **Faturas emitidas**, clique em **PDF** na fatura que precisar
+
+Logo abaixo fica o **Histórico de pagamentos**. Dúvida sobre uma cobrança: abra um ticket em Suporte.`,
+  },
+];
+
+let synced: Promise<{ categories: number; created: number; updated: number; removed: number }> | null = null;
+
+/** Once per server process: the public help pages call it on every visit */
+export function seedDefaultHelpContent() {
+  if (!synced) {
+    synced = syncHelpContent().catch((e) => {
+      synced = null;
+      throw e;
     });
+  }
+  return synced;
+}
+
+export async function syncHelpContent() {
+  const catIds: Record<string, string> = {};
+  for (const c of HELP_CATEGORIES) {
+    const cat = await prisma.helpCategory.upsert({ where: { slug: c.slug }, update: c, create: c });
     catIds[c.slug] = cat.id;
   }
 
-  const articles = [
-    {
-      categorySlug: 'primeiros-passos',
-      slug: 'como-criar-restaurante',
-      title: 'Como configuro meu restaurante pela primeira vez?',
-      summary: 'Cadastre os dados do seu restaurante, defina horário de funcionamento e prepare a base para operar no Gastrux.',
-      keywords: 'cadastro, setup, configuração, inicial, começar, novo, dados do restaurante',
-      featured: true,
-      order: 1,
-      content:
-        '## Onde configurar\n\nAcesse **Configurações** (menu Admin) para preencher os dados do seu restaurante.\n\n## Passo a passo\n\n1. Preencha **Nome do restaurante** (obrigatório)\n2. Adicione **CNPJ**, **E-mail** e **Telefone** de contato\n3. Informe **Endereço**, **Cidade**, **Estado** e **CEP**\n4. Escolha o **Fuso horário** (ex.: America/Sao_Paulo)\n5. Configure o **Horário de Funcionamento** de cada dia da semana\n6. Clique em **Salvar alterações**\n\n## Depois de configurar\n\nCom os dados básicos salvos, siga esta ordem para deixar o Gastrux pronto para operar:\n\n1. Cadastre seus **Insumos** (ingredientes e suprimentos)\n2. Monte suas **Receitas** (fichas técnicas) — o custo é calculado automaticamente\n3. Configure suas **Mesas** e gere os QR Codes para os clientes\n4. Convide sua **Equipe**\n\n> 💡 **Dica**: comece cadastrando só as 5-10 receitas mais vendidas do seu cardápio. Dá para completar o resto depois, sem pressa.',
-    },
-    {
-      categorySlug: 'primeiros-passos',
-      slug: 'convidar-equipe',
-      title: 'Como convido minha equipe?',
-      summary: 'Adicione colaboradores com as funções certas: Admin, Gerente, Caixa ou Cozinheiro.',
-      keywords: 'usuário, equipe, colaborador, permissão, função, convidar, staff, rh',
-      order: 2,
-      content:
-        '## Adicionando colaboradores\n\n1. Acesse **Staff / RH** (menu Admin)\n2. Clique em **Novo Funcionário**\n3. Preencha nome, e-mail, telefone e horário de trabalho\n4. Escolha a função:\n   - **Admin**: acesso total ao sistema, incluindo configurações e financeiro\n   - **Gerente**: opera o dia a dia (cardápio, estoque, comandas) sem acesso a configurações críticas\n   - **Caixa**: foco em vendas e pagamentos\n   - **Cozinheiro**: acesso à comanda e ao KDS (tela da cozinha)\n5. Salve — o colaborador recebe as credenciais de acesso\n\n## Desligando um colaborador\n\nNa lista de **Equipe / RH**, clique em **Desligar** ao lado do nome. O acesso é revogado na hora, mas o histórico de vendas/ações do colaborador continua registrado.\n\n> 💡 **Dica**: dê a função de **Cozinheiro** para quem só precisa ver a tela da cozinha (KDS) — evita que a equipe operacional tenha acesso a números financeiros sem necessidade.',
-    },
-    {
-      categorySlug: 'primeiros-passos',
-      slug: 'configurar-mesas-qrcode',
-      title: 'Como configuro mesas e QR Code para os clientes?',
-      summary: 'Organize seções e mesas do salão e gere QR Codes para pedido/consulta direta na mesa.',
-      keywords: 'mesa, qr code, seção, salão, cardápio digital',
-      order: 3,
-      content:
-        '## Gerenciar Mesas\n\n1. Acesse **Gerenciar Mesas** (menu Admin)\n2. Crie uma **Seção** (ex.: Salão, Varanda, Área Externa)\n3. Dentro da seção, adicione as **Mesas** (número e capacidade)\n\n## Gerando QR Codes\n\n1. Clique em **QR Codes**\n2. Baixe ou imprima o código de cada mesa\n3. Cole o QR Code na mesa correspondente\n\nCada QR Code identifica a mesa automaticamente — quando o cliente escaneia, o pedido já entra vinculado à mesa certa, sem confusão na hora de servir ou fechar a conta.\n\n> 💡 **Dica**: organize por seção antes de criar as mesas — fica mais fácil localizar e reorganizar o salão depois, principalmente se você tiver área interna e externa.',
-    },
-    {
-      categorySlug: 'cardapio-e-receitas',
-      slug: 'cadastrar-receita',
-      title: 'Como cadastro uma receita (ficha técnica)?',
-      summary: 'Monte a ficha técnica do prato com ingredientes, rendimento e tempo de preparo — o custo é calculado sozinho.',
-      keywords: 'receita, ficha técnica, ingredientes, rendimento, porção, prato, cardápio',
-      order: 1,
-      content:
-        '## Cadastrando uma receita\n\n1. Acesse **Ficha Técnica** e clique em **Nova Receita**\n2. Preencha nome, código interno e descrição/modo de preparo\n3. Informe:\n   - **Rendimento**: quantas porções a receita gera\n   - **Porção**: tamanho de cada porção\n   - **Tempo de Preparo**\n   - **Fator de Perda**: percentual de perda no preparo (limpeza, corte, cocção)\n4. Clique em **Adicionar Ingrediente** e escolha os insumos, um a um, com a quantidade usada\n5. Salve\n\n## O que acontece automaticamente\n\nAssim que você adiciona os ingredientes, o Gastrux calcula sozinho, na seção **Resumo de Custos**:\n\n- **Custo Total da Receita**: soma do custo de todos os ingredientes\n- **Custo por Porção**: custo total dividido pelo rendimento\n- **Food Cost %**: depois que você define o **Preço de Venda**, o sistema calcula automaticamente qual porcentagem desse preço é custo de insumo\n\n> ⚠️ Se um ingrediente não tiver preço cadastrado em **Insumos**, o custo dele não entra na conta. Mantenha os preços atualizados para ter o custo real da receita.\n\n> 💡 **Dica**: cadastre o **Preço de Venda** assim que criar a receita — é o que permite ao sistema calcular o Food Cost % e te avisar se a margem está apertada.',
-    },
-    {
-      categorySlug: 'cardapio-e-receitas',
-      slug: 'calcular-cmv',
-      title: 'Como funciona o cálculo automático de CMV (Food Cost)?',
-      summary: 'O Gastrux calcula o custo de cada receita sozinho, direto a partir do preço dos seus insumos.',
-      keywords: 'cmv, custo, margem, food cost, receita, preço, lucro',
-      featured: true,
-      order: 2,
-      content:
-        '## CMV automático\n\nToda vez que você cadastra ou atualiza uma receita, o Gastrux recalcula na hora:\n\n- **Custo Total da Receita**: soma do custo de cada ingrediente usado\n- **Custo por Porção**: custo total ÷ rendimento\n- **Food Cost %**: custo por porção ÷ preço de venda\n\nVocê encontra esses números na página de cada receita, em **Resumo de Custos**.\n\n## Onde ver a visão geral\n\nUse a **Calculadora de CMV** para ver o Food Cost consolidado do cardápio inteiro, não só de uma receita — útil para identificar rapidamente quais pratos estão com margem apertada.\n\n## Como melhorar seu Food Cost\n\n1. Mantenha o preço dos **insumos** sempre atualizado (o cálculo usa o último preço cadastrado)\n2. Negocie com fornecedores os itens que mais pesam no custo\n3. Padronize porções — receitas com rendimento inconsistente distorcem o custo por porção\n4. Revise o **Fator de Perda** de receitas com muito desperdício de preparo\n\n> 💡 **Referência de mercado**: a maioria dos restaurantes busca um Food Cost entre 28% e 35%. Acima disso, vale revisar o preço de venda ou a ficha técnica.',
-    },
-    {
-      categorySlug: 'estoque-e-insumos',
-      slug: 'cadastrar-insumos',
-      title: 'Como cadastro meus insumos (ingredientes)?',
-      summary: 'Cadastre ingredientes e suprimentos com categoria, unidade e preço — a base de todo o cálculo de custo do Gastrux.',
-      keywords: 'insumo, ingrediente, cadastro, unidade, categoria, fornecedor, preço',
-      featured: true,
-      order: 1,
-      content:
-        '## Cadastrando um insumo\n\n1. Acesse **Cadastro de Insumos** e clique em **Novo Insumo**\n2. Preencha nome e código interno\n3. Escolha a **Categoria** (ex.: Hortifruti, Carnes, Bebidas)\n4. Escolha a **Unidade de medida** (kg, g, l, ml, un)\n5. Informe o **Preço** de referência\n6. Vincule um ou mais **Fornecedores**, se quiser rastrear de onde compra cada item\n7. Salve\n\n## Por que isso importa\n\nTodo o cálculo de custo de receita e Food Cost do Gastrux parte do preço cadastrado aqui. Um insumo com preço desatualizado gera um custo de receita errado — por isso vale revisar os preços sempre que o fornecedor reajustar.\n\n## Filtrando a lista\n\nUse os filtros de **Categoria**, **Unidade**, **Com fornecedores** e **Preço** no topo da página para encontrar rápido o insumo que precisa, e clique em **Salvar Filtro** se for um filtro que você usa com frequência.\n\n> 💡 **Dica**: use o mesmo código de insumo que aparece na nota fiscal do fornecedor — facilita conferir depois se o preço lançado bate com a compra real.',
-    },
-    {
-      categorySlug: 'estoque-e-insumos',
-      slug: 'controle-estoque-alertas',
-      title: 'Como funciona o Controle de Estoque e os alertas?',
-      summary: 'Acompanhe o nível de cada insumo e seja avisado antes de faltar.',
-      keywords: 'estoque, alerta, crítico, baixo, movimento, mínimo',
-      order: 2,
-      content:
-        '## Acompanhando o estoque\n\nAcesse **Controle de Estoque** para ver, insumo por insumo, a quantidade atual e o estoque mínimo configurado. Cada item recebe um status:\n\n- 🔴 **Crítico**: no mínimo ou abaixo dele — reabasteça o quanto antes\n- 🟡 **Baixo**: perto do mínimo\n- 🟢 **OK**: quantidade saudável\n\n## Registrando um movimento\n\n1. Clique em **Registrar Movimento**\n2. Escolha o insumo e o tipo de movimento (entrada, saída, ajuste)\n3. Informe a quantidade\n4. Salve — o estoque atualiza na hora\n\n## Configurando o estoque mínimo\n\nO estoque mínimo de cada insumo é definido no cadastro do insumo, em **Cadastro de Insumos**. É esse número que dispara o status Crítico/Baixo aqui no Controle de Estoque.\n\n> 💡 **Dica**: revise o estoque mínimo de cada insumo periodicamente — um mínimo mal calibrado gera alertas demais (ou de menos) e a equipe passa a ignorá-los.',
-    },
-    {
-      categorySlug: 'pdv-e-caixa',
-      slug: 'conectar-maquininha-cartao',
-      title: 'Como conecto uma maquininha de cartão e acompanho as vendas?',
-      summary: 'Integre sua maquininha (ex.: SumUp) e veja faturamento, ticket médio e transações em tempo real.',
-      keywords: 'pdv, maquininha, cartão, pos, vendas, transação, sumup',
-      featured: true,
-      order: 1,
-      content:
-        '## Conectando a maquininha\n\n1. Acesse **Vendas Rápidas (POS)** e clique em **Configurar POS**\n2. Siga o passo a passo para conectar sua maquininha (ex.: SumUp)\n3. Depois de conectada, toda venda feita na maquininha aparece automaticamente aqui\n\n## O que você acompanha\n\nNa tela de **Vendas Rápidas (POS)**:\n\n- **Total de Vendas** e **Total de Transações** do período\n- **Ticket Médio**\n- Lista de transações com status: Concluídas, Pendentes, Falhadas\n\nUse o filtro de período (7, 30 ou 90 dias) para comparar.\n\n## Integração PDV (visão consolidada)\n\nSe você tem mais de uma maquininha ou provedor, use **Integração PDV** (menu Admin) para ver faturamento, descontos e reconciliação consolidados por método de pagamento e por provedor, em um só lugar.\n\n> 💡 **Dica**: confira "Pendente Reconciliar" com frequência — transações que não batem automaticamente com um pedido do sistema ficam nessa fila até você revisar.',
-    },
-    {
-      categorySlug: 'comanda-e-kds',
-      slug: 'abrir-comanda-lancar-pedido',
-      title: 'Como abro uma comanda e lanço um pedido?',
-      summary: 'Use a Comanda Eletrônica para lançar pedidos, que já caem direto na tela da cozinha.',
-      keywords: 'comanda, pedido, mesa, garçom, lançar, eletrônica',
-      featured: true,
-      order: 1,
-      content:
-        '## Abrindo uma comanda\n\n1. Acesse **Comanda Eletrônica**\n2. Clique em **Nova Comanda**\n3. Vincule à mesa (se o pedido for no salão) ou identifique o cliente\n4. Adicione os itens do cardápio, com quantidade e observações (ex.: "sem cebola")\n5. Envie o pedido\n\n## O que acontece depois de enviar\n\nO pedido cai automaticamente na tela da cozinha (**KDS**), na estação correta, sem precisar de papel ou de gritar o pedido para a cozinha.\n\n## Adicionando itens depois\n\nUma comanda fica aberta até ser fechada — dá para voltar nela e adicionar novos itens conforme o cliente pede mais, sem precisar abrir uma comanda nova para a mesma mesa/cliente.\n\n> 💡 **Dica**: use o campo de observação para registrar qualquer alteração de prato (sem ingrediente, ponto da carne, etc.) — isso aparece direto para a cozinha no KDS, sem passar recado errado.',
-    },
-    {
-      categorySlug: 'comanda-e-kds',
-      slug: 'usar-kds',
-      title: 'Como configuro e uso o KDS na cozinha?',
-      summary: 'Organize a cozinha em estações e acompanhe os pedidos chegando em tempo real.',
-      keywords: 'kds, cozinha, tablet, pedido, tempo real, estação',
-      order: 2,
-      content:
-        '## Configurando as estações\n\n1. Acesse **Kitchen Display System** (menu Admin)\n2. Clique em **Nova Estação** (ex.: Grelha, Saladas, Bebidas, Sobremesas)\n3. Escolha um nome e uma cor de identificação para cada estação\n4. Repita para cada área da sua cozinha\n\n## Usando no dia a dia\n\nDeixe essa mesma tela aberta em um tablet ou monitor na cozinha. Assim que uma comanda é enviada:\n\n1. O item aparece automaticamente na estação certa\n2. A equipe toca no card para mover de **Em preparo** para **Pronto**\n3. Ao marcar como pronto, quem está no salão é avisado\n\n### Alertas de tempo\n\n- 🟡 Amarelo: item há mais de 10 minutos sem atualização\n- 🔴 Vermelho: mais de 20 minutos (atrasado)\n\n> 💡 **Dica**: crie uma estação por praça de trabalho real na sua cozinha (não por categoria de cardápio) — assim cada estação só vê o que ela mesma precisa preparar.',
-    },
-    {
-      categorySlug: 'faturamento-e-assinatura',
-      slug: 'como-cancelar',
-      title: 'Como cancelo minha assinatura?',
-      summary: 'Cancele a qualquer momento sem multa.',
-      keywords: 'cancelar, assinatura, plano, churn',
-      order: 1,
-      content:
-        '## Cancelando\n\n1. Acesse **Configurações → Assinatura**\n2. Clique em **Cancelar assinatura**\n3. Confirme o motivo (nos ajuda a melhorar)\n4. Seu acesso continua até o fim do período já pago\n5. Seus dados ficam arquivados por 90 dias\n\n> ❗ Após 90 dias, dados podem ser removidos permanentemente conforme a LGPD.',
-    },
-    {
-      categorySlug: 'faturamento-e-assinatura',
-      slug: 'baixar-fatura',
-      title: 'Onde baixo minhas faturas?',
-      summary: 'Acesse todas as faturas emitidas.',
-      keywords: 'fatura, nota, fiscal, pdf, recibo, invoice',
-      order: 2,
-      content:
-        '## Baixando faturas\n\n1. Acesse **Configurações → Assinatura**\n2. Vá até o histórico de faturas\n3. Baixe a fatura que precisar\n\nSe não encontrar uma fatura específica ou tiver dúvida sobre uma cobrança, abra um ticket de suporte — a equipe confirma os detalhes com você.',
-    },
-    {
-      categorySlug: 'integracao-delivery',
-      slug: 'conectar-ifood',
-      title: 'Como conecto o iFood?',
-      summary: 'Integre pedidos do iFood direto no KDS.',
-      keywords: 'ifood, delivery, integração, pedido, online',
-      featured: true,
-      order: 1,
-      content:
-        '## Integração com iFood\n\n1. Em **Admin → Integrações**, clique em **iFood**\n2. Informe seu token de merchant (painel iFood)\n3. Mapeie o cardápio (automático ou manual)\n4. Ative a sincronização\n\n### Fluxo\n\n- Pedidos chegam no KDS automaticamente\n- Status (aceito, em preparo, pronto, em entrega) sincroniza\n- Comprovantes e faturas em **Pedidos Externos**',
-    },
-  ];
+  const currentHashes = new Set(HELP_ARTICLES.map((a) => contentHash(a.content)));
+  const isDefault = (content: string) => {
+    const h = contentHash(content);
+    return LEGACY_DEFAULT_HASHES.has(h) || currentHashes.has(h);
+  };
 
-  // Slugs from an earlier seed that described features not actually reachable
-  // in the live UI (CSV import and a cash-register sangria/suprimento flow -
-  // both components exist in the codebase but aren't mounted on any route).
-  const obsoleteSlugs = ['importar-csv', 'abrir-fechar-caixa'];
-  await prisma.helpArticle.deleteMany({ where: { slug: { in: obsoleteSlugs } } });
-
-  let upserted = 0;
-  for (const a of articles) {
-    const categoryId = catIds[a.categorySlug];
-    if (!categoryId) continue;
-    await prisma.helpArticle.upsert({
-      where: { slug: a.slug },
-      update: {
-        categoryId,
-        title: a.title,
-        summary: a.summary,
-        content: a.content,
-        keywords: a.keywords,
-        featured: a.featured ?? false,
-        order: a.order ?? 0,
-        published: true,
-      },
-      create: {
-        categoryId,
-        slug: a.slug,
-        title: a.title,
-        summary: a.summary,
-        content: a.content,
-        keywords: a.keywords,
-        featured: a.featured ?? false,
-        order: a.order ?? 0,
-        published: true,
-        publishedAt: new Date(),
-      },
-    });
-    upserted++;
+  let removed = 0;
+  const obsolete = await prisma.helpArticle.findMany({ where: { slug: { in: OBSOLETE_SLUGS } }, select: { id: true, content: true } });
+  for (const o of obsolete) {
+    if (!isDefault(o.content)) continue;
+    await prisma.helpArticle.delete({ where: { id: o.id } });
+    removed++;
   }
 
-  return { categories: categories.length, articles: upserted };
+  let created = 0;
+  let updated = 0;
+  for (const a of HELP_ARTICLES) {
+    const categoryId = catIds[a.categorySlug];
+    const fields = {
+      categoryId,
+      title: a.title,
+      summary: a.summary,
+      content: a.content,
+      keywords: a.keywords,
+      featured: a.featured ?? false,
+      order: a.order ?? 0,
+    };
+    const existing = await prisma.helpArticle.findUnique({ where: { slug: a.slug }, select: { id: true, content: true } });
+    if (!existing) {
+      await prisma.helpArticle.create({ data: { ...fields, slug: a.slug, published: true, publishedAt: new Date() } });
+      created++;
+    } else if (existing.content !== a.content && isDefault(existing.content)) {
+      await prisma.helpArticle.update({ where: { id: existing.id }, data: fields });
+      updated++;
+    }
+  }
+
+  return { categories: HELP_CATEGORIES.length, created, updated, removed };
 }
