@@ -126,7 +126,7 @@ export function SegmentPageClient({ segment }: { segment: Segment }) {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup">
-              <Button variant="cta" className="gap-1">Começar Grátis</Button>
+              <Button variant="cta" className="gap-1">Testar 30 dias grátis</Button>
             </Link>
           </div>
         </div>
@@ -217,7 +217,7 @@ export function SegmentPageClient({ segment }: { segment: Segment }) {
           <p className="text-base sm:text-lg text-white mb-8 max-w-xl mx-auto">{segment.cta.description}</p>
           <Link href="/auth/signup">
             <Button size="lg" className="bg-white text-slate-900 hover:bg-white/90 gap-2">
-              Começar Agora — É Grátis <ArrowRight className="w-4 h-4" />
+              Testar 30 dias grátis <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
         </div>

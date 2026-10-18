@@ -71,7 +71,7 @@ export default function PPCLandingClient({ campaign, utms }: Props) {
             onClick={() => handleCTA('nav')}
             className={`text-sm bg-gradient-to-r ${accent} text-white px-4 py-2 rounded-lg font-semibold shadow hover:opacity-90 transition`}
           >
-            Começar Grátis
+            Testar 30 dias grátis
           </Link>
         </div>
       </nav>
@@ -187,7 +187,7 @@ export default function PPCLandingClient({ campaign, utms }: Props) {
       <section className="py-12 bg-white border-y border-gray-200">
         <div className="max-w-5xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-center text-sm text-gray-700">
           <div className="flex items-center justify-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Starter grátis
+            <CheckCircle2 className="w-5 h-5 text-emerald-500" /> 30 dias grátis, sem cartão
           </div>
           <div className="flex items-center justify-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" /> Sem cartão de crédito
@@ -209,7 +209,7 @@ export default function PPCLandingClient({ campaign, utms }: Props) {
             {campaign.finalCta.headline}
           </h2>
           <p className="mt-4 text-lg md:text-xl text-white/90">
-            Comece pelo plano grátis. Cancelável quando quiser.
+            Teste grátis por 30 dias, com tudo do Business. Sem cartão.
           </p>
           <Link
             href={signupHref}

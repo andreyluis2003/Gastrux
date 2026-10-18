@@ -9,5 +9,5 @@ Menu: Vender > Contagem do dia. Em espetarias o título é "Contagem de espetos"
 - Desfazer: quem lançou desfaz em até 2 minutos; depois só gerente ou dono.
 - Fechar contagem: só dono e gerente. Conte a sobra de cada item; a tela mostra "faltam" em vermelho e "a mais" em amarelo. A sobra contada vira o início da noite seguinte e não pode ser apagada.
 - Na primeira noite, use "Lançar o início" para dizer quantos já tem na geladeira.
-- Histórico: noites fechadas e totais por item das últimas 4 semanas. No Pro, a falta gera aviso no sino com o valor em R$.
-- A validade dos espetos fica com as Etiquetas (controle de validades do Pro).`;
+- Histórico: noites fechadas e totais por item das últimas 4 semanas. No Business, a falta gera aviso no sino com o valor em R$.
+- A validade dos espetos fica com as Etiquetas (controle de validades do Business).`;

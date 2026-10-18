@@ -20,7 +20,7 @@ interface SubscriptionData {
 }
 
 const tierLabels: Record<string, string> = {
-  starter: 'Starter',
+  starter: 'Sem plano',
   pro: 'Profissional',
   enterprise: 'Enterprise',
 };

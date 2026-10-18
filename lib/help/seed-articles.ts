@@ -27,6 +27,12 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '84fb0e79510d1cdefe042475737061534b07c15c580b647203840a5dc89f5f8b', // como-cancelar
   '77cc38e8218f43b95013fac7ebbbb782a2304e9085515b172ba65b95855ca466', // baixar-fatura
   '4b229bf0f3212dac1a5d9d60e9d3eebf3a6d9745d4fb899983ebbcd4ab80c287', // conectar-ifood
+  // Version of 2026-10-17 (live until the plans of 2026-10-18)
+  '707363d9803371ade83b7796a8e8fbcc0dd33bb2a8b4665880ac5c53dc4277bc', // convidar-equipe
+  'a9399e99e303d4347d644fda37b89fd77505de393ac3c3f2d5cb033633402cee', // pergunte-ao-gastrux
+  '42a5a7553655414dfd680009bdaa8e0418290d4ac53b39ebe8b2ccc7c26f6266', // usar-kds
+  'c065d71e3c9e0d0a5138dd57f6bb345ab90454b448ec93c33296216a07efae82', // cadastrar-insumos
+  '48537abefdff56b666ce7c2d738dfef7d4831cabd0a39aa423ba6f9f46e044b9', // como-cancelar
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -100,7 +106,7 @@ Ações sensíveis, como cancelar uma comanda, reabrir uma conta ou estornar um 
 
 Na lista de **Equipe e acessos**, desligue a pessoa. O acesso termina na hora e o histórico dela continua registrado.
 
-> O número de usuários depende do plano: Starter tem 1 (só o dono), Pro 3 e Business 5.`,
+> O número de usuários depende do plano: Pro 2 e Business 5 (no teste grátis, 5).`,
   },
   {
     categorySlug: 'primeiros-passos',
@@ -143,7 +149,7 @@ Ele só lê; nada muda no sistema sem você confirmar. Cada pessoa vê só o que
 
 ## Limites por plano
 
-Starter 30 perguntas por mês, Pro 150, Business 350. Nos primeiros 30 dias da conta, as primeiras 100 perguntas são grátis. O uso aparece em **Configurações > Uso da IA**.`,
+Pro 50 perguntas por mês, Business 350 (no teste grátis, 350). O uso aparece em **Configurações > Uso da IA**.`,
   },
   {
     categorySlug: 'pdv-e-caixa',
@@ -221,7 +227,7 @@ O ícone de impressora imprime o ticket da cozinha. Um item riscado com "CANCELA
 
 ## Estações
 
-As abas **Todos Pedidos** e **Por Estação** mudam a visão. Quantas estações você pode ter depende do plano: Starter 1, Pro até 3, Business ilimitadas. Só o dono configura as estações.
+As abas **Todos Pedidos** e **Por Estação** mudam a visão. Quantas estações você pode ter depende do plano: Pro 2, Business 5, Enterprise ilimitadas. Só o dono configura as estações.
 
 > **Dica**: crie uma estação por praça real da cozinha (grelha, fritura, bebidas), não por categoria do cardápio.`,
   },
@@ -299,7 +305,7 @@ Abra **Cardápio e produtos > Insumos** e cadastre cada insumo com:
 
 O custo das fichas técnicas e o CMV usam o custo de referência daqui. Ao importar o XML da nota de compra em **Estoque e compras > Importar nota de compra**, os insumos vinculados recebem o custo e a entrada no estoque.
 
-O número de insumos depende do plano: Starter 100, Pro 500.`,
+O número de insumos depende do plano: Pro 500, Business 1.000.`,
   },
   {
     categorySlug: 'estoque-e-insumos',
@@ -371,6 +377,35 @@ Hoje o Gastrux não recebe pedidos direto do iFood ou de outros aplicativos de e
   },
   {
     categorySlug: 'faturamento-e-assinatura',
+    slug: 'teste-gratis',
+    title: 'Como funciona o teste grátis?',
+    summary: '30 dias com tudo do Business, sem cartão. Depois, você escolhe o plano.',
+    keywords: 'teste, grátis, trial, 30 dias, plano, assinatura, bloqueio, consulta',
+    featured: true,
+    order: 0,
+    content: `## 30 dias com tudo do Business
+
+Toda conta nova começa com **30 dias grátis do plano Business**, sem cartão. Uma faixa no topo da tela mostra quantos dias faltam.
+
+## Avisos
+
+Nos dias 23, 27 e 30 do teste, o sino do Gastrux e o e-mail do dono avisam que o teste está acabando.
+
+## Escolhendo o plano
+
+No rodapé do menu, abra **Minha assinatura** (só o dono vê) e escolha:
+
+- **Pro** (R$ 149 por mês): vender, caixa, nota fiscal, cozinha com 2 estações, estoque, fichas técnicas e CMV, 2 usuários
+- **Business** (R$ 199 por mês): tudo do Pro, mais pagamento na mesa pelo celular, controle de validades, indicadores das contas de consumo, campanhas e fidelidade, 5 usuários e 5 estações de cozinha
+
+No plano anual, você paga 11 meses e usa 12.
+
+## Se o teste acabar sem plano
+
+A conta fica **só para consulta**: você vê tudo, mas não vende nem cadastra, e os pedidos pelo QR Code, site de delivery e WhatsApp param. Nenhum dado é apagado: ao escolher um plano, tudo volta a funcionar na hora.`,
+  },
+  {
+    categorySlug: 'faturamento-e-assinatura',
     slug: 'como-cancelar',
     title: 'Como cancelo minha assinatura?',
     summary: 'O dono cancela em Minha assinatura, sem multa.',
@@ -382,7 +417,7 @@ Hoje o Gastrux não recebe pedidos direto do iFood ou de outros aplicativos de e
 2. Clique em **Gerenciar assinatura**
 3. Clique em **Cancelar assinatura** e confirme
 
-Nada mais é cobrado. O plano continua até o fim do período já pago; no período de teste, termina na hora e o restaurante volta para o plano **Starter**, que é grátis.`,
+Nada mais é cobrado. O plano continua até o fim do período já pago. Depois, a conta fica **só para consulta**: você vê tudo, mas não vende nem cadastra até escolher um plano de novo. Nenhum dado é apagado.`,
   },
   {
     categorySlug: 'faturamento-e-assinatura',

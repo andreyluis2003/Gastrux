@@ -6,7 +6,7 @@ describe('AI knowledge and prompt', () => {
   it('the knowledge covers every area with the facts owners ask about', () => {
     for (const fact of [
       'Contagem do dia', 'Fechar contagem', 'Contas de consumo', 'Pagamento na mesa', 'Etiquetas', 'Validades',
-      'Fichas técnicas', 'Caixa', 'Sangria', 'DRE', 'NFC-e', 'Starter', 'Pro', 'Business', '30 perguntas', '150 perguntas', '350 perguntas',
+      'Fichas técnicas', 'Caixa', 'Sangria', 'DRE', 'NFC-e', 'Teste grátis', '30 dias', 'Pro', 'Business', '50 perguntas', '350 perguntas', 'R$ 149', 'R$ 199',
     ]) expect([fact, KNOWLEDGE.includes(fact)]).toEqual([fact, true]);
     expect(KNOWLEDGE).not.toMatch(/—/); // no em dashes (owner rule)
   });

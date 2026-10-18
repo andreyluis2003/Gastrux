@@ -51,7 +51,7 @@ export const SEGMENTS: Segment[] = [
     ],
     cta: {
       headline: 'Pronto para transformar a gestão do seu restaurante?',
-      description: 'Comece grátis, sem cartão, com os seus próprios pratos.',
+      description: 'Teste 30 dias grátis, com tudo do Business, sem cartão e com os seus próprios pratos.',
     },
     color: 'from-blue-600 to-blue-800',
   },
@@ -138,7 +138,7 @@ export const SEGMENTS: Segment[] = [
     ],
     cta: {
       headline: 'Pronto para modernizar sua pizzaria?',
-      description: 'Teste grátis e veja a diferença no primeiro fim de semana.',
+      description: 'Teste 30 dias grátis e veja a diferença no primeiro fim de semana.',
     },
     color: 'from-red-500 to-orange-600',
   },

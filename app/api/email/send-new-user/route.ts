@@ -67,8 +67,7 @@ export async function POST(request: NextRequest) {
 
           <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 4px; margin: 20px 0;">
             <p style="margin: 0; color: #1e40af; font-size: 14px;">
-              <strong>Dica de Ouro:</strong> O plano <strong>Starter (Grátis)</strong> já inclui a maioria dos recursos que você precisa para começar. Explore e depois considere fazer upgrade para Pro quando sentir necessidade.
-            </p>
+              <strong>Dica de Ouro:</strong> Você tem 30 dias grátis com tudo do plano Business. Cadastre o cardápio, faça as primeiras vendas e, antes do fim do teste, escolha o Pro ou o Business.</p>
           </div>
 
           <div style="text-align: center; margin: 30px 0;">

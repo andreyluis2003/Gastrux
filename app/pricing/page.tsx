@@ -37,7 +37,7 @@ const FEATURES_COMPARISON = [
   { category: 'Fiscal', name: 'NFC-e (nota do consumidor)' },
   { category: 'Operação', name: 'Tela da cozinha (KDS)' },
   { category: 'Operação', name: 'Cardápio digital com QR Code' },
-  { category: 'Operação', name: 'Pagamento na mesa (Pix pelo celular)' },
+  { category: 'Operação', name: 'Pagamento na mesa (Pix e cartão pelo celular)' },
   { category: 'Operação', name: 'Etiquetas de manipulação' },
   { category: 'Clientes', name: 'Clientes (CRM)' },
   { category: 'Clientes', name: 'Campanhas e fidelidade' },
@@ -53,13 +53,13 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Ingredientes': tier.limits.ingredients === 999999 ? '∞' : `${tier.limits.ingredients}`,
     'Receitas': tier.limits.recipes === 999999 ? '∞' : `${tier.limits.recipes}`,
     'Usuários Simultâneos': tier.limits.users === 999999 ? '∞' : tier.limits.users,
-    'Sistema PDV': tierId !== 'starter',
-    'Relatórios de Vendas': tierId !== 'starter',
+    'Sistema PDV': true,
+    'Relatórios de Vendas': true,
     'Gerenciamento de Estoque': true,
     'Alertas de Baixa Quantidade': true,
-    'Planejamento de Produção': tierId !== 'starter',
+    'Planejamento de Produção': true,
     'Previsão de Demanda (ML)': ['pro', 'business', 'enterprise'].includes(tierId),
-    'Dashboard Analítico': tierId !== 'starter',
+    'Dashboard Analítico': true,
     'Relatórios Executivos': ['business', 'enterprise'].includes(tierId),
     'Pedidos externos por webhook (API)':
       tier.limits.deliveryIntegrations > 0
@@ -76,11 +76,10 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     // Owner decision 2026-10-09: on every plan, with limits that grow with the plan
     'Tela da cozinha (KDS)': tier.limits.kitchenStations >= 999999 ? 'Estações ilimitadas' : `${tier.limits.kitchenStations} ${tier.limits.kitchenStations === 1 ? 'estação' : 'estações'}`,
     'Cardápio digital com QR Code': true,
-    // Owner decision 2026-10-12: from Pro
-    'Pagamento na mesa (Pix pelo celular)': tierId !== 'starter',
-    // Owner decision 2026-10-09: printing on every plan, the expiry control from Pro
-    'Etiquetas de manipulação': tierId === 'starter' ? 'Imprimir' : 'Imprimir + validades',
-    'Clientes (CRM)': tierId === 'starter' ? 'Lista e histórico' : 'Com anotações',
+    // Plans of 2026-10-18: pay at the table and the expiry control are Business and up
+    'Pagamento na mesa (Pix e cartão pelo celular)': tierId !== 'pro',
+    'Etiquetas de manipulação': tierId === 'pro' ? 'Imprimir' : 'Imprimir + validades',
+    'Clientes (CRM)': 'Com anotações',
     'Campanhas e fidelidade': ['business', 'enterprise'].includes(tierId),
   };
 
@@ -145,12 +144,6 @@ export default function PricingPage() {
       return;
     }
 
-    if (tierId === 'starter') {
-      toast.success('Você já tem acesso ao plano Starter. Bem-vindo!');
-      router.push('/dashboard');
-      return;
-    }
-
     if (mercadoPagoEnabled) {
       setGatewayDialogTier(tier);
       return;
@@ -185,7 +178,7 @@ export default function PricingPage() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup">
-              <Button variant="cta">Começar Grátis</Button>
+              <Button variant="cta">Testar 30 dias grátis</Button>
             </Link>
           </div>
         </div>
@@ -201,7 +194,7 @@ export default function PricingPage() {
             Escolha o plano certo. Cresce com você.
           </h1>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto mb-8">
-            Comece grátis no Starter. Upgrade quando precisar. Sem letras miúdas, sem fidelização.
+            Teste grátis por 30 dias, com tudo do Business. Sem cartão. Depois, escolha o plano: sem letras miúdas, sem fidelização.
           </p>
 
           {/* Billing toggle */}
@@ -228,7 +221,7 @@ export default function PricingPage() {
             >
               Anual
               <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400">
-                -15%
+                1 mês grátis
               </span>
             </button>
           </div>
@@ -237,8 +230,8 @@ export default function PricingPage() {
 
       {/* Pricing Cards */}
       <section className="py-12 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-5">
             {tiers.map((tier) => {
               const isPopular = tier.id === 'business';
               const isCustom = tier.priceMonthly === null;
@@ -254,14 +247,15 @@ export default function PricingPage() {
                   key={tier.id}
                   className={cn(
                     'relative bg-white dark:bg-slate-900 rounded-2xl border transition-all overflow-hidden',
+                    // The most chosen plan comes first on the phone (plans of 2026-10-18)
                     isPopular
-                      ? 'border-brand-green shadow-2xl ring-2 ring-brand-green lg:scale-105'
+                      ? 'order-first md:order-none border-brand-green shadow-2xl ring-2 ring-brand-green lg:scale-105'
                       : 'border-slate-200 dark:border-slate-700 hover:shadow-xl'
                   )}
                 >
                   {isPopular && (
                     <div className="absolute top-0 left-0 right-0 bg-brand-green text-white text-xs font-semibold text-center py-1.5 tracking-wider uppercase">
-                      Recomendado
+                      Mais escolhido
                     </div>
                   )}
 
@@ -281,13 +275,6 @@ export default function PricingPage() {
                           <p className="text-xs text-slate-500 mt-2">
                             Entre em contato para uma cotação
                           </p>
-                        </div>
-                      ) : tier.priceMonthly === 0 ? (
-                        <div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-5xl font-bold text-slate-900 dark:text-slate-100">Grátis</span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-2">Para sempre. Sem cartão.</p>
                         </div>
                       ) : (
                         <div>
@@ -321,12 +308,10 @@ export default function PricingPage() {
                     >
                       {loading === tier.id ? (
                         'Processando...'
-                      ) : tier.id === 'starter' ? (
-                        <>Começar Grátis<ArrowRight className="w-4 h-4 ml-2" /></>
                       ) : isCustom ? (
                         <>Falar com vendas<ArrowRight className="w-4 h-4 ml-2" /></>
                       ) : (
-                        <>Começar {billing === 'annual' ? 'plano anual' : '30 dias grátis'}<ArrowRight className="w-4 h-4 ml-2" /></>
+                        <>{session?.user ? `Assinar o ${tier.name}` : 'Testar 30 dias grátis'}<ArrowRight className="w-4 h-4 ml-2" /></>
                       )}
                     </Button>
 
@@ -481,12 +466,12 @@ export default function PricingPage() {
             Ainda tem dúvidas?
           </h2>
           <p className="text-base sm:text-lg mb-8 text-brand-light">
-            Comece gratuitamente hoje. Se não servir, é só cancelar.
+            Teste grátis por 30 dias, com tudo do Business. Se não servir, é só não assinar.
           </p>
           <div className="flex justify-center">
             <Link href="/auth/signup">
               <Button size="lg" variant="cta" className="gap-2 bg-brand-light text-brand-ink hover:bg-white">
-                Começar Grátis
+                Testar 30 dias grátis
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

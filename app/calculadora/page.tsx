@@ -247,7 +247,7 @@ export default function CalculadoraPage() {
             <GastruxLogo className="h-14" />
           </Link>
           <Link href="/auth/signup">
-            <Button size="sm" variant="cta">Criar conta grátis</Button>
+            <Button size="sm" variant="cta">Testar 30 dias grátis</Button>
           </Link>
         </div>
       </header>
@@ -522,7 +522,7 @@ export default function CalculadoraPage() {
                   </div>
                   <Link href="/auth/signup">
                     <Button variant="outline" className="rounded-xl">
-                      Criar conta grátis <ArrowRight className="h-4 w-4 ml-2" />
+                      Testar 30 dias grátis <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
                 </div>
@@ -533,11 +533,11 @@ export default function CalculadoraPage() {
                     Pronto! Vamos te enviar dicas personalizadas
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    Enquanto isso, crie sua conta gratuita para ver o diagnóstico completo.
+                    Enquanto isso, teste o Gastrux 30 dias grátis para ver o diagnóstico completo.
                   </p>
                   <Link href="/auth/signup">
                     <Button className="bg-brand-green hover:bg-brand-ink text-white rounded-xl">
-                      Criar conta grátis <ArrowRight className="h-4 w-4 ml-2" />
+                      Testar 30 dias grátis <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
                 </div>

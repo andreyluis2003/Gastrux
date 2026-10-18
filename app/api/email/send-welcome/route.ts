@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
           </div>
 
           <p style="color: #4b5563; line-height: 1.6; margin-bottom: 20px;">
-            Você está no plano <strong>Starter (Grátis)</strong> com acesso a todos os recursos básicos. Aproveite!
+            Você está no <strong>teste grátis de 30 dias</strong>, com tudo do plano Business. Aproveite!
           </p>
 
           <div style="text-align: center; margin: 30px 0;">

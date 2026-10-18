@@ -11,6 +11,6 @@ Menu: Vender > Mesas e balcão.
 - Reabrir uma conta já fechada: botão "Reabrir conta", só gerente ou dono, com motivo; o dinheiro volta do caixa.
 - Venda de balcão: vende e recebe na hora. A opção "Enviar para a cozinha" vem desmarcada; marque quando o item precisar ser preparado.
 - Mesas: o cadastro fica em Vender > Mesas (número, setor, manutenção). Os QR Codes de cada mesa ficam em Cardápio e produtos > QR Codes das mesas.
-- Cozinha (KDS): Vender > Cozinha (KDS) mostra os pedidos por estação. O Starter tem 1 estação, o Pro até 3 e o Business ilimitadas.
+- Cozinha (KDS): Vender > Cozinha (KDS) mostra os pedidos por estação. O Pro tem 2 estações, o Business 5 e o Enterprise ilimitadas.
 - Na Cozinha (KDS), cada pedido tem um botão por etapa: "Iniciar" (o pedido novo passa a Em preparo), "Pronto" (quando terminar) e "Completar" (quando sai da cozinha; o pedido some da tela). O ícone de impressora imprime o ticket da cozinha. As abas "Todos Pedidos" e "Por Estação" mudam a visão. Item riscado com "CANCELADO: não fazer" foi removido pela comanda.
 - Pedidos de delivery do site aparecem em Vender > Pedidos de delivery.`;

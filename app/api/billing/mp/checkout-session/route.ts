@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (tierId === 'starter') {
-      return NextResponse.json({ error: 'O plano Starter é gratuito e não precisa de pagamento' }, { status: 400 });
+      return NextResponse.json({ error: 'Escolha o plano Pro ou o Business' }, { status: 400 });
     }
     if (tier.priceMonthly == null) {
       return NextResponse.json(

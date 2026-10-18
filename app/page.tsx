@@ -23,13 +23,13 @@ const heroBenefits = [
   'Sai do caderno em 10 minutos',
   'Custo (CMV) e margem de cada prato',
   'Funciona no celular',
-  'Começa grátis, sem cartão',
+  '30 dias grátis, sem cartão',
 ];
 
 // Product facts only: Gastrux has no customer results to publish yet, so no customer counts, ratings
 // or savings figures go here (site claims review, 2026-09-25).
 const heroStats = [
-  { value: 'R$ 0', label: 'Plano Starter, sem cartão' },
+  { value: '30 dias', label: 'de teste com tudo do Business' },
   { value: 'Celular', label: 'E computador, sem instalar' },
   { value: 'Offline', label: 'Comanda e balcão sem internet' },
   { value: 'NFC-e', label: 'Emissão ao fechar a conta*' },
@@ -83,7 +83,7 @@ function HomePageContent() {
               <Button variant="ghost">Entrar</Button>
             </Link>
             <Link href="/auth/signup" className="hidden sm:block">
-              <Button variant="cta" className="gap-1">Começar Grátis</Button>
+              <Button variant="cta" className="gap-1">Testar 30 dias grátis</Button>
             </Link>
             <button
               className="md:hidden p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -111,7 +111,7 @@ function HomePageContent() {
                 <Button variant="outline" className="w-full">Entrar</Button>
               </Link>
               <Link href="/auth/signup" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="cta" className="w-full">Começar Grátis</Button>
+                <Button variant="cta" className="w-full">Testar 30 dias grátis</Button>
               </Link>
             </div>
           </div>
@@ -203,17 +203,17 @@ function HomePageContent() {
               : 'Seu restaurante merece mais que um caderno'}
           </h2>
           <p className="text-lg mb-8 text-brand-light max-w-2xl mx-auto">
-            Começa grátis em 10 minutos. Se não gostar, volta pro caderno, sem custo e sem burocracia.
+            Teste 30 dias grátis, com tudo do Business. Se não gostar, volta pro caderno, sem custo e sem burocracia.
           </p>
           <div className="flex justify-center">
             <Link href="/auth/signup" onClick={handleFinalCtaClick}>
               <Button size="lg" variant="cta" className="gap-2 shadow-xl bg-brand-light text-brand-ink hover:bg-white">
-                {finalCtaBtn.isLoaded ? finalCtaBtn.content : 'Criar Conta Grátis'}
+                {finalCtaBtn.isLoaded ? finalCtaBtn.content : 'Testar 30 dias grátis'}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
           </div>
-          <p className="text-sm text-brand-light mt-6">Sem cartão • Sem contrato • Grátis para sempre no Starter</p>
+          <p className="text-sm text-brand-light mt-6">Sem cartão • Sem contrato • Teste grátis por 30 dias, com tudo do Business</p>
         </div>
       </section>
 

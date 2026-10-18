@@ -37,36 +37,35 @@ export async function POST(request: NextRequest) {
           </p>
           
           <p style="color: #4b5563; line-height: 1.6; margin-bottom: 20px;">
-            Você já explorou a maioria das funcionalidades do plano Starter. Agora é hora de explorar todo o potencial de sua gestão com nossos planos PRO e BUSINESS.
+            Você está no teste de 30 dias com tudo do Business. Aproveite para usar o que traz dinheiro e evita perdas, e escolha o plano antes do fim do teste.
           </p>
 
           <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%); border-left: 4px solid #8b5cf6; padding: 20px; border-radius: 4px; margin: 30px 0;">
-            <h2 style="color: #6d28d9; margin-top: 0; font-size: 18px;">⭐ O que você ganha com PRO/BUSINESS</h2>
+            <h2 style="color: #6d28d9; margin-top: 0; font-size: 18px;">⭐ O que só o Business tem</h2>
             <div style="color: #4b5563; line-height: 1.8;">
-              <p style="margin: 10px 0;">✨ Transações <strong>ilimitadas</strong> (vs 50/dia no Starter)</p>
-              <p style="margin: 10px 0;">📊 Relatórios executivos com dados avançados</p>
-              <p style="margin: 10px 0;">🤖 Previsões de demanda com IA</p>
-              <p style="margin: 10px 0;">🔗 Integração com fornecedores</p>
-              <p style="margin: 10px 0;">⚡ Suporte prioritário</p>
-              <p style="margin: 10px 0;">📈 Análises de rentabilidade por prato</p>
+              <p style="margin: 10px 0;">📱 Pagamento na mesa pelo celular (Pix e cartão)</p>
+              <p style="margin: 10px 0;">⏰ Controle de validades com aviso</p>
+              <p style="margin: 10px 0;">💡 Indicadores das contas de luz, água e gás</p>
+              <p style="margin: 10px 0;">🎁 Campanhas e programa de fidelidade</p>
+              <p style="margin: 10px 0;">👥 5 usuários e 5 estações de cozinha</p>
             </div>
           </div>
 
           <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px; margin: 30px 0;">
             <p style="margin: 0; color: #92400e; font-size: 14px;">
-              <strong>Economizar tempo = Ganhar dinheiro.</strong> Restaurantes premium já ganham 10x mais usando planejamento inteligente. Você está pronto para fazer parte desse grupo?
+              <strong>Pro R$ 149 ou Business R$ 199 por mês.</strong> Por R$ 50 a mais, o Business inclui tudo acima.
             </p>
           </div>
 
           <div style="text-align: center; margin: 30px 0;">
             <a href="${appUrl}/pricing" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-              Ver Planos de Upgrade
+              Escolher plano
             </a>
           </div>
 
           <div style="text-align: center; margin: 20px 0;">
             <p style="margin: 0; color: #6b7280; font-size: 12px;">
-              ou continue usando o Starter gratuitamente
+              Ao fim do teste sem plano, seus dados ficam guardados para consulta
             </p>
           </div>
 

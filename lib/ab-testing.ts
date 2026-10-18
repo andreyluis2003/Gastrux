@@ -89,7 +89,7 @@ export const AB_TESTS = {
     testId: 'hero-cta-primary',
     variants: {
       control: 'Trocar o Caderno Agora',
-      'variant-a': 'Começar Grátis em 10 Min',
+      'variant-a': 'Testar 30 dias grátis',
       'variant-b': 'Ver a Margem dos Meus Pratos',
     },
     description: 'Test primary CTA button text',
@@ -118,9 +118,9 @@ export const AB_TESTS = {
   FINAL_CTA_BUTTON: {
     testId: 'final-cta-button',
     variants: {
-      control: 'Criar Conta Grátis',
+      control: 'Testar 30 dias grátis',
       'variant-a': 'Comece Agora',
-      'variant-b': 'Teste Gratuitamente',
+      'variant-b': 'Teste 30 dias grátis',
     },
     description: 'Test final CTA button text',
   } as ABTestConfig,

@@ -46,7 +46,7 @@ export default function UsagePage() {
 
   const getTierLabel = (tier: string) => {
     const labels: Record<string, string> = {
-      starter: 'Starter (Grátis)',
+      starter: 'Sem plano',
       pro: 'Pro',
       business: 'Business',
       enterprise: 'Enterprise',

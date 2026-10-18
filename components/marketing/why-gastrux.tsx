@@ -13,7 +13,7 @@ const FEATURES: FeatureRow[] = [
   { feature: '100% na nuvem, sem instalar', plan: 'Todos' },
   { feature: 'Comanda e venda de balcão sem internet', plan: 'Todos' },
   { feature: 'Previsão de demanda', plan: 'Pro ou superior' },
-  { feature: 'Tela da cozinha (KDS)', plan: 'Todos (Starter 1 estação, Pro 3, Business ilimitado)' },
+  { feature: 'Tela da cozinha (KDS)', plan: 'Pro 2 estações, Business 5, Enterprise ilimitadas' },
   { feature: 'Cardápio digital com QR Code', plan: 'Todos' },
   { feature: 'Etiquetas de manipulação (controle de validades no Pro)', plan: 'Todos' },
   { feature: 'Clientes: lista e histórico (anotações no Pro)', plan: 'Todos' },

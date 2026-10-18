@@ -14,7 +14,7 @@ interface TierInfo {
 }
 
 const TIER_NAMES: Record<string, string> = {
-  starter: 'Starter (Grátis)',
+  starter: 'Sem plano',
   pro: 'Pro',
   business: 'Business',
   enterprise: 'Enterprise',

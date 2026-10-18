@@ -4,7 +4,7 @@ import { brtDay, periodContaining, shiftPeriod, type PeriodBounds } from '@/lib/
 
 /**
  * Sales per month per plan (owner decision 2026-10-09, after the competitor research: Anota AI sells
- * by orders per month): Starter 300, Pro 1.500, Business 3.000, Enterprise unlimited.
+ * by orders per month): Pro 1.000, Business 3.500 (plans of 2026-10-18), Enterprise unlimited.
  *
  * A sale is a closed comanda (table, name, counter, quick sale) or a delivery / online order that is
  * not cancelled (an order with no comanda). Kitchen orders of a comanda are not counted again.
@@ -50,7 +50,7 @@ export async function monthlySalesUsage(restaurantId: string, now: Date = new Da
   };
 }
 
-const PLAN_NAMES: Record<string, string> = { starter: 'Starter', pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+const PLAN_NAMES: Record<string, string> = { starter: 'sem plano', pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
 
 /**
  * Called after a sale. Leaves a restaurant-wide alert (owner and managers see it, lib/notification-utils)

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const TIER_LABELS: Record<string, string> = {
-  starter: 'Starter (Grátis)',
+  starter: 'Sem plano',
   pro: 'Pro',
   business: 'Business',
   enterprise: 'Enterprise',

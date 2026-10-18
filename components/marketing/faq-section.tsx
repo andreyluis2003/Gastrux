@@ -11,7 +11,7 @@ const DEFAULT_FAQS: FAQ[] = [
   },
   {
     q: 'Preciso pagar algo pra começar?',
-    a: 'Não. O plano Starter é gratuito para sempre, sem cartão de crédito. Você só paga se quiser recursos avançados, quando estiver pronto.',
+    a: 'Não. Você testa 30 dias com tudo do Business, sem cartão. Depois escolhe o Pro (R$ 149) ou o Business (R$ 199) por mês; se não escolher, seus dados ficam guardados para consulta.',
   },
   {
     q: 'Quanto tempo leva pra começar a usar?',

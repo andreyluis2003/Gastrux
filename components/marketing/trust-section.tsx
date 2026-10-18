@@ -66,7 +66,7 @@ export function TrustSection() {
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Quem está por trás</h3>
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
               A Gastrux é desenvolvida pela Help Flow Ltda, empresa brasileira (CNPJ 61.639.918/0001-70). Antes de
-              assinar, você pode criar a conta grátis e testar com os seus próprios pratos. Dúvidas? Escreva para{' '}
+              assinar, você pode testar 30 dias grátis com os seus próprios pratos. Dúvidas? Escreva para{' '}
               <a href="mailto:contato@gastrux.com" className="font-medium text-brand-green hover:underline">contato@gastrux.com</a>.
             </p>
           </div>
@@ -75,7 +75,7 @@ export function TrustSection() {
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             <ArrowRight className="w-4 h-4" />
-            Criar conta grátis
+            Testar 30 dias grátis
           </Link>
         </div>
       </div>

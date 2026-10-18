@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { X, Star, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 
 interface UpgradeModalProps {
   isOpen: boolean;

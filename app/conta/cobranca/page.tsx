@@ -48,7 +48,7 @@ export default function CobrancaPage() {
       toast.success(
         data.accessUntil
           ? `Assinatura cancelada. O plano continua até ${new Date(data.accessUntil).toLocaleDateString('pt-BR')}.`
-          : 'Assinatura cancelada. O restaurante voltou para o plano Starter.'
+          : 'Assinatura cancelada. A conta fica disponível para consulta até você escolher um plano.'
       )
       await load()
     } catch (err: any) {

@@ -50,13 +50,13 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
     metaTitle:
       'Sistema para Pizzaria: controle estoque, margem e delivery em 1 app',
     metaDescription:
-      'Plataforma completa para pizzarias. Controle de mussarela, ficha técnica e margem por sabor. Plano Starter grátis, sem cartão.',
+      'Plataforma completa para pizzarias. Controle de mussarela, ficha técnica e margem por sabor. 30 dias grátis, com tudo do Business, sem cartão.',
     hero: {
       eyebrow: '🍕 Específico para PIZZARIAS',
       headline: 'Pare de perder mussarela. Comece a ganhar margem.',
       subheadline:
         'Controle o estoque em tempo real e saiba o custo e a margem de cada sabor pela ficha técnica.',
-      ctaPrimary: 'Começar Grátis',
+      ctaPrimary: 'Testar 30 dias grátis',
       ctaSecondary: 'Ver Demonstração',
       trustLine: '✅ Sem cartão de crédito • 📱 Funciona no celular • 🍕 Ficha técnica por sabor',
     },
@@ -93,14 +93,14 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: '30 dias', label: 'de teste grátis' },
       { value: 'Por sabor', label: 'Custo e margem' },
       { value: 'Offline', label: 'Comanda e balcão' },
       { value: 'NFC-e', label: 'No plano Business' },
     ],
     finalCta: {
       headline: 'Descubra quanto cada sabor deixa de margem',
-      button: 'Começar Grátis',
+      button: 'Testar 30 dias grátis',
     },
     theme: {
       accentFrom: 'from-red-500',
@@ -114,15 +114,15 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
     metaTitle:
       'Sistema para Hamburgueria: padronize receitas, escale lojas',
     metaDescription:
-      'Ficha técnica, multi-loja e KDS para hamburguerias. Plano Starter grátis, sem cartão.',
+      'Ficha técnica, multi-loja e KDS para hamburguerias. 30 dias grátis, com tudo do Business, sem cartão.',
     hero: {
       eyebrow: '🍔 Específico para HAMBURGUERIAS',
       headline: 'Escale sua hamburgueria sem perder o sabor.',
       subheadline:
         'Padronize receitas, controle CMV e abra a próxima loja com confiança.',
-      ctaPrimary: 'Começar Grátis',
+      ctaPrimary: 'Testar 30 dias grátis',
       ctaSecondary: 'Como funciona',
-      trustLine: '✅ Starter grátis • 🍔 Multi-loja no Business • 📱 Funciona no celular',
+      trustLine: '✅ 30 dias grátis • 🍔 Multi-loja no Business • 📱 Funciona no celular',
     },
     painPoints: [
       'Sabor inconsistente entre turnos',
@@ -157,14 +157,14 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: '30 dias', label: 'de teste grátis' },
       { value: 'Por receita', label: 'Gramatura e custo' },
       { value: 'KDS', label: 'No plano Business' },
       { value: '2 lojas', label: 'No plano Business' },
     ],
     finalCta: {
       headline: 'A próxima unidade começa com o sistema certo',
-      button: 'Começar Grátis',
+      button: 'Testar 30 dias grátis',
     },
     theme: {
       accentFrom: 'from-amber-500',
@@ -178,7 +178,7 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
     metaTitle:
       'Controle de Estoque para Restaurantes: simples, rápido, em tempo real',
     metaDescription:
-      'Controle de estoque para restaurantes sem planilhas. Alertas automáticos, ficha técnica, cadastro de fornecedores. Plano Starter grátis, sem cartão.',
+      'Controle de estoque para restaurantes sem planilhas. Alertas automáticos, ficha técnica, cadastro de fornecedores. 30 dias grátis, com tudo do Business, sem cartão.',
     hero: {
       eyebrow: '📦 CONTROLE DE ESTOQUE PARA RESTAURANTES',
       headline: 'Estoque sob controle, sem planilha.',
@@ -221,14 +221,14 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: '30 dias', label: 'de teste grátis' },
       { value: 'Automática', label: 'Baixa por receita' },
       { value: 'Celular', label: 'Contagem de estoque' },
       { value: 'CSV', label: 'Importa ingredientes' },
     ],
     finalCta: {
       headline: 'Comece com estoque real ainda hoje',
-      button: 'Criar Conta Grátis',
+      button: 'Testar 30 dias grátis',
     },
     theme: {
       accentFrom: 'from-blue-500',
@@ -250,7 +250,7 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
         'Calcule CMV por prato, acompanhe variações diárias e descubra quais itens do cardápio têm a melhor margem de contribuição.',
       ctaPrimary: 'Quero Saber Meu CMV',
       ctaSecondary: 'Como funciona',
-      trustLine: '✅ Starter grátis • 📊 DRE com seus lançamentos • 📱 Funciona no celular',
+      trustLine: '✅ 30 dias grátis • 📊 DRE com seus lançamentos • 📱 Funciona no celular',
     },
     painPoints: [
       'CMV oscilando sem explicação todo mês',
@@ -285,14 +285,14 @@ export const PPC_CAMPAIGNS: Record<string, PPCCampaign> = {
       },
     ],
     stats: [
-      { value: 'R$ 0', label: 'Plano Starter' },
+      { value: '30 dias', label: 'de teste grátis' },
       { value: 'Por prato', label: 'CMV e margem' },
       { value: 'Matriz', label: 'Engenharia de cardápio' },
       { value: 'DRE', label: 'Com seus lançamentos' },
     ],
     finalCta: {
       headline: 'Saiba o CMV de cada prato antes de mudar o preço',
-      button: 'Começar Grátis',
+      button: 'Testar 30 dias grátis',
     },
     theme: {
       accentFrom: 'from-violet-500',
