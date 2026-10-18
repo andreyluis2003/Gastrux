@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react';
 import { ChevronDown, CreditCard, LifeBuoy, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
 import { openFeedback } from '@/components/feedback/feedback-widget';
+import { PlanBanner } from '@/components/billing/plan-banner';
 import { signOutSafely } from '@/lib/offline/sign-out';
 import { activeHref, navFor, shellMode, type NavGroup } from '@/lib/navigation/app-nav';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         {bellInTopBar && <NotificationCenter />}
       </header>
+
+      <PlanBanner />
 
       {open && <div className={cn('fixed inset-0 z-50 bg-black/50', sidebar && 'md:hidden')} onClick={() => setOpen(false)} aria-hidden />}
 

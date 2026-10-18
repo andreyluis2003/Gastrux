@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
@@ -19,6 +20,13 @@ export default function BillingSuccessPage() {
   const mpSubscriptionId = searchParams.get('subscription_id'); // Mercado Pago
   const [state, setState] = useState<VerificationState>('checking');
   const cancelled = useRef(false);
+  const { update } = useSession() || ({} as any);
+
+  // Paid: the login reads the plan again at once, so a locked restaurant is released without waiting 5 minutes
+  useEffect(() => {
+    if (state === 'success') void update?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   useEffect(() => {
     cancelled.current = false;
