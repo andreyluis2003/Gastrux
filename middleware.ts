@@ -11,6 +11,7 @@ import { getCacheHeaders, getCacheTypeForRoute } from '@/lib/cache-strategy';
 import { detectRegionFromCountry } from '@/lib/regional-config';
 import { getToken } from 'next-auth/jwt';
 import { entryRedirect } from '@/lib/navigation/entry';
+import { LOCK_CODE, LOCK_MESSAGE } from '@/lib/billing/plan-lock-text';
 
 export const config = {
   matcher: [
@@ -92,6 +93,13 @@ const PLATFORM_ADMIN_API_PREFIXES = [
   '/api/admin/nurturing',
   '/api/admin/onboarding',
 ];
+
+// Plans of 2026-10-18 §6: what a locked restaurant can still do (pay, log in/out, account, support)
+export const PLAN_OPEN_API_PREFIXES = [
+  '/api/auth', '/api/billing', '/api/conta', '/api/password', '/api/support', '/api/feedback',
+  '/api/feature-requests', '/api/notifications', '/api/push-notifications', '/api/signup',
+];
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function matchesPrefix(pathname: string, prefixes: string[]): boolean {
   for (const p of prefixes) {
@@ -216,6 +224,12 @@ export async function middleware(request: NextRequest) {
           { error: 'Forbidden', message: 'Acesso restrito à equipe da plataforma.' },
           { status: 403 },
         );
+      }
+
+      // Read-only after the trial (spec 2026-10-18 §6): writes refused, screens still open. A token from
+      // before the deploy has no claim and passes until the next refresh (lib/billing/plan-claim.ts)
+      if (token?.planLocked === true && WRITE_METHODS.has(request.method) && !matchesPrefix(pathname, PLAN_OPEN_API_PREFIXES) && !isPlatformAdminToken(token)) {
+        return NextResponse.json({ error: LOCK_MESSAGE, code: LOCK_CODE }, { status: 402 });
       }
     } catch {
       response.headers.set('X-Authenticated', 'false');

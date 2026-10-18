@@ -6,7 +6,8 @@ import { OnboardingProvider } from './onboarding/onboarding-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <NextAuthSessionProvider>
+    // Every 5 minutes the session is read again, and with it the plan lock (lib/billing/plan-claim.ts)
+    <NextAuthSessionProvider refetchInterval={300} refetchOnWindowFocus>
       {children}
       <OnboardingProvider />
     </NextAuthSessionProvider>

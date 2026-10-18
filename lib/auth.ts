@@ -7,6 +7,7 @@ import { prisma } from './prisma';
 import { resolveEffectiveRole } from './auth/effective-role';
 import bcryptjs from 'bcryptjs';
 import { trialEnd } from '@/lib/billing/plan-access';
+import { refreshPlanClaim } from '@/lib/billing/plan-claim';
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? process.env.NODE_ENV === 'production';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
@@ -90,6 +91,8 @@ export const authOptions: NextAuthOptions = {
           console.error('[JWT Callback] Error fetching user role:', e);
         }
       }
+      // The plan lock for the middleware (spec 2026-10-18 §6): at login, on update() and every 5 minutes
+      await refreshPlanClaim(token, { force: !!user || trigger === 'update' });
       return token;
     },
     async session({ session, token }) {
@@ -102,6 +105,9 @@ export const authOptions: NextAuthOptions = {
         // middleware.ts enforces (the menu used to show only for role ADMIN, hiding it from the team)
         const allow = (process.env.PLATFORM_ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
         (session.user as any).isPlatformAdmin = token.role === 'ADMIN' || (!!token.email && allow.includes(String(token.email).toLowerCase()));
+        // The trial / locked bar (components/billing/plan-banner.tsx), from the claim refreshed every 5 minutes
+        (session.user as any).planState = (session.user as any).isPlatformAdmin ? null : (token.planState as string | null) ?? null;
+        (session.user as any).trialDaysLeft = (token.trialDaysLeft as number | null) ?? null;
       }
       return session;
     },
