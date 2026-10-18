@@ -7,6 +7,7 @@ import {
   UtilityError, type BillPoint, type Indicators, type UtilityKind,
 } from './rules';
 import { alertIfAbove } from './alert';
+import { syncUtilityPayable } from '@/lib/payables/service';
 
 const KINDS = Object.keys(KIND_INFO) as UtilityKind[];
 
@@ -76,6 +77,12 @@ export async function upsertBill(
       action: 'UPDATE', entityType: 'UtilityBill', entityId: bill.id,
       changes: { month: ym, before: { amountCents: previous.amountCents, consumption: previous.consumption === null ? null : Number(previous.consumption) }, after: { amountCents, consumption } },
     });
+  }
+  try {
+    // With a due date the bill is also in Contas a pagar (spec 2026-10-18 contas a pagar)
+    await syncUtilityPayable(member.restaurantId, bill.id, member.userId);
+  } catch (error) {
+    console.error('[utility-bills] payable sync failed:', error); // the bill itself is saved
   }
   let alerted = false;
   try {

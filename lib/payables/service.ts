@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { isTierFeatureEnabled } from '@/lib/tier-guard';
-import { UtilityError } from '@/lib/utility-bills/rules';
+import { monthLabel, UtilityError } from '@/lib/utility-bills/rules';
 import { addEntry } from '@/lib/caixa/sessions';
 import {
   addMonths, brtToday, CATEGORIES, CATEGORY_LABEL, currentMonth, dayDate, displayState, dueDateIn, installmentDueDates,
@@ -352,6 +352,40 @@ export async function undoPayment(member: RestaurantMember, id: string, reason: 
   if (done.count === 0) throw new PayableError('Esta conta não está paga', 409);
   await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { undone: why, from: p.paidFrom } });
   return { ok: true as const };
+}
+
+/**
+ * A utility bill with a due date is a bill to pay (spec 2026-10-18 §5): its payable is created or follows it while
+ * still open; a paid one keeps its values. Without a due date an open payable is canceled, a paid one stays.
+ */
+export async function syncUtilityPayable(restaurantId: string, billId: string, userId: string) {
+  const bill = await prisma.utilityBill.findFirst({ where: { id: billId, restaurantId }, include: { account: { select: { name: true } } } });
+  if (!bill) return;
+  const existing = await prisma.payable.findUnique({ where: { utilityBillId: bill.id } });
+  if (!bill.dueDate) {
+    if (existing?.status === 'OPEN') {
+      await prisma.payable.update({
+        where: { id: existing.id },
+        data: { status: 'CANCELED', canceledAt: new Date(), canceledById: userId, cancelReason: 'Vencimento removido na conta de consumo' },
+      });
+    }
+    return;
+  }
+  const values = {
+    description: `${bill.account.name} ${monthLabel(monthOf(bill.referenceMonth))}`.slice(0, 120),
+    amountCents: bill.amountCents,
+    competenceMonth: bill.referenceMonth,
+    dueDate: bill.dueDate,
+  };
+  if (!existing) {
+    await prisma.payable.create({ data: { restaurantId, category: 'UTILITIES', source: 'UTILITY', utilityBillId: bill.id, createdById: userId, ...values } });
+  } else if (existing.status !== 'PAID') {
+    // A canceled one comes back when the bill gets a due date again
+    await prisma.payable.update({
+      where: { id: existing.id },
+      data: { ...values, status: 'OPEN', canceledAt: null, canceledById: null, cancelReason: null, updatedById: userId },
+    });
+  }
 }
 
 export async function stopSeries(member: RestaurantMember, seriesId: string) {
