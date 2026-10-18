@@ -100,6 +100,8 @@ export const PLAN_OPEN_API_PREFIXES = [
   '/api/feature-requests', '/api/notifications', '/api/push-notifications', '/api/signup',
   // Leaving a locked restaurant for another one the person works in (final review I-5)
   '/api/admin/multi-location/switch',
+  // Page metrics and A/B events the browser sends by itself (homolog check 2026-10-18: 402s in the console)
+  '/api/analytics',
 ];
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

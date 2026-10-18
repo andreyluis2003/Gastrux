@@ -27,7 +27,7 @@ describe('middleware: plan lock', () => {
     expect((await call('/api/comanda/sessions/s1', 'GET')).status).not.toBe(402);
   });
 
-  it.each(['/api/billing/mp/checkout-session', '/api/auth/session', '/api/conta/profile', '/api/support/tickets', '/api/feedback', '/api/notifications/read', '/api/password/reset', '/api/admin/multi-location/switch'])('%s stays open', async (path) => {
+  it.each(['/api/billing/mp/checkout-session', '/api/auth/session', '/api/conta/profile', '/api/support/tickets', '/api/feedback', '/api/notifications/read', '/api/password/reset', '/api/admin/multi-location/switch', '/api/analytics/web-vitals'])('%s stays open', async (path) => {
     as({ planLocked: true });
     expect((await call(path)).status).not.toBe(402);
   });
