@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/guard';
-import { getCustomerDetails, updateCustomer, extendTrial } from '@/lib/admin/customer-service';
+import { getCustomerDetails, updateCustomer } from '@/lib/admin/customer-service';
 import { clientProfiles } from '@/lib/admin/client-profile';
 import { prisma } from '@/lib/prisma';
 
@@ -42,13 +42,7 @@ export async function PATCH(
   try {
     const body = await req.json();
 
-    // Support special actions
-    if (body.action === 'extend_trial' && typeof body.days === 'number' && body.days > 0) {
-      const result = await extendTrial(params.id, body.days);
-      if (!result) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
-      return NextResponse.json(result);
-    }
-
+    // Extending a trial has its own route with a reason and audit: ./trial (spec 2026-10-18 §8)
     if (body.action === 'suspend') {
       const result = await updateCustomer(params.id, {
         status: 'SUSPENDED' as any,

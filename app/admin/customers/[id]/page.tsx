@@ -81,6 +81,7 @@ interface CustomerDetail {
     subscriptionTier: string;
     subscriptionStatus: string;
     trialEndsAt: string | null;
+    isInternal: boolean;
     billingCycleEnd: string | null;
     createdAt: string;
     updatedAt: string;
@@ -132,7 +133,9 @@ export default function CustomerDetailPage() {
   const [editTier, setEditTier] = useState('starter');
   const [editStatus, setEditStatus] = useState('ACTIVE');
   const [editSubStatus, setEditSubStatus] = useState('active');
-  const [editTrialDays, setEditTrialDays] = useState('7');
+  // Teste e acesso (spec 2026-10-18 §8): every change asks for the reason
+  const [reason, setReason] = useState('');
+  const [untilDate, setUntilDate] = useState('');
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -158,6 +161,28 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     void fetchDetail();
   }, [fetchDetail]);
+
+  async function post(path: string, method: 'POST' | 'PATCH', body: any, successMsg: string) {
+    if (!id) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${id}/${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, reason }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
+      toast.success(successMsg);
+      setReason('');
+      setUntilDate('');
+      await fetchDetail();
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function callPatch(body: any, successMsg: string) {
     if (!id) return;
@@ -202,6 +227,9 @@ export default function CustomerDetailPage() {
   }
 
   const { restaurant, owner, recentPayments, stats } = detail;
+  const extensions = (detail.notes || []).filter((n) => n.text.startsWith('Teste estendido')).length;
+  const paid = ['pro', 'business', 'enterprise'].includes(restaurant.subscriptionTier) && ['active', 'past_due'].includes(restaurant.subscriptionStatus);
+  const noReason = reason.trim().length < 3;
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl">
@@ -279,6 +307,51 @@ export default function CustomerDetailPage() {
         </Card>
       </div>
 
+      {/* Teste e acesso (spec 2026-10-18 §8) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Teste e acesso
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm">
+            {restaurant.isInternal
+              ? 'Conta interna: nunca é bloqueada e funciona como Business.'
+              : paid
+                ? `Plano pago: ${restaurant.subscriptionTier}.`
+                : `Teste até ${formatDate(restaurant.trialEndsAt)}${extensions ? ` · estendido ${extensions}×` : ''}.`}
+          </p>
+          <div>
+            <Label className="text-xs">Motivo (obrigatório)</Label>
+            <Input className="mt-1" value={reason} maxLength={200} placeholder="Ex.: piloto da espetaria" onChange={(e) => setReason(e.target.value)} />
+          </div>
+          {!paid && (
+            <div className="flex flex-wrap items-center gap-2">
+              {[7, 15, 30].map((d) => (
+                <Button key={d} variant="outline" disabled={saving || noReason} onClick={() => post('trial', 'POST', { days: d }, `Teste estendido por ${d} dias`)}>
+                  +{d} dias
+                </Button>
+              ))}
+              <Input type="date" className="w-44" value={untilDate} onChange={(e) => setUntilDate(e.target.value)} />
+              <Button variant="outline" disabled={saving || noReason || !untilDate} onClick={() => post('trial', 'POST', { until: untilDate }, 'Teste estendido')}>
+                Usar data
+              </Button>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <Button
+              variant={restaurant.isInternal ? 'destructive' : 'secondary'}
+              disabled={saving || noReason}
+              onClick={() => post('internal', 'PATCH', { isInternal: !restaurant.isInternal }, restaurant.isInternal ? 'Conta interna desligada' : 'Conta interna ligada')}
+            >
+              {restaurant.isInternal ? 'Desligar conta interna' : 'Marcar como conta interna'}
+            </Button>
+            <span className="text-xs text-muted-foreground">Fica registrado na auditoria e nas anotações, com o motivo.</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Actions */}
       <Card>
         <CardHeader className="pb-3">
@@ -303,29 +376,6 @@ export default function CustomerDetailPage() {
             >
               <Play className="h-4 w-4" /> Reativar
             </Button>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min="1"
-                max="180"
-                className="w-20"
-                value={editTrialDays}
-                onChange={(e) => setEditTrialDays(e.target.value)}
-              />
-              <Button
-                variant="outline"
-                className="gap-2"
-                disabled={saving}
-                onClick={() =>
-                  callPatch(
-                    { action: 'extend_trial', days: parseInt(editTrialDays, 10) },
-                    `Trial estendido por ${editTrialDays} dias`
-                  )
-                }
-              >
-                <Clock className="h-4 w-4" /> Estender trial
-              </Button>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -336,7 +386,7 @@ export default function CustomerDetailPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="starter">Starter</SelectItem>
+                  <SelectItem value="starter">Sem plano</SelectItem>
                   <SelectItem value="pro">Pro</SelectItem>
                   <SelectItem value="business">Business</SelectItem>
                   <SelectItem value="enterprise">Enterprise</SelectItem>

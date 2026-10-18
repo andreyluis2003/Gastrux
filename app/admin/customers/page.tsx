@@ -27,6 +27,8 @@ interface Customer {
   subscriptionTier: string;
   subscriptionStatus: string;
   trialEndsAt: string | null;
+  isInternal: boolean;
+  trialExtensions: number;
   billingCycleEnd: string | null;
   city: string | null;
   state: string | null;
@@ -289,7 +291,11 @@ export default function CustomersPortalPage() {
                       <span>{p.usage.closedBills30d} contas fechadas em 30 dias</span>
                       <span>Mercado Pago: {p.usage.mercadoPago}</span>
                       <span>Nota fiscal: {p.usage.fiscal}</span>
-                      {c.status === 'TRIAL' && <span>Teste até {formatDate(c.trialEndsAt)}</span>}
+                      {c.isInternal
+                        ? <span className="font-medium text-slate-700">Interna</span>
+                        : c.status === 'TRIAL' && (
+                          <span>Teste até {formatDate(c.trialEndsAt)}{c.trialExtensions > 0 && ` · estendido ${c.trialExtensions}×`}</span>
+                        )}
                     </div>
                   )}
 

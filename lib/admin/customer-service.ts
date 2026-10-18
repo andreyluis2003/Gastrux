@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { cache, cacheKey, invalidate, CACHE_TTL } from '@/lib/cache';
+import { EXTENSION_NOTE_PREFIX } from '@/lib/admin/trial';
 import { PaymentStatus, RestaurantStatus } from '@prisma/client';
 
 function toNumber(value: unknown): number {
@@ -76,6 +77,7 @@ export async function listCustomers(filters: CustomerListFilters) {
         subscriptionTier: true,
         subscriptionStatus: true,
         trialEndsAt: true,
+        isInternal: true,
         billingCycleEnd: true,
         ownerId: true,
         city: true,
@@ -87,9 +89,18 @@ export async function listCustomers(filters: CustomerListFilters) {
     prisma.restaurant.count({ where }),
   ]);
 
+  // How many times the team extended each trial (spec 2026-10-18 §8: notes written by lib/admin/trial.ts)
+  const extensions = await prisma.platformClientNote.groupBy({
+    by: ['restaurantId'],
+    where: { restaurantId: { in: rows.map((r) => r.id) }, text: { startsWith: EXTENSION_NOTE_PREFIX } },
+    _count: { _all: true },
+  });
+  const extended = new Map(extensions.map((x) => [x.restaurantId, x._count._all]));
+
   return {
     customers: rows.map((r) => ({
       ...r,
+      trialExtensions: extended.get(r.id) ?? 0,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
       trialEndsAt: r.trialEndsAt ? r.trialEndsAt.toISOString() : null,
@@ -287,19 +298,3 @@ export async function updateCustomer(id: string, payload: UpdateCustomerPayload)
   };
 }
 
-export async function extendTrial(id: string, days: number) {
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { id },
-    select: { trialEndsAt: true },
-  });
-  if (!restaurant) return null;
-  const base = restaurant.trialEndsAt && restaurant.trialEndsAt > new Date()
-    ? restaurant.trialEndsAt
-    : new Date();
-  const newEnd = new Date(base);
-  newEnd.setDate(newEnd.getDate() + days);
-  return updateCustomer(id, {
-    trialEndsAt: newEnd.toISOString(),
-    status: 'TRIAL' as RestaurantStatus,
-  });
-}
