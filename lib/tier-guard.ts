@@ -80,7 +80,7 @@ export async function checkTierLimit(
  */
 export function isTierFeatureEnabled(
   tier: string,
-  feature: 'kds' | 'qrMenu' | 'tablePayment' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'dailyCountAlert' | 'utilityInsights' | 'loyalty' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
+  feature: 'kds' | 'qrMenu' | 'tablePayment' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'dailyCountAlert' | 'utilityInsights' | 'loyalty' | 'payableSeries' | 'payableAlerts' | 'payableFromNfe' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
 ): boolean {
   const featureMap: Record<string, string[]> = {
     // Owner decision 2026-10-09: the KDS, the QR menu and the basic CRM (customer list and history) on
@@ -100,6 +100,10 @@ export function isTierFeatureEnabled(
     // Owner decision 2026-10-16: utility bills and their DRE line on every plan; indicators and alert Business and up (2026-10-18)
     utilityInsights: ['business', 'enterprise'],
     loyalty: ['business', 'enterprise'],
+    // Spec 2026-10-18 contas a pagar: the list, installments and paying on every plan; what saves work is Business
+    payableSeries: ['business', 'enterprise'],
+    payableAlerts: ['business', 'enterprise'],
+    payableFromNfe: ['business', 'enterprise'],
     // Owner decision 2026-10-09: the NFC-e on every plan (a restaurant must issue the consumer note)
     nfe: ['starter', 'pro', 'business', 'enterprise'],
     customApi: ['enterprise'],

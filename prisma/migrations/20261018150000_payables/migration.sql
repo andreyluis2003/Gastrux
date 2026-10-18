@@ -19,6 +19,7 @@ CREATE TABLE "payable_series" (
     "supplierId" TEXT,
     "amountCents" INTEGER NOT NULL,
     "dueDay" INTEGER NOT NULL,
+    "startMonth" DATE NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
     "createdById" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

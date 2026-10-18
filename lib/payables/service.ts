@@ -1,0 +1,289 @@
+import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
+import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { UtilityError } from '@/lib/utility-bills/rules';
+import {
+  addMonths, brtToday, CATEGORIES, CATEGORY_LABEL, currentMonth, dayDate, displayState, dueDateIn, installmentDueDates,
+  monthDate, monthOf, parseAmountCents, parseDay, PayableError, seriesMonths, splitInstallments, type DisplayState, type PayableCategory,
+} from './rules';
+
+/**
+ * Contas a pagar (spec 2026-10-18 contas a pagar): one list of the restaurant's bills. Owner and manager only
+ * (the routes check it); every query is scoped by the member's restaurant.
+ */
+
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const money = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\s/g, ' ');
+export { money };
+
+async function tierOf(restaurantId: string) {
+  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } });
+  return r?.subscriptionTier || 'starter';
+}
+
+export async function payableFeatures(restaurantId: string) {
+  const tier = await tierOf(restaurantId);
+  return {
+    series: isTierFeatureEnabled(tier, 'payableSeries'),
+    alerts: isTierFeatureEnabled(tier, 'payableAlerts'),
+    nfe: isTierFeatureEnabled(tier, 'payableFromNfe'),
+  };
+}
+
+function amountOf(v: unknown): number {
+  try {
+    return parseAmountCents(v);
+  } catch (error) {
+    if (error instanceof UtilityError) throw new PayableError('Valor inválido');
+    throw error;
+  }
+}
+
+function descriptionOf(v: unknown): string {
+  const d = typeof v === 'string' ? v.trim() : '';
+  if (!d) throw new PayableError('Informe a descrição da conta');
+  return d.slice(0, 120);
+}
+
+function categoryOf(v: unknown): PayableCategory {
+  if (typeof v !== 'string' || !CATEGORIES.includes(v as PayableCategory)) throw new PayableError('Categoria inválida');
+  return v as PayableCategory;
+}
+
+function competenceOf(v: unknown, dueDay: string): string {
+  if (v === undefined || v === null || v === '') return dueDay.slice(0, 7);
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}$/.test(v)) throw new PayableError('Mês de competência inválido');
+  return v;
+}
+
+const notesOf = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 500) : null);
+
+async function supplierOf(restaurantId: string, v: unknown): Promise<string | null> {
+  if (v === undefined || v === null || v === '') return null;
+  const s = await prisma.supplier.findFirst({ where: { id: String(v), restaurantId }, select: { id: true } });
+  if (!s) throw new PayableError('Fornecedor não encontrado', 404);
+  return s.id;
+}
+
+/** Creates the occurrences missing for the active series of a Business restaurant (current month + 2). */
+export async function ensureSeries(restaurantId: string, now = new Date(), onlySeriesId?: string): Promise<number> {
+  if (!(await payableFeatures(restaurantId)).series) return 0;
+  const series = await prisma.payableSeries.findMany({ where: { restaurantId, active: true, ...(onlySeriesId ? { id: onlySeriesId } : {}) } });
+  if (!series.length) return 0;
+  const months = seriesMonths(currentMonth(now));
+  let created = 0;
+  for (const s of series) {
+    const existing = await prisma.payable.findMany({ where: { seriesId: s.id, competenceMonth: { in: months.map(monthDate) } }, select: { competenceMonth: true } });
+    const have = new Set(existing.map((e) => monthOf(e.competenceMonth)));
+    for (const ym of months) {
+      // Never before the series' first month (a rent created today that starts next month)
+      if (have.has(ym) || ym < monthOf(s.startMonth)) continue;
+      try {
+        await prisma.payable.create({
+          data: {
+            restaurantId, description: s.description, category: s.category, supplierId: s.supplierId, amountCents: s.amountCents,
+            competenceMonth: monthDate(ym), dueDate: dueDateIn(ym, s.dueDay), source: 'SERIES', seriesId: s.id, createdById: s.createdById,
+          },
+        });
+        created++;
+      } catch (error) {
+        // Two requests at once: the unique (seriesId, competenceMonth) keeps a single bill
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002')) throw error;
+      }
+    }
+  }
+  return created;
+}
+
+export async function createPayables(
+  member: RestaurantMember,
+  body: { description?: unknown; category?: unknown; supplierId?: unknown; amount?: unknown; dueDate?: unknown; competenceMonth?: unknown; notes?: unknown; mode?: unknown; installments?: unknown },
+  now = new Date(),
+): Promise<{ ids: string[] }> {
+  const description = descriptionOf(body.description);
+  const category = categoryOf(body.category);
+  const amountCents = amountOf(body.amount);
+  const due = parseDay(body.dueDate);
+  const notes = notesOf(body.notes);
+  const supplierId = await supplierOf(member.restaurantId, body.supplierId);
+  const base = { restaurantId: member.restaurantId, category, supplierId, notes, createdById: member.userId };
+  const mode = body.mode ?? 'ONCE';
+
+  if (mode === 'ONCE') {
+    const competence = competenceOf(body.competenceMonth, due);
+    const row = await prisma.payable.create({
+      data: { ...base, description, amountCents, dueDate: dayDate(due), competenceMonth: monthDate(competence) },
+      select: { id: true },
+    });
+    return { ids: [row.id] };
+  }
+
+  if (mode === 'INSTALLMENTS') {
+    const n = Number(body.installments);
+    if (!Number.isInteger(n) || n < 2 || n > 24) throw new PayableError('Escolha de 2 a 24 parcelas');
+    const parts = splitInstallments(amountCents, n);
+    const dates = installmentDueDates(due, n);
+    const group = crypto.randomUUID();
+    const ids: string[] = [];
+    await prisma.$transaction(async (tx) => {
+      for (let i = 0; i < n; i++) {
+        const row = await tx.payable.create({
+          data: {
+            ...base, description: `${description} ${i + 1}/${n}`, amountCents: parts[i], dueDate: dates[i], competenceMonth: monthDate(iso(dates[i]).slice(0, 7)),
+            source: 'INSTALLMENT', installmentGroup: group, installmentNumber: i + 1, installmentTotal: n,
+          },
+          select: { id: true },
+        });
+        ids.push(row.id);
+      }
+    });
+    return { ids };
+  }
+
+  if (mode === 'SERIES') {
+    if (!(await payableFeatures(member.restaurantId)).series) throw new PayableError('Repetir todo mês é do plano Business', 403);
+    const series = await prisma.payableSeries.create({
+      data: {
+        restaurantId: member.restaurantId, description, category, supplierId, amountCents, dueDay: Number(due.slice(8, 10)),
+        startMonth: monthDate(due.slice(0, 7)), createdById: member.userId,
+      },
+    });
+    await ensureSeries(member.restaurantId, now, series.id);
+    const rows = await prisma.payable.findMany({ where: { seriesId: series.id }, orderBy: { competenceMonth: 'asc' }, select: { id: true } });
+    return { ids: rows.map((r) => r.id) };
+  }
+
+  throw new PayableError('Modo inválido');
+}
+
+async function ownPayable(member: RestaurantMember, id: unknown) {
+  if (typeof id !== 'string') throw new PayableError('Conta não encontrada', 404);
+  const p = await prisma.payable.findFirst({ where: { id, restaurantId: member.restaurantId } });
+  if (!p) throw new PayableError('Conta não encontrada', 404);
+  return p;
+}
+export { ownPayable };
+
+export async function listPayables(member: RestaurantMember, query: { status?: string | null; category?: string | null; month?: string | null }, now = new Date()) {
+  const { restaurantId } = member;
+  await ensureSeries(restaurantId, now);
+  const today = brtToday(now);
+  const ym = today.slice(0, 7);
+  const where: Prisma.PayableWhereInput = { restaurantId };
+  if (query.category && CATEGORIES.includes(query.category as PayableCategory)) where.category = query.category as PayableCategory;
+  if (query.month && /^\d{4}-\d{2}$/.test(query.month)) where.competenceMonth = monthDate(query.month);
+  const rows = await prisma.payable.findMany({
+    where,
+    orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+    take: 500,
+    include: { supplier: { select: { name: true } } },
+  });
+  const items = rows.map((r) => ({
+    id: r.id,
+    description: r.description,
+    category: r.category,
+    categoryLabel: CATEGORY_LABEL[r.category as PayableCategory],
+    supplierName: r.supplier?.name ?? null,
+    amountCents: r.amountCents,
+    dueDate: iso(r.dueDate),
+    competenceMonth: monthOf(r.competenceMonth),
+    state: displayState(r, today) as DisplayState,
+    source: r.source,
+    installment: r.installmentNumber ? `${r.installmentNumber}/${r.installmentTotal}` : null,
+    seriesId: r.seriesId,
+    paidAt: r.paidAt ? iso(r.paidAt) : null,
+    paidMethod: r.paidMethod,
+    paidFrom: r.paidFrom,
+    notes: r.notes,
+  }));
+  const filtered = query.status ? items.filter((i) => i.state === query.status || (query.status === 'OPEN' && ['OVERDUE', 'TODAY', 'WEEK', 'LATER'].includes(i.state))) : items;
+
+  // The cards always read the whole restaurant, whatever the filters
+  const all = query.category || query.month ? await prisma.payable.findMany({ where: { restaurantId }, select: { status: true, dueDate: true, amountCents: true, competenceMonth: true } }) : rows;
+  const sum = (pred: (r: { status: string; dueDate: Date; competenceMonth: Date }) => boolean) => {
+    const sel = all.filter(pred);
+    return { count: sel.length, cents: sel.reduce((s, r) => s + r.amountCents, 0) };
+  };
+  const summary = {
+    overdue: sum((r) => displayState(r, today) === 'OVERDUE'),
+    today: sum((r) => displayState(r, today) === 'TODAY'),
+    week: sum((r) => displayState(r, today) === 'WEEK'),
+    month: sum((r) => r.status !== 'CANCELED' && monthOf(r.competenceMonth) === ym),
+  };
+  return { summary, items: filtered, features: await payableFeatures(restaurantId) };
+}
+
+export async function editPayable(
+  member: RestaurantMember,
+  id: string,
+  body: { description?: unknown; amount?: unknown; dueDate?: unknown; competenceMonth?: unknown; category?: unknown; notes?: unknown; supplierId?: unknown; scope?: unknown },
+) {
+  const p = await ownPayable(member, id);
+  if (p.status !== 'OPEN') throw new PayableError('Só uma conta a pagar pode ser editada', 409);
+  const data: Prisma.PayableUpdateInput = { updatedById: member.userId };
+  const touchesMoney = body.amount !== undefined || body.dueDate !== undefined || body.competenceMonth !== undefined;
+  if (p.source === 'UTILITY' && touchesMoney) throw new PayableError('Edite esta conta em Contas de consumo', 409);
+  if (body.description !== undefined) data.description = descriptionOf(body.description);
+  if (body.category !== undefined) data.category = categoryOf(body.category);
+  if (body.amount !== undefined) data.amountCents = amountOf(body.amount);
+  if (body.notes !== undefined) data.notes = notesOf(body.notes);
+  if (body.supplierId !== undefined) {
+    const sid = await supplierOf(member.restaurantId, body.supplierId);
+    data.supplier = sid ? { connect: { id: sid } } : { disconnect: true };
+  }
+  let newDue: string | null = null;
+  if (body.dueDate !== undefined) {
+    newDue = parseDay(body.dueDate);
+    data.dueDate = dayDate(newDue);
+  }
+  if (body.competenceMonth !== undefined) data.competenceMonth = monthDate(competenceOf(body.competenceMonth, newDue ?? iso(p.dueDate)));
+
+  if (body.scope === 'NEXT' && p.seriesId) {
+    // "Esta e as próximas": the series and every OPEN bill of it from this month on; paid and canceled ones stay
+    const seriesData: Prisma.PayableSeriesUpdateInput = {};
+    if (data.description) seriesData.description = data.description as string;
+    if (data.category) seriesData.category = data.category as PayableCategory;
+    if (data.amountCents) seriesData.amountCents = data.amountCents as number;
+    if (newDue) seriesData.dueDay = Number(newDue.slice(8, 10));
+    await prisma.$transaction(async (tx) => {
+      const series = await tx.payableSeries.update({ where: { id: p.seriesId! }, data: seriesData });
+      const next = await tx.payable.findMany({ where: { seriesId: p.seriesId, status: 'OPEN', competenceMonth: { gte: p.competenceMonth } } });
+      for (const n of next) {
+        await tx.payable.update({
+          where: { id: n.id },
+          data: {
+            description: series.description, category: series.category, amountCents: series.amountCents, updatedById: member.userId,
+            ...(newDue ? { dueDate: dueDateIn(monthOf(n.competenceMonth), series.dueDay) } : {}),
+          },
+        });
+      }
+    });
+  } else {
+    await prisma.payable.update({ where: { id: p.id }, data });
+  }
+  await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { scope: body.scope === 'NEXT' ? 'NEXT' : 'THIS', body } });
+  return { ok: true as const };
+}
+
+export async function cancelPayable(member: RestaurantMember, id: string, reason: unknown) {
+  const why = typeof reason === 'string' ? reason.trim() : '';
+  if (why.length < 3) throw new PayableError('Informe o motivo do cancelamento');
+  const p = await ownPayable(member, id);
+  if (p.status === 'PAID') throw new PayableError('Desfaça o pagamento antes de cancelar', 409);
+  if (p.status === 'CANCELED') return { ok: true as const };
+  await prisma.payable.update({ where: { id: p.id }, data: { status: 'CANCELED', canceledAt: new Date(), canceledById: member.userId, cancelReason: why.slice(0, 200) } });
+  await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { canceled: why } });
+  return { ok: true as const };
+}
+
+export async function stopSeries(member: RestaurantMember, seriesId: string) {
+  const s = await prisma.payableSeries.findFirst({ where: { id: seriesId, restaurantId: member.restaurantId } });
+  if (!s) throw new PayableError('Repetição não encontrada', 404);
+  await prisma.payableSeries.update({ where: { id: s.id }, data: { active: false } });
+  await recordAudit(member, { action: 'UPDATE', entityType: 'PayableSeries', entityId: s.id, changes: { active: false } });
+  return { ok: true as const };
+}
+
+export { addMonths, money as formatMoney };

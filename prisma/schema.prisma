@@ -4839,6 +4839,8 @@ model PayableSeries {
   supplierId   String?
   amountCents  Int
   dueDay       Int
+  /// First competence month: the generator never creates bills before it
+  startMonth   DateTime        @db.Date
   active       Boolean         @default(true)
   createdById  String
   createdAt    DateTime        @default(now())
