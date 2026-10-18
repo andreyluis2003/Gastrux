@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { isTierFeatureEnabled } from '@/lib/tier-guard';
 import { UtilityError } from '@/lib/utility-bills/rules';
+import { addEntry } from '@/lib/caixa/sessions';
 import {
   addMonths, brtToday, CATEGORIES, CATEGORY_LABEL, currentMonth, dayDate, displayState, dueDateIn, installmentDueDates,
-  monthDate, monthOf, parseAmountCents, parseDay, PayableError, seriesMonths, splitInstallments, type DisplayState, type PayableCategory,
+  monthDate, monthOf, parseAmountCents, parseDay, PayableError, PAY_METHODS, seriesMonths, splitInstallments, type DisplayState, type PayableCategory,
 } from './rules';
 
 /**
@@ -275,6 +276,81 @@ export async function cancelPayable(member: RestaurantMember, id: string, reason
   if (p.status === 'CANCELED') return { ok: true as const };
   await prisma.payable.update({ where: { id: p.id }, data: { status: 'CANCELED', canceledAt: new Date(), canceledById: member.userId, cancelReason: why.slice(0, 200) } });
   await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { canceled: why } });
+  return { ok: true as const };
+}
+
+/** The open shift the drawer money comes from: the one named, else the only open one */
+async function drawerShift(restaurantId: string, cashSessionId: unknown, noneMessage: string) {
+  if (typeof cashSessionId === 'string' && cashSessionId) {
+    const s = await prisma.cashSession.findFirst({ where: { id: cashSessionId, restaurantId, status: 'OPEN' }, select: { id: true } });
+    if (!s) throw new PayableError('Este caixa não está aberto', 409);
+    return s.id;
+  }
+  const open = await prisma.cashSession.findMany({ where: { restaurantId, status: 'OPEN' }, include: { cashRegister: { select: { name: true } } } });
+  if (open.length === 0) throw new PayableError(noneMessage, 409);
+  if (open.length > 1) {
+    throw new PayableError('Escolha o caixa', 409, { shifts: open.map((o) => ({ id: o.id, registerName: o.cashRegister.name })) });
+  }
+  return open[0].id;
+}
+
+export async function payPayable(
+  member: RestaurantMember,
+  id: string,
+  body: { paidAt?: unknown; method?: unknown; from?: unknown; cashSessionId?: unknown; force?: unknown },
+  now = new Date(),
+) {
+  const p = await ownPayable(member, id);
+  if (p.status === 'PAID') throw new PayableError('Esta conta já foi paga', 409);
+  if (p.status === 'CANCELED') throw new PayableError('Esta conta foi cancelada', 409);
+  const method = typeof body.method === 'string' && (PAY_METHODS as readonly string[]).includes(body.method) ? body.method : null;
+  if (!method) throw new PayableError('Forma de pagamento inválida');
+  if (body.from !== 'DRAWER' && body.from !== 'BANK') throw new PayableError('Informe de onde saiu o dinheiro');
+  const paidAt = body.paidAt === undefined || body.paidAt === '' ? brtToday(now) : parseDay(body.paidAt, 'Data do pagamento');
+  const shiftId = body.from === 'DRAWER' ? await drawerShift(member.restaurantId, body.cashSessionId, 'Abra o caixa para pagar com dinheiro da gaveta') : null;
+
+  // Claimed first: two clicks at once pay once
+  const claimed = await prisma.payable.updateMany({
+    where: { id: p.id, status: 'OPEN' },
+    data: { status: 'PAID', paidAt: dayDate(paidAt), paidMethod: method, paidFrom: body.from, paidById: member.userId, updatedById: member.userId },
+  });
+  if (claimed.count === 0) throw new PayableError('Esta conta já foi paga', 409);
+
+  if (shiftId) {
+    try {
+      const { entry } = await addEntry(member, shiftId, {
+        type: 'EXPENSE', amount: p.amountCents / 100, category: 'outros', description: `Conta a pagar: ${p.description}`.slice(0, 200),
+        force: body.force === true, payableId: p.id,
+      });
+      await prisma.payable.update({ where: { id: p.id }, data: { cashEntryId: entry.id } });
+    } catch (error) {
+      // The drawer refused (not enough cash, shift closed): the bill stays open
+      await prisma.payable.update({ where: { id: p.id }, data: { status: 'OPEN', paidAt: null, paidMethod: null, paidFrom: null, paidById: null } });
+      throw error;
+    }
+  }
+  await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { paid: { method, from: body.from, paidAt, shiftId } } });
+  return { ok: true as const };
+}
+
+export async function undoPayment(member: RestaurantMember, id: string, reason: unknown, cashSessionId?: unknown) {
+  const why = typeof reason === 'string' ? reason.trim() : '';
+  if (why.length < 3) throw new PayableError('Informe o motivo');
+  const p = await ownPayable(member, id);
+  if (p.status !== 'PAID') throw new PayableError('Esta conta não está paga', 409);
+  if (p.paidFrom === 'DRAWER') {
+    const shiftId = await drawerShift(member.restaurantId, cashSessionId, 'Abra um caixa para devolver o dinheiro à gaveta');
+    await addEntry(member, shiftId, {
+      type: 'ADJUSTMENT', direction: 'IN', method: 'CASH', amount: p.amountCents / 100,
+      description: `Pagamento desfeito: ${p.description} (${why})`.slice(0, 200),
+    });
+  }
+  const done = await prisma.payable.updateMany({
+    where: { id: p.id, status: 'PAID' },
+    data: { status: 'OPEN', paidAt: null, paidMethod: null, paidFrom: null, paidById: null, cashEntryId: null, updatedById: member.userId },
+  });
+  if (done.count === 0) throw new PayableError('Esta conta não está paga', 409);
+  await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { undone: why, from: p.paidFrom } });
   return { ok: true as const };
 }
 

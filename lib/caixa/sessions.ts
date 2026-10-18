@@ -114,7 +114,8 @@ const NEEDS_REASON: Record<ManualType, number> = { WITHDRAWAL: 1, SUPPLY: 0, EXP
 export async function addEntry(
   member: RestaurantMember,
   sessionId: string,
-  input: { type: ManualType; amount: unknown; method?: unknown; category?: unknown; description?: unknown; direction?: unknown; force?: boolean }
+  // payableId: the bill this expense pays (spec 2026-10-18 contas a pagar): the DRE counts the bill, not the entry
+  input: { type: ManualType; amount: unknown; method?: unknown; category?: unknown; description?: unknown; direction?: unknown; force?: boolean; payableId?: string }
 ) {
   if (!MANUAL.includes(input.type)) throw new CashRuleError('Tipo de lançamento inválido');
   const managerOnly = input.type === 'EXPENSE' || input.type === 'ADJUSTMENT';
@@ -152,7 +153,7 @@ export async function addEntry(
       }
     }
     const created = await tx.cashSessionEntry.create({
-      data: { restaurantId: member.restaurantId, cashSessionId: found.id, type: input.type, method, amountCents, direction, category, description, createdById: member.userId },
+      data: { restaurantId: member.restaurantId, cashSessionId: found.id, type: input.type, method, amountCents, direction, category, description, createdById: member.userId, payableId: input.payableId ?? null },
     });
     if (status === 'CLOSED') await recalcClosedSession(tx, found.id);
     return created;
