@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +19,6 @@ function destinationAfterLogin(): string {
 }
 
 export default function SignInPage() {
-  const router = useRouter();
   const { trackLogin, trackEvent } = useAnalytics();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,7 +47,10 @@ export default function SignInPage() {
         // Track successful login
         trackLogin('email');
         toast.success('Login realizado com sucesso!');
-        router.replace(destinationAfterLogin());
+        // A full page load, not router.replace: coming from the landing page, the client router still
+        // holds the logged-out "/" and showed it again instead of passing through the middleware, so
+        // the person had to log in twice (owner report 2026-10-17)
+        window.location.assign(destinationAfterLogin());
       }
     } catch (error) {
       toast.error('Erro ao fazer login');
