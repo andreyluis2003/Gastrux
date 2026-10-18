@@ -98,6 +98,8 @@ const PLATFORM_ADMIN_API_PREFIXES = [
 export const PLAN_OPEN_API_PREFIXES = [
   '/api/auth', '/api/billing', '/api/conta', '/api/password', '/api/support', '/api/feedback',
   '/api/feature-requests', '/api/notifications', '/api/push-notifications', '/api/signup',
+  // Leaving a locked restaurant for another one the person works in (final review I-5)
+  '/api/admin/multi-location/switch',
 ];
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,7 @@ const SEVERITY_STYLES = {
 };
 
 export default function MultiLocationPage() {
+  const { update } = useSession() || ({} as any);
   const [tab, setTab] = useState<Tab>('dashboard');
   const [loading, setLoading] = useState(true);
   const [dashData, setDashData] = useState<any>(null);
@@ -92,6 +94,8 @@ export default function MultiLocationPage() {
       });
       if (!res.ok) throw new Error();
       toast.success('Unidade alterada! Recarregando...');
+      // The login reads the plan of the new restaurant at once (lib/billing/plan-claim.ts)
+      await update?.();
       window.location.reload();
     } catch { toast.error('Erro ao trocar unidade'); setSwitching(null); }
   };
