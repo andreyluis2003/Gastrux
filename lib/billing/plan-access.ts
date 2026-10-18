@@ -5,7 +5,14 @@ import { prisma } from '@/lib/prisma';
  * is the read-only lock. 'starter' in the database now means "no plan".
  */
 export type PlanState = 'internal' | 'trial' | 'paid' | 'locked';
-export interface PlanFields { isInternal: boolean; subscriptionTier: string | null; subscriptionStatus: string | null; trialEndsAt: Date | null }
+export interface PlanFields {
+  isInternal: boolean;
+  subscriptionTier: string | null;
+  subscriptionStatus: string | null;
+  trialEndsAt: Date | null;
+  /** End of the period already paid (mirrored from the subscription) */
+  billingCycleEnd?: Date | null;
+}
 
 export const TRIAL_DAYS = 30;
 // The texts live in an edge-safe file (no prisma) because middleware.ts imports them
@@ -25,13 +32,17 @@ export function planAccess(r: PlanFields, now = new Date()): { state: PlanState;
     }
     return { state: 'locked', locked: true, daysLeft: 0 };
   }
-  if (PAID_TIERS.includes(String(r.subscriptionTier)) && (r.subscriptionStatus === 'active' || r.subscriptionStatus === 'past_due')) {
-    return { state: 'paid', locked: false, daysLeft: null };
+  if (PAID_TIERS.includes(String(r.subscriptionTier))) {
+    if (r.subscriptionStatus === 'active' || r.subscriptionStatus === 'past_due') return { state: 'paid', locked: false, daysLeft: null };
+    // Canceled (Mercado Pago cancels at once): the plan runs to the end of the period already paid (spec §5)
+    if (r.subscriptionStatus === 'canceled' && r.billingCycleEnd && r.billingCycleEnd.getTime() > now.getTime()) {
+      return { state: 'paid', locked: false, daysLeft: null };
+    }
   }
   return { state: 'locked', locked: true, daysLeft: null };
 }
 
-const PLAN_SELECT = { isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true } as const;
+const PLAN_SELECT = { isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true, billingCycleEnd: true } as const;
 
 export async function restaurantPlanAccess(restaurantId: string, now = new Date()) {
   const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: PLAN_SELECT });

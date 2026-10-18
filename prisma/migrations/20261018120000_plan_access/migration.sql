@@ -1,4 +1,4 @@
--- Plans of 2026-10-18: internal accounts; every restaurant that exists today is a test account
+-- Plans of 2026-10-18: internal accounts; every restaurant that exists when this runs is a test account
 ALTER TABLE "restaurants" ADD COLUMN IF NOT EXISTS "isInternal" BOOLEAN NOT NULL DEFAULT false;
 UPDATE "restaurants" SET "isInternal" = true, "subscriptionTier" = CASE WHEN "subscriptionTier" = 'starter' THEN 'business' ELSE "subscriptionTier" END
-WHERE "createdAt" < '2026-10-19T00:00:00Z' AND "isInternal" = false;
+WHERE "isInternal" = false;

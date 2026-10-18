@@ -42,13 +42,12 @@ async function afterChange(restaurantId: string, actor: Actor, before: object, a
     await invalidate(cacheKey('customer', 'details', restaurantId));
     await invalidate(cacheKey('platform', 'metrics', 'v1'));
   } catch (error) {
-    // The change is saved; a stale client file only lasts until its cache expires (lib/cache memory driver
-    // calls lru.delete, missing in the lru-cache 5 that npm resolves: pre-existing, 2026-10-18)
+    // The change is saved; a stale client file only lasts until its cache expires
     console.error('[admin/trial] could not clear the client cache', error);
   }
 }
 
-const SELECT = { name: true, isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true, status: true } as const;
+const SELECT = { name: true, isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true, billingCycleEnd: true, status: true } as const;
 
 export async function extendTrial(
   input: { restaurantId: string; days?: unknown; until?: unknown; reason?: unknown; actor: Actor },

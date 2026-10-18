@@ -29,3 +29,15 @@ describe('planAccess (spec 2026-10-18 §5)', () => {
     expect(trialEnd(NOW).getTime() - NOW.getTime()).toBe(30 * day);
   });
 });
+
+describe('a canceled paid plan runs to the end of the paid period (final review I-1, Mercado Pago cancels at once)', () => {
+  it('canceled with the period still ahead is paid; after it, locked', () => {
+    const canceled = { ...base, subscriptionTier: 'pro', subscriptionStatus: 'canceled', trialEndsAt: null };
+    expect(planAccess({ ...canceled, billingCycleEnd: new Date(NOW.getTime() + 5 * day) }, NOW).state).toBe('paid');
+    expect(planAccess({ ...canceled, billingCycleEnd: new Date(NOW.getTime() - 1) }, NOW).state).toBe('locked');
+    expect(planAccess({ ...canceled, billingCycleEnd: null }, NOW).state).toBe('locked');
+  });
+  it('a canceled "starter" (no plan) is locked even with a date', () => {
+    expect(planAccess({ ...base, subscriptionTier: 'starter', subscriptionStatus: 'canceled', trialEndsAt: null, billingCycleEnd: new Date(NOW.getTime() + day) }, NOW).state).toBe('locked');
+  });
+});

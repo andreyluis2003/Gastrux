@@ -34,6 +34,14 @@ export interface CacheDriver {
 
 /* -------------------- in-memory LRU driver -------------------- */
 
+/**
+ * lru-cache is not a direct dependency: npm resolves 5.1.1 (del, reset, length, maxAge) while the code was
+ * written for 7+ (delete, clear, size, ttl). These helpers work with both (final review 2026-10-18).
+ */
+const lruDelete = (lru: any, key: string) => (typeof lru.delete === 'function' ? lru.delete(key) : lru.del(key));
+const lruClear = (lru: any) => (typeof lru.clear === 'function' ? lru.clear() : lru.reset());
+const lruSize = (lru: any): number => (typeof lru.size === 'number' ? lru.size : lru.length ?? lru.itemCount ?? 0);
+
 class MemoryDriver implements CacheDriver {
   readonly name = 'memory' as const;
   private lru: LRUCache<string, SerializedValue>;
@@ -43,7 +51,8 @@ class MemoryDriver implements CacheDriver {
   constructor() {
     this.lru = new LRUCache<string, SerializedValue>({
       max: 5000, // max ~5k keys
-      ttl: 1000 * 60 * 5, // default 5 min
+      ttl: 1000 * 60 * 5, // default 5 min (lru-cache 7+)
+      maxAge: 1000 * 60 * 5, // the same for lru-cache 5
       ttlAutopurge: true,
       allowStale: false,
       updateAgeOnGet: false,
@@ -77,17 +86,17 @@ class MemoryDriver implements CacheDriver {
 
   async del(keys: string | string[]): Promise<void> {
     const arr = Array.isArray(keys) ? keys : [keys];
-    for (const k of arr) this.lru.delete(k);
+    for (const k of arr) lruDelete(this.lru, k);
   }
 
   async clear(pattern?: string): Promise<void> {
     if (!pattern) {
-      this.lru.clear();
+      lruClear(this.lru);
       return;
     }
     const regex = globToRegex(pattern);
     for (const key of Array.from(this.lru.keys())) {
-      if (regex.test(key)) this.lru.delete(key);
+      if (regex.test(key)) lruDelete(this.lru, key);
     }
   }
 
@@ -97,7 +106,7 @@ class MemoryDriver implements CacheDriver {
 
   async stats() {
     return {
-      size: this.lru.size,
+      size: lruSize(this.lru),
       hits: this.hits,
       misses: this.misses,
       driver: this.name,
