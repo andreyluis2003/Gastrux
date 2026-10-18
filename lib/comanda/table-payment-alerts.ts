@@ -25,9 +25,13 @@ async function notify(restaurantId: string, kind: string, dedupeKey: string, tit
 // Intl puts a no-break space after "R$"; plain text keeps the alert easy to search and compare
 const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ');
 
-export function alertTablePaid(restaurantId: string, sessionId: string, label: string, totalCents: number) {
+/** The phone payment closed the bill. Part of it may have been received at the register: the text says what came by phone */
+export function alertTablePaid(restaurantId: string, sessionId: string, label: string, totalCents: number, phoneCents: number) {
+  const paid = phoneCents >= totalCents
+    ? `${label} pagou ${brl(totalCents)} pelo celular.`
+    : `${label} quitou a conta de ${brl(totalCents)}: ${brl(phoneCents)} pelo celular, o resto no caixa.`;
   return notify(restaurantId, 'table-paid', `table-paid:${sessionId}`, `${label} paga pelo celular`,
-    `${label} pagou ${brl(totalCents)} pelo celular. A conta foi fechada e a mesa está livre.`, 'MEDIUM', { orderSessionId: sessionId });
+    `${paid} A conta foi fechada e a mesa está livre.`, 'MEDIUM', { orderSessionId: sessionId });
 }
 
 export function alertTableOverpaid(restaurantId: string, sessionId: string, label: string, overpaidCents: number, paymentId: string) {

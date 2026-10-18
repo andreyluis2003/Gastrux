@@ -14,13 +14,19 @@ function Tile({ title, session, onClick }: { title: string; session: SalaoSessio
       onClick={onClick}
       className={`min-h-[88px] rounded-xl border-2 p-3 text-left transition active:scale-[0.98] ${
         waiter
-          ? 'bg-rose-50 border-rose-500 text-rose-900 animate-pulse'
+          ? 'bg-rose-100 border-rose-600 text-rose-950 shadow-md shadow-rose-200'
           : asked ? 'bg-amber-50 border-amber-400 text-amber-900' : busy ? 'bg-emerald-50 border-emerald-400 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-600'
       }`}
     >
       <div className="text-lg font-bold">{title}</div>
       {waiter
-        ? <div className="text-xs font-semibold">Chamou o garçom · {openFor(session!.waiterCalledAt!, new Date())}</div>
+        ? (
+          // Only the dot blinks: the whole tile blinking looked faded, like a disabled table (prod test 2026-10-18)
+          <div className="text-xs font-bold flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" aria-hidden />
+            Chamou o garçom · {openFor(session!.waiterCalledAt!, new Date())}
+          </div>
+        )
         : asked && <div className="text-xs font-semibold">Pediu a conta</div>}
       {busy ? (
         <>

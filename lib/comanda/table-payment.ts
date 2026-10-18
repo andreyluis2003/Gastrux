@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { settleSessionStock } from '@/lib/stock/session-stock';
 import { lockComanda } from '@/lib/comanda/add-item';
-import { emitClosedBillFor, loadBill } from '@/lib/comanda/bill-service';
+import { billPaidCents, emitClosedBillFor, loadBill } from '@/lib/comanda/bill-service';
 import { onlinePaidCents } from '@/lib/comanda/bill';
 import { alertOnlineWithoutShift, alertTableOverpaid, alertTablePaid } from './table-payment-alerts';
 
@@ -49,7 +49,8 @@ export async function applyTablePayment(restaurantId: string, paymentId: string)
       data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents, payAtWaiterRequestedAt: null },
     });
     if (guard.count === 1) await settleSessionStock(tx, restaurantId, sessionId);
-    return { outcome: guard.count === 1 ? ('closed' as const) : ('applied' as const), overpaidCents, withoutShift, label, totalCents: after.totalCents };
+    const { onlineCents } = await billPaidCents(tx, restaurantId, sessionId);
+    return { outcome: guard.count === 1 ? ('closed' as const) : ('applied' as const), overpaidCents, withoutShift, label, totalCents: after.totalCents, onlineCents };
   });
 
   if (result.outcome === 'already-applied') return { outcome: result.outcome, overpaidCents: 0, withoutShift: false };
@@ -67,7 +68,7 @@ export async function applyTablePayment(restaurantId: string, paymentId: string)
       // The note never fails the close: the fiscal alert of autoEmitNFCe covers a rejection
       console.error('[table-payment] NFC-e after an online close failed:', error);
     }
-    await alertTablePaid(restaurantId, sessionId, result.label, result.totalCents);
+    await alertTablePaid(restaurantId, sessionId, result.label, result.totalCents, (result as { onlineCents?: number }).onlineCents ?? result.totalCents);
   }
   if (result.overpaidCents > 0) await alertTableOverpaid(restaurantId, sessionId, result.label, result.overpaidCents, payment.id);
   if (result.withoutShift) await alertOnlineWithoutShift(restaurantId, sessionId, result.label, onlinePaidCents(payment), payment.id);

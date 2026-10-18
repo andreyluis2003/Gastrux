@@ -75,6 +75,22 @@ describe('applyTablePayment', () => {
     expect(await alerts('table-paid')).toHaveLength(1);
   });
 
+  it('the paid alert names the total and what came by phone when part was received at the register (prod test 2026-10-18)', async () => {
+    const shift = await openShift();
+    const sid = await newBill();
+    // R$ 40,00 by PIX at the register, R$ 70,00 by phone: the alert said "pagou R$ 110,00 pelo celular"
+    await prisma.cashSessionEntry.create({ data: { restaurantId: rid, cashSessionId: shift.id, orderSessionId: sid, type: 'RECEIPT', method: 'PIX', amountCents: 4_000, createdById: ownerId } });
+    const p = await approved(sid, 70);
+    expect((await applyTablePayment(rid, p.id)).outcome).toBe('closed');
+    const [alert] = await alerts('table-paid');
+    expect(alert.message).toContain('quitou a conta de R$ 110,00: R$ 70,00 pelo celular, o resto no caixa.');
+
+    const sid2 = await newBill();
+    await applyTablePayment(rid, (await approved(sid2, 110)).id);
+    const all = await alerts('table-paid');
+    expect(all.find((a) => a.message.includes('pagou R$ 110,00 pelo celular.'))).toBeTruthy();
+  });
+
   it('applies once: a repeated call changes nothing and issues nothing new', async () => {
     await openShift();
     const sid = await newBill();
