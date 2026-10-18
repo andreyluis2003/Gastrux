@@ -11,14 +11,14 @@ export const STRIPE_PRICING_TIERS = {
   PRO: {
     ...BASE_PRICING_TIERS.PRO,
     stripeProductId: process.env.STRIPE_PRODUCT_ID_PRO || 'prod_UMH4qOvOKXJHbC',
-    stripePriceId: process.env.STRIPE_PRICE_ID_PRO_MONTHLY || 'price_1TNYWUE1RR9k01ogUdFmvMXk',
-    stripePriceIdAnnual: process.env.STRIPE_PRICE_ID_PRO_ANNUAL || 'price_1TNyYOE1RR9k01ogaaxcnF9R',
+    stripePriceId: process.env.STRIPE_PRICE_ID_PRO_MONTHLY || 'price_1URxFCE1RR9k01ogajeLEj1e',
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_ID_PRO_ANNUAL || 'price_1URxHrE1RR9k01ogG365j74U',
   },
   BUSINESS: {
     ...BASE_PRICING_TIERS.BUSINESS,
     stripeProductId: process.env.STRIPE_PRODUCT_ID_BUSINESS || 'prod_UMHS8jl85sfuIT',
-    stripePriceId: process.env.STRIPE_PRICE_ID_BUSINESS_MONTHLY || 'price_1TNYtIE1RR9k01ogmZ15d9fc',
-    stripePriceIdAnnual: process.env.STRIPE_PRICE_ID_BUSINESS_ANNUAL || 'price_1TNyZuE1RR9k01ogWkhuPLYR',
+    stripePriceId: process.env.STRIPE_PRICE_ID_BUSINESS_MONTHLY || 'price_1URxKdE1RR9k01ogpQlzt7tI',
+    stripePriceIdAnnual: process.env.STRIPE_PRICE_ID_BUSINESS_ANNUAL || 'price_1URxLZE1RR9k01ogedc7IvZQ',
   },
   ENTERPRISE: {
     ...BASE_PRICING_TIERS.ENTERPRISE,
