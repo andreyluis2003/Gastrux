@@ -80,7 +80,8 @@ describe('trial reminders', () => {
   });
 
   it('an extended trial gets its reminders again (final review M-3)', async () => {
-    await prisma.restaurant.update({ where: { id: ids.d3 }, data: { trialEndsAt: new Date(Date.now() + 2.2 * DAY) } });
+    // A real extension (4 more days): another end date, so another reminder, whatever the time of day
+    await prisma.restaurant.update({ where: { id: ids.d3 }, data: { trialEndsAt: new Date(Date.now() + 6.5 * DAY) } });
     await sendTrialReminders();
     expect((await alerts()).filter((n) => n.restaurantId === ids.d3)).toHaveLength(2);
   });
