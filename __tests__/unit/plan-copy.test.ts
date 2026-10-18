@@ -1,6 +1,6 @@
 /**
  * Plans of 2026-10-18 (spec planos-teste-business §9): nobody reads about a free plan forever, the
- * Starter or the old prices. The terms of use (app/termos) join this list once the owner approves its text.
+ * Starter or the old prices. Terms of use approved by the owner on 2026-10-18.
  */
 import fs from 'fs';
 import path from 'path';
@@ -17,7 +17,7 @@ const FILES = [
   'components/tier/upgrade-banner.tsx', 'components/upgrade-modal.tsx', 'components/transaction-limit-badge.tsx',
   'app/dashboard/usage/page.tsx', 'lib/plans/monthly-sales.ts',
   'lib/help/seed-articles.ts', 'lib/ai/knowledge/planos.ts', 'lib/ai/knowledge/implantacao.ts',
-  'lib/ai/knowledge/pagamento-mesa.ts', 'lib/ai/knowledge/vender.ts',
+  'lib/ai/knowledge/pagamento-mesa.ts', 'lib/ai/knowledge/vender.ts', 'app/termos/page.tsx',
 ];
 const FORBIDDEN: RegExp[] = [
   /gr[aá]tis para sempre/i, /gratuito para sempre/i, /gratuitamente/i, /Starter \(Gr[aá]tis\)/, /Starter gr[aá]tis/i,
@@ -39,4 +39,11 @@ it('landing and pricing say the trial', () => {
   for (const f of ['app/page.tsx', 'app/pricing/page.tsx']) {
     expect(read(f)).toContain('Teste grátis por 30 dias, com tudo do Business');
   }
+});
+
+it('terms of use: the plans and the trial as approved by the owner (2026-10-18)', () => {
+  const terms = read('app/termos/page.tsx');
+  expect(terms).not.toMatch(/\bStarter\b/);
+  expect(terms).toContain('conforme o plano contratado (Pro, Business ou Enterprise).');
+  expect(terms).toContain('Ao se cadastrar, um restaurante é criado automaticamente com 30 dias de teste gratuito, com os recursos do plano Business. Ao fim do teste, sem um plano contratado, a conta fica disponível apenas para consulta e exportação dos dados, até a contratação de um plano.');
 });

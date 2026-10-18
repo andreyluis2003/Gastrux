@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default function TermosPage() {
-  const dataAtualizacao = '28 de abril de 2026';
+  const dataAtualizacao = '18 de outubro de 2026';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,12 +25,12 @@ export default function TermosPage() {
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-slate-800">2. Descrição do Serviço</h2>
-            <p className="text-gray-700 leading-relaxed">A Plataforma é um sistema de gestão para restaurantes que oferece funcionalidades como controle de estoque, cardápio digital, gestão financeira, CRM, relatórios, e integrações com serviços de terceiros. Os recursos disponíveis variam conforme o plano contratado (Starter, Pro, Business ou Enterprise).</p>
+            <p className="text-gray-700 leading-relaxed">A Plataforma é um sistema de gestão para restaurantes que oferece funcionalidades como controle de estoque, cardápio digital, gestão financeira, CRM, relatórios, e integrações com serviços de terceiros. Os recursos disponíveis variam conforme o plano contratado (Pro, Business ou Enterprise).</p>
           </section>
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-slate-800">3. Cadastro e Conta</h2>
-            <p className="text-gray-700 leading-relaxed">Para utilizar a Plataforma, você deve criar uma conta fornecendo informações verdadeiras e completas. Você é responsável por manter a confidencialidade de sua senha e por todas as atividades realizadas em sua conta. Ao se cadastrar, um restaurante é criado automaticamente com período de teste gratuito (trial) de 30 dias.</p>
+            <p className="text-gray-700 leading-relaxed">Para utilizar a Plataforma, você deve criar uma conta fornecendo informações verdadeiras e completas. Você é responsável por manter a confidencialidade de sua senha e por todas as atividades realizadas em sua conta. Ao se cadastrar, um restaurante é criado automaticamente com 30 dias de teste gratuito, com os recursos do plano Business. Ao fim do teste, sem um plano contratado, a conta fica disponível apenas para consulta e exportação dos dados, até a contratação de um plano.</p>
           </section>
 
           <section className="space-y-3">
