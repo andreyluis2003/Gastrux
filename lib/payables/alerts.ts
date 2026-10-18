@@ -9,6 +9,8 @@ import { ensureSeries, formatMoney } from './service';
  * Business restaurant, one bell summary a day (owner and manager) plus an e-mail to the owner.
  */
 const DAY_MS = 86_400_000;
+// Bill descriptions and names are typed by people (or come from a supplier note): never raw HTML in an e-mail
+const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export function summaryTitle(today: { count: number; cents: number }, overdue: { count: number; cents: number }, soon: number) {
@@ -60,10 +62,10 @@ export async function morningCheck(now = new Date()): Promise<{ series: number; 
     const owner = await prisma.user.findUnique({ where: { id: r.ownerId }, select: { email: true, name: true } });
     if (!owner?.email) continue;
     try {
-      const rows = list.map((p) => `<li>${p.description}: ${formatMoney(p.amountCents)}, vence em ${day(p).split('-').reverse().join('/')}</li>`).join('');
+      const rows = list.map((p) => `<li>${esc(p.description)}: ${formatMoney(p.amountCents)}, vence em ${day(p).split('-').reverse().join('/')}</li>`).join('');
       await sendTransactionalEmail({
         to: owner.email, subject: title, notificationId: notification.id,
-        html: `<p>Olá, ${owner.name || r.name}.</p><p>${title}.</p><ul>${rows}</ul><p><a href="https://gastrux.com/contas-a-pagar">Ver contas a pagar</a></p>`,
+        html: `<p>Olá, ${esc(owner.name || r.name)}.</p><p>${esc(title)}.</p><ul>${rows}</ul><p><a href="https://gastrux.com/contas-a-pagar">Ver contas a pagar</a></p>`,
       });
     } catch (error) {
       console.error(`[payables] e-mail to the owner of ${restaurantId} failed`, error);

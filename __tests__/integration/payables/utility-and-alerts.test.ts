@@ -87,7 +87,7 @@ describe('utility bills link and the morning check', () => {
     await mk(b.rid, 'Atrasada', '2026-10-15', 30000);
     await mk(b.rid, 'Hoje A', '2026-10-18', 100000);
     await mk(b.rid, 'Hoje B', '2026-10-18', 45000);
-    await mk(b.rid, 'Em 3 dias', '2026-10-21', 20000);
+    await mk(b.rid, 'Em 3 dias <b>x</b>', '2026-10-21', 20000);
     await mk(p.rid, 'Pro hoje', '2026-10-18', 10000);
     const first = await morningCheck(NOW);
     expect(first.alerted).toBe(1);
@@ -95,7 +95,11 @@ describe('utility bills link and the morning check', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0].title).toBe('Contas a pagar: 2 vencem hoje (R$ 1.450,00) · 1 atrasada (R$ 300,00) · 1 em 3 dias');
     expect(notes[0].actionUrl).toBe('/contas-a-pagar');
-    expect(mails.filter((m) => m.to === b.email)).toHaveLength(1);
+    const mine = mails.filter((m) => m.to === b.email);
+    expect(mine).toHaveLength(1);
+    // What staff typed never becomes HTML in the owner's e-mail
+    expect(mine[0].html).toContain('Em 3 dias &lt;b&gt;x&lt;/b&gt;');
+    expect(mine[0].html).not.toContain('<b>x</b>');
     expect(await prisma.notification.count({ where: { restaurantId: p.rid } })).toBe(0);
     await morningCheck(NOW);
     expect(await prisma.notification.count({ where: { restaurantId: b.rid, data: { path: ['kind'], equals: 'payables-morning' } } })).toBe(1);
