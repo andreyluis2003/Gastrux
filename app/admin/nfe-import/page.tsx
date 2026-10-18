@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { parseDuplicatas } from '@/lib/nfe/duplicatas';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
@@ -13,6 +14,7 @@ interface ImportResult {
   items: { produto: string; matched: boolean; ingredient?: string; qty: number; unit: string }[];
   matchedCount: number;
   totalCount: number;
+  payables?: { created: number; skipped: number } | { refused: 'business' };
 }
 
 export default function NFeImportPage() {
@@ -20,6 +22,13 @@ export default function NFeImportPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [fileName, setFileName] = useState('');
+  // The boletos of the note go to Contas a pagar (spec 2026-10-18 contas a pagar, Business)
+  const [launchPayables, setLaunchPayables] = useState(true);
+  const [nfeFeature, setNfeFeature] = useState<boolean | null>(null);
+  const boletos = useMemo(() => (xmlContent ? parseDuplicatas(xmlContent).duplicatas : []), [xmlContent]);
+  useEffect(() => {
+    fetch('/api/payables').then((r) => (r.ok ? r.json() : null)).then((d) => setNfeFeature(d?.features?.nfe ?? false)).catch(() => setNfeFeature(false));
+  }, []);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -40,12 +49,13 @@ export default function NFeImportPage() {
       const res = await fetch('/api/nfe/import-xml', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xmlContent }),
+        body: JSON.stringify({ xmlContent, launchPayables: launchPayables && nfeFeature === true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setResult(data);
       toast.success(`NF-e importada! ${data.matchedCount}/${data.totalCount} itens vinculados`);
+      if (data.payables && 'created' in data.payables && data.payables.created) toast.success(`${data.payables.created} boleto(s) lançado(s) no Contas a pagar`);
     } catch (err: any) {
       toast.error(err.message || 'Erro ao importar');
     } finally {
@@ -80,6 +90,24 @@ export default function NFeImportPage() {
             <Button variant="outline" asChild><span>Selecionar Arquivo XML</span></Button>
           </label>
         </div>
+
+        {boletos.length > 0 && (
+          <div className="rounded-lg border p-4 space-y-2">
+            <p className="font-semibold text-sm">Boletos desta nota</p>
+            {boletos.map((b) => (
+              <div key={b.nDup} className="flex justify-between text-sm">
+                <span>{b.nDup} · vence em {b.dueDate.split('-').reverse().join('/')}</span>
+                <span className="font-medium">{formatBRL(b.amountCents / 100)}</span>
+              </div>
+            ))}
+            <label className="flex items-center gap-2 text-sm pt-2">
+              <input type="checkbox" checked={launchPayables && nfeFeature === true} disabled={nfeFeature !== true} onChange={(e) => setLaunchPayables(e.target.checked)} />
+              Lançar no Contas a pagar
+              {nfeFeature === false && <span className="text-xs rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5">Business</span>}
+            </label>
+            {nfeFeature === false && <p className="text-xs text-muted-foreground">No plano Business, os boletos da nota viram contas a pagar sozinhos.</p>}
+          </div>
+        )}
 
         {xmlContent && (
           <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleImport} disabled={loading}>

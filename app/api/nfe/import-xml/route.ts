@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { parseDuplicatas } from '@/lib/nfe/duplicatas';
+import { createFromNfe } from '@/lib/payables/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { xmlContent } = body;
+    const { xmlContent, launchPayables } = body;
     if (!xmlContent) return NextResponse.json({ error: 'xmlContent obrigat\u00f3rio' }, { status: 400 });
 
     const restaurantId = await getCurrentRestaurantId();
@@ -164,8 +166,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // The boletos of the note go to Contas a pagar (spec 2026-10-18 contas a pagar, Business); on by default
+    let payables: Awaited<ReturnType<typeof createFromNfe>> | undefined;
+    if (launchPayables !== false) {
+      try {
+        payables = await createFromNfe(restaurantId, String((session.user as any)?.id ?? ''), parseDuplicatas(xmlContent));
+      } catch (error) {
+        console.error('[nfe/import-xml] contas a pagar failed:', error); // the stock entry is saved
+      }
+    }
+
     return NextResponse.json({
       success: true,
+      payables,
       invoice: { id: invoice.id, number: nfe.nNF, supplier: nfe.emitente, total: nfe.vNF, date: nfe.dhEmi },
       items: results,
       matchedCount: results.filter((r) => r.matched).length,

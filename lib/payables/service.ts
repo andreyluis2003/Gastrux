@@ -5,6 +5,7 @@ import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { isTierFeatureEnabled } from '@/lib/tier-guard';
 import { monthLabel, UtilityError } from '@/lib/utility-bills/rules';
 import { addEntry } from '@/lib/caixa/sessions';
+import type { NfeDuplicatas } from '@/lib/nfe/duplicatas';
 import {
   addMonths, brtToday, CATEGORIES, CATEGORY_LABEL, currentMonth, dayDate, displayState, dueDateIn, installmentDueDates,
   monthDate, monthOf, parseAmountCents, parseDay, PayableError, PAY_METHODS, seriesMonths, splitInstallments, type DisplayState, type PayableCategory,
@@ -386,6 +387,39 @@ export async function syncUtilityPayable(restaurantId: string, billId: string, u
       data: { ...values, status: 'OPEN', canceledAt: null, canceledById: null, cancelReason: null, updatedById: userId },
     });
   }
+}
+
+/**
+ * The boletos of an imported purchase NF-e become merchandise bills (spec 2026-10-18 §5, Business). The same note
+ * imported again never creates a second bill: (restaurantId, nfeKey, nfeDupNumber) is unique.
+ */
+export async function createFromNfe(restaurantId: string, userId: string, parsed: NfeDuplicatas): Promise<{ created: number; skipped: number } | { refused: 'business' }> {
+  if (!parsed.duplicatas.length) return { created: 0, skipped: 0 };
+  if (!(await payableFeatures(restaurantId)).nfe) return { refused: 'business' };
+  const digits = (v: string | null) => (v ?? '').replace(/\D/g, '');
+  const suppliers = parsed.cnpj ? await prisma.supplier.findMany({ where: { restaurantId, cnpj: { not: null } }, select: { id: true, cnpj: true } }) : [];
+  const supplierId = suppliers.find((s) => digits(s.cnpj) === digits(parsed.cnpj))?.id ?? null;
+  // Without an access key the note number and the supplier keep the import from duplicating
+  const key = parsed.key ?? `NF${parsed.nNF}-${digits(parsed.cnpj)}`;
+  let created = 0;
+  let skipped = 0;
+  for (const dup of parsed.duplicatas) {
+    try {
+      await prisma.payable.create({
+        data: {
+          restaurantId, category: 'MERCHANDISE', source: 'NFE', supplierId, createdById: userId,
+          description: `NF ${parsed.nNF} - ${parsed.emitente} ${dup.nDup}`.slice(0, 120),
+          amountCents: dup.amountCents, dueDate: dayDate(dup.dueDate), competenceMonth: monthDate(dup.dueDate.slice(0, 7)),
+          nfeKey: key, nfeDupNumber: dup.nDup,
+        },
+      });
+      created++;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') skipped++;
+      else throw error;
+    }
+  }
+  return { created, skipped };
 }
 
 export async function stopSeries(member: RestaurantMember, seriesId: string) {
