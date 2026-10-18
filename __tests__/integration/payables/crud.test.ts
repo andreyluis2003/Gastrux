@@ -106,6 +106,37 @@ describe('contas a pagar: create, list, edit, cancel', () => {
     void oct;
   });
 
+  it('"esta e as próximas" from a clamped February keeps the day 31 and the amounts (final review I-3)', async () => {
+    const s = await prisma.payableSeries.create({ data: { restaurantId: b.rid, description: 'Loja', category: 'RENT', amountCents: 100000, dueDay: 31, startMonth: new Date('2027-02-01T00:00:00Z'), createdById: b.member.userId } });
+    const mk = (ym, due, cents) => prisma.payable.create({ data: { restaurantId: b.rid, seriesId: s.id, source: 'SERIES', description: 'Loja', category: 'RENT', amountCents: cents, competenceMonth: new Date(ym + '-01T00:00:00Z'), dueDate: new Date(due + 'T00:00:00Z'), createdById: b.member.userId } });
+    const feb = await mk('2027-02', '2027-02-28', 120000); // a one-off amount set earlier with "só esta"
+    const mar = await mk('2027-03', '2027-03-31', 100000);
+    // The dialog used to send every field, changed or not
+    await editPayable(b.member, feb.id, { description: 'Loja centro', amount: '1.200,00', dueDate: '2027-02-28', scope: 'NEXT' });
+    expect(await prisma.payableSeries.findUnique({ where: { id: s.id } })).toMatchObject({ dueDay: 31, amountCents: 100000, description: 'Loja centro' });
+    const m2 = await prisma.payable.findUnique({ where: { id: mar.id } });
+    expect(m2.dueDate.toISOString().slice(0, 10)).toBe('2027-03-31');
+    expect(m2).toMatchObject({ amountCents: 100000, description: 'Loja centro' });
+  });
+
+  it('more than 500 bills: the open ones and the cards still show (final review I-4)', async () => {
+    const x = await setup('pro');
+    try {
+      const old = Array.from({ length: 520 }, (_, i) => ({ restaurantId: x.rid, description: 'Antiga ' + i, category: 'OTHER', amountCents: 100, status: 'PAID', competenceMonth: new Date('2025-01-01T00:00:00Z'), dueDate: new Date('2025-01-10T00:00:00Z'), createdById: x.member.userId }));
+      await prisma.payable.createMany({ data: old });
+      await prisma.payable.create({ data: { restaurantId: x.rid, description: 'Hoje', category: 'OTHER', amountCents: 5000, competenceMonth: new Date('2026-10-01T00:00:00Z'), dueDate: new Date('2026-10-18T00:00:00Z'), createdById: x.member.userId } });
+      const out = await listPayables(x.member, { status: 'OPEN' }, new Date('2026-10-18T15:00:00Z'));
+      expect(out.items.map((i) => i.description)).toEqual(['Hoje']);
+      expect(out.summary.today).toEqual({ count: 1, cents: 5000 });
+      const all = await listPayables(x.member, {}, new Date('2026-10-18T15:00:00Z'));
+      expect(all.summary.today).toEqual({ count: 1, cents: 5000 });
+    } finally {
+      await prisma.payable.deleteMany({ where: { restaurantId: x.rid } });
+      await prisma.restaurant.delete({ where: { id: x.rid } });
+      await prisma.user.deleteMany({ where: { id: { in: x.userIds } } });
+    }
+  }, 60000);
+
   it('cancel: open with a reason; without reason 400; paid 409', async () => {
     const { ids } = await createPayables(b.member, { description: 'Multa', category: 'TAXES', amount: '50', dueDate: '2026-10-20', mode: 'ONCE' }, NOW);
     expect((await cancelPayable(b.member, ids[0], ' ').catch((e) => e)).status).toBe(400);

@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { parseDuplicatas } from '@/lib/nfe/duplicatas';
 import { createFromNfe } from '@/lib/payables/service';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Stock entry and contas a pagar from a purchase note: owner and manager, as in the menu
+    const access = await requireRestaurantRole(MANAGER_ROLES, 'Importar nota de compra é do dono e do gerente');
+    if (!access.ok) return access.response;
 
     const body = await req.json();
     const { xmlContent, launchPayables } = body;

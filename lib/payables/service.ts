@@ -176,9 +176,14 @@ export async function listPayables(member: RestaurantMember, query: { status?: s
   const where: Prisma.PayableWhereInput = { restaurantId };
   if (query.category && CATEGORIES.includes(query.category as PayableCategory)) where.category = query.category as PayableCategory;
   if (query.month && /^\d{4}-\d{2}$/.test(query.month)) where.competenceMonth = monthDate(query.month);
+  // The situation filter runs in the database: a long paid history never pushes the open bills out of the list
+  const open = query.status === 'OPEN' || query.status === 'OVERDUE';
+  if (open) where.status = 'OPEN';
+  if (query.status === 'OVERDUE') where.dueDate = { lt: dayDate(today) };
+  if (query.status === 'PAID' || query.status === 'CANCELED') where.status = query.status;
   const rows = await prisma.payable.findMany({
     where,
-    orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+    orderBy: open ? [{ dueDate: 'asc' }, { createdAt: 'asc' }] : [{ dueDate: 'desc' }, { createdAt: 'desc' }],
     take: 500,
     include: { supplier: { select: { name: true } } },
   });
@@ -200,21 +205,23 @@ export async function listPayables(member: RestaurantMember, query: { status?: s
     paidFrom: r.paidFrom,
     notes: r.notes,
   }));
-  const filtered = query.status ? items.filter((i) => i.state === query.status || (query.status === 'OPEN' && ['OVERDUE', 'TODAY', 'WEEK', 'LATER'].includes(i.state))) : items;
-
-  // The cards always read the whole restaurant, whatever the filters
-  const all = query.category || query.month ? await prisma.payable.findMany({ where: { restaurantId }, select: { status: true, dueDate: true, amountCents: true, competenceMonth: true } }) : rows;
-  const sum = (pred: (r: { status: string; dueDate: Date; competenceMonth: Date }) => boolean) => {
-    const sel = all.filter(pred);
+  // The cards always read the whole restaurant, whatever the filters: open bills up to 7 days ahead, and the month
+  const in7 = new Date(Date.parse(`${today}T00:00:00Z`) + 7 * 86_400_000);
+  const [soon, month] = await Promise.all([
+    prisma.payable.findMany({ where: { restaurantId, status: 'OPEN', dueDate: { lte: in7 } }, select: { status: true, dueDate: true, amountCents: true } }),
+    prisma.payable.aggregate({ where: { restaurantId, status: { not: 'CANCELED' }, competenceMonth: monthDate(ym) }, _sum: { amountCents: true }, _count: true }),
+  ]);
+  const sum = (state: DisplayState) => {
+    const sel = soon.filter((r) => displayState(r, today) === state);
     return { count: sel.length, cents: sel.reduce((s, r) => s + r.amountCents, 0) };
   };
   const summary = {
-    overdue: sum((r) => displayState(r, today) === 'OVERDUE'),
-    today: sum((r) => displayState(r, today) === 'TODAY'),
-    week: sum((r) => displayState(r, today) === 'WEEK'),
-    month: sum((r) => r.status !== 'CANCELED' && monthOf(r.competenceMonth) === ym),
+    overdue: sum('OVERDUE'),
+    today: sum('TODAY'),
+    week: sum('WEEK'),
+    month: { count: month._count, cents: month._sum.amountCents ?? 0 },
   };
-  return { summary, items: filtered, features: await payableFeatures(restaurantId) };
+  return { summary, items, features: await payableFeatures(restaurantId) };
 }
 
 export async function editPayable(
@@ -247,8 +254,11 @@ export async function editPayable(
     const seriesData: Prisma.PayableSeriesUpdateInput = {};
     if (data.description) seriesData.description = data.description as string;
     if (data.category) seriesData.category = data.category as PayableCategory;
-    if (data.amountCents) seriesData.amountCents = data.amountCents as number;
-    if (newDue) seriesData.dueDay = Number(newDue.slice(8, 10));
+    // A field sent unchanged (the February 28th of a day-31 series, a one-off amount) never reaches the series
+    const amountChanged = data.amountCents !== undefined && data.amountCents !== p.amountCents;
+    const dueChanged = newDue !== null && newDue !== iso(p.dueDate);
+    if (amountChanged) seriesData.amountCents = data.amountCents as number;
+    if (dueChanged) seriesData.dueDay = Number(newDue!.slice(8, 10));
     await prisma.$transaction(async (tx) => {
       const series = await tx.payableSeries.update({ where: { id: p.seriesId! }, data: seriesData });
       const next = await tx.payable.findMany({ where: { seriesId: p.seriesId, status: 'OPEN', competenceMonth: { gte: p.competenceMonth } } });
@@ -256,8 +266,9 @@ export async function editPayable(
         await tx.payable.update({
           where: { id: n.id },
           data: {
-            description: series.description, category: series.category, amountCents: series.amountCents, updatedById: member.userId,
-            ...(newDue ? { dueDate: dueDateIn(monthOf(n.competenceMonth), series.dueDay) } : {}),
+            description: series.description, category: series.category, updatedById: member.userId,
+            ...(amountChanged ? { amountCents: series.amountCents } : {}),
+            ...(dueChanged ? { dueDate: dueDateIn(monthOf(n.competenceMonth), series.dueDay) } : {}),
           },
         });
       }
@@ -339,18 +350,28 @@ export async function undoPayment(member: RestaurantMember, id: string, reason: 
   if (why.length < 3) throw new PayableError('Informe o motivo');
   const p = await ownPayable(member, id);
   if (p.status !== 'PAID') throw new PayableError('Esta conta não está paga', 409);
-  if (p.paidFrom === 'DRAWER') {
-    const shiftId = await drawerShift(member.restaurantId, cashSessionId, 'Abra um caixa para devolver o dinheiro à gaveta');
-    await addEntry(member, shiftId, {
-      type: 'ADJUSTMENT', direction: 'IN', method: 'CASH', amount: p.amountCents / 100,
-      description: `Pagamento desfeito: ${p.description} (${why})`.slice(0, 200),
-    });
-  }
+  const shiftId = p.paidFrom === 'DRAWER' ? await drawerShift(member.restaurantId, cashSessionId, 'Abra um caixa para devolver o dinheiro à gaveta') : null;
+  // Claimed first: two undos at once give the money back once
   const done = await prisma.payable.updateMany({
     where: { id: p.id, status: 'PAID' },
     data: { status: 'OPEN', paidAt: null, paidMethod: null, paidFrom: null, paidById: null, cashEntryId: null, updatedById: member.userId },
   });
   if (done.count === 0) throw new PayableError('Esta conta não está paga', 409);
+  if (shiftId) {
+    try {
+      await addEntry(member, shiftId, {
+        type: 'ADJUSTMENT', direction: 'IN', method: 'CASH', amount: p.amountCents / 100,
+        description: `Pagamento desfeito: ${p.description} (${why})`.slice(0, 200),
+      });
+    } catch (error) {
+      // The drawer refused: the bill stays paid as it was
+      await prisma.payable.update({
+        where: { id: p.id },
+        data: { status: 'PAID', paidAt: p.paidAt, paidMethod: p.paidMethod, paidFrom: p.paidFrom, paidById: p.paidById, cashEntryId: p.cashEntryId },
+      });
+      throw error;
+    }
+  }
   await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { undone: why, from: p.paidFrom } });
   return { ok: true as const };
 }

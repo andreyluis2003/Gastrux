@@ -82,6 +82,20 @@ describe('NF-e duplicatas become contas a pagar', () => {
     expect(await prisma.payable.count({ where: { restaurantId: b.rid } })).toBe(0);
   });
 
+  it('cashier: 403, no bills (final review I-5)', async () => {
+    const c = await prisma.user.create({ data: { email: 'pnfe-c-' + tag + '@gastrux.test', name: 'Caixa', password: 'x', role: 'CASHIER', currentRestaurantId: b.rid } });
+    try {
+      await prisma.restaurantUser.create({ data: { restaurantId: b.rid, userId: c.id, role: 'CASHIER', permissions: [], acceptedAt: new Date() } });
+      await prisma.payable.deleteMany({ where: { restaurantId: b.rid } });
+      as({ ownerId: c.id, email: c.email });
+      expect((await imp({ xmlContent: XML })).status).toBe(403);
+      expect(await prisma.payable.count({ where: { restaurantId: b.rid } })).toBe(0);
+    } finally {
+      await prisma.restaurantUser.deleteMany({ where: { userId: c.id } });
+      await prisma.user.delete({ where: { id: c.id } });
+    }
+  });
+
   it('Pro: refused (Business), no bills', async () => {
     as(p);
     expect((await (await imp({ xmlContent: XML })).json()).payables).toEqual({ refused: 'business' });

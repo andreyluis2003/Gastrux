@@ -184,8 +184,12 @@ export function EditDialog({ item, onClose, onSaved }: { item: PayableItem; onCl
 
   async function save(scope: 'THIS' | 'NEXT') {
     setBusy(true);
-    const body: Record<string, unknown> = { description: form.description, notes: form.notes, scope };
-    if (!utility) Object.assign(body, { amount: form.amount, dueDate: form.dueDate });
+    // Only what changed: an unchanged date or amount must not move a whole series
+    const body: Record<string, unknown> = { scope };
+    if (form.description !== item.description) body.description = form.description;
+    if (form.notes !== (item.notes ?? '')) body.notes = form.notes;
+    if (!utility && form.amount !== centsToInput(item.amountCents)) body.amount = form.amount;
+    if (!utility && form.dueDate !== item.dueDate) body.dueDate = form.dueDate;
     const { ok, out } = await send(`/api/payables/${item.id}`, 'PATCH', body);
     setBusy(false);
     if (!ok) return toast.error(out.error || 'Não foi possível salvar');
@@ -219,19 +223,38 @@ export function EditDialog({ item, onClose, onSaved }: { item: PayableItem; onCl
   );
 }
 
-export function ReasonDialog({ title, help, confirm, onClose, onConfirm }: { title: string; help: string; confirm: string; onClose: () => void; onConfirm: (reason: string) => Promise<boolean> }) {
+type Shift = { id: string; registerName: string };
+
+/** onConfirm answers true (done), false (failed) or the open registers to choose from (undo with two drawers open) */
+export function ReasonDialog({ title, help, confirm, onClose, onConfirm }: { title: string; help: string; confirm: string; onClose: () => void; onConfirm: (reason: string, cashSessionId?: string) => Promise<boolean | Shift[]> }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [shifts, setShifts] = useState<Shift[] | null>(null);
+  const [shiftId, setShiftId] = useState('');
   return (
     <Shell title={title} onClose={onClose}>
       <p className="text-sm text-slate-600">{help}</p>
       <div><p className={label}>Motivo</p><input className={field} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} /></div>
+      {shifts && (
+        <div><p className={label}>Para qual caixa volta o dinheiro?</p>
+          <select className={field} value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
+            <option value="">Escolha</option>
+            {shifts.map((s) => <option key={s.id} value={s.id}>{s.registerName}</option>)}
+          </select>
+        </div>
+      )}
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>Voltar</Button>
         <Button
           variant="destructive"
-          disabled={busy || reason.trim().length < 3}
-          onClick={async () => { setBusy(true); const ok = await onConfirm(reason.trim()); setBusy(false); if (ok) onClose(); }}
+          disabled={busy || reason.trim().length < 3 || (!!shifts && !shiftId)}
+          onClick={async () => {
+            setBusy(true);
+            const out = await onConfirm(reason.trim(), shiftId || undefined);
+            setBusy(false);
+            if (Array.isArray(out)) setShifts(out);
+            else if (out) onClose();
+          }}
         >
           {confirm}
         </Button>

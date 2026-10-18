@@ -139,7 +139,13 @@ export default function ContasAPagarPage() {
         <ReasonDialog
           title="Desfazer pagamento" confirm="Desfazer" help={dialog.item.paidFrom === 'DRAWER' ? 'O dinheiro volta para o caixa aberto.' : 'A conta volta a ficar a pagar.'}
           onClose={() => setDialog(null)}
-          onConfirm={async (reason) => { const r = await send(`/api/payables/${dialog.item.id}/pay`, 'DELETE', { reason }); if (!r.ok) toast.error(r.out.error || 'Não foi possível desfazer'); else done(); return r.ok; }}
+          onConfirm={async (reason, cashSessionId) => {
+            const r = await send(`/api/payables/${dialog.item.id}/pay`, 'DELETE', { reason, cashSessionId });
+            if (!r.ok) toast.error(r.out.error || 'Não foi possível desfazer');
+            if (!r.ok && Array.isArray(r.out.shifts)) return r.out.shifts;
+            if (r.ok) done();
+            return r.ok;
+          }}
         />
       )}
     </div>

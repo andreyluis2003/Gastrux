@@ -87,6 +87,18 @@ describe('contas a pagar: pay and undo', () => {
     expect(back).toMatchObject({ amountCents: 12000, method: 'CASH' });
   });
 
+  it('two undos at once give the money back once (final review I-1)', async () => {
+    const shift = await prisma.cashSession.findFirst({ where: { cashRegisterId: regA.id, status: 'OPEN' } });
+    const id = await bill('77');
+    await payPayable(owner, id, { method: 'CASH', from: 'DRAWER', cashSessionId: shift.id });
+    const p = await prisma.payable.findUnique({ where: { id } });
+    const results = await Promise.allSettled([undoPayment(owner, id, 'duplo clique', shift.id), undoPayment(owner, id, 'duplo clique', shift.id)]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const back = await prisma.cashSessionEntry.count({ where: { cashSessionId: shift.id, type: 'ADJUSTMENT', direction: 'IN', description: { contains: p.description } } });
+    expect(back).toBe(1);
+    expect((await prisma.payable.findUnique({ where: { id } })).status).toBe('OPEN');
+  });
+
   it('undo a bank payment needs no register', async () => {
     const p = await prisma.payable.findFirst({ where: { restaurantId: rid, paidFrom: 'BANK', status: 'PAID' } });
     await undoPayment(owner, p.id, 'estornado no banco');

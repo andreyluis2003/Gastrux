@@ -59,4 +59,10 @@ describe('DRE with contas a pagar', () => {
     expect(dre.despesasOperacionais.pessoal).toBe(2500);
     expect(dre.pessoalOrigem).toBe('contas');
   });
+
+  it('September and October with payroll only in October: September keeps its estimate (final review I-6)', async () => {
+    const { dre } = await computeDre(rid, '2026-09-01', '2026-10-31');
+    expect(dre.despesasOperacionais.pessoal).toBeCloseTo(2000 + 2500, 1);
+    expect(dre.pessoalOrigem).toBe('misto');
+  });
 });
