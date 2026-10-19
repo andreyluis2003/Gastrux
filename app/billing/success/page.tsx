@@ -22,9 +22,14 @@ export default function BillingSuccessPage() {
   const cancelled = useRef(false);
   const { update } = useSession() || ({} as any);
 
-  // Paid: the login reads the plan again at once, so a locked restaurant is released without waiting 5 minutes
+  // Paid: the login reads the plan again at once, so a locked restaurant is released without waiting 5 minutes.
+  // Once more a few seconds later (review M-5): the webhook copies the plan to the stores right after it
+  // saves the subscription this page waits for
   useEffect(() => {
-    if (state === 'success') void update?.();
+    if (state !== 'success') return;
+    void update?.();
+    const again = setTimeout(() => void update?.(), 4000);
+    return () => clearTimeout(again);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -50,11 +55,9 @@ export default function BillingSuccessPage() {
       const res = await fetch(`/api/billing/checkout-session/status?session_id=${encodeURIComponent(id)}`);
       const data = await res.json();
       if (cancelled.current) return;
-      if (res.ok && data.complete && (data.subscriptionStatus === 'active' || data.subscriptionStatus === 'trialing')) {
-        setState('success');
-      } else if (res.ok && data.complete) {
-        // Checkout finished but the subscription webhook hasn't landed yet -
-        // wait for it the same way the Mercado Pago branch does.
+      if (res.ok && data.complete) {
+        // The status above comes from Stripe itself, before our webhook saved the plan (review M-5: the
+        // login was read too early and the lock stayed up to 5 minutes): wait for our copy, like Mercado Pago
         pollConfirmation();
       } else {
         setState('pending');

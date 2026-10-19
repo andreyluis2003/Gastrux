@@ -62,11 +62,22 @@ export async function PATCH(
       return NextResponse.json(result);
     }
 
-    // Generic update
+    // Generic update. The form always sends the three fields (review M-1): choosing another paid plan for a
+    // client in trial left 'trialing', and with no gateway subscription the restaurant locked at the trial
+    // date. Choosing a plan gives the plan; a trial is extended in ./trial. 'cancelled' is read by nothing.
+    const current = await prisma.restaurant.findUnique({ where: { id: params.id }, select: { subscriptionTier: true } });
+    const choosesPaidPlan =
+      ['pro', 'business', 'enterprise'].includes(body.subscriptionTier) && body.subscriptionTier !== current?.subscriptionTier;
+    let subscriptionStatus = body.subscriptionStatus === 'cancelled' ? 'canceled' : body.subscriptionStatus;
+    let status = body.status;
+    if (choosesPaidPlan && (!subscriptionStatus || subscriptionStatus === 'trialing')) {
+      subscriptionStatus = 'active';
+      if (!status || status === 'TRIAL') status = 'ACTIVE';
+    }
     const result = await updateCustomer(params.id, {
-      status: body.status,
+      status,
       subscriptionTier: body.subscriptionTier,
-      subscriptionStatus: body.subscriptionStatus,
+      subscriptionStatus,
       trialEndsAt: body.trialEndsAt,
       billingCycleEnd: body.billingCycleEnd,
       note: body.note,

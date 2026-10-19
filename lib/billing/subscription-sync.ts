@@ -133,7 +133,7 @@ export async function upsertSubscriptionFromGatewayEvent(input: GatewaySubscript
     // Preserves the pre-existing behavior (syncRestaurantTier): one paid
     // subscription covers every restaurant this user owns.
     await prisma.restaurant.updateMany({
-      where: { ownerId: input.userId },
+      where: storesToMirror(input.userId, mirror.data, subscription, now),
       data: mirror.data,
     });
   } catch (e) {
@@ -141,6 +141,18 @@ export async function upsertSubscriptionFromGatewayEvent(input: GatewaySubscript
   }
 
   return subscription;
+}
+
+/**
+ * The owner's stores that take the mirror. A plan that ends ('starter' = no plan) skips a store in a trial
+ * the team extended after the cancel (review M-2: the sweep wrote 'starter' over the extension). The
+ * extension has its own end date; the gateway's own trial has the subscription's, and canceling it still
+ * ends the plan at once. A paying plan always reaches every store.
+ */
+function storesToMirror(ownerId: string, data: { subscriptionTier?: string }, sub: { trialEnd?: Date | null }, now: Date) {
+  if (data.subscriptionTier !== 'starter') return { ownerId };
+  const extended = sub.trialEnd ? { gt: now, not: sub.trialEnd } : { gt: now };
+  return { ownerId, NOT: { subscriptionStatus: 'trialing', trialEndsAt: extended } };
 }
 
 /**
@@ -196,7 +208,7 @@ export async function expireEndedSubscriptions(now = new Date()): Promise<number
     const mirror = full ? await resolveMirror(full, sub.userId as string, now) : null;
     if (!mirror) continue;
     await prisma.user.update({ where: { id: sub.userId as string }, data: { subscriptionId: mirror.sourceId, ...mirror.data } });
-    await prisma.restaurant.updateMany({ where: { ownerId: sub.userId as string }, data: mirror.data });
+    await prisma.restaurant.updateMany({ where: storesToMirror(sub.userId as string, mirror.data, full, now), data: mirror.data });
     expired++;
   }
   return expired;

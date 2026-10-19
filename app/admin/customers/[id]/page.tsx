@@ -419,7 +419,7 @@ export default function CustomerDetailPage() {
                   <SelectItem value="trialing">trialing</SelectItem>
                   <SelectItem value="past_due">past_due</SelectItem>
                   <SelectItem value="paused">paused</SelectItem>
-                  <SelectItem value="cancelled">cancelled</SelectItem>
+                  <SelectItem value="canceled">canceled</SelectItem>
                 </SelectContent>
               </Select>
             </div>

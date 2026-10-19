@@ -9,18 +9,20 @@ O registro original se perdeu; M-1, M-2, M-4 e M-5 foram recuperados do históri
 
 ### Abertos
 
-- **M-1. Plataforma pode deixar um plano pago "em teste"**: a edição genérica de cliente
-  (`app/api/admin/customers/[id]/route.ts:63-70`, `lib/admin/customer-service.ts` updateCustomer) põe o
-  plano 'pro' e deixa o status 'trialing'. Sem assinatura no gateway, o restaurante trava quando
-  `trialEndsAt` passa. Correção sugerida: ao escolher um plano pago, gravar status 'active' (ou avisar na tela).
-- **M-2. "Estender teste" depois de um cancelamento do Mercado Pago é desfeito**: `extendTrial` transforma
-  em teste do Business o restaurante travado pelo cancelamento (I-1), mas `expireEndedSubscriptions`
-  (`lib/billing/subscription-sync.ts`) ainda vê o plano 'pro' no usuário e grava 'starter', cortando a extensão.
-- **M-5. Depois de pagar, a trava pode durar até 5 minutos**: `app/billing/success/page.tsx` chama
-  `update()` quando a consulta diz sucesso, o que pode ser antes de o webhook copiar o plano para o
-  restaurante. Correção sugerida: chamar `update()` de novo depois de alguns segundos, ou esperar a cópia.
+Nenhum.
 
 ### Resolvidos
+
+- **M-1. Plataforma deixava um plano pago "em teste"**: o formulário manda sempre os três campos; escolher
+  Pro num cliente em teste deixava 'trialing' e travava na data do teste. Agora escolher outro plano pago
+  grava 'active' (o teste se estende em "Estender teste"); a opção "cancelled" virou "canceled".
+  `app/api/admin/customers/[id]/route.ts`.
+- **M-2. "Estender teste" depois de um cancelamento era desfeito**: a cópia de "sem plano" para as lojas
+  pula a loja com teste estendido pela Plataforma (data diferente da do teste do gateway; cancelar durante o
+  teste do gateway continua encerrando na hora). `storesToMirror` em `lib/billing/subscription-sync.ts`.
+- **M-5. Trava até 5 minutos depois de pagar**: no Stripe, a tela de sucesso agora espera a assinatura
+  gravada pelo webhook (como no Mercado Pago) e relê o login de novo 4 s depois. `app/billing/success/page.tsx`.
+  Sem teste automatizado: conferir na próxima assinatura real pelo Stripe.
 
 - **Assinou durante o teste continuava "em teste"**: faixa "faltam N dias / Escolher plano", trava se o
   gateway avisasse a 1ª cobrança com atraso, e "Estender teste" trocava o Pro por teste do Business.
@@ -42,6 +44,10 @@ O registro original se perdeu; M-1, M-2, M-4 e M-5 foram recuperados do históri
 - Risco v1: quem nunca recarrega a sessão fica com o JWT antigo (sem trava) até o próximo refresh.
 
 ### Menores, sem pressa
+
+- **Teste instável**: `__tests__/integration/api/consumption-default.test.ts` ("by default: sales, manual
+  exits and losses") falhou uma vez na rodada completa de 2026-10-19 e passa sozinho, com e sem as correções
+  M-1/M-2/M-5. Provável dependência de dados de outro teste no mesmo banco; investigar.
 
 - O teste do gateway arredonda para cima os dias que faltam (`remainingTrialDays`, Math.ceil): até 1 dia
   grátis a mais para quem assina no meio do teste.
