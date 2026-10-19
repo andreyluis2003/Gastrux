@@ -39,7 +39,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/dashboard/loyalty': ['app/dashboard/loyalty/page.tsx'],
   '/admin/cashback': ['app/admin/cashback/page.tsx'],
   '/admin/messaging/campaigns': ['app/admin/messaging/campaigns/page.tsx'],
-  '/admin/delivery-site': ['app/admin/delivery-site/page.tsx'],
+  '/admin/delivery-site': ['components/delivery/delivery-site-client.tsx'],
   '/admin/staff': ['app/admin/staff/page.tsx'],
   '/planejamento': [TR, "'planning.title': 'Planejamento de produção'"],
   '/etiquetas': ['app/etiquetas/page.tsx'],

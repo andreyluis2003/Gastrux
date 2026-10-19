@@ -43,6 +43,13 @@ describe('server pages never list another restaurant\'s data', () => {
     expect(positions).toContain('where: { restaurantId, active: true }');
   });
 
+  it('the delivery site shows the selected store, not the first of the list (multi-store owners, 2026-10-19)', () => {
+    const src = fs.readFileSync(path.join(appDir, 'admin/delivery-site/page.tsx'), 'utf8');
+    expect(/getCurrentRestaurantId\(\)/.test(src)).toBe(true);
+    expect(src).not.toMatch(/\/api\/restaurants['"`]/);
+    expect(src).not.toMatch(/data\[0\]/);
+  });
+
   it('restaurant data is never marked as publicly cacheable', () => {
     for (const s of ['short', 'medium', 'long'] as const) {
       expect(getCacheHeader(s)['Cache-Control']).toMatch(/^private, no-store/);
