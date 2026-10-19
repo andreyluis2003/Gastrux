@@ -24,6 +24,11 @@ jest.mock('@/lib/prisma', () => ({
 
 import { HELP_ARTICLES, syncHelpContent } from '@/lib/help/seed-articles';
 
+it('the ficha article tells the cost inside the product (2026-10-18)', () => {
+  const a = HELP_ARTICLES.find((x) => x.slug === 'cadastrar-receita');
+  for (const fact of ['Cardápio digital', 'margem', 'CMV', 'Editar ficha técnica']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+});
+
 it('the stock article tells the batch entry (2026-10-18)', () => {
   const a = HELP_ARTICLES.find((x) => x.slug === 'controle-estoque-alertas');
   for (const fact of ['Entrada em lote', 'sem entrada ainda', 'custo por unidade']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);

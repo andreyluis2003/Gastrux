@@ -1,6 +1,7 @@
 /** Knowledge: menu, recipes, ingredients. */
 export default `## Cardápio, fichas técnicas e insumos
 - Cardápio digital: Cardápio e produtos > Cardápio digital. Categorias, itens, preços, fotos e o que aparece no QR Code e no site.
+- Custo no produto: em Cardápio e produtos > Cardápio digital, ao criar ou editar um produto e escolher a ficha técnica, aparecem o custo de um item vendido, a margem (em reais e %) e o CMV % no preço do produto, os insumos e o link "Editar ficha técnica". Insumo sem custo é avisado (o custo real fica maior). Produto sem ficha: avisa que não baixa estoque e oferece "Criar ficha técnica". Só dono e gerente veem custos.
 - Fichas técnicas: Cardápio e produtos > Fichas técnicas. Cada ficha lista os insumos e quantidades de uma porção; o custo vem do custo de referência dos insumos. Na ficha também ficam a validade por conservação (para as etiquetas) e a opção "Contar na contagem do dia".
 - Insumos: Cardápio e produtos > Insumos. Nome, unidade, custo de referência, estoque mínimo. Não há importação por planilha; a importação da nota de compra (Estoque e compras > Importar nota de compra) atualiza o custo dos insumos vinculados.
 - CMV: Relatórios > CMV mostra o custo da mercadoria vendida sobre as vendas. Engenharia de cardápio (Mais recursos) classifica os itens por popularidade e margem.

@@ -14,6 +14,7 @@ import { brl } from '@/components/caixa/money';
 import { isProductRecipe } from '@/lib/cardapio/is-product-recipe';
 import { Plus, Trash2, Edit2, Eye, EyeOff, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
+import { RecipeCostPanel } from '@/components/cardapio/recipe-cost-panel';
 import Image from 'next/image';
 
 interface MenuCategory {
@@ -349,6 +350,7 @@ export default function AdminCardapioPage() {
                         </option>
                       ))}
                     </select>
+                    <RecipeCostPanel recipeId={newItem.recipeId} price={newItem.price} />
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleCreateItem(cat.id)}>
@@ -496,6 +498,7 @@ export default function AdminCardapioPage() {
                   </option>
                 ))}
               </select>
+              <RecipeCostPanel recipeId={editingItem.recipeId} price={editingItem.price} />
             </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">

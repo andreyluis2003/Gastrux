@@ -34,6 +34,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   'c065d71e3c9e0d0a5138dd57f6bb345ab90454b448ec93c33296216a07efae82', // cadastrar-insumos
   '48537abefdff56b666ce7c2d738dfef7d4831cabd0a39aa423ba6f9f46e044b9', // como-cancelar
   '665449ae68f039482354ba97a7ab2fe068e65ade42bccd62848c0b37a5513454', // controle-estoque-alertas (2026-10-17 version, before 'Contagem de estoque')
+  '3f29b4f010aa7391a133992cf7e5820feb59983fc0e377fcfdf9dcfbe1afad0e', // cadastrar-receita (2026-10-17 version, before the cost inside the product)
   '4d23d4e94701e30c2c55cb9b3285fb31ca61578755de8f0e4253ed436a95e8c7', // controle-estoque-alertas ('Contagem de estoque', before 'Entrada em lote')
 ]);
 
@@ -293,6 +294,10 @@ A ficha técnica diz quais insumos, e quanto de cada um, vão numa porção. Com
 2. Dê o nome e o rendimento
 3. Adicione os insumos com a quantidade usada
 4. Salve. O custo por porção aparece na hora
+
+## No produto do cardápio
+
+Em **Cardápio e produtos > Cardápio digital**, ao criar ou editar um produto, escolha a ficha técnica dele. Logo abaixo aparecem o custo de um item vendido, a margem e o CMV no preço do produto, a lista de insumos e o link **Editar ficha técnica**. Mudou o preço? A margem muda na hora.
 
 Na ficha também ficam a validade por conservação (usada nas etiquetas) e a opção "Contar na contagem do dia".
 
