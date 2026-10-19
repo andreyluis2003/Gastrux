@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { setOwnerTrialEnd } from '@/lib/admin/trial';
 
 export const dynamic = 'force-dynamic';
 
@@ -170,6 +171,9 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // The access date is the Business trial of the tester's stores (plans of 2026-10-18)
+    if (createAccess && userId && accessEndsAt) await setOwnerTrialEnd(userId, accessEndsAt);
 
     const tester = await prisma.betaTester.create({
       data: {

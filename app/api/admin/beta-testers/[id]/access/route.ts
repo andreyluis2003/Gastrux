@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { setOwnerTrialEnd } from '@/lib/admin/trial';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           where: { id: tester.userId },
           data: { trialEndsAt: newEnd, active: true, subscriptionStatus: 'trialing' },
         });
+        // The store locked on the old date: only the User row used to change (plans of 2026-10-18)
+        await setOwnerTrialEnd(tester.userId, newEnd);
       }
       await prisma.betaTester.update({
         where: { id: tester.id },

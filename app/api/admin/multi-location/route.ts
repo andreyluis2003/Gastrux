@@ -136,6 +136,14 @@ export async function POST(req: NextRequest) {
       console.warn('[multi-location] tier check skipped:', e);
     }
 
+    // The new store has the owner's plan (Business trial or paid; the gateways copy a subscription to every
+    // store the owner has): 'starter' means "no plan" since 2026-10-18 and the store was born locked
+    const PLAN = { status: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true, billingCycleStart: true, billingCycleEnd: true, isInternal: true } as const;
+    const me = await prisma.user.findUnique({ where: { id: userId }, select: { currentRestaurantId: true } });
+    const source =
+      (me?.currentRestaurantId && (await prisma.restaurant.findFirst({ where: { id: me.currentRestaurantId, ownerId: userId }, select: PLAN }))) ||
+      (await prisma.restaurant.findFirst({ where: { ownerId: userId }, orderBy: { createdAt: 'asc' }, select: PLAN }));
+
     const restaurant = await prisma.restaurant.create({
       data: {
         name,
@@ -145,9 +153,13 @@ export async function POST(req: NextRequest) {
         phone: phone || null,
         email: email || null,
         ownerId: userId,
-        status: 'ACTIVE',
-        subscriptionTier: 'starter',
-        subscriptionStatus: 'active',
+        status: source?.status === 'TRIAL' ? 'TRIAL' : 'ACTIVE',
+        subscriptionTier: source?.subscriptionTier ?? 'starter',
+        subscriptionStatus: source?.subscriptionStatus ?? 'active',
+        trialEndsAt: source?.trialEndsAt ?? null,
+        billingCycleStart: source?.billingCycleStart ?? null,
+        billingCycleEnd: source?.billingCycleEnd ?? null,
+        isInternal: source?.isInternal ?? false,
       },
     });
 

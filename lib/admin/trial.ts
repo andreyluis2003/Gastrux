@@ -105,3 +105,18 @@ export async function setInternal(input: { restaurantId: string; isInternal?: un
     throw error;
   }
 }
+
+/**
+ * Beta testers (Plataforma › Beta testers): their access date is the Business trial of the stores they own.
+ * It used to change only the User row, so the store locked on the old date. Paid stores are left alone.
+ */
+export async function setOwnerTrialEnd(ownerId: string, trialEndsAt: Date, now = new Date()): Promise<number> {
+  const stores = await prisma.restaurant.findMany({ where: { ownerId }, select: { id: true, ...SELECT } });
+  let changed = 0;
+  for (const r of stores) {
+    if (planAccess({ ...r, subscribedInTrial: await subscribedInTrial(r) }, now).state === 'paid') continue;
+    await prisma.restaurant.update({ where: { id: r.id }, data: { trialEndsAt, subscriptionStatus: 'trialing', subscriptionTier: 'business', status: 'TRIAL' } });
+    changed++;
+  }
+  return changed;
+}
