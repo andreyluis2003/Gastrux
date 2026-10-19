@@ -108,16 +108,7 @@ export async function getDashboardStats(restaurantId: string, now = new Date()):
       where: { restaurantId, planDate: { gte: new Date(Math.min(lastWeekStart.getTime(), now.getTime() - 7 * DAY_MS)) } },
       select: { planDate: true },
     }),
-    // Same rule as the rest of the app (lib/ai/gather-restaurant-data.ts): below the minimum set for it
-    prisma.$queryRaw<Array<{ n: number }>>`
-      SELECT count(*)::int AS n
-      FROM ingredients i
-      LEFT JOIN stocks s ON s."ingredientId" = i.id AND s."restaurantId" = i."restaurantId"
-      WHERE i."restaurantId" = ${restaurantId}
-        AND i.active = true
-        AND i."minimumStock" > 0
-        AND COALESCE(s."currentQuantity", 0) < i."minimumStock"
-    `,
+    lowStockCount(restaurantId),
   ]);
 
   return {
@@ -125,6 +116,20 @@ export async function getDashboardStats(restaurantId: string, now = new Date()):
     recipes: growthCard(recipes.map((r) => r.createdAt), now),
     plansThisWeek: plansCard(plans.map((p) => p.planDate), now),
     // No stock history is kept per day, so no trend or line is invented for it
-    lowStock: { value: lowStock[0]?.n ?? 0, delta: null, deltaLabel: null, series: [] },
+    lowStock: { value: lowStock, delta: null, deltaLabel: null, series: [] },
   };
+}
+
+/** Active insumos below the minimum set for them; same rule as the rest of the app (lib/ai/gather-restaurant-data.ts) */
+export async function lowStockCount(restaurantId: string): Promise<number> {
+  const rows = await prisma.$queryRaw<Array<{ n: number }>>`
+    SELECT count(*)::int AS n
+    FROM ingredients i
+    LEFT JOIN stocks s ON s."ingredientId" = i.id AND s."restaurantId" = i."restaurantId"
+    WHERE i."restaurantId" = ${restaurantId}
+      AND i.active = true
+      AND i."minimumStock" > 0
+      AND COALESCE(s."currentQuantity", 0) < i."minimumStock"
+  `;
+  return rows[0]?.n ?? 0;
 }

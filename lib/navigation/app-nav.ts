@@ -2,8 +2,8 @@
  * One navigation for the whole app (2026-10-05). There used to be three: the "Admin" sidebar with 27
  * loose items, a 10-item mobile menu, and nothing at all on the dashboard, the cash register and the
  * production screens. Competitors (Goomer, Anota AI, Consumer) group a few areas by the day's task and
- * keep the rest out of sight; this does the same. No feature is removed: whatever is not in a group
- * is still reachable from "Todos os recursos" on the dashboard.
+ * keep the rest out of sight; this does the same. Since 2026-10-18 the Início is the "Painel do dia" and the
+ * old grid of module cards is gone: pages outside the menu open only by their address.
  *
  * Pure module (no React): unit-tested in __tests__/unit/app-nav.test.ts.
  */
@@ -145,7 +145,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'WhatsApp', href: '/admin/integrations/whatsapp', roles: MANAGERS },
       { label: 'Várias lojas', href: '/admin/multi-location', roles: MANAGERS },
       { label: 'Uso da IA', href: '/admin/settings/ia', roles: MANAGERS },
-      { label: 'Todos os recursos', href: '/dashboard#modulos', roles: MANAGERS },
     ],
   },
   {
