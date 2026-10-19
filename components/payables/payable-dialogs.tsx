@@ -61,7 +61,8 @@ export function NewPayableDialog({ seriesAllowed, suppliers, onClose, onSaved }:
     const { ok, out } = await send('/api/payables', 'POST', { ...form, mode, installments: Number(form.installments), supplierId: form.supplierId || undefined, competenceMonth: form.competenceMonth || undefined });
     setBusy(false);
     if (!ok) return toast.error(out.error || 'Não foi possível salvar');
-    toast.success(mode === 'ONCE' ? 'Conta lançada' : `${out.ids.length} contas lançadas`);
+    // A series far ahead has no bill yet: they appear 2 months before they are due
+    toast.success(mode === 'ONCE' ? 'Conta lançada' : out.ids.length ? `${out.ids.length} contas lançadas` : 'Repetição criada: cada conta aparece na lista 2 meses antes de vencer');
     onSaved();
   }
 

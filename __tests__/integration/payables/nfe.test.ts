@@ -9,6 +9,7 @@ jest.mock('next-auth/next', () => ({ getServerSession: jest.fn() }));
 import { getServerSession } from 'next-auth';
 import { getServerSession as getServerSessionNext } from 'next-auth/next';
 import { POST as IMPORT } from '../../../app/api/nfe/import-xml/route';
+import { createFromNfe } from '../../../lib/payables/service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -94,6 +95,15 @@ describe('NF-e duplicatas become contas a pagar', () => {
       await prisma.restaurantUser.deleteMany({ where: { userId: c.id } });
       await prisma.user.delete({ where: { id: c.id } });
     }
+  });
+
+  it('notes without key, number and CNPJ never block each other (minor M-5)', async () => {
+    await prisma.payable.deleteMany({ where: { restaurantId: b.rid } });
+    const bare = (cents) => ({ key: null, nNF: '', emitente: 'Fornecedor', cnpj: '', duplicatas: [{ nDup: '1', dueDate: '2026-11-05', amountCents: cents }] });
+    expect(await createFromNfe(b.rid, b.ownerId, bare(1000))).toEqual({ created: 1, skipped: 0 });
+    expect(await createFromNfe(b.rid, b.ownerId, bare(2000))).toEqual({ created: 1, skipped: 0 });
+    expect(await createFromNfe(b.rid, b.ownerId, bare(2000))).toEqual({ created: 0, skipped: 1 });
+    await prisma.payable.deleteMany({ where: { restaurantId: b.rid } });
   });
 
   it('Pro: refused (Business), no bills', async () => {

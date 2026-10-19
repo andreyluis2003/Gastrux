@@ -99,6 +99,25 @@ describe('contas a pagar: pay and undo', () => {
     expect((await prisma.payable.findUnique({ where: { id } })).status).toBe('OPEN');
   });
 
+  it('a drawer payment still being registered cannot be undone (minor M-1)', async () => {
+    const shift = await prisma.cashSession.findFirst({ where: { cashRegisterId: regA.id, status: 'OPEN' } });
+    const id = await bill('33');
+    // As payPayable leaves it between the claim and the drawer entry
+    await prisma.payable.update({ where: { id }, data: { status: 'PAID', paidFrom: 'DRAWER', paidMethod: 'CASH', paidAt: new Date('2026-10-18T00:00:00Z') } });
+    const e = await undoPayment(owner, id, 'clique rapido', shift.id).catch((x) => x);
+    expect(e.status).toBe(409);
+    const p = await prisma.payable.findUnique({ where: { id } });
+    expect(p.status).toBe('PAID');
+    expect(await prisma.cashSessionEntry.count({ where: { cashSessionId: shift.id, type: 'ADJUSTMENT', description: { contains: p.description } } })).toBe(0);
+  });
+
+  it('from the drawer the method is always cash (minor M-6)', async () => {
+    const shift = await prisma.cashSession.findFirst({ where: { cashRegisterId: regA.id, status: 'OPEN' } });
+    const id = await bill('5');
+    await payPayable(owner, id, { method: 'PIX', from: 'DRAWER', cashSessionId: shift.id });
+    expect((await prisma.payable.findUnique({ where: { id } })).paidMethod).toBe('CASH');
+  });
+
   it('undo a bank payment needs no register', async () => {
     const p = await prisma.payable.findFirst({ where: { restaurantId: rid, paidFrom: 'BANK', status: 'PAID' } });
     await undoPayment(owner, p.id, 'estornado no banco');

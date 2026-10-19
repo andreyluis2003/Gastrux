@@ -137,6 +137,32 @@ describe('contas a pagar: create, list, edit, cancel', () => {
     }
   }, 60000);
 
+  it('"esta e as próximas": notes and supplier stay on this bill, the typed date is kept (minor M-3)', async () => {
+    const sup = await prisma.supplier.create({ data: { restaurantId: b.rid, code: 'S' + tag, name: 'Contador Silva' } });
+    const s = await prisma.payableSeries.create({ data: { restaurantId: b.rid, description: 'Contador', category: 'SERVICES', amountCents: 50000, dueDay: 10, startMonth: new Date('2027-03-01T00:00:00Z'), createdById: b.member.userId } });
+    const mk = (ym, due) => prisma.payable.create({ data: { restaurantId: b.rid, seriesId: s.id, source: 'SERIES', description: 'Contador', category: 'SERVICES', amountCents: 50000, competenceMonth: new Date(ym + '-01T00:00:00Z'), dueDate: new Date(due + 'T00:00:00Z'), createdById: b.member.userId } });
+    const mar = await mk('2027-03', '2027-03-10');
+    const apr = await mk('2027-04', '2027-04-10');
+    await editPayable(b.member, mar.id, { notes: 'boleto 123', supplierId: sup.id, dueDate: '2027-04-02', scope: 'NEXT' });
+    const m2 = await prisma.payable.findUnique({ where: { id: mar.id } });
+    expect(m2).toMatchObject({ notes: 'boleto 123', supplierId: sup.id });
+    expect(m2.dueDate.toISOString().slice(0, 10)).toBe('2027-04-02');
+    const a2 = await prisma.payable.findUnique({ where: { id: apr.id } });
+    expect(a2.supplierId).toBe(sup.id);
+    expect(a2.notes).toBeNull();
+    expect(a2.dueDate.toISOString().slice(0, 10)).toBe('2027-04-02');
+    expect((await prisma.payableSeries.findUnique({ where: { id: s.id } })).supplierId).toBe(sup.id);
+    await prisma.payable.deleteMany({ where: { seriesId: s.id } });
+    await prisma.payableSeries.delete({ where: { id: s.id } });
+    await prisma.supplier.delete({ where: { id: sup.id } });
+  });
+
+  it('utility bills are not typed by hand (minor M-6)', async () => {
+    const e = await createPayables(b.member, { description: 'Luz', category: 'UTILITIES', amount: '100', dueDate: '2026-10-20', mode: 'ONCE' }).catch((x) => x);
+    expect(e.status).toBe(400);
+    expect(e.message).toBe('Contas de consumo se lançam em Relatórios > Contas de consumo');
+  });
+
   it('cancel: open with a reason; without reason 400; paid 409', async () => {
     const { ids } = await createPayables(b.member, { description: 'Multa', category: 'TAXES', amount: '50', dueDate: '2026-10-20', mode: 'ONCE' }, NOW);
     expect((await cancelPayable(b.member, ids[0], ' ').catch((e) => e)).status).toBe(400);

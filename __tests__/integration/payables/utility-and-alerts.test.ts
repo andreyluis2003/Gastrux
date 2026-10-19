@@ -15,6 +15,8 @@ import { upsertBill } from '../../../lib/utility-bills/service';
 import { morningCheck } from '../../../lib/payables/alerts';
 import { ensureSeries } from '../../../lib/payables/service';
 import { POST as MORNING } from '../../../app/api/payables/morning-check/route';
+import { prisma as libPrisma } from '../../../lib/prisma';
+import { cancelPayable, editPayable } from '../../../lib/payables/service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -93,16 +95,49 @@ describe('utility bills link and the morning check', () => {
     expect(first.alerted).toBe(1);
     const notes = await prisma.notification.findMany({ where: { restaurantId: b.rid, data: { path: ['kind'], equals: 'payables-morning' } } });
     expect(notes).toHaveLength(1);
-    expect(notes[0].title).toBe('Contas a pagar: 2 vencem hoje (R$ 1.450,00) · 1 atrasada (R$ 300,00) · 1 em 3 dias');
+    expect(notes[0].title).toBe('Contas a pagar: 2 vencem hoje (R$ 1.450,00) · 1 atrasada (R$ 300,00) · 1 nos próximos 3 dias');
     expect(notes[0].actionUrl).toBe('/contas-a-pagar');
     const mine = mails.filter((m) => m.to === b.email);
     expect(mine).toHaveLength(1);
     // What staff typed never becomes HTML in the owner's e-mail
     expect(mine[0].html).toContain('Em 3 dias &lt;b&gt;x&lt;/b&gt;');
     expect(mine[0].html).not.toContain('<b>x</b>');
+    // The link follows the environment (homolog e-mails open homolog)
+    expect(mine[0].html).toContain('href="' + (process.env.NEXTAUTH_URL || 'https://gastrux.com').replace(/\/+$/, '') + '/contas-a-pagar"');
     expect(await prisma.notification.count({ where: { restaurantId: p.rid } })).toBe(0);
     await morningCheck(NOW);
     expect(await prisma.notification.count({ where: { restaurantId: b.rid, data: { path: ['kind'], equals: 'payables-morning' } } })).toBe(1);
+  });
+
+  it('a payable the owner canceled stays canceled, and its edited name stays, when the utility bill is saved again (minor M-4)', async () => {
+    await upsertBill(b.member, { accountId: energy.id, referenceMonth: '2026-07', amount: '200', consumption: '400', dueDate: '2026-08-20' }, NOW);
+    const jul = await prisma.payable.findFirst({ where: { restaurantId: b.rid, source: 'UTILITY', competenceMonth: d('2026-07-01') } });
+    await editPayable(b.member, jul.id, { description: 'Luz de julho' });
+    await upsertBill(b.member, { accountId: energy.id, referenceMonth: '2026-07', amount: '210', consumption: '400', dueDate: '2026-08-20' }, NOW);
+    expect(await prisma.payable.findUnique({ where: { id: jul.id } })).toMatchObject({ description: 'Luz de julho', amountCents: 21000 });
+    await cancelPayable(b.member, jul.id, 'paga no banco antes do sistema');
+    await upsertBill(b.member, { accountId: energy.id, referenceMonth: '2026-07', amount: '210', consumption: '410', dueDate: '2026-08-20' }, NOW);
+    expect((await prisma.payable.findUnique({ where: { id: jul.id } })).status).toBe('CANCELED');
+  });
+
+  it('one restaurant failing does not stop the others (minor M-2)', async () => {
+    const x1 = await setup('business');
+    const x2 = await setup('business');
+    for (const x of [x1, x2]) await prisma.payable.create({ data: { restaurantId: x.rid, description: 'Hoje', category: 'OTHER', amountCents: 1000, competenceMonth: d('2026-10-01'), dueDate: d('2026-10-18'), createdById: x.ownerId } });
+    const real = libPrisma.notification.create.bind(libPrisma.notification);
+    const spy = jest.spyOn(libPrisma.notification, 'create').mockImplementation((args) => (args.data.restaurantId === x1.rid ? Promise.reject(new Error('boom')) : real(args)));
+    try {
+      await morningCheck(NOW);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await prisma.notification.count({ where: { restaurantId: x2.rid } })).toBe(1);
+    for (const x of [x1, x2]) {
+      await prisma.notification.deleteMany({ where: { restaurantId: x.rid } });
+      await prisma.payable.deleteMany({ where: { restaurantId: x.rid } });
+      await prisma.restaurant.delete({ where: { id: x.rid } });
+      await prisma.user.delete({ where: { id: x.ownerId } });
+    }
   });
 
   it('a Pro series never generates bills', async () => {

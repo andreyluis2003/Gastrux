@@ -54,6 +54,13 @@ function categoryOf(v: unknown): PayableCategory {
   return v as PayableCategory;
 }
 
+/** Utility bills come from Contas de consumo (with their consumption); typed by hand they would leave the DRE */
+function manualCategoryOf(v: unknown): PayableCategory {
+  const c = categoryOf(v);
+  if (c === 'UTILITIES') throw new PayableError('Contas de consumo se lançam em Relatórios > Contas de consumo');
+  return c;
+}
+
 function competenceOf(v: unknown, dueDay: string): string {
   if (v === undefined || v === null || v === '') return dueDay.slice(0, 7);
   if (typeof v !== 'string' || !/^\d{4}-\d{2}$/.test(v)) throw new PayableError('Mês de competência inválido');
@@ -105,7 +112,7 @@ export async function createPayables(
   now = new Date(),
 ): Promise<{ ids: string[] }> {
   const description = descriptionOf(body.description);
-  const category = categoryOf(body.category);
+  const category = manualCategoryOf(body.category);
   const amountCents = amountOf(body.amount);
   const due = parseDay(body.dueDate);
   const notes = notesOf(body.notes);
@@ -235,12 +242,13 @@ export async function editPayable(
   const touchesMoney = body.amount !== undefined || body.dueDate !== undefined || body.competenceMonth !== undefined;
   if (p.source === 'UTILITY' && touchesMoney) throw new PayableError('Edite esta conta em Contas de consumo', 409);
   if (body.description !== undefined) data.description = descriptionOf(body.description);
-  if (body.category !== undefined) data.category = categoryOf(body.category);
+  if (body.category !== undefined) data.category = manualCategoryOf(body.category);
   if (body.amount !== undefined) data.amountCents = amountOf(body.amount);
   if (body.notes !== undefined) data.notes = notesOf(body.notes);
+  let supplierSet: string | null | undefined;
   if (body.supplierId !== undefined) {
-    const sid = await supplierOf(member.restaurantId, body.supplierId);
-    data.supplier = sid ? { connect: { id: sid } } : { disconnect: true };
+    supplierSet = await supplierOf(member.restaurantId, body.supplierId);
+    data.supplier = supplierSet ? { connect: { id: supplierSet } } : { disconnect: true };
   }
   let newDue: string | null = null;
   if (body.dueDate !== undefined) {
@@ -259,14 +267,17 @@ export async function editPayable(
     const dueChanged = newDue !== null && newDue !== iso(p.dueDate);
     if (amountChanged) seriesData.amountCents = data.amountCents as number;
     if (dueChanged) seriesData.dueDay = Number(newDue!.slice(8, 10));
+    if (supplierSet !== undefined) seriesData.supplierId = supplierSet;
     await prisma.$transaction(async (tx) => {
+      // This bill gets exactly what was typed (notes and date included); the next ones follow the series
+      await tx.payable.update({ where: { id: p.id }, data });
       const series = await tx.payableSeries.update({ where: { id: p.seriesId! }, data: seriesData });
-      const next = await tx.payable.findMany({ where: { seriesId: p.seriesId, status: 'OPEN', competenceMonth: { gte: p.competenceMonth } } });
+      const next = await tx.payable.findMany({ where: { seriesId: p.seriesId, status: 'OPEN', competenceMonth: { gt: p.competenceMonth } } });
       for (const n of next) {
         await tx.payable.update({
           where: { id: n.id },
           data: {
-            description: series.description, category: series.category, updatedById: member.userId,
+            description: series.description, category: series.category, supplierId: series.supplierId, updatedById: member.userId,
             ...(amountChanged ? { amountCents: series.amountCents } : {}),
             ...(dueChanged ? { dueDate: dueDateIn(monthOf(n.competenceMonth), series.dueDay) } : {}),
           },
@@ -315,9 +326,10 @@ export async function payPayable(
   const p = await ownPayable(member, id);
   if (p.status === 'PAID') throw new PayableError('Esta conta já foi paga', 409);
   if (p.status === 'CANCELED') throw new PayableError('Esta conta foi cancelada', 409);
-  const method = typeof body.method === 'string' && (PAY_METHODS as readonly string[]).includes(body.method) ? body.method : null;
-  if (!method) throw new PayableError('Forma de pagamento inválida');
   if (body.from !== 'DRAWER' && body.from !== 'BANK') throw new PayableError('Informe de onde saiu o dinheiro');
+  // Money from the drawer is cash, whatever the request says
+  const method = body.from === 'DRAWER' ? 'CASH' : typeof body.method === 'string' && (PAY_METHODS as readonly string[]).includes(body.method) ? body.method : null;
+  if (!method) throw new PayableError('Forma de pagamento inválida');
   const paidAt = body.paidAt === undefined || body.paidAt === '' ? brtToday(now) : parseDay(body.paidAt, 'Data do pagamento');
   const shiftId = body.from === 'DRAWER' ? await drawerShift(member.restaurantId, body.cashSessionId, 'Abra o caixa para pagar com dinheiro da gaveta') : null;
 
@@ -329,17 +341,20 @@ export async function payPayable(
   if (claimed.count === 0) throw new PayableError('Esta conta já foi paga', 409);
 
   if (shiftId) {
+    let entryId: string;
     try {
       const { entry } = await addEntry(member, shiftId, {
         type: 'EXPENSE', amount: p.amountCents / 100, category: 'outros', description: `Conta a pagar: ${p.description}`.slice(0, 200),
         force: body.force === true, payableId: p.id,
       });
-      await prisma.payable.update({ where: { id: p.id }, data: { cashEntryId: entry.id } });
+      entryId = entry.id;
     } catch (error) {
       // The drawer refused (not enough cash, shift closed): the bill stays open
       await prisma.payable.update({ where: { id: p.id }, data: { status: 'OPEN', paidAt: null, paidMethod: null, paidFrom: null, paidById: null } });
       throw error;
     }
+    // The money left the drawer: the bill stays paid even if this link fails (undo waits for it)
+    await prisma.payable.update({ where: { id: p.id }, data: { cashEntryId: entryId } });
   }
   await recordAudit(member, { action: 'UPDATE', entityType: 'Payable', entityId: p.id, changes: { paid: { method, from: body.from, paidAt, shiftId } } });
   return { ok: true as const };
@@ -350,10 +365,12 @@ export async function undoPayment(member: RestaurantMember, id: string, reason: 
   if (why.length < 3) throw new PayableError('Informe o motivo');
   const p = await ownPayable(member, id);
   if (p.status !== 'PAID') throw new PayableError('Esta conta não está paga', 409);
+  // A drawer payment is undone only once its expense is in the drawer: never money back for an expense still being written
+  if (p.paidFrom === 'DRAWER' && !p.cashEntryId) throw new PayableError('O pagamento pela gaveta ainda está sendo registrado. Tente de novo em instantes', 409);
   const shiftId = p.paidFrom === 'DRAWER' ? await drawerShift(member.restaurantId, cashSessionId, 'Abra um caixa para devolver o dinheiro à gaveta') : null;
   // Claimed first: two undos at once give the money back once
   const done = await prisma.payable.updateMany({
-    where: { id: p.id, status: 'PAID' },
+    where: { id: p.id, status: 'PAID', cashEntryId: p.cashEntryId },
     data: { status: 'OPEN', paidAt: null, paidMethod: null, paidFrom: null, paidById: null, cashEntryId: null, updatedById: member.userId },
   });
   if (done.count === 0) throw new PayableError('Esta conta não está paga', 409);
@@ -380,6 +397,8 @@ export async function undoPayment(member: RestaurantMember, id: string, reason: 
  * A utility bill with a due date is a bill to pay (spec 2026-10-18 §5): its payable is created or follows it while
  * still open; a paid one keeps its values. Without a due date an open payable is canceled, a paid one stays.
  */
+const DUE_REMOVED = 'Vencimento removido na conta de consumo';
+
 export async function syncUtilityPayable(restaurantId: string, billId: string, userId: string) {
   const bill = await prisma.utilityBill.findFirst({ where: { id: billId, restaurantId }, include: { account: { select: { name: true } } } });
   if (!bill) return;
@@ -388,7 +407,7 @@ export async function syncUtilityPayable(restaurantId: string, billId: string, u
     if (existing?.status === 'OPEN') {
       await prisma.payable.update({
         where: { id: existing.id },
-        data: { status: 'CANCELED', canceledAt: new Date(), canceledById: userId, cancelReason: 'Vencimento removido na conta de consumo' },
+        data: { status: 'CANCELED', canceledAt: new Date(), canceledById: userId, cancelReason: DUE_REMOVED },
       });
     }
     return;
@@ -401,13 +420,17 @@ export async function syncUtilityPayable(restaurantId: string, billId: string, u
   };
   if (!existing) {
     await prisma.payable.create({ data: { restaurantId, category: 'UTILITIES', source: 'UTILITY', utilityBillId: bill.id, createdById: userId, ...values } });
-  } else if (existing.status !== 'PAID') {
-    // A canceled one comes back when the bill gets a due date again
-    await prisma.payable.update({
-      where: { id: existing.id },
-      data: { ...values, status: 'OPEN', canceledAt: null, canceledById: null, cancelReason: null, updatedById: userId },
-    });
+    return;
   }
+  // Paid ones keep their values; one the owner canceled in Contas a pagar stays canceled
+  if (existing.status === 'PAID') return;
+  if (existing.status === 'CANCELED' && existing.cancelReason !== DUE_REMOVED) return;
+  const { description: _name, ...money } = values; // a name edited in Contas a pagar stays
+  await prisma.payable.update({
+    where: { id: existing.id },
+    // Canceled only because the due date was cleared: it comes back with the date
+    data: { ...money, status: 'OPEN', canceledAt: null, canceledById: null, cancelReason: null, updatedById: userId },
+  });
 }
 
 /**
@@ -420,8 +443,12 @@ export async function createFromNfe(restaurantId: string, userId: string, parsed
   const digits = (v: string | null) => (v ?? '').replace(/\D/g, '');
   const suppliers = parsed.cnpj ? await prisma.supplier.findMany({ where: { restaurantId, cnpj: { not: null } }, select: { id: true, cnpj: true } }) : [];
   const supplierId = suppliers.find((s) => digits(s.cnpj) === digits(parsed.cnpj))?.id ?? null;
-  // Without an access key the note number and the supplier keep the import from duplicating
-  const key = parsed.key ?? `NF${parsed.nNF}-${digits(parsed.cnpj)}`;
+  // Without an access key the note number and the supplier keep the import from duplicating; a note without
+  // either is told apart by its own content, so two unrelated notes never block each other
+  const key = parsed.key
+    ?? (parsed.nNF && digits(parsed.cnpj)
+      ? `NF${parsed.nNF}-${digits(parsed.cnpj)}`
+      : `SEMCHAVE-${crypto.createHash('sha256').update(JSON.stringify([parsed.emitente, parsed.duplicatas])).digest('hex').slice(0, 32)}`);
   let created = 0;
   let skipped = 0;
   for (const dup of parsed.duplicatas) {

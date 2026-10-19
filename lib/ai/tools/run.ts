@@ -125,6 +125,7 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
           despesas: { operacional: r2(d.operacional), pessoal: r2(d.pessoal), pessoalOrigem: dre.pessoalOrigem, contasConsumo: r2(d.contasConsumo), contasAPagar: r2(d.contasAPagar ?? 0), taxasGateway: r2(d.taxasGateway), total: r2(d.total) },
           // true: the utility bills are whole-month values inside a partial period
           contasConsumoMesInteiro: dre.contasConsumoMesInteiro,
+          contasAPagarMesInteiro: dre.contasMesInteiro,
           resultadoOperacional: r2(dre.resultadoOperacional), resultadoLiquido: r2(dre.resultadoLiquido), margemLiquidaPct: dre.margemLiquida } };
       }
       case 'contas_consumo': {
