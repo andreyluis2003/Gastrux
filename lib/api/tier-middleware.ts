@@ -45,12 +45,8 @@ export async function enforceFeature(
   restaurantId: string,
   feature: FeatureType
 ): Promise<NextResponse | null> {
-  const { prisma } = await import('@/lib/prisma');
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { id: restaurantId },
-    select: { subscriptionTier: true },
-  });
-  const tier = restaurant?.subscriptionTier || 'starter';
+  const { restaurantTier } = await import('@/lib/tier-guard');
+  const tier = await restaurantTier(restaurantId);
 
   if (!isTierFeatureEnabled(tier, feature)) {
     const featureNames: Record<string, string> = {

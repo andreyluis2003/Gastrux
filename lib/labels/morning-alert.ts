@@ -4,11 +4,12 @@ import { brtDay, brtDayStart } from '@/lib/staff/commission-rules';
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00.000Z`) + 864e5).toISOString().slice(0, 10);
 
-// The plans with the expiry control (lib/tier-guard.ts labelExpiry)
-const EXPIRY_TIERS = ['pro', 'business', 'enterprise'];
+// The plans with the expiry control (lib/tier-guard.ts labelExpiry: Business and up since 2026-10-18; an internal
+// account reads Business at least, lib/tier-guard.ts effectiveTier)
+const EXPIRY_TIERS = ['business', 'enterprise'];
 
 /**
- * Restaurants to look at: Pro+ with active labels expiring within a day. Filtered by plan in the
+ * Restaurants to look at: Business+ with active labels expiring within a day. Filtered by plan in the
  * query: Starter labels can never be settled and stay ACTIVE, so they must not cost the daily run
  * (review of etiquetas 2026-10-09).
  */
@@ -18,7 +19,7 @@ export async function labelAlertCandidates(now = new Date()): Promise<string[]> 
     where: {
       status: 'ACTIVE',
       expiresAt: { lt: new Date(now.getTime() + 864e5) },
-      restaurant: { subscriptionTier: { in: EXPIRY_TIERS } },
+      restaurant: { OR: [{ subscriptionTier: { in: EXPIRY_TIERS } }, { isInternal: true }] },
     },
   });
   return rows.map((r) => r.restaurantId);

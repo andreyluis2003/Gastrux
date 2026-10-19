@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
-import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { isTierFeatureEnabled, restaurantTier } from '@/lib/tier-guard';
 import { monthSalesCents } from '@/lib/finance/month-sales';
 import {
   addMonths, currentMonth, indicators, KIND_INFO, monthDate, monthOf, parseAmountCents, parseConsumption, parseMonth,
@@ -95,8 +95,7 @@ export async function upsertBill(
 
 export async function loadScreen(member: RestaurantMember, now = new Date()) {
   const { restaurantId } = member;
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } });
-  const insights = isTierFeatureEnabled(restaurant?.subscriptionTier || 'starter', 'utilityInsights');
+  const insights = isTierFeatureEnabled(await restaurantTier(restaurantId), 'utilityInsights');
   const cur = currentMonth(now);
   const accounts = await prisma.utilityAccount.findMany({
     where: { restaurantId },

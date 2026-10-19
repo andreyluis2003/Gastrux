@@ -1,3 +1,4 @@
+import { effectiveTier } from '@/lib/tier-guard';
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@/lib/prisma';
 import type { RestaurantMember } from '@/lib/auth/restaurant-role';
@@ -35,8 +36,8 @@ export async function askQuestion(member: RestaurantMember, body: unknown, now =
 }
 
 async function ask(client: Anthropic, member: RestaurantMember, b: { history?: unknown; detailed?: unknown }, question: string, attachments: Attachment[], now: Date) {
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { name: true, subscriptionTier: true, createdAt: true } });
-  const tier = (restaurant?.subscriptionTier || 'starter').toLowerCase();
+  const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { name: true, subscriptionTier: true, isInternal: true, createdAt: true } });
+  const tier = effectiveTier(restaurant).toLowerCase();
   const detailed = b.detailed === true;
   if (detailed && !DETAILED_TIERS.includes(tier)) return { status: 403, body: { error: 'A análise detalhada é do plano Pro.', upgradeUrl: '/pricing' } };
   const limit = monthlyLimit(tier);

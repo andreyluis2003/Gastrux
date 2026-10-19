@@ -1,3 +1,4 @@
+import { restaurantTier } from '@/lib/tier-guard';
 import { NextResponse } from 'next/server';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { prisma } from '@/lib/prisma';
@@ -13,7 +14,7 @@ export async function GET() {
   const auth = await requireRestaurantRole([...MANAGER_ROLES, 'ADMIN'], 'O uso da IA é do dono e do gerente');
   if (!auth.ok) return auth.response;
   const rid = auth.member.restaurantId;
-  const tier = (await prisma.restaurant.findUnique({ where: { id: rid }, select: { subscriptionTier: true } }))?.subscriptionTier || 'starter';
+  const tier = await restaurantTier(rid);
   const rows = await prisma.aiQuestion.findMany({
     where: { restaurantId: rid, createdAt: { gte: brtDayStart(`${currentMonth()}-01`) } },
     orderBy: { createdAt: 'desc' }, take: 50,

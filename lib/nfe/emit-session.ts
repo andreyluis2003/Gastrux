@@ -388,9 +388,8 @@ export async function autoEmitNFCe(
     if (!config) return { emitted: false, nfce: null, message: 'NFC-e não configurada. Venda registrada sem nota fiscal.' };
     // A plan downgrade after the fiscal setup must not break the sale: the same graceful answer
     // as "not configured", never a hard refusal (rule from /api/nfe/auto-emit)
-    const { isTierFeatureEnabled } = await import('@/lib/tier-guard');
-    const restaurant = await prisma.restaurant.findUnique({ where: { id: input.restaurantId }, select: { subscriptionTier: true } });
-    if (!isTierFeatureEnabled(restaurant?.subscriptionTier || 'starter', 'nfe')) {
+    const { isTierFeatureEnabled, restaurantTier } = await import('@/lib/tier-guard');
+    if (!isTierFeatureEnabled(await restaurantTier(input.restaurantId), 'nfe')) {
       return { emitted: false, nfce: null, message: 'NF-e não disponível no plano atual. Venda registrada sem nota fiscal.' };
     }
     if (input.onlyIfEnabled && !config.autoIssueOnSale) {

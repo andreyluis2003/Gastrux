@@ -1,12 +1,11 @@
 import { prisma } from '@/lib/prisma';
-import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { isTierFeatureEnabled, restaurantTier } from '@/lib/tier-guard';
 import { addMonths, alertText, indicators, isAlertableMonth, monthDate, monthOf, shouldAlert, type BillPoint, type UtilityKind } from './rules';
 
 /** Pro: a bill 20% above the 3 months before its own reference month rings the managers' bell, once per account and month */
 export async function alertIfAbove(restaurantId: string, accountId: string, ym: string): Promise<boolean> {
   if (!isAlertableMonth(ym)) return false;
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } });
-  if (!isTierFeatureEnabled(restaurant?.subscriptionTier || 'starter', 'utilityInsights')) return false;
+  if (!isTierFeatureEnabled(await restaurantTier(restaurantId), 'utilityInsights')) return false;
   const account = await prisma.utilityAccount.findFirst({ where: { id: accountId, restaurantId }, select: { kind: true, name: true } });
   if (!account) return false;
   const rows = await prisma.utilityBill.findMany({

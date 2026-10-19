@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { RestaurantMember } from '@/lib/auth/restaurant-role';
-import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { isTierFeatureEnabled, restaurantTier } from '@/lib/tier-guard';
 import { closeRows, DailyCountError, type ClosedRow } from './compute';
 import { nightRows } from './service';
 
@@ -67,8 +67,7 @@ export async function closeNight(member: RestaurantMember, counts: { recipeId: s
   }, { timeout: 30_000, maxWait: 10_000 });
 
   // Pro+: the difference rings the managers' bell (restaurant-wide alert, userId null)
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } });
-  if (isTierFeatureEnabled(restaurant?.subscriptionTier || 'starter', 'dailyCountAlert')) {
+  if (isTierFeatureEnabled(await restaurantTier(restaurantId), 'dailyCountAlert')) {
     const text = differenceAlertText(result.lines.map((l) => ({ recipeName: l.name, difference: l.difference, unitCost: result.costs[l.recipeId] ?? 0 })));
     if (text) {
       try {

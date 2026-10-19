@@ -1,3 +1,4 @@
+import { restaurantTier } from '@/lib/tier-guard';
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
@@ -21,8 +22,7 @@ const money = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 
 export { money };
 
 async function tierOf(restaurantId: string) {
-  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } });
-  return r?.subscriptionTier || 'starter';
+  return restaurantTier(restaurantId);
 }
 
 export async function payableFeatures(restaurantId: string) {

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { effectiveTier } from '@/lib/tier-guard';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -23,10 +24,10 @@ export async function GET(req: NextRequest) {
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
-    select: { subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true },
+    select: { subscriptionTier: true, isInternal: true, subscriptionStatus: true, trialEndsAt: true },
   });
 
-  const tier = restaurant?.subscriptionTier || 'starter';
+  const tier = effectiveTier(restaurant);
   const limits = getTierLimits(tier);
 
   // Check resource param

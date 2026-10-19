@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { sendTransactionalEmail } from '@/lib/email/transactional';
-import { isTierFeatureEnabled } from '@/lib/tier-guard';
+import { effectiveTier, isTierFeatureEnabled } from '@/lib/tier-guard';
 import { appBaseUrl } from '@/lib/auth/password-reset';
 import { captureException } from '@/lib/sentry';
 import { brtToday, dayDate } from './rules';
@@ -65,8 +65,8 @@ type DueBill = { dueDate: Date; amountCents: number; description: string };
 
 /** One bell summary a day for a Business restaurant, plus the owner's e-mail. True when it alerted. */
 async function alertRestaurant(restaurantId: string, list: DueBill[], today: string): Promise<boolean> {
-  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true, ownerId: true, name: true } });
-  if (!r || !isTierFeatureEnabled(r.subscriptionTier || 'starter', 'payableAlerts')) return false;
+  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true, isInternal: true, ownerId: true, name: true } });
+  if (!r || !isTierFeatureEnabled(effectiveTier(r), 'payableAlerts')) return false;
   const day = (p: { dueDate: Date }) => p.dueDate.toISOString().slice(0, 10);
   const sum = (sel: DueBill[]) => ({ count: sel.length, cents: sel.reduce((s, p) => s + p.amountCents, 0) });
   const overdue = sum(list.filter((p) => day(p) < today));

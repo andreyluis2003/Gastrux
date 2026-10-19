@@ -1,3 +1,4 @@
+import { restaurantTier } from '@/lib/tier-guard';
 import { prisma } from '@/lib/prisma';
 import type { RestaurantMember } from '@/lib/auth/restaurant-role';
 import { getSessionView } from '@/lib/caixa/sessions';
@@ -23,7 +24,7 @@ const TZ = 'America/Sao_Paulo';
 const hhmm = (d: Date) => d.toLocaleString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 async function tierOf(restaurantId: string) {
-  return (await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } }))?.subscriptionTier || 'starter';
+  return restaurantTier(restaurantId);
 }
 
 /** Runs one tool for the logged member (spec 2026-10-16 ia-assistente §4.2/§4.3): read-only, scoped, role-checked again */

@@ -17,6 +17,21 @@ export interface TierCheckResult {
 
 const TIER_ORDER = ['starter', 'pro', 'business', 'enterprise'];
 
+/**
+ * The plan that decides features and limits. 'starter' means "no plan" since 2026-10-18 (the Starter plan no
+ * longer exists). An internal account works as Business at least (owner, 2026-10-19; review M-4: internal 'pro'
+ * accounts lost pay at the table). To test Pro, turn off 'Conta interna' on that account.
+ */
+export function effectiveTier(r: { subscriptionTier?: string | null; isInternal?: boolean | null } | null | undefined): string {
+  const tier = r?.subscriptionTier || 'starter';
+  return r?.isInternal && TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf('business') ? 'business' : tier;
+}
+
+export async function restaurantTier(restaurantId: string): Promise<string> {
+  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true, isInternal: true } });
+  return effectiveTier(r);
+}
+
 function nextTier(currentTier: string): string | null {
   const idx = TIER_ORDER.indexOf(currentTier);
   return idx >= 0 && idx < TIER_ORDER.length - 1 ? TIER_ORDER[idx + 1] : null;
@@ -26,12 +41,7 @@ export async function checkTierLimit(
   restaurantId: string,
   resource: 'ingredients' | 'recipes' | 'users' | 'deliveryIntegrations' | 'locations' | 'kitchenStations'
 ): Promise<TierCheckResult> {
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { id: restaurantId },
-    select: { subscriptionTier: true },
-  });
-
-  const tier = restaurant?.subscriptionTier || 'starter';
+  const tier = await restaurantTier(restaurantId);
   const limits = getTierLimits(tier);
   const limit = (limits as any)[resource] ?? 999999;
 

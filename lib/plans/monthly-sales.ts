@@ -1,3 +1,4 @@
+import { restaurantTier } from '@/lib/tier-guard';
 import { prisma } from '@/lib/prisma';
 import { getTierLimits } from '@/lib/stripe-config';
 import { brtDay, periodContaining, shiftPeriod, type PeriodBounds } from '@/lib/staff/commission-rules';
@@ -34,8 +35,7 @@ async function countSales(restaurantId: string, month: PeriodBounds): Promise<nu
 }
 
 export async function monthlySalesUsage(restaurantId: string, now: Date = new Date()): Promise<SalesUsage> {
-  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } });
-  const tier = restaurant?.subscriptionTier || 'starter';
+  const tier = await restaurantTier(restaurantId);
   const raw = (getTierLimits(tier) as any).monthlySales ?? 999999;
   const limit = raw >= 999999 ? null : raw;
   const month = periodContaining('MONTHLY', brtDay(now));

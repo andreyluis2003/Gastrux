@@ -8,14 +8,14 @@ const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
 
 describe('labels: morning alert', () => {
-  let pro: string, starter: string, userId: string;
+  let biz: string, starter: string, userId: string;
   const alerts = (rid: string) => prisma.notification.findMany({ where: { restaurantId: rid, data: { path: ['kind'], equals: 'label_expiry' } } });
   beforeAll(async () => {
     userId = (await prisma.user.create({ data: { email: `lm-${tag}@gastrux.test`, name: 'Ana', password: 'x', role: 'OWNER' } })).id;
-    pro = (await prisma.restaurant.create({ data: { name: `Lm ${tag}`, ownerId: userId, status: 'ACTIVE', subscriptionTier: 'pro' } })).id;
+    biz = (await prisma.restaurant.create({ data: { name: `Lm ${tag}`, ownerId: userId, status: 'ACTIVE', subscriptionTier: 'business' } })).id;
     starter = (await prisma.restaurant.create({ data: { name: `Lm2 ${tag}`, ownerId: userId, status: 'ACTIVE', subscriptionTier: 'starter' } })).id;
     const now = Date.now();
-    for (const rid of [pro, starter]) {
+    for (const rid of [biz, starter]) {
       await prisma.foodLabel.createMany({ data: [
         { restaurantId: rid, itemType: 'INGREDIENT', itemName: 'Leite', storage: 'CHILLED', preparedAt: new Date(now - 4 * 864e5), expiresAt: new Date(now - 3600e3), printedById: userId },
         { restaurantId: rid, itemType: 'INGREDIENT', itemName: 'Creme', storage: 'CHILLED', preparedAt: new Date(now - 864e5), expiresAt: new Date(now + 60e3), printedById: userId },
@@ -23,21 +23,21 @@ describe('labels: morning alert', () => {
     }
   }, 60000);
   afterAll(async () => {
-    try { await prisma.restaurant.deleteMany({ where: { id: { in: [pro, starter] } } }); } catch {}
+    try { await prisma.restaurant.deleteMany({ where: { id: { in: [biz, starter] } } }); } catch {}
     try { await prisma.user.delete({ where: { id: userId } }); } catch {}
   });
 
   // Starter labels can never be settled and stay ACTIVE: they must not cost the daily run (review 2026-10-09)
-  it('only Pro and up restaurants are candidates, filtered in the query', async () => {
+  it('only Business and up restaurants are candidates (expiry control is Business since 2026-10-18), filtered in the query', async () => {
     const ids = await labelAlertCandidates();
-    expect(ids).toContain(pro);
+    expect(ids).toContain(biz);
     expect(ids).not.toContain(starter);
   });
 
-  it('one restaurant-wide alert per day, only for Pro and up', async () => {
+  it('one restaurant-wide alert per day, only for Business and up', async () => {
     await alertExpiringLabels();
     await alertExpiringLabels();
-    const a = await alerts(pro);
+    const a = await alerts(biz);
     expect(a).toHaveLength(1);
     expect(a[0].userId).toBeNull();
     expect(a[0].title).toMatch(/1 etiqueta vencida/);
