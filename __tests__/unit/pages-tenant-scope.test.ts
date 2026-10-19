@@ -32,10 +32,15 @@ describe('server pages never list another restaurant\'s data', () => {
   });
 
   it('the recipes and stock pages filter by the current restaurant', () => {
-    for (const p of ['receitas/page.tsx', 'estoque/page.tsx']) {
+    for (const p of ['receitas/page.tsx']) {
       const src = fs.readFileSync(path.join(appDir, p), 'utf8');
       expect([p, /getCurrentRestaurantId\(\)/.test(src), /where: \{ restaurantId \}|restaurantId,\s*\n\s*active: true/.test(src)]).toEqual([p, true, true]);
     }
+    // Estoque reads its rows through lib/stock/positions.ts (2026-10-18), scoped there
+    const estoque = fs.readFileSync(path.join(appDir, 'estoque/page.tsx'), 'utf8');
+    expect(/getCurrentRestaurantId\(\)/.test(estoque) && /stockPositions\(restaurantId\)/.test(estoque)).toBe(true);
+    const positions = fs.readFileSync(path.join(appDir, '..', 'lib/stock/positions.ts'), 'utf8');
+    expect(positions).toContain('where: { restaurantId, active: true }');
   });
 
   it('restaurant data is never marked as publicly cacheable', () => {

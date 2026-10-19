@@ -48,7 +48,7 @@ export function parseMonth(v: unknown, now = new Date()): string {
  * digits and no comma is a thousands separator, as on a Brazilian bill ("1.240" = 1240, review I1);
  * a comma before a dot ("1,240.00") is ambiguous and refused.
  */
-function parseDecimal(v: unknown): number {
+export function parseDecimal(v: unknown): number {
   if (typeof v === 'number') return v;
   if (typeof v !== 'string' || v.trim() === '') return NaN;
   const s = v.trim();
