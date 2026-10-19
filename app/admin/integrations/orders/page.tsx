@@ -183,7 +183,7 @@ export default function DeliveryOrdersPage() {
           <div className="flex items-center gap-3">
             <BackButton href="/dashboard" />
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold">Central de Pedidos</h1>
+              <h1 className="text-xl sm:text-2xl font-bold">Pedidos de delivery</h1>
               <p className="text-sm text-muted-foreground">Gerencie pedidos de todas as plataformas</p>
             </div>
           </div>

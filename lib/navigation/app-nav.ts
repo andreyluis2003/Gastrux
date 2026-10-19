@@ -72,7 +72,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Estoque e compras',
     links: [
       { label: 'Estoque', href: '/estoque', roles: [...MANAGERS, 'COOK'] },
-      { label: 'Contagem', href: '/contagem', roles: [...MANAGERS, 'COOK'] },
+      { label: 'Contagem de estoque', href: '/contagem', roles: [...MANAGERS, 'COOK'] },
       { label: 'Compras', href: '/compras', roles: MANAGERS },
       { label: 'Desperdício', href: '/desperdicio', roles: [...MANAGERS, 'COOK'] },
       // The register (add, edit); its price comparison panel is one click away from there

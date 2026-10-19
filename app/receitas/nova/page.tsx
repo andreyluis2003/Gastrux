@@ -59,7 +59,7 @@ export default function NovaReceitaPage() {
       <div className="flex items-center gap-4">
         <BackButton href="/receitas" label="Voltar" />
         <div>
-          <h1 className="text-xl sm:text-3xl font-bold">Nova Receita</h1>
+          <h1 className="text-xl sm:text-3xl font-bold">Nova ficha técnica</h1>
           <p className="text-slate-600 dark:text-slate-400">Cadastrar nova ficha técnica</p>
         </div>
       </div>

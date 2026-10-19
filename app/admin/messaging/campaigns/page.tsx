@@ -167,7 +167,7 @@ export default function CampaignsPage() {
         <div className="flex items-center gap-3">
           <BackButton />
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold">Campanhas de Mensagens</h1>
+            <h1 className="text-xl sm:text-3xl font-bold">Campanhas</h1>
             <p className="text-sm text-gray-600">Dispare templates aprovados para listas de clientes via Meta, Take Blip ou Zenvia.</p>
           </div>
         </div>

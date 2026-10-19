@@ -165,7 +165,7 @@ export default function MultiLocationPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Building2 className="w-7 h-7 text-violet-500" />
-              Multi-Loja Inteligente
+              Várias lojas
             </h1>
             <p className="text-sm text-muted-foreground">{consolidated.totalLocations || 0} unidade(s) • Visão consolidada</p>
           </div>

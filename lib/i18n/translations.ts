@@ -185,7 +185,7 @@ const pt = {
   'module.ia-monitoring.desc': 'Qualidade e alertas do agente de suporte',
 
   // ── Ingredients (Insumos) ───────────────────────────
-  'ingredients.title': 'Cadastro de Insumos',
+  'ingredients.title': 'Insumos',
   'ingredients.subtitle': 'Gerencie todos os seus ingredientes e suprimentos',
   'ingredients.new': 'Novo Insumo',
   'ingredients.search': 'Buscar insumos...',
@@ -202,9 +202,9 @@ const pt = {
   'ingredients.belowMin': 'Abaixo do mínimo',
 
   // ── Recipes (Receitas) ─────────────────────────────
-  'recipes.title': 'Ficha Técnica',
-  'recipes.subtitle': 'Gerencie suas receitas e fichas técnicas',
-  'recipes.new': 'Nova Receita',
+  'recipes.title': 'Fichas técnicas',
+  'recipes.subtitle': 'O que vai em cada produto e quanto custa',
+  'recipes.new': 'Nova ficha técnica',
   'recipes.search': 'Buscar receitas...',
   'recipes.name': 'Nome',
   'recipes.description': 'Descrição',
@@ -217,7 +217,7 @@ const pt = {
   'recipes.portions': 'porções',
 
   // ── Stock ──────────────────────────────────────────
-  'stock.title': 'Controle de Estoque',
+  'stock.title': 'Estoque',
   'stock.subtitle': 'Acompanhe o estoque dos seus insumos',
   'stock.current': 'Estoque Atual',
   'stock.minimum': 'Estoque Mínimo',
@@ -228,10 +228,10 @@ const pt = {
   'stock.noData': 'Nenhum item em estoque',
   'stock.low': 'Estoque Baixo',
   'stock.ok': 'Estoque OK',
-  'stock.registerMovement': 'Registrar Movimento',
+  'stock.registerMovement': 'Registrar entrada ou saída',
 
   // ── Shopping Lists (Compras) ───────────────────────
-  'shopping.title': 'Lista de Compras',
+  'shopping.title': 'Compras',
   'shopping.subtitle': 'Gerencie suas listas de compras',
   'shopping.new': 'Nova Lista',
   'shopping.auto': 'Gerar Automaticamente',
@@ -244,7 +244,7 @@ const pt = {
   'shopping.status.cancelled': 'Cancelado',
 
   // ── Production Planning ────────────────────────────
-  'planning.title': 'Planejamento de Produção',
+  'planning.title': 'Planejamento de produção',
   'planning.subtitle': 'Planeje a produção diária do seu restaurante',
   'planning.new': 'Novo Plano',
   'planning.noData': 'Nenhum plano de produção',
@@ -262,7 +262,7 @@ const pt = {
   'reports.noData': 'Nenhum dado disponível',
 
   // ── Billing ────────────────────────────────────────
-  'billing.title': 'Minha Assinatura',
+  'billing.title': 'Minha assinatura',
   'billing.subtitle': 'Gerencie sua assinatura e método de pagamento',
   'billing.currentPlan': 'Plano Atual',
   'billing.monthlyPrice': 'Preço mensal',
@@ -917,7 +917,7 @@ const es: Record<string, string> = {
   'stock.registerMovement': 'Registrar Movimiento',
 
   // ── Shopping Lists
-  'shopping.title': 'Lista de Compras',
+  'shopping.title': 'Compras',
   'shopping.subtitle': 'Gestione sus listas de compras',
   'shopping.new': 'Nueva Lista',
   'shopping.auto': 'Generar Automáticamente',

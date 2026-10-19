@@ -114,7 +114,7 @@ export default function StaffPage() {
           <BackButton />
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 mt-1">
             <Users className="h-7 w-7 text-blue-600" />
-            Equipe / RH
+            Equipe e acessos
           </h1>
           <p className="text-sm text-gray-500 mt-1">{members.length} funcionários cadastrados</p>
         </div>

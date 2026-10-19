@@ -163,7 +163,7 @@ export default function FiscalPage() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                 <Receipt className="w-8 h-8 text-indigo-600" />
-                Compliance Fiscal
+                Notas fiscais (NFC-e)
               </h1>
               <p className="text-gray-500 mt-1">Emissão de NFC-e / NF-e via Focus NFe, NFe.io ou TaxGroup</p>
             </div>

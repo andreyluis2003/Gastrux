@@ -110,7 +110,7 @@ export default function CRMPage() {
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <BackButton />
-          <h1 className="text-xl font-bold sm:text-3xl">CRM - Gestão de Clientes</h1>
+          <h1 className="text-xl font-bold sm:text-3xl">Clientes (CRM)</h1>
           <p className="text-sm text-gray-600">Gerencie clientes e interações</p>
         </div>
         <Button

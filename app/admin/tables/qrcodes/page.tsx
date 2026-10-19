@@ -133,7 +133,7 @@ export default function QRCodesPage() {
             <BackButton />
             <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
               <QrCode className="w-7 h-7 text-amber-600" />
-              QR Codes das Mesas
+              QR Codes das mesas
             </h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">

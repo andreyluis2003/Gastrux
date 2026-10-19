@@ -171,7 +171,7 @@ export default function WhatsAppIntegrationPage() {
             <div>
               <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
                 <MessageSquare className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
-                WhatsApp Bot
+                WhatsApp
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 Receba pedidos direto pelo WhatsApp via Meta Cloud API

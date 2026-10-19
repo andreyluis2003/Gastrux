@@ -33,6 +33,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '42a5a7553655414dfd680009bdaa8e0418290d4ac53b39ebe8b2ccc7c26f6266', // usar-kds
   'c065d71e3c9e0d0a5138dd57f6bb345ab90454b448ec93c33296216a07efae82', // cadastrar-insumos
   '48537abefdff56b666ce7c2d738dfef7d4831cabd0a39aa423ba6f9f46e044b9', // como-cancelar
+  '665449ae68f039482354ba97a7ab2fe068e65ade42bccd62848c0b37a5513454', // controle-estoque-alertas (2026-10-17 version, before 'Contagem de estoque')
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -363,14 +364,14 @@ O número de insumos depende do plano: Pro 500, Business 1.000.`,
 - **Entradas**: em **Estoque e compras > Estoque**, registre uma movimentação de entrada. A primeira entrada de um insumo começa o controle dele
 - **Compras**: em **Estoque e compras > Compras**, marcar uma lista como Recebido (ou Parcial) dá entrada nos itens recebidos
 - **Nota de compra**: **Estoque e compras > Importar nota de compra** lê o XML da NF-e do fornecedor
-- **Contagem**: em **Estoque e compras > Contagem**, confira o estoque físico e ajuste
+- **Contagem de estoque**: em **Estoque e compras > Contagem de estoque**, confira o estoque físico e ajuste
 - **Desperdício**: registre perdas com motivo em **Estoque e compras > Desperdício**
 
 ## Alertas
 
 Insumos abaixo do estoque mínimo aparecem como estoque baixo. O mínimo de cada insumo fica no cadastro do insumo.
 
-> **Dica**: comece com uma Contagem dos insumos principais. A partir dela, as vendas e as compras mantêm o número em dia.`,
+> **Dica**: comece com uma contagem de estoque dos insumos principais. A partir dela, as vendas e as compras mantêm o número em dia.`,
   },
   {
     categorySlug: 'fiscal',

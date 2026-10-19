@@ -60,7 +60,7 @@ export default function DeliverySitePage() {
         <BackButton />
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Globe className="h-6 w-6 text-orange-600" /> Site Delivery
+            <Globe className="h-6 w-6 text-orange-600" /> Site de delivery
           </h1>
           <p className="text-sm text-gray-500">Link público para pedidos de delivery</p>
         </div>

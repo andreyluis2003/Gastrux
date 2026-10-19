@@ -159,7 +159,7 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <BackButton href="/admin" />
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold text-slate-900">Configurações</h1>
+            <h1 className="text-xl sm:text-3xl font-bold text-slate-900">Configurações do restaurante</h1>
             <p className="text-sm text-gray-600">Dados e horários do restaurante</p>
           </div>
         </div>

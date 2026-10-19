@@ -97,7 +97,7 @@ export default function ShiftsPage() {
           <BackButton />
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 mt-1">
             <Calendar className="h-7 w-7 text-blue-600" />
-            Turnos da Semana
+            Turnos
           </h1>
         </div>
         <div className="flex items-center gap-2">

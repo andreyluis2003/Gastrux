@@ -115,7 +115,7 @@ export default function NFeDocumentsPage() {
         <div>
           <div className="flex items-center gap-3">
             <BackButton />
-            <h1 className="text-xl font-bold sm:text-3xl">Documentos NF-e/NFC-e</h1>
+            <h1 className="text-xl font-bold sm:text-3xl">Notas emitidas</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             Histórico de documentos fiscais emitidos

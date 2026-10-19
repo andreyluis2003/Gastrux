@@ -48,7 +48,7 @@ export default function LoyaltyPage() {
       <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <BackButton />
-          <h1 className="text-xl font-bold sm:text-3xl">Programa de Fidelização</h1>
+          <h1 className="text-xl font-bold sm:text-3xl">Fidelidade</h1>
           <p className="text-sm text-gray-600">Gerencie pontos, recompensas e clientes VIP</p>
         </div>
       </div>

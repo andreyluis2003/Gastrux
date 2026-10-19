@@ -223,7 +223,7 @@ export default function AdminCardapioPage() {
             <BackButton />
             <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
               <ChefHat className="w-7 h-7 text-amber-600" />
-              Cardápio Digital
+              Cardápio digital
             </h1>
           </div>
           <p className="text-sm text-muted-foreground mt-1">

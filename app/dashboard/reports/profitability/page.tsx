@@ -129,7 +129,7 @@ export default function ProfitabilityPage() {
         <div>
           <div className="flex items-center gap-3">
             <BackButton />
-            <h1 className="text-xl font-bold sm:text-3xl">Analise de Lucratividade</h1>
+            <h1 className="text-xl font-bold sm:text-3xl">Lucratividade</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             Margem de lucro por prato e ingrediente

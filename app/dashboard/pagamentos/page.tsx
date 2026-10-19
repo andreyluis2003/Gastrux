@@ -106,7 +106,7 @@ export default function PagamentosDashboardPage() {
           <div className="flex items-center gap-3">
             <BackButton href="/dashboard" />
             <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Pagamentos</h1>
+              <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Pagamentos online</h1>
               <p className="text-sm text-gray-500">Gerencie recebimentos, reembolsos e conciliação</p>
             </div>
           </div>

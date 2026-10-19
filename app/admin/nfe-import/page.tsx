@@ -68,7 +68,7 @@ export default function NFeImportPage() {
       <div className="flex items-center gap-3">
         <BackButton />
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><FileText className="h-6 w-6 text-blue-600" /> Importar NF-e</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><FileText className="h-6 w-6 text-blue-600" /> Importar nota de compra</h1>
           <p className="text-sm text-gray-500">Importe XML de notas fiscais para atualizar estoque</p>
         </div>
       </div>

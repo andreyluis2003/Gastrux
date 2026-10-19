@@ -113,12 +113,12 @@ export default function CMVPage() {
 
   return (
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
-      <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'CMV' }]} />
+      <Breadcrumb items={[{ label: 'Início', href: '/dashboard' }, { label: 'CMV' }]} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <BackButton href="/dashboard" label="Voltar" />
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold">Calculadora de CMV</h1>
+            <h1 className="text-xl sm:text-3xl font-bold">CMV</h1>
             <p className="text-sm text-muted-foreground">Custo de Mercadoria Vendida · Snapshots + Alertas automáticos</p>
           </div>
         </div>

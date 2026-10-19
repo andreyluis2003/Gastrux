@@ -98,7 +98,7 @@ export default function RelatoriosPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 p-4 sm:space-y-6 sm:p-6">
       <div>
         <BackButton />
-        <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mt-2">Relatórios Executivos</h1>
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mt-2">Relatório executivo (PDF)</h1>
         <p className="text-sm text-gray-600 mt-1">Gere relatórios profissionais em PDF para análise e apresentação</p>
       </div>
 

@@ -118,12 +118,12 @@ export default function ContagemPage() {
 
   return (
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
-      <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Contagem Rápida' }]} />
+      <Breadcrumb items={[{ label: 'Início', href: '/dashboard' }, { label: 'Contagem de estoque' }]} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <BackButton href="/dashboard" label="Voltar" />
           <div>
-            <h1 className="text-xl sm:text-3xl font-bold">Contagem Rápida de Estoque</h1>
+            <h1 className="text-xl sm:text-3xl font-bold">Contagem de estoque</h1>
             <p className="text-sm text-muted-foreground">Checklist para contagem física</p>
           </div>
         </div>

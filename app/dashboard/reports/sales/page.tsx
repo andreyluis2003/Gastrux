@@ -131,7 +131,7 @@ export default function SalesReportPage() {
         <div>
           <div className="flex items-center gap-3">
             <BackButton />
-            <h1 className="text-xl font-bold sm:text-3xl">Relatorio de Vendas</h1>
+            <h1 className="text-xl font-bold sm:text-3xl">Vendas</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             Analise de vendas por periodo e categoria
