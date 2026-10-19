@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       : undefined;
     const movementTypes = movementTypesParam
       ? movementTypesParam.split(',')
-      : ['MANUAL_DEDUCTION']; // Default to consumption only
+      : ['AUTO_DEDUCTION', 'MANUAL_DEDUCTION', 'LOSS']; // What leaves the stock: sales, manual exits, losses (sales were left out until 2026-10-19)
 
     // Build where clause
     const where: any = {

@@ -51,7 +51,7 @@ export default function ConsumoAnalisePage() {
   const [filters, setFilters] = useState({
     period: '30',
     ingredientIds: [] as string[],
-    types: ['MANUAL_DEDUCTION'] as string[],
+    types: ['AUTO_DEDUCTION', 'MANUAL_DEDUCTION', 'LOSS'] as string[],
   });
 
   const [summary, setSummary] = useState<ConsumptionSummary | null>(null);
@@ -137,7 +137,7 @@ export default function ConsumoAnalisePage() {
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white">
-                Análise de Consumo
+                Consumo de insumos
               </h1>
               <p className="text-slate-600 dark:text-slate-400 mt-1">
                 Visualize tendências e padrões de consumo

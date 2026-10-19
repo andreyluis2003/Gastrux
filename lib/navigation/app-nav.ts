@@ -94,6 +94,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Relatórios',
     links: [
       { label: 'CMV', href: '/cmv', roles: MANAGERS },
+      // Back from the old Início grid after the 2026-10-19 audit: the only one of the left-out pages that works and helps
+      { label: 'Consumo de insumos', href: '/consumo-analise', roles: MANAGERS },
       { label: 'Vendas', href: '/dashboard/reports/sales', roles: MANAGERS },
       { label: 'Lucratividade', href: '/dashboard/reports/profitability', roles: MANAGERS },
       { label: 'Financeiro', href: '/dashboard/financeiro', roles: MANAGERS },

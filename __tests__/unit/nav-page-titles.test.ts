@@ -30,6 +30,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/admin/fiscal': ['app/admin/fiscal/page.tsx'],
   '/admin/nfe/documents': ['app/admin/nfe/documents/page.tsx'],
   '/cmv': ['app/cmv/page.tsx'],
+  '/consumo-analise': ['app/consumo-analise/page.tsx'],
   '/dashboard/reports/sales': ['app/dashboard/reports/sales/page.tsx'],
   '/dashboard/reports/profitability': ['app/dashboard/reports/profitability/page.tsx'],
   '/dashboard/financeiro': ['app/dashboard/financeiro/page.tsx'],
@@ -67,6 +68,11 @@ it.each(restaurantLinks.filter((l) => !NO_FIXED_TITLE.has(l.href)).map((l) => [l
   const src = read(file);
   if (text) expect(src).toContain(text);
   else expect(src).toMatch(new RegExp(`<h1[^>]*>(?:\\s|<[^>]+/>|<[A-Za-z]+[^>]*/>)*${label.replace(/[()]/g, '\\$&')}\\s*</h1>|<h1[^>]*>[\\s\\S]{0,160}?\\n\\s*${label.replace(/[()]/g, '\\$&')}\\n\\s*</h1>`));
+});
+
+it('Consumo de insumos is back in Relatórios for managers (audit of the pages left out of Início, 2026-10-19)', () => {
+  const rel = NAV_GROUPS.find((g) => g.label === 'Relatórios');
+  expect(rel?.links.find((l) => l.href === '/consumo-analise')?.label).toBe('Consumo de insumos');
 });
 
 it('stock count and night count have different names', () => {

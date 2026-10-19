@@ -39,7 +39,7 @@ export function ConsumptionFilters({
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [searchIngredient, setSearchIngredient] = useState('');
-  const [types, setTypes] = useState<string[]>(['MANUAL_DEDUCTION']);
+  const [types, setTypes] = useState<string[]>(['AUTO_DEDUCTION', 'MANUAL_DEDUCTION', 'LOSS']);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(true);
 
   useEffect(() => {
@@ -113,10 +113,11 @@ export function ConsumptionFilters({
           </Label>
           <div className="space-y-2">
             {[
-              { id: 'MANUAL_DEDUCTION', label: 'Saídas (Consumo)' },
+              { id: 'AUTO_DEDUCTION', label: 'Vendas (baixa automática)' },
+              { id: 'MANUAL_DEDUCTION', label: 'Saídas manuais' },
+              { id: 'LOSS', label: 'Perdas' },
               { id: 'ENTRY', label: 'Entradas' },
               { id: 'ADJUSTMENT', label: 'Ajustes' },
-              { id: 'AUTO_DEDUCTION', label: 'Saídas Automáticas' },
             ].map((type) => (
               <label key={type.id} className="flex items-center gap-2 cursor-pointer">
                 <input

@@ -5,7 +5,7 @@ import { buildUserMessage, SYSTEM_PROMPT } from '../../lib/ai/prompt';
 describe('AI knowledge and prompt', () => {
   it('the knowledge covers every area with the facts owners ask about', () => {
     for (const fact of [
-      'Contagem do dia', 'Fechar contagem', 'Contas de consumo', 'Contas a pagar', 'Repetir todo mês', 'Desfazer pagamento', 'Mensagem de saudação', '/cardapio', 'Resumo do dia', 'Entrada em lote', 'Editar ficha técnica', 'Pagamento na mesa', 'Etiquetas', 'Validades',
+      'Contagem do dia', 'Fechar contagem', 'Contas de consumo', 'Contas a pagar', 'Repetir todo mês', 'Desfazer pagamento', 'Mensagem de saudação', '/cardapio', 'Resumo do dia', 'Entrada em lote', 'Editar ficha técnica', 'Consumo de insumos', 'Pagamento na mesa', 'Etiquetas', 'Validades',
       'Fichas técnicas', 'Caixa', 'Sangria', 'DRE', 'NFC-e', 'Teste grátis', '30 dias', 'Pro', 'Business', '50 perguntas', '350 perguntas', 'R$ 149', 'R$ 199',
     ]) expect([fact, KNOWLEDGE.includes(fact)]).toEqual([fact, true]);
     expect(KNOWLEDGE).not.toMatch(/—/); // no em dashes (owner rule)

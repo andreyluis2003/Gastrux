@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       : undefined;
     const movementTypes = movementTypesParam
       ? movementTypesParam.split(',')
-      : ['MANUAL_DEDUCTION'];
+      : ['AUTO_DEDUCTION', 'MANUAL_DEDUCTION', 'LOSS']; // what leaves the stock (sales were left out until 2026-10-19)
 
     const where: any = {
       ingredient: { restaurantId },
