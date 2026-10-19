@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,8 @@ export async function PUT(
     }
 
     const newQuantity = quantity !== undefined ? parseFloat(quantity) : item.quantity;
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+    if (restaurantId) await withLiveCost(restaurantId, [item.recipe]);
     const estimatedCost = item.recipe.costPerPortion * newQuantity;
 
     const updated = await prisma.productionPlanItem.update({

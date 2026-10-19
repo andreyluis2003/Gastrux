@@ -33,7 +33,11 @@ describe('DRE with the Caixa criterion', () => {
 
     const register = await prisma.cashRegister.create({ data: { name: 'Caixa', restaurantId: rid, isDefault: true } });
     const shift = await prisma.cashSession.create({ data: { restaurantId: rid, cashRegisterId: register.id, openedById: o.id } });
-    const recipe = await prisma.recipe.create({ data: { restaurantId: rid, code: `R${tag}`, name: 'Espeto', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', costPerPortion: 4 } });
+    // The cost comes from the ficha's insumos (Recipe.costPerPortion is never written by the app; 2026-10-19 the DRE read it as zero)
+    const cat = await prisma.ingredientCategory.create({ data: { restaurantId: rid, name: `Carnes ${tag}` } });
+    const carne = await prisma.ingredient.create({ data: { restaurantId: rid, code: `C${tag}`, name: 'Carne', categoryId: cat.id, standardUnit: 'kg', purchaseUnit: 'kg', referenceCost: 40 } });
+    const recipe = await prisma.recipe.create({ data: { restaurantId: rid, code: `R${tag}`, name: 'Espeto', baseYield: 1, yieldUnit: 'un', portionUnit: 'un',
+      ingredients: { create: [{ ingredientId: carne.id, quantity: 100, unit: 'g' }] } } });
     const entry = (data) => prisma.cashSessionEntry.create({ data: { restaurantId: rid, cashSessionId: shift.id, createdById: o.id, ...data } });
 
     // A: counter sale NOT sent to the kitchen, paid at 23:30 of Sept 30 in Brasília (02:30Z of Oct 1)
@@ -63,6 +67,9 @@ describe('DRE with the Caixa criterion', () => {
   }, 60000);
   afterAll(async () => {
     try { await prisma.payment.deleteMany({ where: { restaurantId: rid } }); } catch {}
+    try { await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId: rid } } }); } catch {}
+    try { await prisma.recipe.deleteMany({ where: { restaurantId: rid } }); } catch {}
+    try { await prisma.ingredient.deleteMany({ where: { restaurantId: rid } }); } catch {}
     try { await prisma.restaurant.deleteMany({ where: { id: rid } }); } catch {}
     try { await prisma.user.deleteMany({ where: { id: { in: userIds } } }); } catch {}
   });
@@ -88,7 +95,7 @@ describe('DRE with the Caixa criterion', () => {
   it('estimated CMV uses what was sold (comanda lines + delivery), not the kitchen copy', async () => {
     as(owner);
     const { dre: d } = await (await dre()).json();
-    expect(d.cmv).toBeCloseTo(16, 2); // (2 + 1 + 1) × R$ 4
+    expect(d.cmv).toBeCloseTo(16, 2); // (2 + 1 + 1) × 100 g of carne at R$ 40/kg = R$ 4 each
   });
 
   it('October starts at 00:00 in Brasília', async () => {

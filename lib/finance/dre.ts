@@ -5,6 +5,7 @@ import { salesInRange } from '@/lib/finance/month-sales';
 import { soldByRecipe } from '@/lib/daily-count/sold';
 import { brtDayStart } from '@/lib/staff/commission-rules';
 import { dreLine, type PayableCategory } from '@/lib/payables/rules';
+import { recipeCostMap } from '@/lib/recipes/cost-map';
 
 /**
  * The DRE of a period of Brasília days (startDate and endDate as AAAA-MM-DD, end included): the screen
@@ -44,8 +45,9 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   let cmv = cmvTotal;
   if (cmv === 0) {
     const sold = await soldByRecipe(prisma, restaurantId, null, start, endExclusive);
-    const costs = await prisma.recipe.findMany({ where: { restaurantId, id: { in: Object.keys(sold) } }, select: { id: true, costPerPortion: true } });
-    cmv = costs.reduce((sum, r) => sum + (r.costPerPortion || 0) * (sold[r.id] ?? 0), 0);
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written: CMV read zero)
+    const costs = await recipeCostMap(restaurantId, Object.keys(sold));
+    cmv = Object.entries(sold).reduce((sum, [id, qty]) => sum + (costs.get(id) ?? 0) * qty, 0);
   }
 
   const lucroBruto = receitaLiquida - cmv;

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 
@@ -133,6 +134,8 @@ async function checkAlertCondition(
       const lowMarginRecipes = await prisma.recipe.findMany({
         where: { restaurantId, active: true, sellingPrice: { gt: 0 } },
       });
+      // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+      await withLiveCost(restaurantId, lowMarginRecipes);
 
       for (const recipe of lowMarginRecipes) {
         if (!recipe.sellingPrice) continue;

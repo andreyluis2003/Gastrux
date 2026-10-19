@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -84,9 +85,11 @@ async function gatherData(type: string, restaurantId: string) {
       prisma.recipe.findMany({
         where: { restaurantId, active: true },
         take: 20,
-        select: { name: true, sellingPrice: true, costPerPortion: true, totalCost: true, baseYield: true },
+        select: { id: true, name: true, sellingPrice: true, costPerPortion: true, totalCost: true, baseYield: true },
       }),
     ]);
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+    await withLiveCost(restaurantId, costs);
     const withMargin = costs.map((r: any) => ({
       name: r.name,
       sellingPrice: r.sellingPrice,

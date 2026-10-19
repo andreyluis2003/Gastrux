@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 
@@ -231,6 +232,8 @@ async function generateMenuEngineeringReport(restaurantId: string): Promise<stri
     where: { restaurantId, active: true },
     include: { productionPlans: { take: 30 } },
   });
+  // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+  await withLiveCost(restaurantId, recipes);
 
   const classifications: Record<string, Array<{ name: string; popularity: number; margin: string; cost: string; sellingPrice: string }>> = {
     STAR: [],
@@ -472,6 +475,9 @@ async function generateComprehensiveReport(days: number, includeRecipes: boolean
       include: { productionPlans: { take: 30 }, ...(includeRecipes ? { ingredients: { include: { ingredient: true } } } : {}) },
     }),
   ]);
+
+  // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+  await withLiveCost(restaurantId, recipes);
 
   // CMV summary
   let totalCMV = 0;

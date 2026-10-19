@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,8 @@ export async function POST(req: NextRequest) {
     });
 
     const analysed = new Set(recipes.map((r) => r.id));
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+    await withLiveCost(restaurantId, recipes);
     const sessionItems = await prisma.orderSessionItem.findMany({
       where: {
         addedAt: { gte: startDate, lte: endDate },

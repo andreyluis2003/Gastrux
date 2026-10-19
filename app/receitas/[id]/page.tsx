@@ -19,6 +19,8 @@ import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { FadeIn } from '@/components/ui/animate';
 import { GlassCard } from '@/components/ui/glass-card';
 import { formatBRL } from '@/lib/formatters';
+import { recipeCost } from '@/lib/recipes/cost';
+import { convertUnits } from '@/lib/utils';
 import { RecipeFiscalCard } from '@/components/fiscal/recipe-fiscal-card';
 
 interface RecipeIngredient {
@@ -32,6 +34,7 @@ interface RecipeIngredient {
     code: string;
     standardUnit: string;
     referenceCost: number;
+    conversionFactor?: number;
     category?: {
       id: string;
       name: string;
@@ -195,15 +198,15 @@ export default function ReceitaDetailPage() {
     }
   }
 
-  // Calculate cost from ingredients
-  const calculatedCost = recipe?.ingredients?.reduce((total, ri) => {
-    return total + (ri.quantity * ri.ingredient.referenceCost);
-  }, 0) ?? 0;
-
-  const displayTotalCost = recipe?.totalCost && recipe.totalCost > 0 ? recipe.totalCost : calculatedCost;
-  const displayCostPerPortion = recipe?.costPerPortion && recipe.costPerPortion > 0
-    ? recipe.costPerPortion
-    : recipe?.portionSize ? displayTotalCost / (recipe.baseYield / recipe.portionSize) : 0;
+  // Cost from the insumos, in each insumo's unit (lib/recipes/cost.ts, the rule of every screen since 2026-10-19:
+  // the stored totalCost/costPerPortion were never written, and 5 g of salt used to count as 5 kg)
+  const lineCost = (ri: RecipeIngredient) =>
+    convertUnits(ri.quantity, ri.unit, ri.ingredient.standardUnit, ri.ingredient.conversionFactor ?? 1) * ri.ingredient.referenceCost;
+  const displayCostPerPortion = recipe
+    ? recipeCost({ baseYield: recipe.baseYield, ingredients: recipe.ingredients.map((ri) => ({ ...ri, ingredient: { ...ri.ingredient, conversionFactor: ri.ingredient.conversionFactor ?? 1 } })) }).cost
+    : 0;
+  const calculatedCost = recipe?.ingredients?.reduce((total, ri) => total + lineCost(ri), 0) ?? 0;
+  const displayTotalCost = calculatedCost;
 
   if (loading) {
     return (
@@ -467,7 +470,7 @@ export default function ReceitaDetailPage() {
                 </thead>
                 <tbody>
                   {recipe.ingredients.map((ri) => {
-                    const itemCost = ri.quantity * ri.ingredient.referenceCost;
+                    const itemCost = lineCost(ri);
                     const stockQty = ri.ingredient.currentStock?.currentQuantity ?? 0;
                     return (
                       <tr key={ri.id} className="border-b dark:border-slate-700 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">

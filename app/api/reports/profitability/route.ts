@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,9 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+    await withLiveCost(restaurantId, orders.flatMap((o) => o.items.map((i) => i.recipe)).filter(Boolean));
 
     const dishMetrics = new Map();
 

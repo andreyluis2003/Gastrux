@@ -94,7 +94,8 @@ export async function GET(request: NextRequest) {
         });
 
         // Calculate average cost over time
-        const costPerPortion = totalCost / (recipe.portionSize || 1);
+        // Per item sold: the ficha's total over its yield (as lib/recipes/cost.ts); it divided by the portion size
+        const costPerPortion = totalCost / (recipe.baseYield > 0 ? recipe.baseYield : 1);
 
         return {
           recipeId: recipe.id,

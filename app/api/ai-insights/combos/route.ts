@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { callLLM } from '@/lib/ai/llm-client';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
         costPerPortion: true,
       },
     });
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+    await withLiveCost(restaurantId, recipes);
 
     // Get latest snapshots for classification
     const snapshots = await (prisma as any).menuEngineeringSnapshot.findMany({

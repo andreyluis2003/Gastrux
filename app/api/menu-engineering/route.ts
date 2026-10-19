@@ -7,6 +7,7 @@ import { lineTotal } from '@/lib/comanda/line-total';
 import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,8 @@ export async function GET(req: NextRequest) {
       })
     ).map((r) => r.name);
     const analysed = new Set(recipes.map((r) => r.id));
+    // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+    if (restaurantId) await withLiveCost(restaurantId, recipes);
 
     // SALES DATA: OrderSessionItem from sessions not CANCELLED in period
     const sessionItems = await prisma.orderSessionItem.findMany({

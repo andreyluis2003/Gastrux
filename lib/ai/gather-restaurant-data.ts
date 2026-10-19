@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { prisma } from '@/lib/prisma';
+import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export interface RestaurantDailySummary {
   date: string;
@@ -45,7 +46,7 @@ export async function gatherDailySummary(restaurantId: string): Promise<Restaura
       session: { restaurantId, status: { not: 'CANCELLED' as any } },
     },
     include: {
-      recipe: { select: { name: true, sellingPrice: true, costPerPortion: true } },
+      recipe: { select: { id: true, name: true, sellingPrice: true, costPerPortion: true } },
     },
   });
 
@@ -59,11 +60,14 @@ export async function gatherDailySummary(restaurantId: string): Promise<Restaura
         session: { restaurantId, status: { not: 'CANCELLED' as any } },
       },
       include: {
-        recipe: { select: { name: true, sellingPrice: true, costPerPortion: true } },
+        recipe: { select: { id: true, name: true, sellingPrice: true, costPerPortion: true } },
       },
     });
     sessionItems.push(...yesterdayItems);
   }
+
+  // The cost of each ficha now, from its insumos (the stored costPerPortion was never written, 2026-10-19)
+  await withLiveCost(restaurantId, sessionItems.map((i) => i.recipe).filter(Boolean));
 
   // Aggregate sales
   const itemAgg: Record<string, { name: string; qty: number; revenue: number; cost: number; price: number }> = {};
@@ -358,7 +362,7 @@ export async function gatherChatContext(restaurantId: string): Promise<string> {
   const [recipes, ingredients, sessions30d, sessions7d, latestCMV, latestMenuEng] = await Promise.all([
     prisma.recipe.findMany({
       where: { restaurantId, active: true },
-      select: { name: true, sellingPrice: true, costPerPortion: true },
+      select: { id: true, name: true, sellingPrice: true, costPerPortion: true },
       take: 30,
     }),
     prisma.ingredient.findMany({
@@ -394,6 +398,7 @@ export async function gatherChatContext(restaurantId: string): Promise<string> {
     }),
   ]);
 
+  await withLiveCost(restaurantId, recipes);
   const recipeSummary = recipes.map(r => {
     const price = Number(r.sellingPrice || 0);
     const cost = Number(r.costPerPortion || 0);

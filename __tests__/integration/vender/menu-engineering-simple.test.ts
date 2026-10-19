@@ -23,12 +23,17 @@ describe('menu engineering and fichas simples', () => {
     (getCurrentRestaurantId as jest.Mock).mockResolvedValue(rid);
   });
   afterAll(async () => {
+    try { await prisma.recipeIngredient.deleteMany({ where: { recipe: { restaurantId: rid } } }); } catch {}
     try { await prisma.restaurant.delete({ where: { id: rid } }); } catch {}
     try { await prisma.user.delete({ where: { id: ownerId } }); } catch {}
   });
 
   it('analyses the restaurant fichas técnicas and lists the items left out', async () => {
-    const burger = await prisma.recipe.create({ data: { restaurantId: rid, code: `B-${tag}`, name: 'Burger', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 30, costPerPortion: 12 } });
+    // The cost comes from the insumos (the stored costPerPortion is never written; it read zero, 2026-10-19)
+    const icat = await prisma.ingredientCategory.create({ data: { restaurantId: rid, name: `Carnes ${tag}` } });
+    const carne = await prisma.ingredient.create({ data: { restaurantId: rid, code: `C-${tag}`, name: 'Carne', categoryId: icat.id, standardUnit: 'kg', purchaseUnit: 'kg', referenceCost: 40 } });
+    const burger = await prisma.recipe.create({ data: { restaurantId: rid, code: `B-${tag}`, name: 'Burger', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 30,
+      ingredients: { create: [{ ingredientId: carne.id, quantity: 300, unit: 'g' }] } } });
     const cat = await prisma.menuCategory.create({ data: { restaurantId: rid, name: 'Bebidas', position: 0, active: true } });
     const soda = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: 'Refri lata', price: 6, position: 0 } });
     await ensureMenuItemRecipes(prisma, rid, [soda.id]);
@@ -41,5 +46,7 @@ describe('menu engineering and fichas simples', () => {
     expect(body.recipes.map((r) => r.name)).toEqual(['Burger']);
     expect(body.recipes[0].popularityPercent).toBe(100);
     expect(body.withoutFicha).toEqual(['Refri lata']);
+    expect(body.recipes[0].costPerPortion).toBeCloseTo(12, 6);
+    expect(Math.round(body.recipes[0].profitMargin)).toBe(60);
   });
 });
