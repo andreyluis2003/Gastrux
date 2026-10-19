@@ -41,3 +41,14 @@ describe('a canceled paid plan runs to the end of the paid period (final review 
     expect(planAccess({ ...base, subscriptionTier: 'starter', subscriptionStatus: 'canceled', trialEndsAt: null, billingCycleEnd: new Date(NOW.getTime() + day) }, NOW).state).toBe('locked');
   });
 });
+
+describe('a subscription made during the trial is a paid plan (deferred from the 2026-10-18 review)', () => {
+  it('no trial bar and no lock, even after trialEndsAt while the gateway has not answered', () => {
+    const subscribed = { ...base, subscriptionTier: 'pro', subscribedInTrial: true };
+    expect(planAccess(subscribed, NOW)).toEqual({ state: 'paid', locked: false, daysLeft: null });
+    expect(planAccess({ ...subscribed, trialEndsAt: new Date(NOW.getTime() - day) }, NOW).state).toBe('paid');
+  });
+  it('without a subscription the trial stays a trial', () => {
+    expect(planAccess({ ...base, subscribedInTrial: false }, NOW).state).toBe('trial');
+  });
+});

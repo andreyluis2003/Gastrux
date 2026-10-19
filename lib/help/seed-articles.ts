@@ -36,6 +36,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '665449ae68f039482354ba97a7ab2fe068e65ade42bccd62848c0b37a5513454', // controle-estoque-alertas (2026-10-17 version, before 'Contagem de estoque')
   '3f29b4f010aa7391a133992cf7e5820feb59983fc0e377fcfdf9dcfbe1afad0e', // cadastrar-receita (2026-10-17 version, before the cost inside the product)
   '4d23d4e94701e30c2c55cb9b3285fb31ca61578755de8f0e4253ed436a95e8c7', // controle-estoque-alertas ('Contagem de estoque', before 'Entrada em lote')
+  'e637112bcbb515bb07f62712d3ad6eb6fa286053d2d49051a5da578890a6d395', // teste-gratis (2026-10-18 version, before 'assinar durante o teste')
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -477,6 +478,8 @@ No rodapé do menu, abra **Minha assinatura** (só o dono vê) e escolha:
 - **Business** (R$ 199 por mês): tudo do Pro, mais pagamento na mesa pelo celular, controle de validades, indicadores das contas de consumo, campanhas e fidelidade, 5 usuários e 5 estações de cozinha
 
 No plano anual, você paga 11 meses e usa 12.
+
+Se você assinar durante o teste, a primeira cobrança só acontece quando os 30 dias acabam, e a faixa do teste sai da tela.
 
 ## Se o teste acabar sem plano
 

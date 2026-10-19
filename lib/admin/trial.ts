@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { cacheKey, invalidate } from '@/lib/cache';
 import { logAdminAction } from '@/lib/admin-helpers';
-import { planAccess } from '@/lib/billing/plan-access';
+import { planAccess, subscribedInTrial } from '@/lib/billing/plan-access';
 
 /**
  * Plataforma › Clientes (spec 2026-10-18 §8): the Gastrux team extends a client's trial or marks the
@@ -47,7 +47,7 @@ async function afterChange(restaurantId: string, actor: Actor, before: object, a
   }
 }
 
-const SELECT = { name: true, isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true, billingCycleEnd: true, status: true } as const;
+const SELECT = { name: true, isInternal: true, subscriptionTier: true, subscriptionStatus: true, trialEndsAt: true, billingCycleEnd: true, status: true, ownerId: true } as const;
 
 export async function extendTrial(
   input: { restaurantId: string; days?: unknown; until?: unknown; reason?: unknown; actor: Actor },
@@ -57,7 +57,7 @@ export async function extendTrial(
     const reason = reasonOf(input.reason);
     const r = await prisma.restaurant.findUnique({ where: { id: input.restaurantId }, select: SELECT });
     if (!r) return { ok: false, status: 404, error: 'Cliente não encontrado' };
-    if (planAccess(r, now).state === 'paid') return { ok: false, status: 409, error: 'Este cliente já tem um plano pago' };
+    if (planAccess({ ...r, subscribedInTrial: await subscribedInTrial(r) }, now).state === 'paid') return { ok: false, status: 409, error: 'Este cliente já tem um plano pago' };
     let opts: { days?: number; until?: Date };
     if (typeof input.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.until)) {
       opts = { until: new Date(`${input.until}T00:00:00-03:00`) };
