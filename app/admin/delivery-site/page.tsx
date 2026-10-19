@@ -8,6 +8,7 @@ import { Globe, Copy, ExternalLink, Loader2, CheckCircle, Bike, Link2 } from 'lu
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { PaymentSettingsCard } from '@/components/delivery/payment-settings-card';
+import { WhatsAppMenuCard } from '@/components/delivery/whatsapp-menu-card';
 
 export default function DeliverySitePage() {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
@@ -112,6 +113,8 @@ export default function DeliverySitePage() {
           </div>
         )}
       </Card>
+
+      {deliveryUrl && <WhatsAppMenuCard restaurantName={restaurantName} url={deliveryUrl} />}
 
       <PaymentSettingsCard />
     </div>

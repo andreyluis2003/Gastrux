@@ -419,6 +419,33 @@ Com a conta do Mercado Pago do restaurante conectada, o cliente pode pagar pelo 
 Hoje o Gastrux não recebe pedidos direto do iFood ou de outros aplicativos de entrega.`,
   },
   {
+    categorySlug: 'integracao-delivery',
+    slug: 'cardapio-no-whatsapp',
+    title: 'Como mando o cardápio automático no WhatsApp?',
+    summary: 'Configure a saudação do WhatsApp Business com o link do cardápio: o cliente recebe sozinho quando chama o restaurante.',
+    keywords: 'whatsapp, cardápio, cardapio, saudação, mensagem automática, resposta rápida, link, delivery',
+    order: 2,
+    content: `## Onde estão as mensagens
+
+Em **Clientes e marketing > Site de delivery**, o quadro **Cardápio automático no WhatsApp** traz três mensagens prontas, com o nome do restaurante e o link do cardápio online. Dá para editar o texto antes de copiar.
+
+## No celular (app WhatsApp Business)
+
+1. Abra **Ferramentas comerciais** (no iPhone, dentro de Configurações).
+2. **Mensagem de saudação**: ative, cole a mensagem e escolha os destinatários **Todos**.
+3. **Mensagem de ausência**: ative, cole a mensagem e escolha **Fora do horário comercial**.
+4. **Respostas rápidas**: crie a resposta com o atalho **/cardapio**.
+5. No **Perfil comercial**, coloque o link do cardápio no campo Site.
+
+## Quando o cliente recebe
+
+A saudação vai sozinha no primeiro contato do cliente ou depois de 14 dias sem conversa (regra do WhatsApp). Nas outras vezes, o atendente digita **/cardapio** na conversa.
+
+O link aparece no WhatsApp com o nome e o logo do restaurante.
+
+> O Gastrux não lê nem responde as conversas do app WhatsApp Business. Os pedidos feitos pelo link chegam em **Vender > Pedidos de delivery**.`,
+  },
+  {
     categorySlug: 'faturamento-e-assinatura',
     slug: 'teste-gratis',
     title: 'Como funciona o teste grátis?',

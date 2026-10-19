@@ -24,6 +24,12 @@ jest.mock('@/lib/prisma', () => ({
 
 import { HELP_ARTICLES, syncHelpContent } from '@/lib/help/seed-articles';
 
+it('the WhatsApp menu article is in Delivery (2026-10-18)', () => {
+  const a = HELP_ARTICLES.find((x) => x.slug === 'cardapio-no-whatsapp');
+  expect(a?.categorySlug).toBe('integracao-delivery');
+  for (const fact of ['Mensagem de saudação', 'Mensagem de ausência', '/cardapio', '14 dias', 'Site de delivery']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+});
+
 it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a pagar)', () => {
   const a = HELP_ARTICLES.find((x) => x.slug === 'contas-a-pagar');
   expect(a?.categorySlug).toBe('pdv-e-caixa');
