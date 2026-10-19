@@ -115,7 +115,8 @@ export function BatchEntryForm({ rows }: { rows: BatchRow[] }) {
         {shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nenhum insumo com esse filtro.</p>}
       </Card>
 
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t bg-white/95 dark:bg-slate-950/95 backdrop-blur px-4 py-3">
+      {/* Sticky inside the page column: a fixed bar covered the side menu (Sair) */}
+      <div className="sticky bottom-0 z-30 rounded-xl border bg-white/95 dark:bg-slate-950/95 backdrop-blur px-4 py-3 shadow-md">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <p className="text-sm">{filled.length === 1 ? '1 insumo preenchido' : `${filled.length} insumos preenchidos`}</p>
           <div className="flex gap-2">

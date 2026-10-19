@@ -18,7 +18,7 @@ export default async function EntradaEmLotePage() {
   if (!member || !isManager(member)) redirect('/estoque');
   const rows = await stockPositions(restaurantId);
   return (
-    <div className="space-y-4 p-4 sm:p-6 pb-28 max-w-4xl mx-auto">
+    <div className="space-y-4 p-4 sm:p-6 max-w-4xl mx-auto">
       <div>
         <h1 className="text-xl sm:text-3xl font-bold">Entrada em lote</h1>
         <p className="text-sm text-muted-foreground">
