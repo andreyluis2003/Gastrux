@@ -25,7 +25,7 @@ describe('delivery link preview', () => {
   it('name, menu text and the restaurant logo', async () => {
     const m = await generateMetadata({ params: { restaurantId: withLogo } });
     expect(m.title).toBe(`Espetaria ${tag} | Cardápio e pedidos online`);
-    expect(m.description).toBe(`Veja o cardápio do Espetaria ${tag} e faça seu pedido online.`);
+    expect(m.description).toBe(`Veja o cardápio de Espetaria ${tag} e faça seu pedido online.`);
     expect(m.openGraph.title).toBe(`Espetaria ${tag}`);
     expect(m.openGraph.description).toBe('Cardápio e pedidos online');
     expect(m.openGraph.images).toEqual([{ url: 'https://cdn.example.com/logo.png' }]);

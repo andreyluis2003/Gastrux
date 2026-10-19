@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: { restaurantId: str
     : null;
   return {
     title: `${restaurant.name} | ${MENU_TEXT}`,
-    description: `Veja o cardápio do ${restaurant.name} e faça seu pedido online.`,
+    description: `Veja o cardápio de ${restaurant.name} e faça seu pedido online.`,
     openGraph: {
       title: restaurant.name,
       description: MENU_TEXT,
