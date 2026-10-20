@@ -27,7 +27,6 @@ const FEATURES_COMPARISON = [
   { category: 'Estoque', name: 'Gerenciamento de Estoque' },
   { category: 'Estoque', name: 'Alertas de Baixa Quantidade' },
   { category: 'Produção', name: 'Planejamento de Produção' },
-  { category: 'Produção', name: 'Previsão de Demanda (ML)' },
   { category: 'Analytics', name: 'Dashboard Analítico' },
   { category: 'Analytics', name: 'Relatórios Executivos' },
   { category: 'Integrações', name: 'Pedidos externos por webhook (API)' },
@@ -58,7 +57,6 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Gerenciamento de Estoque': true,
     'Alertas de Baixa Quantidade': true,
     'Planejamento de Produção': true,
-    'Previsão de Demanda (ML)': ['pro', 'business', 'enterprise'].includes(tierId),
     'Dashboard Analítico': true,
     'Relatórios Executivos': ['business', 'enterprise'].includes(tierId),
     'Pedidos externos por webhook (API)':

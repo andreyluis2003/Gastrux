@@ -12,7 +12,6 @@ const FEATURES: FeatureRow[] = [
   { feature: 'Engenharia de cardápio', plan: 'Todos' },
   { feature: '100% na nuvem, sem instalar', plan: 'Todos' },
   { feature: 'Comanda e venda de balcão sem internet', plan: 'Todos' },
-  { feature: 'Previsão de demanda', plan: 'Pro ou superior' },
   { feature: 'Tela da cozinha (KDS)', plan: 'Pro 2 estações, Business 5, Enterprise ilimitadas' },
   { feature: 'Cardápio digital com QR Code', plan: 'Todos' },
   { feature: 'Etiquetas de manipulação (controle de validades no Business)', plan: 'Todos' },
@@ -31,8 +30,8 @@ const DIFFERENTIALS = [
   },
   {
     icon: Brain,
-    title: 'Alertas e previsão',
-    description: 'Alerta de estoque baixo, previsão de vendas a partir do seu histórico e lista de compras. Decisão com dados, não no achismo.',
+    title: 'Alertas e compras',
+    description: 'Alerta de estoque baixo e lista de compras. Decisão com dados, não no achismo.',
   },
   {
     icon: Shield,
