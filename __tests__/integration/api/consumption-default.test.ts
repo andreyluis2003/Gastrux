@@ -26,7 +26,10 @@ describe('consumo de insumos', () => {
     (getCurrentRestaurantId as jest.Mock).mockResolvedValue(rid);
     const cat = await prisma.ingredientCategory.create({ data: { restaurantId: rid, name: `Carnes ${tag}` } });
     carne = await prisma.ingredient.create({ data: { restaurantId: rid, code: `C${tag}`, name: 'Carne', categoryId: cat.id, standardUnit: 'kg', purchaseUnit: 'kg', referenceCost: 40 } });
-    const mv = (movementType, quantity) => prisma.stockMovement.create({ data: { restaurantId: rid, ingredientId: carne.id, movementType, quantity } });
+    // A minute ago: createdAt comes a few ms ahead of this process's clock (test DB in Docker), so rows made "now"
+    // could fall after the route's `createdAt <= now` and drop out (flaky 2026-10-19: 2 instead of 3.5)
+    const at = new Date(Date.now() - 60_000);
+    const mv = (movementType, quantity) => prisma.stockMovement.create({ data: { restaurantId: rid, ingredientId: carne.id, movementType, quantity, createdAt: at } });
     await mv('AUTO_DEDUCTION', 2);
     await mv('MANUAL_DEDUCTION', 1);
     await mv('LOSS', 0.5);

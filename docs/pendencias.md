@@ -3,6 +3,27 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Telas escondidas (decisão do dono, 2026-10-19)
+
+Apagadas (cada endereço antigo redireciona): /tutorial → /ajuda, /estoque-rapido → /estoque/entrada,
+/notas-fiscais → /admin/nfe-import, /custo-analise → /receitas, /alertas, /alertas-inteligentes e
+/previsoes-demanda → /dashboard, /vendas-rapidas → /vender, /settings/pos e as telas de voz → /admin/settings.
+Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
+
+### Abertos
+
+- **Rotas da API sem tela**: ficaram de propósito, para uma limpeza separada (algumas têm testes ou outros
+  usos). Conferir cada uma antes de apagar: `/api/stock/quick-movement` (citada em security-fixes.test.ts),
+  `/api/invoices/process-ocr` (o resto de `/api/invoices` serve a tela de faturas em /conta/cobranca),
+  `/api/cost-analysis/{ingredient-summary,ingredient-trends,supplier-comparison,recipe-costs,price-alerts}`
+  (passam no teste de isolamento read-isolation), `/api/alerts`, `/api/smart-alerts/{rules,check}`,
+  `/api/pos/{transactions,settings}` (o `/api/pos/webhook` é outra coisa), `/api/demand-forecast`,
+  `/api/admin/voice/*` e `/api/voice/webhook/*` (testados no security-sweep do bad-day).
+- **/admin/alertas-smart** ("Alertas Smart", só pelo endereço): não estava na auditoria; o dono não decidiu.
+- **E-mail do 3º dia** (`app/api/email/send-day3/route.ts`): o link agora vai para /ajuda, mas o texto ainda diz
+  que o planejamento de produção é criado "automaticamente com base na demanda histórica", o que não existe.
+  Hoje esse e-mail não tem rotina que o envie.
+
 ## Planos novos (2026-10-18), revisão de 2026-10-19
 
 O registro original se perdeu; M-1, M-2, M-4 e M-5 foram recuperados do histórico da sessão de 2026-10-18.
@@ -45,13 +66,12 @@ Nenhum.
 
 ### Menores, sem pressa
 
-- **Teste instável**: `__tests__/integration/api/consumption-default.test.ts` ("by default: sales, manual
-  exits and losses") falhou uma vez na rodada completa de 2026-10-19 e passa sozinho, com e sem as correções
-  M-1/M-2/M-5. A mensagem da falha não foi guardada (só o resumo). Investigado em 2026-10-19: não reproduz
-  (5 de 5 sozinho; suíte completa 971/971); a rota não usa cache; o `createdAt` vem do relógio do processo de
-  teste (o Prisma o manda no INSERT), então não é diferença de relógio com o banco no Docker. Suspeita:
-  memória baixa no PC (~0,8 GB livres), como as falhas antigas de PrismaClientInitializationError. Nas
-  próximas rodadas completas, guardar a saída inteira (sem `grep`) para ter a mensagem se voltar.
+- **Teste instável (RESOLVIDO 2026-10-19)**: `__tests__/integration/api/consumption-default.test.ts` dava 2 ou 1
+  em vez de 3,5 às vezes. Causa: o `createdAt` gravado sai alguns ms à frente do relógio do processo de teste
+  (medido: 1500 de 1500 linhas, até 8 ms; banco de teste no Docker/WSL2), e a rota filtra `createdAt <= agora`.
+  Quando a rota roda logo depois dos INSERTs, os últimos movimentos ficam "no futuro" e saem da soma. O teste
+  agora cria os movimentos com `createdAt` de 1 minuto atrás. Sem efeito em produção (ms num relatório de 30
+  dias). Outro teste que crie linhas e filtre "até agora" logo em seguida pode ter o mesmo problema.
 
 - O teste do gateway arredonda para cima os dias que faltam (`remainingTrialDays`, Math.ceil): até 1 dia
   grátis a mais para quem assina no meio do teste.

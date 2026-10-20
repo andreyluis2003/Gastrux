@@ -129,6 +129,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Mais recursos',
     links: [
       { label: 'Planejamento de produção', href: '/planejamento', roles: [...MANAGERS, 'COOK'] },
+      { label: 'Escalonar receita', href: '/escalonamento', roles: [...MANAGERS, 'COOK'] },
       { label: 'Etiquetas', href: '/etiquetas', roles: [...MANAGERS, 'COOK'] },
       { label: 'Validades', href: '/etiquetas/validades', roles: [...MANAGERS, 'COOK'] },
       { label: 'Engenharia de cardápio', href: '/engenharia-cardapio', roles: MANAGERS },
@@ -167,21 +168,16 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Início module cards not in the menu that a non-manager uses (the rest of the cards are for managers only) */
-const MODULE_ROLES: Record<string, NavRole[]> = {
-  '/vendas-rapidas': FRONT,
-  '/estoque-rapido': [...MANAGERS, 'COOK'],
-};
-
 /**
- * Whether a module card of the Início shows for a role: the menu link's roles, else MODULE_ROLES, else managers
- * only (prod audit 2026-10-17: the cook's Início listed Financeiro, DRE, CRM and campaigns)
+ * Whether a module card of the Início shows for a role: the menu link's roles, else managers only (prod audit
+ * 2026-10-17: the cook's Início listed Financeiro, DRE, CRM and campaigns). The two cards outside the menu
+ * (vendas-rapidas, estoque-rapido) left with their screens on 2026-10-19.
  */
 export function canSeeModule(href: string, role: string | undefined | null): boolean {
   const r = (role || 'OWNER') as NavRole;
   const path = href.split('#')[0];
   const link = NAV_GROUPS.filter((g) => !g.platformOnly).flatMap((g) => g.links).find((l) => l.href === path);
-  const roles = link ? link.roles : MODULE_ROLES[path] ?? MANAGERS;
+  const roles = link ? link.roles : MANAGERS;
   return !roles || roles.includes(r);
 }
 

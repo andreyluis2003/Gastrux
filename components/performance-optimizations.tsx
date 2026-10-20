@@ -42,7 +42,7 @@ export function PerformanceOptimizations() {
     }
 
     // Prefetch de rotas frequentemente visitadas
-    const frequentRoutes = ['/dashboard', '/estoque', '/receitas', '/alertas'];
+    const frequentRoutes = ['/dashboard', '/estoque', '/receitas'];
     const timeouts: NodeJS.Timeout[] = [];
     frequentRoutes.forEach(route => {
       const t = setTimeout(() => prefetchRoute(route), 2000);

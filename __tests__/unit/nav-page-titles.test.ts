@@ -43,6 +43,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/admin/delivery-site': ['components/delivery/delivery-site-client.tsx'],
   '/admin/staff': ['app/admin/staff/page.tsx'],
   '/planejamento': [TR, "'planning.title': 'Planejamento de produção'"],
+  '/escalonamento': ['app/escalonamento/page.tsx'],
   '/etiquetas': ['app/etiquetas/page.tsx'],
   '/etiquetas/validades': ['app/etiquetas/validades/page.tsx'],
   '/engenharia-cardapio': ['app/engenharia-cardapio/page.tsx'],

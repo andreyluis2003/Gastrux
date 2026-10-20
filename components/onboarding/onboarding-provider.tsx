@@ -13,7 +13,7 @@ const OnboardingDialog = dynamic(
 // Public pages where onboarding should never appear
 const PUBLIC_PATHS = [
   '/', '/pricing', '/auth', '/casos-de-sucesso', '/para/',
-  '/calculadora', '/ajuda', '/tutorial', '/survey',
+  '/calculadora', '/ajuda', '/survey',
   '/pedido-direto', '/delivery', '/termos', '/privacidade',
   '/partnerships', '/beta-testers',
 ];

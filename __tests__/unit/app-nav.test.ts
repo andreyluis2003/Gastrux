@@ -121,7 +121,7 @@ describe('floating helpers on full-screen operation (homolog check of tela Vende
 });
 
 describe('advanced screens under "Mais recursos" (owner, 2026-10-12)', () => {
-  const ADVANCED = ['/planejamento', '/etiquetas', '/etiquetas/validades', '/engenharia-cardapio', '/dashboard/financeiro/dre', '/admin/staff/shifts', '/admin/staff/commissions'];
+  const ADVANCED = ['/planejamento', '/escalonamento', '/etiquetas', '/etiquetas/validades', '/engenharia-cardapio', '/dashboard/financeiro/dre', '/admin/staff/shifts', '/admin/staff/commissions'];
 
   it('the advanced screens live only in "Mais recursos", just before Configurações', () => {
     const mais = NAV_GROUPS.find((g) => g.id === 'mais');
@@ -141,14 +141,14 @@ describe('advanced screens under "Mais recursos" (owner, 2026-10-12)', () => {
 // Prod audit 2026-10-17: the cook's Início listed Financeiro, DRE, CRM and campaigns
 describe('Início modules follow the menu roles', () => {
   it('the cook sees only kitchen screens', () => {
-    for (const h of ['/cozinha', '/receitas', '/insumos', '/estoque', '/contagem', '/desperdicio', '/planejamento', '/estoque-rapido']) expect(canSeeModule(h, 'COOK')).toBe(true);
-    for (const h of ['/dashboard/financeiro', '/dashboard/financeiro/dre', '/dashboard/crm', '/cmv', '/engenharia-cardapio', '/relatorios', '/caixa', '/vender', '/vendas-rapidas', '/admin/messaging/campaigns', '/previsoes-demanda']) expect(canSeeModule(h, 'COOK')).toBe(false);
+    for (const h of ['/cozinha', '/receitas', '/insumos', '/estoque', '/contagem', '/desperdicio', '/planejamento', '/escalonamento']) expect(canSeeModule(h, 'COOK')).toBe(true);
+    for (const h of ['/dashboard/financeiro', '/dashboard/financeiro/dre', '/dashboard/crm', '/cmv', '/engenharia-cardapio', '/relatorios', '/caixa', '/vender', '/admin/messaging/campaigns']) expect(canSeeModule(h, 'COOK')).toBe(false);
   });
   it('the cashier sees selling screens, not results', () => {
-    for (const h of ['/vender', '/caixa', '/vendas-rapidas']) expect(canSeeModule(h, 'CASHIER')).toBe(true);
-    for (const h of ['/dashboard/financeiro', '/dashboard/crm', '/cmv', '/receitas']) expect(canSeeModule(h, 'CASHIER')).toBe(false);
+    for (const h of ['/vender', '/caixa']) expect(canSeeModule(h, 'CASHIER')).toBe(true);
+    for (const h of ['/dashboard/financeiro', '/dashboard/crm', '/cmv', '/receitas', '/escalonamento']) expect(canSeeModule(h, 'CASHIER')).toBe(false);
   });
   it('owner and manager see everything', () => {
-    for (const r of ['OWNER', 'MANAGER']) for (const h of ['/dashboard/financeiro', '/cozinha', '/vendas-rapidas', '/survey']) expect(canSeeModule(h, r)).toBe(true);
+    for (const r of ['OWNER', 'MANAGER']) for (const h of ['/dashboard/financeiro', '/cozinha', '/escalonamento', '/survey']) expect(canSeeModule(h, r)).toBe(true);
   });
 });

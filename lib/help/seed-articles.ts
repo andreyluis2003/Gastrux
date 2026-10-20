@@ -37,6 +37,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '3f29b4f010aa7391a133992cf7e5820feb59983fc0e377fcfdf9dcfbe1afad0e', // cadastrar-receita (2026-10-17 version, before the cost inside the product)
   '4d23d4e94701e30c2c55cb9b3285fb31ca61578755de8f0e4253ed436a95e8c7', // controle-estoque-alertas ('Contagem de estoque', before 'Entrada em lote')
   'e637112bcbb515bb07f62712d3ad6eb6fa286053d2d49051a5da578890a6d395', // teste-gratis (2026-10-18 version, before 'assinar durante o teste')
+  '50bdca4036da85cdde76704e94fd1e506118a67157978ee63b4606abaa309b9d', // cadastrar-receita (cost inside the product, before 'Escalonar receita')
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -301,6 +302,10 @@ A ficha técnica diz quais insumos, e quanto de cada um, vão numa porção. Com
 Em **Cardápio e produtos > Cardápio digital**, ao criar ou editar um produto, escolha a ficha técnica dele. Logo abaixo aparecem o custo de um item vendido, a margem e o CMV no preço do produto, a lista de insumos e o link **Editar ficha técnica**. Mudou o preço? A margem muda na hora.
 
 Na ficha também ficam a validade por conservação (usada nas etiquetas) e a opção "Contar na contagem do dia".
+
+## Escalonar para uma produção
+
+Em **Mais recursos > Escalonar receita**, escolha a ficha e diga quantas porções vai produzir. O Gastrux mostra quanto separar de cada insumo, quanto tem no estoque e quanto falta. Uma ficha que rende 10 porções, pedida para 25, vira 2,5 vezes a ficha. Dono e gerente também veem o custo da produção; a cozinha vê só as quantidades.
 
 ## Ficha técnica é opcional para vender
 
