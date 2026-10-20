@@ -9,6 +9,7 @@ jest.mock('next-auth/next', () => ({ getServerSession: jest.fn() }));
 import { getServerSession } from 'next-auth';
 import { getServerSession as getServerSessionNext } from 'next-auth/next';
 import { GET as REPORT } from '../../../app/api/reports/sales/route';
+import { GET as PROFIT } from '../../../app/api/reports/profitability/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -18,6 +19,8 @@ const as = (u) => {
   (getServerSessionNext as jest.Mock).mockResolvedValue(s);
 };
 const report = () => REPORT(new NextRequest('http://x/api/reports/sales?startDate=2026-09-01&endDate=2026-09-30'));
+// The end day counts whole: the sales are on 2026-09-10 at 19h Brasília
+const profit = () => PROFIT(new NextRequest('http://x/api/reports/profitability?startDate=2026-09-01&endDate=2026-09-10'));
 
 describe('sales report', () => {
   let rid, otherRid, owner, cook, userIds = [];
@@ -34,7 +37,11 @@ describe('sales report', () => {
 
     const register = await prisma.cashRegister.create({ data: { name: 'Caixa', restaurantId: rid, isDefault: true } });
     const shift = await prisma.cashSession.create({ data: { restaurantId: rid, cashRegisterId: register.id, openedById: o.id } });
-    const espeto = await prisma.recipe.create({ data: { restaurantId: rid, code: `E${tag}`, name: 'Espeto de frango', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 10 } });
+    // R$ 3,00 of chicken per espeto; the beer has no ficha cost
+    const carnes = await prisma.ingredientCategory.create({ data: { restaurantId: rid, name: `Carnes ${tag}` } });
+    const frango = await prisma.ingredient.create({ data: { restaurantId: rid, categoryId: carnes.id, code: `F${tag}`, name: 'Frango', standardUnit: 'kg', purchaseUnit: 'kg', referenceCost: 30 } });
+    const espeto = await prisma.recipe.create({ data: { restaurantId: rid, code: `E${tag}`, name: 'Espeto de frango', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 10,
+      ingredients: { create: [{ ingredientId: frango.id, quantity: 0.1, unit: 'kg' }] } } });
     const cerveja = await prisma.recipe.create({ data: { restaurantId: rid, code: `C${tag}`, name: 'Cerveja', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 12 } });
     const cat = await prisma.menuCategory.create({ data: { restaurantId: rid, name: 'Espetos', position: 0, active: true } });
     await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: 'Espeto de frango', price: 10, recipeId: espeto.id } });
@@ -90,5 +97,20 @@ describe('sales report', () => {
   it('only owner and manager', async () => {
     as(cook);
     expect((await report()).status).toBe(403);
+    expect((await profit()).status).toBe(403);
+  });
+
+  // 2026-10-20: Lucratividade read every kitchen order (the cancelled comanda of 50 espetos too) at the ficha price
+  it('profitability: the same items, at the price charged, minus the ficha cost', async () => {
+    as(owner);
+    const r = await (await profit()).json();
+    const espeto = r.dishes.find((d) => d.name === 'Espeto de frango');
+    expect(espeto).toMatchObject({ quantitySold: 4, totalRevenue: 43, costPrice: 3, totalCost: 12, profit: 31, noCost: false });
+    expect(espeto.marginPercentage).toBeCloseTo(72.09, 1);
+    expect(r.dishes.find((d) => d.name === 'Cerveja')).toMatchObject({ quantitySold: 2, totalRevenue: 24, noCost: true });
+    // The beer without cost stays out of the totals instead of showing a 100% margin
+    expect(r).toMatchObject({ totalProfit: 31, withoutCost: 1, lowMargin: [] });
+    expect(r.averageMargin).toBeCloseTo(72.09, 1);
+    expect(r.topProfitable.map((d) => d.name)).toEqual(['Espeto de frango']);
   });
 });

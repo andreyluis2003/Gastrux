@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { MANAGER_ROLES } from '@/lib/auth/restaurant-role';
+import { storeMetrics } from '@/lib/multi-location/metrics';
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +14,9 @@ export async function GET(req: NextRequest) {
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     const userId = (session.user as any).id;
 
+    // Only the stores where this person is the owner or a manager: the alerts compare revenue and CMV
     const userRestaurants = await prisma.restaurantUser.findMany({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, role: { in: MANAGER_ROLES } },
       include: { restaurant: { select: { id: true, name: true } } },
     });
 
@@ -21,35 +24,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ alerts: [], message: 'Necessário ter pelo menos 2 unidades para alertas cruzados' });
     }
 
-    const restaurantIds = userRestaurants.map(ur => ur.restaurant.id);
-    const nameMap = Object.fromEntries(userRestaurants.map(ur => [ur.restaurant.id, ur.restaurant.name]));
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Fetch data for cross-comparison
-    const [cmvSnapshots, orderCounts, revenueSums, stockAlerts] = await Promise.all([
-      prisma.cMVSnapshot.findMany({
-        where: { restaurantId: { in: restaurantIds } },
-        orderBy: { periodEnd: 'desc' },
-        distinct: ['restaurantId'],
-        select: { restaurantId: true, cmvPercent: true, alertLevel: true, revenue: true, totalCMV: true },
-      }),
-      prisma.order.groupBy({
-        by: ['restaurantId'],
-        where: { restaurantId: { in: restaurantIds }, createdAt: { gte: thirtyDaysAgo }, status: { notIn: ['CANCELLED'] } },
-        _count: true,
-      }),
-      prisma.order.groupBy({
-        by: ['restaurantId'],
-        where: { restaurantId: { in: restaurantIds }, createdAt: { gte: thirtyDaysAgo }, status: { notIn: ['CANCELLED'] } },
-        _sum: { total: true },
-      }),
-      prisma.alert.findMany({
-        where: { restaurantId: { in: restaurantIds }, type: 'LOW_STOCK', dismissed: false },
-        select: { restaurantId: true, title: true, message: true },
-      }),
-    ]);
+    // Last 30 days with the numbers of the DRE and the Caixa (lib/multi-location/metrics.ts, 2026-10-20: they
+    // came from every kitchen order and from CMV snapshots only the CMV screen writes)
+    const metrics = await Promise.all(userRestaurants.map((ur) => storeMetrics(ur.restaurant.id, 30)));
+    const byStore = userRestaurants.map((ur, i) => ({ id: ur.restaurant.id, name: ur.restaurant.name, ...metrics[i] }));
+    const selling = byStore.filter((m) => m.sales > 0);
 
     const alerts: Array<{
       id: string;
@@ -61,11 +40,10 @@ export async function GET(req: NextRequest) {
     }> = [];
 
     // 1. CMV Disparity Alert
-    if (cmvSnapshots.length >= 2) {
-      const cmvValues = cmvSnapshots.map(s => ({ name: nameMap[s.restaurantId], cmv: s.cmvPercent, id: s.restaurantId }));
-      const maxCmv = cmvValues.reduce((a, b) => a.cmv > b.cmv ? a : b);
-      const minCmv = cmvValues.reduce((a, b) => a.cmv < b.cmv ? a : b);
-      const diff = maxCmv.cmv - minCmv.cmv;
+    if (selling.length >= 2) {
+      const maxCmv = selling.reduce((a, b) => a.cmvPercent > b.cmvPercent ? a : b);
+      const minCmv = selling.reduce((a, b) => a.cmvPercent < b.cmvPercent ? a : b);
+      const diff = maxCmv.cmvPercent - minCmv.cmvPercent;
 
       if (diff > 5) {
         alerts.push({
@@ -73,34 +51,30 @@ export async function GET(req: NextRequest) {
           type: 'CMV_DISPARITY',
           severity: diff > 10 ? 'critical' : 'warning',
           title: 'Disparidade de CMV entre unidades',
-          message: `${maxCmv.name} tem CMV de ${maxCmv.cmv.toFixed(1)}% enquanto ${minCmv.name} está em ${minCmv.cmv.toFixed(1)}% (diferença de ${diff.toFixed(1)}pp). Investigue custos e processos na unidade com maior CMV.`,
+          message: `${maxCmv.name} tem CMV de ${maxCmv.cmvPercent.toFixed(1)}% enquanto ${minCmv.name} está em ${minCmv.cmvPercent.toFixed(1)}% (diferença de ${diff.toFixed(1)}pp). Investigue custos e processos na unidade com maior CMV.`,
           locations: [maxCmv.name, minCmv.name],
         });
       }
+    }
 
-      // Any location with CMV > 40%
-      for (const c of cmvValues) {
-        if (c.cmv > 40) {
-          alerts.push({
-            id: `cmv-critical-${c.id}`,
-            type: 'CMV_CRITICAL',
-            severity: 'critical',
-            title: `CMV crítico em ${c.name}`,
-            message: `${c.name} está com CMV de ${c.cmv.toFixed(1)}%, acima do limite saudável de 35%. Ação urgente necessária.`,
-            locations: [c.name],
-          });
-        }
+    // Any location with CMV > 40%
+    for (const c of selling) {
+      if (c.cmvPercent > 40) {
+        alerts.push({
+          id: `cmv-critical-${c.id}`,
+          type: 'CMV_CRITICAL',
+          severity: 'critical',
+          title: `CMV crítico em ${c.name}`,
+          message: `${c.name} está com CMV de ${c.cmvPercent.toFixed(1)}% nos últimos 30 dias, acima de 40%. Confira os preços, as fichas técnicas e o custo dos insumos.`,
+          locations: [c.name],
+        });
       }
     }
 
     // 2. Revenue Disparity
-    if (revenueSums.length >= 2) {
-      const revValues = revenueSums.map(r => ({
-        name: nameMap[r.restaurantId],
-        revenue: Number(r._sum?.total || 0),
-      }));
-      const maxRev = revValues.reduce((a, b) => a.revenue > b.revenue ? a : b);
-      const minRev = revValues.reduce((a, b) => a.revenue < b.revenue ? a : b);
+    if (selling.length >= 2) {
+      const maxRev = selling.reduce((a, b) => a.revenue > b.revenue ? a : b);
+      const minRev = selling.reduce((a, b) => a.revenue < b.revenue ? a : b);
 
       if (maxRev.revenue > 0 && minRev.revenue > 0) {
         const ratio = maxRev.revenue / minRev.revenue;
@@ -117,57 +91,47 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 3. Order Volume Disparity
-    if (orderCounts.length >= 2) {
-      const ordValues = orderCounts.map(o => ({ name: nameMap[o.restaurantId], count: o._count }));
-      const maxOrd = ordValues.reduce((a, b) => a.count > b.count ? a : b);
-      const minOrd = ordValues.reduce((a, b) => a.count < b.count ? a : b);
-
-      if (maxOrd.count > 0 && minOrd.count > 0) {
-        const ratio = maxOrd.count / minOrd.count;
-        if (ratio > 2.5) {
-          alerts.push({
-            id: `orders-gap-${Date.now()}`,
-            type: 'ORDERS_GAP',
-            severity: 'info',
-            title: 'Diferença significativa de pedidos',
-            message: `${maxOrd.name} processou ${maxOrd.count} pedidos vs ${minOrd.count} em ${minOrd.name} (${ratio.toFixed(1)}x mais). Considere rebalancear marketing ou horários de funcionamento.`,
-            locations: [maxOrd.name, minOrd.name],
-          });
-        }
+    // 3. Sales Volume Disparity
+    if (selling.length >= 2) {
+      const maxOrd = selling.reduce((a, b) => a.sales > b.sales ? a : b);
+      const minOrd = selling.reduce((a, b) => a.sales < b.sales ? a : b);
+      const ratio = maxOrd.sales / minOrd.sales;
+      if (ratio > 2.5) {
+        alerts.push({
+          id: `orders-gap-${Date.now()}`,
+          type: 'ORDERS_GAP',
+          severity: 'info',
+          title: 'Diferença grande de vendas',
+          message: `${maxOrd.name} fez ${maxOrd.sales} vendas e ${minOrd.name} ${minOrd.sales} (${ratio.toFixed(1)}x mais). Considere rebalancear marketing ou horários de funcionamento.`,
+          locations: [maxOrd.name, minOrd.name],
+        });
       }
     }
 
-    // 4. Stock Alerts concentration
-    const stockByLoc: Record<string, number> = {};
-    for (const a of stockAlerts) {
-      const name = nameMap[a.restaurantId] || a.restaurantId;
-      stockByLoc[name] = (stockByLoc[name] || 0) + 1;
-    }
-    for (const [name, count] of Object.entries(stockByLoc)) {
-      if (count >= 5) {
+    // 4. Insumos below the minimum (the Estoque screen rule)
+    for (const { name, lowStock } of byStore) {
+      if (lowStock >= 5) {
         alerts.push({
           id: `stock-concentration-${name}`,
           type: 'STOCK_CONCENTRATION',
           severity: 'warning',
-          title: `Muitos alertas de estoque em ${name}`,
-          message: `${name} tem ${count} alertas de estoque baixo ativos. Considere transferir insumos de outra unidade ou agilizar compras.`,
+          title: `Muitos insumos em falta em ${name}`,
+          message: `${name} tem ${lowStock} insumos abaixo do estoque mínimo. Considere transferir insumos de outra unidade ou agilizar compras.`,
           locations: [name],
         });
       }
     }
 
-    // 5. Location without recent orders
-    for (const ur of userRestaurants) {
-      const hasOrders = orderCounts.find(o => o.restaurantId === ur.restaurant.id);
-      if (!hasOrders || hasOrders._count === 0) {
+    // 5. Location without recent sales
+    for (const m of byStore) {
+      if (m.sales === 0) {
         alerts.push({
-          id: `no-orders-${ur.restaurant.id}`,
+          id: `no-orders-${m.id}`,
           type: 'NO_RECENT_ORDERS',
           severity: 'critical',
-          title: `${ur.restaurant.name} sem pedidos recentes`,
-          message: `${ur.restaurant.name} não registrou pedidos nos últimos 30 dias. Verifique se a unidade está operando normalmente.`,
-          locations: [ur.restaurant.name],
+          title: `${m.name} sem vendas recentes`,
+          message: `${m.name} não registrou vendas nos últimos 30 dias. Verifique se a unidade está operando normalmente.`,
+          locations: [m.name],
         });
       }
     }

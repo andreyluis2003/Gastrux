@@ -31,6 +31,7 @@ interface DishProfitability {
   totalRevenue: number;
   totalCost: number;
   profit: number;
+  noCost: boolean;
 }
 
 interface ProfitabilityReport {
@@ -40,6 +41,7 @@ interface ProfitabilityReport {
   dishes: DishProfitability[];
   topProfitable: DishProfitability[];
   lowMargin: DishProfitability[];
+  withoutCost: number;
 }
 
 export default function ProfitabilityPage() {
@@ -96,28 +98,32 @@ export default function ProfitabilityPage() {
     fetchReport(start, end);
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
+    if (!report) return;
+    setExporting(true);
     try {
-      setExporting(true);
-      const response = await fetch(
-        `/api/reports/profitability/export?startDate=${startDate}&endDate=${endDate}&format=excel`
-      );
-
-      if (!response.ok) throw new Error('Failed to export');
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const money = (v: number) => v.toFixed(2).replace('.', ',');
+      const pct = (v: number) => v.toFixed(1).replace('.', ',');
+      const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+      const rows = [
+        ['Período', report.period],
+        ['Margem de contribuição (R$)', money(report.totalProfit)],
+        ['Margem média (%)', pct(report.averageMargin)],
+        [],
+        ['Item', 'Quantidade', 'Receita (R$)', 'Custo (R$)', 'Margem (R$)', 'Margem (%)'],
+        ...report.dishes.map((d) => d.noCost
+          ? [d.name, String(d.quantitySold), money(d.totalRevenue), 'sem custo na ficha', '', '']
+          : [d.name, String(d.quantitySold), money(d.totalRevenue), money(d.totalCost), money(d.profit), pct(d.marginPercentage)]),
+      ];
+      const csv = '﻿' + rows.map((r) => r.map(cell).join(';')).join('\r\n');
+      const url = window.URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lucratividade_${startDate}_${endDate}.xlsx`;
+      a.download = `lucratividade_${startDate || 'periodo'}_${endDate || ''}.csv`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
-      toast.success('Relatorio exportado com sucesso');
-    } catch (error) {
-      console.error('Error exporting:', error);
-      toast.error('Erro ao exportar relatorio');
     } finally {
       setExporting(false);
     }
@@ -132,7 +138,7 @@ export default function ProfitabilityPage() {
             <h1 className="text-xl font-bold sm:text-3xl">Lucratividade</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Margem de lucro por prato e ingrediente
+            Receita de cada item vendido menos o custo da ficha técnica
           </p>
         </div>
         <Button
@@ -141,7 +147,7 @@ export default function ProfitabilityPage() {
           className="gap-2 w-full sm:w-auto"
         >
           <Download size={18} />
-          {exporting ? 'Exportando...' : 'Exportar Excel'}
+          {exporting ? 'Gerando...' : 'Baixar planilha (CSV)'}
         </Button>
       </div>
 
@@ -189,7 +195,7 @@ export default function ProfitabilityPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="p-4">
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Lucro Total</p>
+                <p className="text-sm text-muted-foreground">Margem de contribuição</p>
                 <p className="text-2xl font-bold text-green-600">
                   {formatBRL(report.totalProfit)}
                 </p>
@@ -197,13 +203,20 @@ export default function ProfitabilityPage() {
             </Card>
             <Card className="p-4">
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Margem Media</p>
+                <p className="text-sm text-muted-foreground">Margem média</p>
                 <p className="text-2xl font-bold text-primary">
                   {report.averageMargin.toFixed(1)}%
                 </p>
               </div>
             </Card>
           </div>
+
+          {report.withoutCost > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {report.withoutCost === 1 ? '1 item vendido não tem' : `${report.withoutCost} itens vendidos não têm`} custo na ficha técnica e
+              fica{report.withoutCost === 1 ? '' : 'm'} fora da margem média. Cadastre a ficha com os insumos em Cardápio e fichas técnicas.
+            </p>
+          )}
 
           <Card className="p-6 border-green-200 bg-green-50">
             <h3 className="font-semibold mb-4 flex items-center gap-2 text-green-900">
@@ -280,7 +293,7 @@ export default function ProfitabilityPage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Margem</p>
-                    <p className="font-semibold">{dish.marginPercentage.toFixed(1)}%</p>
+                    <p className="font-semibold">{dish.noCost ? 'sem custo' : `${dish.marginPercentage.toFixed(1)}%`}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Vendas</p>
@@ -291,8 +304,8 @@ export default function ProfitabilityPage() {
                     <p className="font-semibold">{formatBRL(dish.totalRevenue)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Lucro</p>
-                    <p className="font-semibold text-green-600">{formatBRL(dish.profit)}</p>
+                    <p className="text-xs text-muted-foreground">Margem (R$)</p>
+                    <p className="font-semibold text-green-600">{dish.noCost ? '-' : formatBRL(dish.profit)}</p>
                   </div>
                 </div>
               ))}

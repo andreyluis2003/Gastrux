@@ -11,6 +11,15 @@ import Link from 'next/link';
 import { formatDate } from '@/lib/formatters';
 import { useI18n } from '@/lib/i18n';
 
+// The names of the plan page's Status field (app/planejamento/[id]); the list showed the code (DRAFT)
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Rascunho',
+  CONFIRMED: 'Confirmado',
+  PRODUCTION: 'Em Produção',
+  COMPLETED: 'Concluído',
+  CANCELLED: 'Cancelado',
+};
+
 export default function PlanejamentoPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +80,7 @@ export default function PlanejamentoPage() {
                   <div>
                     <h3 className="font-semibold">{formatDate(plan.planDate)}</h3>
                     <p className="text-sm text-slate-600">{plan.items?.length ?? 0} receitas</p>
-                    <p className="text-xs text-slate-500 mt-1">Status: {plan.status}</p>
+                    <p className="text-xs text-slate-500 mt-1">Status: {STATUS_LABEL[plan.status] ?? plan.status}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-semibold">R$ {plan.totalCost?.toFixed(2)}</p>

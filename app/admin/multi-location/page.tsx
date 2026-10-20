@@ -237,7 +237,7 @@ export default function MultiLocationPage() {
                   <DollarSign className="w-4 h-4 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Receita Total</p>
+                  <p className="text-xs text-muted-foreground">Faturamento</p>
                   <p className="text-lg font-bold">{fmtBRL(consolidated.totalRevenue || 0)}</p>
                 </div>
               </div>
@@ -248,7 +248,7 @@ export default function MultiLocationPage() {
                   <ShoppingBag className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Pedidos Total</p>
+                  <p className="text-xs text-muted-foreground">Vendas</p>
                   <p className="text-lg font-bold">{consolidated.totalOrders || 0}</p>
                 </div>
               </div>
@@ -339,7 +339,7 @@ export default function MultiLocationPage() {
                           <p className="font-bold text-sm">{fmtBRL(loc.metrics.totalRevenue)}</p>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Pedidos</span>
+                          <span className="text-muted-foreground">Vendas</span>
                           <p className="font-bold text-sm">{loc.metrics.totalOrders} ({loc.metrics.ordersToday} hoje)</p>
                         </div>
                         <div>
@@ -353,7 +353,7 @@ export default function MultiLocationPage() {
                           </p>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Receitas / Insumos</span>
+                          <span className="text-muted-foreground">Fichas / Insumos</span>
                           <p className="font-bold text-sm">{loc.metrics.recipes} / {loc.metrics.ingredients}</p>
                         </div>
                       </div>

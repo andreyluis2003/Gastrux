@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { MANAGER_ROLES } from '@/lib/auth/restaurant-role';
+import { storeMetrics } from '@/lib/multi-location/metrics';
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +14,9 @@ export async function GET(req: NextRequest) {
     if (!session?.user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     const userId = (session.user as any).id;
 
+    // Only the stores where this person is the owner or a manager: the numbers are revenue and CMV
     const userRestaurants = await prisma.restaurantUser.findMany({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, role: { in: MANAGER_ROLES } },
       include: {
         restaurant: {
           select: {
@@ -29,28 +32,10 @@ export async function GET(req: NextRequest) {
     }
 
     const restaurantIds = userRestaurants.map(ur => ur.restaurant.id);
-    const period = parseInt(req.nextUrl.searchParams.get('period') || '30');
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - period);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const period = [7, 30, 90].includes(Number(req.nextUrl.searchParams.get('period'))) ? Number(req.nextUrl.searchParams.get('period')) : 30;
 
-    // Fetch data for all locations in parallel
-    const [allOrders, allExternalOrders, allCmvSnapshots, allRecipeCounts, allIngredientCounts, allStaffCounts] = await Promise.all([
-      prisma.order.findMany({
-        where: { restaurantId: { in: restaurantIds }, createdAt: { gte: startDate }, status: { notIn: ['CANCELLED'] } },
-        select: { restaurantId: true, total: true, createdAt: true },
-      }),
-      prisma.externalOrder.findMany({
-        where: { restaurantId: { in: restaurantIds }, orderReceivedAt: { gte: startDate }, status: { in: ['DELIVERED', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'] } },
-        select: { restaurantId: true, totalAmount: true, orderReceivedAt: true },
-      }),
-      prisma.cMVSnapshot.findMany({
-        where: { restaurantId: { in: restaurantIds } },
-        orderBy: { periodEnd: 'desc' },
-        distinct: ['restaurantId'],
-        select: { restaurantId: true, cmvPercent: true, alertLevel: true, totalCMV: true, revenue: true },
-      }),
+    const [metrics, allRecipeCounts, allIngredientCounts] = await Promise.all([
+      Promise.all(restaurantIds.map((rid) => storeMetrics(rid, period))),
       prisma.recipe.groupBy({
         by: ['restaurantId'],
         where: { restaurantId: { in: restaurantIds }, active: true },
@@ -61,41 +46,13 @@ export async function GET(req: NextRequest) {
         where: { restaurantId: { in: restaurantIds }, active: true },
         _count: true,
       }),
-      prisma.staffMember.groupBy({
-        by: ['restaurantId'],
-        where: { restaurantId: { in: restaurantIds }, status: 'ACTIVE' },
-        _count: true,
-      }),
     ]);
 
-    // Build per-location metrics
-    const locations = userRestaurants.map(ur => {
+    const locations = userRestaurants.map((ur, i) => {
       const r = ur.restaurant;
-      const rid = r.id;
-
-      // Direct orders
-      const directOrders = allOrders.filter(o => o.restaurantId === rid);
-      const directRevenue = directOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
-      const todayOrders = directOrders.filter(o => new Date(o.createdAt) >= today);
-
-      // External orders
-      const extOrders = allExternalOrders.filter(o => o.restaurantId === rid);
-      const extRevenue = extOrders.reduce((s, o) => s + o.totalAmount, 0);
-
-      const totalRevenue = directRevenue + extRevenue;
-      const totalOrders = directOrders.length + extOrders.length;
-      const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-      // CMV
-      const cmv = allCmvSnapshots.find(c => c.restaurantId === rid);
-
-      // Counts
-      const recipes = allRecipeCounts.find(c => c.restaurantId === rid)?._count || 0;
-      const ingredients = allIngredientCounts.find(c => c.restaurantId === rid)?._count || 0;
-      const staff = allStaffCounts.find(c => c.restaurantId === rid)?._count || 0;
-
+      const m = metrics[i];
       return {
-        id: rid,
+        id: r.id,
         name: r.name,
         city: r.city,
         state: r.state,
@@ -103,19 +60,14 @@ export async function GET(req: NextRequest) {
         logoUrl: r.logoUrl,
         role: ur.role,
         metrics: {
-          totalRevenue,
-          directRevenue,
-          externalRevenue: extRevenue,
-          totalOrders,
-          directOrders: directOrders.length,
-          externalOrders: extOrders.length,
-          ordersToday: todayOrders.length,
-          avgTicket,
-          cmvPercent: cmv?.cmvPercent || 0,
-          cmvAlertLevel: cmv?.alertLevel || 'NORMAL',
-          recipes,
-          ingredients,
-          staff,
+          totalRevenue: m.revenue,
+          totalOrders: m.sales,
+          ordersToday: m.salesToday,
+          avgTicket: m.avgTicket,
+          cmvPercent: m.cmvPercent,
+          lowStock: m.lowStock,
+          recipes: allRecipeCounts.find(c => c.restaurantId === r.id)?._count || 0,
+          ingredients: allIngredientCounts.find(c => c.restaurantId === r.id)?._count || 0,
         },
       };
     });

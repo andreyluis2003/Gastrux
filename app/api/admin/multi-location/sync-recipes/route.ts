@@ -5,10 +5,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { MANAGER_ROLES } from '@/lib/auth/restaurant-role';
 
+// Only the stores this person manages: the recipes carry the insumo costs and the copy creates insumos
 async function getUserRestaurantIds(userId: string) {
   const urs = await prisma.restaurantUser.findMany({
-    where: { userId, isActive: true },
+    where: { userId, isActive: true, role: { in: MANAGER_ROLES } },
     select: { restaurantId: true, restaurant: { select: { id: true, name: true } } },
   });
   return urs;

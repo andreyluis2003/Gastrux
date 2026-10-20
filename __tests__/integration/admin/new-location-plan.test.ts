@@ -51,4 +51,11 @@ describe('a new store gets the plan of the store it was created from', () => {
     expect(second.trialEndsAt.getTime()).toBe(first.trialEndsAt.getTime());
     expect((await restaurantPlanAccess(body.restaurant.id)).locked).toBe(false);
   });
+
+  // 2026-10-20: the limit counted only ACTIVE stores, so a trial owner (stores in TRIAL) had no limit
+  it('during the Business trial: a third store is refused (Business has 2)', async () => {
+    const { res } = await create(`Loja 3 ${tag}`);
+    expect(res.status).toBe(403);
+    expect(await prisma.restaurant.count({ where: { ownerId } })).toBe(2);
+  });
 });

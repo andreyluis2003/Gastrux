@@ -65,10 +65,11 @@ export async function checkTierLimit(
       current = await prisma.deliveryIntegration.count({ where: { restaurantId, isActive: true } });
       break;
     case 'locations':
-      // Count restaurants owned by same owner
+      // Count restaurants owned by same owner. TRIAL counts too: during the 30-day trial every store is TRIAL,
+      // and counting only ACTIVE gave a trial owner no limit (2026-10-20)
       const rest = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { ownerId: true } });
       current = rest?.ownerId
-        ? await prisma.restaurant.count({ where: { ownerId: rest.ownerId, status: 'ACTIVE' } })
+        ? await prisma.restaurant.count({ where: { ownerId: rest.ownerId, status: { in: ['ACTIVE', 'TRIAL'] } } })
         : 1;
       break;
   }
