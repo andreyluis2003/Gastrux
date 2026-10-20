@@ -315,7 +315,7 @@ export default function PlatformDashboardPage() {
             accent={metrics.issues.criticalNotificationsOpen > 0 ? 'rose' : 'slate'}
           />
           <MetricCard
-            label="Chargebacks/Disputas"
+            label="Chargebacks / disputas"
             value={metrics.issues.disputesOpen.toString()}
             accent={metrics.issues.disputesOpen > 0 ? 'rose' : 'slate'}
           />
@@ -378,35 +378,42 @@ export default function PlatformDashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end gap-[2px] h-32">
-              {(() => {
-                const maxCount = Math.max(...metrics.signupsPerDay.map(d => d.count), 1);
-                return metrics.signupsPerDay.map((day, i) => {
-                  const heightPct = (day.count / maxCount) * 100;
-                  const dateStr = day.date.slice(5); // MM-DD
-                  return (
-                    <div
-                      key={day.date}
-                      className="flex-1 flex flex-col items-center justify-end group relative"
-                    >
-                      <div
-                        className="w-full bg-primary rounded-t-sm min-h-[2px] transition-all hover:bg-primary"
-                        style={{ height: `${Math.max(heightPct, 2)}%` }}
-                        title={`${day.date}: ${day.count} cadastro(s)`}
-                      />
-                      {i % 5 === 0 && (
-                        <span className="text-[9px] text-muted-foreground mt-1 rotate-[-45deg] origin-top-left whitespace-nowrap">
-                          {dateStr}
-                        </span>
-                      )}
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10">
-                        {day.count} cadastro(s)
+            {(() => {
+              // Every one of the 30 days, 0 when nobody signed up (the API lists only days with sign-ups); the
+              // column is full height so the bar's % has something to measure (it was always the 2px minimum)
+              const byDate = new Map(metrics.signupsPerDay.map((d) => [d.date.slice(0, 10), d.count]));
+              const days = Array.from({ length: 30 }, (_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - (29 - i));
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                return { date: key, count: byDate.get(key) ?? 0 };
+              });
+              const maxCount = Math.max(...days.map((d) => d.count), 1);
+              const label = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
+              return (
+                <>
+                  <div className="flex items-end gap-[2px] h-32">
+                    {days.map((day) => (
+                      <div key={day.date} className="flex-1 h-full flex flex-col justify-end group relative">
+                        <div
+                          className={`w-full rounded-t-sm ${day.count > 0 ? 'bg-primary' : 'bg-slate-200'}`}
+                          style={{ height: day.count > 0 ? `${(day.count / maxCount) * 100}%` : '2px' }}
+                          title={`${label(day.date)}: ${day.count} cadastro(s)`}
+                        />
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10">
+                          {day.count} cadastro(s)
+                        </div>
                       </div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+                    ))}
+                  </div>
+                  <div className="mt-1 flex justify-between text-[10px] text-muted-foreground tabular-nums">
+                    <span>{label(days[0].date)}</span>
+                    <span>{label(days[15].date)}</span>
+                    <span>{label(days[29].date)}</span>
+                  </div>
+                </>
+              );
+            })()}
             <p className="text-xs text-muted-foreground mt-4">
               Total: {metrics.signupsPerDay.reduce((s, d) => s + d.count, 0)} novos restaurantes nos últimos 30 dias
             </p>
@@ -499,7 +506,7 @@ function MetricCard({
   return (
     <Card>
       <CardContent className="pt-5">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-xs uppercase tracking-wide text-muted-foreground [overflow-wrap:anywhere]">{label}</p>
         <p className={`mt-1 text-2xl font-bold tabular-nums ${accentMap[accent]}`}>{value}</p>
         {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>

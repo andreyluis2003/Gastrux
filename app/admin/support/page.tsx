@@ -119,14 +119,14 @@ export default function AdminSupportPage() {
                         'bg-gray-300'
                       }`} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <span className="text-xs text-gray-500 font-mono">#{String(t.number || "").padStart(4, "0")}</span>
                           <Badge className={s.color + ' border-0'}>{s.label}</Badge>
                           <Badge variant="outline" className="text-xs">{t.priority}</Badge>
                           <Badge variant="outline" className="text-xs">{t.category}</Badge>
                         </div>
                         <h3 className="font-semibold text-gray-900 truncate">{t.subject}</h3>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
                           <span className="flex items-center gap-1"><User className="h-3 w-3" />{t.user?.name}</span>
                           <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{t.restaurant?.name}</span>
                           <span className="flex items-center gap-1"><MessageSquare className="h-3 w-3" />{t._count.messages}</span>

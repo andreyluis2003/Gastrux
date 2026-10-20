@@ -241,7 +241,7 @@ export default function MarketingLeadsPage() {
           </h1>
           <p className="text-sm text-gray-600 mt-1">Captura, scoring e nutrição automática</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={runAutomation} disabled={runningAutomation}>
             {runningAutomation ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             Executar Automação

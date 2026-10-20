@@ -95,7 +95,7 @@ export default function AdminOnboardingPage() {
             Sequência automática: boas-vindas → dicas → features → upgrade
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={loadPending} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar

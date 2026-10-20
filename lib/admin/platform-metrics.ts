@@ -228,16 +228,19 @@ async function computePlatformMetrics(): Promise<PlatformMetrics> {
   // Signups per day (last 30 days) via raw SQL for date grouping
   let signupsPerDay: Array<{ date: string; count: number }> = [];
   try {
+    // Day in Brasília as 'YYYY-MM-DD' text (DATE() came back as a JS Date, and String(date).slice(0, 10) gave
+    // 'Sat Sep 26', which the chart showed as 'ep 26')
     const signupRows: Array<{ day: string; cnt: bigint }> = await prisma.$queryRawUnsafe(
-      `SELECT DATE("createdAt") as day, COUNT(*)::bigint as cnt
+      `SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') as day,
+              COUNT(*)::bigint as cnt
        FROM "restaurants"
        WHERE "createdAt" >= $1
-       GROUP BY DATE("createdAt")
-       ORDER BY day ASC`,
+       GROUP BY 1
+       ORDER BY 1 ASC`,
       d30
     );
     signupsPerDay = signupRows.map((r) => ({
-      date: String(r.day).slice(0, 10),
+      date: r.day,
       count: Number(r.cnt),
     }));
   } catch (e) {
