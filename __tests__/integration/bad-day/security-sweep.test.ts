@@ -20,8 +20,9 @@ import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { POST as batchEmail } from '../../../app/api/admin/batch-email-send/route';
 import { POST as cleanupCounters } from '../../../app/api/admin/cleanup-transaction-counters/route';
-import { POST as sendOnboarding } from '../../../app/api/email/send-onboarding/route';
-import { GET as checkOnboarding } from '../../../app/api/email/check-onboarding-emails/route';
+// The Abacus onboarding routes (send-onboarding, check-onboarding-emails) left on 2026-10-19 for this one
+import { POST as sendOnboarding, GET as checkOnboarding } from '../../../app/api/email/onboarding-sequence/route';
+import { NextRequest } from 'next/server';
 import { POST as voiceIncoming } from '../../../app/api/voice/webhook/incoming/route';
 import { POST as messagingWebhook } from '../../../app/api/messaging/webhook/[provider]/route';
 import { POST as createMenuItem } from '../../../app/api/cardapio/itens/route';
@@ -72,8 +73,8 @@ describe('security sweep of the rest of the API', () => {
       delete process.env.ADMIN_CLEANUP_SECRET;
       expect((await batchEmail(json('http://x/api/admin/batch-email-send', { emailType: 'day3' }))).status).toBe(401);
       expect((await cleanupCounters(json('http://x/api/admin/cleanup-transaction-counters', {}, { 'X-Admin-Secret': 'default-secret' }))).status).toBe(401);
-      expect((await sendOnboarding(json('http://x/api/email/send-onboarding', { userId: A.ownerId, day: '3' }))).status).toBe(401);
-      expect((await checkOnboarding(new Request('http://x/api/email/check-onboarding-emails') as any)).status).toBe(401);
+      expect((await sendOnboarding(json('http://x/api/email/onboarding-sequence', {}))).status).toBe(401);
+      expect((await checkOnboarding(new NextRequest('http://x/api/email/onboarding-sequence'))).status).toBe(401);
     });
 
     it('with the secret configured, only the right one passes', async () => {

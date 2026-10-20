@@ -3,194 +3,191 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mail, RefreshCw, Send, Clock, Users } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Mail, RefreshCw, Send, Eye, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface PendingResponse {
-  pending: {
-    welcome: number;
-    day1: number;
-    day14: number;
-    day21: number;
-    trialEnding: number;
-  };
+interface Recipient {
+  id: string;
+  email: string;
+  name: string | null;
+  restaurantName: string;
+  createdAt: string;
 }
 
-interface SendResponse {
-  success: boolean;
-  summary: {
-    total: number;
-    sent: number;
-    failed: number;
-    byDay: Record<string, number>;
-  };
+interface Step {
+  key: string;
+  day: number;
+  label: string;
+  subject: string;
+  pending: Recipient[];
 }
 
-const STEPS = [
-  { key: 'welcome', label: 'Boas-vindas', day: 'Dia 0' },
-  { key: 'day1', label: 'Dicas rápidas', day: 'Dia 1' },
-  { key: 'day14', label: 'Features avançadas', day: 'Dia 14' },
-  { key: 'day21', label: 'Upgrade (Pro)', day: 'Dia 21' },
-  { key: 'trialEnding', label: 'Trial terminando', day: '3 dias antes' },
-];
+interface RunResult {
+  sent: number;
+  failed: number;
+  byStep: Record<string, { sent: number; failed: number }>;
+}
 
+/**
+ * Plataforma › Onboarding (rewritten 2026-10-19 with the Resend sequence, lib/onboarding/emails.ts): who each tip
+ * e-mail goes to on the next run, the e-mail itself, and "Enviar agora". The VPS cron runs it every morning.
+ */
 export default function AdminOnboardingPage() {
-  const [pending, setPending] = useState<PendingResponse['pending'] | null>(null);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [senderConfigured, setSenderConfigured] = useState(true);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [lastRun, setLastRun] = useState<SendResponse['summary'] | null>(null);
+  const [lastRun, setLastRun] = useState<RunResult | null>(null);
+  const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
 
-  const loadPending = async () => {
+  const load = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/email/onboarding-sequence');
       if (!res.ok) throw new Error('Falha ao carregar');
-      const data: PendingResponse = await res.json();
-      setPending(data.pending);
+      const data = await res.json();
+      setSteps(data.steps);
+      setSenderConfigured(data.senderConfigured);
     } catch (e) {
-      toast.error('Não foi possível carregar estatísticas');
-      console.error(e);
+      toast.error('Não foi possível carregar os e-mails pendentes');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPending();
+    load();
   }, []);
 
-  const runSweep = async () => {
-    if (!confirm('Enviar todos os emails pendentes agora?')) return;
+  const openPreview = async (key: string) => {
+    try {
+      const res = await fetch(`/api/email/onboarding-sequence?preview=${key}`);
+      if (!res.ok) throw new Error();
+      setPreview(await res.json());
+    } catch {
+      toast.error('Não foi possível abrir o e-mail');
+    }
+  };
+
+  const total = steps.reduce((s, st) => s + st.pending.length, 0);
+
+  const runNow = async () => {
+    if (!window.confirm(`Enviar agora ${total} e-mail${total === 1 ? '' : 's'} para os donos listados?`)) return;
     setSending(true);
     try {
-      const res = await fetch('/api/email/onboarding-sequence', {
-        method: 'POST',
-        headers: { 'x-internal-trigger': 'admin-dashboard' },
-      });
-      if (!res.ok) throw new Error('Falha ao enviar');
-      const data: SendResponse = await res.json();
-      setLastRun(data.summary);
-      toast.success(`${data.summary.sent} emails enviados`);
-      loadPending();
-    } catch (e) {
-      toast.error('Erro no disparo de emails');
-      console.error(e);
+      const res = await fetch('/api/email/onboarding-sequence', { method: 'POST' });
+      if (!res.ok) throw new Error();
+      const data: RunResult = await res.json();
+      setLastRun(data);
+      if (data.failed) toast.error(`${data.sent} enviados, ${data.failed} com falha`);
+      else toast.success(`${data.sent} e-mail${data.sent === 1 ? '' : 's'} enviado${data.sent === 1 ? '' : 's'}`);
+      load();
+    } catch {
+      toast.error('Erro ao enviar os e-mails');
     } finally {
       setSending(false);
     }
   };
 
-  const totalPending = pending
-    ? pending.welcome + pending.day1 + pending.day14 + pending.day21 + pending.trialEnding
-    : 0;
-
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            <Mail className="w-6 h-6" /> Email Onboarding
+            <Mail className="w-6 h-6" /> Onboarding por e-mail
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Sequência automática: boas-vindas → dicas → features → upgrade
+            Quatro dicas para o dono nas duas primeiras semanas. Saem sozinhas todo dia às 10h.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={loadPending} disabled={loading}>
+          <Button variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          <Button onClick={runSweep} disabled={sending || totalPending === 0}>
+          <Button onClick={runNow} disabled={sending || loading || total === 0 || !senderConfigured}>
             <Send className="w-4 h-4 mr-2" />
-            {sending ? 'Enviando...' : `Disparar agora${totalPending ? ` (${totalPending})` : ''}`}
+            {sending ? 'Enviando...' : `Enviar agora${total ? ` (${total})` : ''}`}
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Clock className="w-5 h-5" /> Emails pendentes por etapa
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {STEPS.map((s) => (
-              <div
-                key={s.key}
-                className="rounded-lg border bg-card p-4 text-center transition hover:shadow-md"
-              >
-                <div className="text-xs text-muted-foreground uppercase">{s.day}</div>
-                <div className="text-xs font-medium mt-1">{s.label}</div>
-                <div className="text-3xl font-bold mt-2 text-primary">
-                  {loading
-                    ? '—'
-                    : (pending?.[s.key as keyof typeof pending] ?? 0).toLocaleString('pt-BR')}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">pendentes</div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {lastRun && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="w-5 h-5" /> Último disparo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{lastRun.total}</div>
-                <div className="text-xs text-muted-foreground">total</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-600">{lastRun.sent}</div>
-                <div className="text-xs text-muted-foreground">enviados</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{lastRun.failed}</div>
-                <div className="text-xs text-muted-foreground">falhas</div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {Object.entries(lastRun.byDay).map(([day, count]) => (
-                <span
-                  key={day}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-muted"
-                >
-                  <strong>{day}:</strong> {count}
-                </span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {!senderConfigured && (
+        <div className="flex gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <p>Nenhum envio de e-mail configurado (RESEND_API_KEY). Nada sai até a variável existir no servidor.</p>
+        </div>
       )}
 
+      {lastRun && (
+        <p className="text-sm text-muted-foreground">
+          Último envio: {lastRun.sent} enviado{lastRun.sent === 1 ? '' : 's'}
+          {lastRun.failed ? `, ${lastRun.failed} com falha (tentam de novo no próximo envio)` : ''}.
+        </p>
+      )}
+
+      <div className="space-y-4">
+        {steps.map((s) => (
+          <Card key={s.key}>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs uppercase text-muted-foreground">Dia {s.day} da conta</p>
+                  <CardTitle className="text-base">{s.label}</CardTitle>
+                  <p className="text-sm text-muted-foreground break-words">Assunto: {s.subject}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => openPreview(s.key)}>
+                  <Eye className="w-4 h-4 mr-1" /> Ver e-mail
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {s.pending.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Ninguém para receber agora.</p>
+              ) : (
+                <ul className="divide-y text-sm">
+                  {s.pending.map((r) => (
+                    <li key={r.id} className="py-2 flex flex-wrap justify-between gap-x-4 gap-y-1">
+                      <span className="min-w-0 break-words">
+                        <strong>{r.name || r.email}</strong> · {r.restaurantName}
+                      </span>
+                      <span className="text-muted-foreground break-all">{r.email}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Como funciona</CardTitle>
+          <CardTitle className="text-base">Quem recebe</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>Cada etapa da sequência é disparada automaticamente quando:</p>
-          <ul className="list-disc list-inside space-y-1 ml-2">
-            <li><strong>Boas-vindas (Dia 0)</strong>: após o cadastro do usuário</li>
-            <li><strong>Dia 1</strong>: 24 horas depois do cadastro</li>
-            <li><strong>Dia 14</strong>: 14 dias após o cadastro</li>
-            <li><strong>Dia 21</strong>: 21 dias após o cadastro (com oferta de upgrade)</li>
-            <li><strong>Trial terminando</strong>: 3 dias antes do fim do trial</li>
-          </ul>
-          <p className="pt-2">
-            Configure uma <strong>tarefa agendada</strong> para chamar{' '}
-            <code className="bg-muted px-1 rounded">POST /api/email/onboarding-sequence</code>{' '}
-            uma vez por dia com o header{' '}
-            <code className="bg-muted px-1 rounded">x-internal-trigger: cron</code>.
+          <p>
+            Só o dono de um restaurante que não é conta interna. Equipe, contas de teste, a equipe da plataforma e quem
+            tocou em &quot;Parar as dicas&quot; ficam de fora.
+          </p>
+          <p>
+            Cada e-mail sai no seu dia da conta e só nos 3 dias seguintes: uma conta antiga nunca recebe a série de uma
+            vez. O fim do teste é avisado à parte (dias 23, 27 e 30).
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={!!preview} onOpenChange={(open) => !open && setPreview(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="break-words pr-6">{preview?.subject}</DialogTitle>
+          </DialogHeader>
+          {preview && (
+            <iframe title="Prévia do e-mail" srcDoc={preview.html} sandbox="" className="h-[65vh] w-full rounded border bg-white" />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

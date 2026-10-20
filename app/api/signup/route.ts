@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { trialEnd } from '@/lib/billing/plan-access';
+import { sendWelcomeIfDue } from '@/lib/onboarding/emails';
 
 export async function POST(req: NextRequest) {
   try {
@@ -100,16 +101,8 @@ export async function POST(req: NextRequest) {
     // (/auth/qualification) put the one of the chosen business type ("Comece com",
     // lib/onboarding/seed-template.ts), or none when the owner starts blank.
 
-    // Send welcome email asynchronously (fire and forget)
-    fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/email/send-welcome`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-cron-secret': process.env.CRON_SECRET || '' },
-      body: JSON.stringify({
-        userId: user.id,
-        userEmail: user.email,
-        userName: user.name,
-      }),
-    }).catch((err) => console.error('Failed to send welcome email:', err));
+    // Welcome e-mail (Resend, lib/onboarding/emails.ts); without waiting: the daily run sends it if this one fails
+    sendWelcomeIfDue(user.id).catch((err) => console.error('Failed to send welcome email:', err));
 
     return NextResponse.json(
       {

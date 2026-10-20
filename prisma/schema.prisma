@@ -58,6 +58,8 @@ model User {
   emailSentWelcome       Boolean                 @default(false)
   emailTrialEndingSentAt DateTime?
   emailWelcomeSentAt     DateTime?
+  /// Asked to stop the onboarding tips (link in the e-mails, 2026-10-19); account e-mails still go
+  onboardingEmailsOptOut Boolean                 @default(false)
   acceptedTermsAt        DateTime?
   businessStage          String?
   businessType           String?

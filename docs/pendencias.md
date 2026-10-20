@@ -20,9 +20,25 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
   `/api/pos/{transactions,settings}` (o `/api/pos/webhook` é outra coisa), `/api/demand-forecast`,
   `/api/admin/voice/*` e `/api/voice/webhook/*` (testados no security-sweep do bad-day).
 - **/admin/alertas-smart** ("Alertas Smart", só pelo endereço): não estava na auditoria; o dono não decidiu.
-- **E-mail do 3º dia** (`app/api/email/send-day3/route.ts`): o link agora vai para /ajuda, mas o texto ainda diz
-  que o planejamento de produção é criado "automaticamente com base na demanda histórica", o que não existe.
-  Hoje esse e-mail não tem rotina que o envie.
+- ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
+
+## E-mails de onboarding (decisão do dono, opção A, 2026-10-19)
+
+Sequência nova em `lib/onboarding/emails.ts` (Resend): boas-vindas, dia 1, dia 7, dia 14, só para o dono de
+restaurante que não é conta interna, cada uma só nos 3 dias depois da data, com link "Parar as dicas"
+(`users.onboardingEmailsOptOut`, migração 20261019120000_onboarding_email_optout). Rotina diária no crontab:
+`0 13 * * * /root/gastrux-cron.sh /api/email/onboarding-sequence`. Saíram as rotas Abacus send-welcome, send-day3,
+send-day7, send-onboarding, check-onboarding-emails e `lib/email-templates/onboarding-sequence.ts`.
+
+### Abertos
+
+- **Outros e-mails ainda pela Abacus.ai** (`sendNotificationEmail` em `lib/email-service.ts` ou fetch direto para
+  apps.abacus.ai): os segmentados (`/api/email/check-segmented-emails`, send-new-user, send-inactive,
+  send-early-adopter), `/api/admin/batch-email-send`, lembrete de reserva (`/api/email/send-reminder`),
+  `lib/admin-alerts.ts` e `lib/pdf-generator.ts`. Sem `NOTIF_ID_*` em produção eles não saem. Rever texto e
+  passar para Resend (`sendTransactionalEmail`) ou apagar, um por um.
+- Os campos antigos da sequência em `users` (emailSentDay3/Day21/TrialEnding, emailVariant*, emailDay*OpenedAt)
+  ficaram sem uso; apagar numa migração futura, junto com os que a tela de funil (`/api/analytics/conversion-funnel`) lê.
 
 ## Planos novos (2026-10-18), revisão de 2026-10-19
 
