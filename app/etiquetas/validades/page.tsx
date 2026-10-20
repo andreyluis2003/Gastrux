@@ -52,7 +52,7 @@ export default function ExpiryPage() {
       <div className="max-w-2xl mx-auto p-4">
         <Card className="p-6 space-y-2">
           <h1 className="text-xl font-bold">Validades</h1>
-          <p>Controle de validades no plano Pro: lista do que venceu e do que vence hoje, aviso de manhã e descarte lançado no desperdício.</p>
+          <p>Controle de validades no plano Business: lista do que venceu e do que vence hoje, aviso de manhã e descarte lançado no desperdício.</p>
           <Link href="/pricing" className="font-medium text-primary hover:underline">Ver planos</Link>
         </Card>
       </div>

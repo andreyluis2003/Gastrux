@@ -78,7 +78,7 @@ export default function LabelPage() {
             </div>
           ) : (
             <p className="pt-2 text-sm">
-              Controle de validades no plano Pro.{' '}
+              Controle de validades no plano Business.{' '}
               <Link href="/pricing" className="font-medium text-primary hover:underline">Ver planos</Link>
             </p>
           ))}

@@ -38,6 +38,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '4d23d4e94701e30c2c55cb9b3285fb31ca61578755de8f0e4253ed436a95e8c7', // controle-estoque-alertas ('Contagem de estoque', before 'Entrada em lote')
   'e637112bcbb515bb07f62712d3ad6eb6fa286053d2d49051a5da578890a6d395', // teste-gratis (2026-10-18 version, before 'assinar durante o teste')
   '50bdca4036da85cdde76704e94fd1e506118a67157978ee63b4606abaa309b9d', // cadastrar-receita (cost inside the product, before 'Escalonar receita')
+  '3c66bbb8df87a6e6725fd2f3c6d2a267ec21944f4273e14fdd153eddc6970b7c', // teste-gratis (before the sales per month and fichas técnicas limits)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -54,6 +55,7 @@ export const HELP_CATEGORIES = [
   { slug: 'fiscal', name: 'Nota fiscal', icon: 'FileText', order: 6, description: 'NFC-e: o que é preciso e como configurar' },
   { slug: 'integracao-delivery', name: 'Delivery', icon: 'Truck', order: 7, description: 'Site de delivery próprio e pedidos' },
   { slug: 'faturamento-e-assinatura', name: 'Assinatura', icon: 'Receipt', order: 8, description: 'Planos, faturas e cancelamento' },
+  { slug: 'financeiro', name: 'Financeiro', icon: 'BarChart3', order: 9, description: 'DRE e contas de consumo' },
 ];
 
 export const HELP_ARTICLES = [
@@ -280,6 +282,40 @@ As abas **Todos Pedidos** e **Por Estação** mudam a visão. Quantas estações
 > **Dica**: crie uma estação por praça real da cozinha (grelha, fritura, bebidas), não por categoria do cardápio.`,
   },
   {
+    categorySlug: 'comanda-e-kds',
+    slug: 'contagem-do-dia',
+    title: 'Como faço a contagem de espetos (contagem do dia)?',
+    summary: 'Lance o que montou e o que perdeu; no fechamento, o Gastrux mostra quanto deveria sobrar de cada item.',
+    keywords: 'contagem, espetos, espeto, salgados, sobra, montados, perda, fechamento, noite, diferença, sumiu',
+    order: 2,
+    content: `## Para que serve
+
+Para o que é preparado antes de vender, como espetos e salgados. No fim da noite, o Gastrux mostra quanto deveria sobrar de cada item, e você confere com o que sobrou de verdade. Em espetarias a tela se chama **Contagem de espetos**. Está em todos os planos.
+
+## Quais itens entram
+
+Na ficha técnica do item (**Cardápio e produtos > Fichas técnicas**), ligue **Contar na contagem do dia**. No cardápio de exemplo de espetaria, os espetos e o pão de alho já vêm ligados.
+
+## Durante a noite
+
+Abra **Vender > Contagem do dia**:
+
+- **Montados**: toque em +1, +10, +20 ou **Outro valor** sempre que montar mais.
+- **Perda**: toque em **Perda** e escolha o motivo (Caiu, Queimou, Venceu ou Outro).
+- **Vendidos** entram sozinhos: comandas, balcão, QR Code, WhatsApp e site de delivery. Pedidos de aplicativos como o iFood só contam se forem lançados no Gastrux.
+- Lançou errado? Quem lançou desfaz em até 2 minutos. Depois disso, só o dono ou o gerente.
+
+Para cada item: **deveria ter = início + montados − vendidos − perdas**.
+
+Na primeira noite, toque em **Lançar o início** e diga quantos já tem de cada item na geladeira.
+
+## Fechando
+
+Só o dono e o gerente fecham. Toque em **Fechar contagem** e conte a sobra de cada item: a tela mostra em vermelho o que falta e em amarelo o que está a mais. A sobra contada vira o início da noite seguinte.
+
+O **Histórico** mostra as noites fechadas e os totais por item das últimas 4 semanas. No plano Business, uma falta gera aviso no sino com o valor em R$.`,
+  },
+  {
     categorySlug: 'cardapio-e-receitas',
     slug: 'cadastrar-receita',
     title: 'Como cadastro uma ficha técnica?',
@@ -387,6 +423,35 @@ Insumos abaixo do estoque mínimo aparecem como estoque baixo. O mínimo de cada
 > **Dica**: comece com uma contagem de estoque dos insumos principais. A partir dela, as vendas e as compras mantêm o número em dia.`,
   },
   {
+    categorySlug: 'estoque-e-insumos',
+    slug: 'etiquetas-validades',
+    title: 'Como imprimo etiquetas e controlo as validades?',
+    summary: 'Imprima a etiqueta com a validade calculada; no Business, a lista de validades avisa o que vence.',
+    keywords: 'etiqueta, validade, vencimento, manipulação, vigilância sanitária, conservação, congelado, refrigerado, impressora, lote, descarte',
+    order: 3,
+    content: `## Imprimindo a etiqueta (todos os planos)
+
+1. Abra **Mais recursos > Etiquetas**
+2. Busque o preparo (ficha técnica) ou o insumo aberto
+3. Escolha a conservação (ambiente, refrigerado ou congelado). A validade é calculada sozinha e pode ser mudada na hora
+4. Escolha o lote, se quiser, e toque em **Imprimir**
+
+A impressão é pela impressora térmica, pelo navegador, nos tamanhos 60x40 mm e 40x25 mm, e precisa de internet. As etiquetas dos últimos 30 dias ficam logo abaixo, com o botão **Reimprimir**.
+
+## De onde vem a validade
+
+Os dias de validade de cada conservação ficam no cadastro da ficha técnica e do insumo.
+
+## Controle de validades (plano Business)
+
+Em **Mais recursos > Validades** aparece o que já venceu e o que vence hoje e amanhã. Em cada etiqueta, toque em:
+
+- **Usado**: o item foi consumido
+- **Descartado**: o item foi jogado fora; a perda entra no Desperdício com o custo
+
+Todo dia às 7h, o sino avisa o dono e o gerente quando há etiquetas vencidas ou vencendo.`,
+  },
+  {
     categorySlug: 'fiscal',
     slug: 'configurar-nfce',
     title: 'Como configuro a nota fiscal (NFC-e)?',
@@ -482,6 +547,8 @@ No rodapé do menu, abra **Minha assinatura** (só o dono vê) e escolha:
 - **Pro** (R$ 149 por mês): vender, caixa, nota fiscal, cozinha com 2 estações, estoque, fichas técnicas e CMV, 2 usuários
 - **Business** (R$ 199 por mês): tudo do Pro, mais pagamento na mesa pelo celular, controle de validades, indicadores das contas de consumo, campanhas e fidelidade, 5 usuários e 5 estações de cozinha
 
+Cada plano tem uma referência de vendas por mês: Pro 1.000 e Business 3.500. Passar dela só gera um aviso, nunca trava uma venda. Fichas técnicas: Pro 100 e Business 500.
+
 No plano anual, você paga 11 meses e usa 12.
 
 Se você assinar durante o teste, a primeira cobrança só acontece quando os 30 dias acabam, e a faixa do teste sai da tela.
@@ -519,6 +586,71 @@ Nada mais é cobrado. O plano continua até o fim do período já pago. Depois, 
 3. Em **Faturas emitidas**, clique em **PDF** na fatura que precisar
 
 Logo abaixo fica o **Histórico de pagamentos**. Dúvida sobre uma cobrança: abra um ticket em Suporte.`,
+  },
+  {
+    categorySlug: 'financeiro',
+    slug: 'contas-de-consumo',
+    title: 'Como lanço as contas de luz, água e gás?',
+    summary: 'Lance cada conta com valor e consumo; ela entra na DRE e, no Business, mostra se o consumo subiu.',
+    keywords: 'contas de consumo, luz, energia, água, gás, botijão, internet, telefone, kwh, m³, conta mensal',
+    order: 1,
+    content: `## Onde fica
+
+**Relatórios > Contas de consumo**, só para o dono e o gerente.
+
+## As contas
+
+Energia (kWh), Água (m³), Gás encanado (m³), Gás de botijão (número de botijões), Telefone/Internet e **Outra conta**, com o nome que você quiser. Aluguel, contador e boletos de fornecedor ficam em **Caixa e pagamentos > Contas a pagar**.
+
+## Lançando
+
+1. Na conta, toque em **Lançar conta**
+2. Escolha o mês de referência (vem o mês anterior)
+3. Digite o valor e o consumo como estão na conta. Abaixo do consumo, a tela mostra o número que vai ser gravado: "1.380" é mil trezentos e oitenta, como na conta de luz. Para decimal, use vírgula (12,5)
+4. Se quiser, informe o vencimento: a conta aparece também em Contas a pagar
+
+É uma conta por mês. Lançar de novo o mesmo mês corrige o valor.
+
+## Na DRE
+
+A conta entra no mês de referência, na linha **Contas de consumo**, em todos os planos.
+
+## Indicadores e aviso (plano Business)
+
+Comparação com o mês anterior, com a média de 3 meses e com o mesmo mês do ano passado, preço por kWh ou m³ e quanto a conta pesa no faturamento. O sino avisa quando o consumo fica 20% acima da média dos meses anteriores (precisa de 2 meses lançados).
+
+Uma conta que não usa mais pode ser desativada: ela sai da lista e o histórico fica guardado.`,
+  },
+  {
+    categorySlug: 'financeiro',
+    slug: 'dre',
+    title: 'Como leio a DRE?',
+    summary: 'A DRE mostra a receita, o custo, as despesas e o resultado de um período, em horário de Brasília.',
+    keywords: 'dre, demonstrativo, resultado, lucro, prejuízo, receita, despesa, margem, financeiro, mês',
+    order: 2,
+    content: `## Onde fica
+
+**Mais recursos > DRE**, só para o dono e o gerente. Escolha o período e toque em **Buscar**. Os dias seguem o horário de Brasília.
+
+## As linhas
+
+- **Receita bruta**: comandas e vendas de balcão pagas, pagamento na mesa (já descontados os estornos) e delivery. Ela se divide em **Vendas Salão** e **Vendas Delivery**; a taxa de serviço aparece à parte, já incluída
+- **Deduções**: impostos e descontos
+- **Custo das Mercadorias Vendidas (CMV)**: o custo das fichas técnicas do que foi vendido. Produto sem ficha técnica não entra
+- **Despesas**: despesas lançadas no Caixa (sangria não é despesa), folha de pagamento, contas a pagar, contas de consumo e taxas dos pagamentos online
+- **Resultado líquido**, com as margens bruta, operacional e líquida
+
+## Folha de pagamento
+
+Se você lança a folha em Contas a pagar, a DRE usa o valor lançado. Sem isso, ela estima pela Equipe, e a linha diz qual das duas usou.
+
+## Para o número ficar certo
+
+1. Mantenha as fichas técnicas e o custo dos insumos em dia (o CMV sai deles)
+2. Lance as despesas pagas pela gaveta no Caixa e as outras em Contas a pagar
+3. Lance as contas de luz, água e gás em Contas de consumo
+
+> O "Pergunte ao Gastrux" também responde sobre a DRE ("qual foi meu resultado em setembro?").`,
   },
 ];
 

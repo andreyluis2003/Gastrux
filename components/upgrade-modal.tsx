@@ -83,7 +83,7 @@ export function UpgradeModal({
             <div className="space-y-2">
               <div className="flex items-start gap-2">
                 <ArrowRight className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
-                <span className="text-sm text-gray-700">Até 1.500 vendas por mês no Pro e 3.000 no Business</span>
+                <span className="text-sm text-gray-700">Até 1.000 vendas por mês no Pro e 3.500 no Business</span>
               </div>
               <div className="flex items-start gap-2">
                 <ArrowRight className="h-4 w-4 text-green-600 mt-1 flex-shrink-0" />
