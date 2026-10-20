@@ -110,14 +110,9 @@ export async function loadDraft(member: RestaurantMember, id: string, now = new 
     };
   } else {
     const p = draft.payload as unknown as StaffPayload;
-    const emails = p.pessoas.map((x) => x.email).filter(Boolean);
-    const elsewhere = emails.length
-      ? await prisma.staffMember.findMany({ where: { user: { email: { in: emails } }, NOT: { restaurantId: rid } }, select: { user: { select: { email: true } } } })
-      : [];
     const t = await checkTierLimit(rid, 'users');
     const roles = ASSIGNABLE_ROLES[member.role] ?? [];
     marks = {
-      emailsElsewhere: elsewhere.map((e) => e.user.email),
       usersLimit: { allowed: t.limit === null || t.current + p.pessoas.length <= t.limit, current: t.current, limit: t.limit },
       assignable: (Object.keys(PAPEL_ROLE) as Papel[]).filter((k) => roles.includes(PAPEL_ROLE[k])),
     };

@@ -94,6 +94,8 @@ describe('contas de consumo', () => {
     expect((await save({ accountId: rent.id, referenceMonth: '2026-08', amount: 100, consumption: 5 })).status).toBe(400);   // rent has no consumption
     expect((await save({ accountId: energy.id, referenceMonth: '2099-01', amount: 100, consumption: 5 })).status).toBe(400); // future
     expect((await save({ accountId: energy.id, referenceMonth: '2026-08', amount: 0, consumption: 5 })).status).toBe(400);
+    expect((await save({ accountId: energy.id, referenceMonth: '2026-08', amount: 100, consumption: 5, dueDate: '2026-02-31' })).status).toBe(400); // pendências 8/9
+    expect((await save({ accountId: energy.id, referenceMonth: '2026-08', amount: 100, consumption: 5, dueDate: '31/08/2026' })).status).toBe(400);
     as(p.owner);
     expect((await save({ accountId: energy.id, referenceMonth: '2026-08', amount: 100, consumption: 5 })).status).toBe(404);
     expect((await EDIT_ACCOUNT(req('PATCH', { active: false }), { params: { id: energy.id } })).status).toBe(404);

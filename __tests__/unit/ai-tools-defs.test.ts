@@ -32,7 +32,7 @@ describe('AI tools (lib/ai/tools)', () => {
     expect(p.to.toISOString()).toBe('2026-10-01T03:00:00.000Z');
     expect(() => parsePeriod({ inicio: '2026-09-30', fim: '2026-09-01' })).toThrow('antes');
     expect(() => parsePeriod({ inicio: '2025-01-01', fim: '2026-09-30' })).toThrow('366');
-    for (const bad of [{ inicio: '01/09/2026', fim: '2026-09-30' }, {}, null, { inicio: '2026-02-30', fim: '2026-03-01' }]) {
+    for (const bad of [{ inicio: '01/09/2026', fim: '2026-09-30' }, {}, null, { inicio: '2026-02-30', fim: '2026-03-01' }, { inicio: '2026-13-01', fim: '2026-13-02' }]) {
       expect(() => parsePeriod(bad)).toThrow(AiToolError);
     }
   });

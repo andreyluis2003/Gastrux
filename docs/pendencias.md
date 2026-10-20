@@ -131,8 +131,10 @@ Da revisão final de 2026-10-17 (sessão 5f0672cc). O registro original foi apag
 - **Fotos reenviadas a cada rodada sem `cache_control`**: um ponto de cache no último anexo baratearia as rodadas 2+.
 - **Busca da implantação para todos os papéis**: o chat chama `/api/ai/onboarding` também para caixa e cozinha
   (um 403 por sessão), e o cartão/contador não se atualiza depois de confirmar, só ao recarregar.
-- **E-mail de outro restaurante revelado** (`loadDraft` em `lib/ai/drafts/service.ts`): mostra que um e-mail é
-  equipe em outro restaurante. A mensagem 409 antiga da Equipe já revelava isso.
+- ~~**E-mail de outro restaurante revelado**~~ (RESOLVIDO 2026-10-20): a revisão do rascunho não marca mais
+  "Já é funcionário em outro restaurante" e a Equipe (`lib/staff/create-member.ts`) recusa com "Este e-mail não pode
+  ser cadastrado aqui. Use outro e-mail para esta pessoa.", sem dizer o motivo. A recusa continua (a pessoa só pode
+  ser funcionária de um restaurante), então quem tenta cadastrar ainda sabe que o e-mail está em uso.
 
 ### Resolvidos
 
@@ -162,8 +164,8 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 
 ### Abertos
 
-- **2. Ponto no consumo**: `"1.50"` vira 1,5, mas `"1.500"` vira 1500 (`lib/utility-bills/rules.ts`, leitura do
-  consumo). Pode dar 1000× na água digitada com 3 casas. Sugestão: mostrar o valor lido antes de salvar.
+- ~~**2. Ponto no consumo**~~ (RESOLVIDO 2026-10-20): a leitura continua ("1.500" = 1500, como na conta), mas a
+  tela mostra abaixo do campo "Vai ser gravado: 1.500 m³" e avisa que o ponto separa milhar.
 - **3. Duas gravações ao mesmo tempo** (`lib/utility-bills/service.ts` saveBill, `alert.ts`): duas gravações da
   mesma conta e mês leem `previous = null`; a segunda sobrescreve sem auditoria e as duas dizem `corrected: false`.
   O aviso é "verifica e cria" sem chave única, então o sino pode tocar duas vezes. Correção: auditoria numa
@@ -172,7 +174,8 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
   exagera a fatia. Marcar "mês em andamento" ou usar o mês anterior.
 - **7. Nome do campo invertido**: `contasConsumoMesInteiro` (`lib/finance/dre.ts`) é `true` quando o período é
   parcial (mostra a nota "entram pelo mês inteiro"). Renomear para `contasConsumoNotaMesInteiro`.
-- **8/9. Data impossível dá 500**: a DRE agora valida o formato AAAA-MM-DD (c3b8637), mas uma data como
+- ~~**8/9. Data impossível dá 500**~~ (RESOLVIDO 2026-10-20: `isValidYmd` em `lib/dates.ts` na DRE, no vencimento
+  e no período da IA, que dava RangeError com mês 13; vencimento inválido agora é 400 em vez de virar vazio): a DRE agora valida o formato AAAA-MM-DD (c3b8637), mas uma data como
   `2026-02-31` ainda não volta 400; o mesmo vale para `dueDate` em saveBill (`lib/utility-bills/service.ts:65`,
   só regex). A tela não manda isso; a API aceita.
 - **12. Pequenas diferenças da spec**: o gráfico do Pro mostra uma série por mês (consumo ou valor), não as duas;

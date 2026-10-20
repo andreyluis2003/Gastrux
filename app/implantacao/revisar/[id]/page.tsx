@@ -292,7 +292,6 @@ export default function ReviewDraftPage() {
                   className={`w-full rounded-md border px-2 py-1 text-sm ${emailBad ? 'border-red-400' : ''}`}
                   aria-label="E-mail"
                 />
-                {data.marks.emailsElsewhere?.includes(p.email.trim().toLowerCase()) && <p className="text-xs text-red-600">Já é funcionário em outro restaurante.</p>}
                 <div className="flex items-center gap-2 text-sm">
                   <select value={p.papel} onChange={(e) => setPeople((l) => l.map((x, j) => (j === i ? { ...x, papel: e.target.value as Papel } : x)))} className="rounded-md border px-2 py-1">
                     {(data.marks.assignable as Papel[]).map((r) => <option key={r} value={r}>{PAPEL_LABEL[r]}</option>)}

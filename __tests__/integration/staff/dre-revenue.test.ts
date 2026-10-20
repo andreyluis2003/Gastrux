@@ -104,6 +104,13 @@ describe('DRE with the Caixa criterion', () => {
     expect(d.receitaBruta).toBeCloseTo(70, 2);
   });
 
+  it('pendências 8/9: an impossible date is a 400, not a rolled-over period or a 500', async () => {
+    as(owner);
+    expect((await dre('2026-02-01', '2026-02-31')).status).toBe(400);
+    expect((await dre('2026-13-01', '2026-13-31')).status).toBe(400);
+    expect((await dre('2026-02-01', '2026-02-28')).status).toBe(200);
+  });
+
   it('only owner and manager open the DRE', async () => {
     as(cook);
     expect((await dre()).status).toBe(403);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { KIND_INFO, addMonths, monthLabel, shouldAlert, type Indicators, type UtilityKind } from '@/lib/utility-bills/rules';
+import { KIND_INFO, addMonths, monthLabel, parseDecimal, shouldAlert, type Indicators, type UtilityKind } from '@/lib/utility-bills/rules';
 
 interface Bill { referenceMonth: string; amountCents: number; consumption: number | null; dueDate: string | null; notes: string | null }
 interface Account { id: string; kind: UtilityKind; name: string; unit: string | null; active: boolean; bills: Bill[]; latest: { referenceMonth: string; indicators: Indicators | null } | null }
@@ -14,6 +14,13 @@ const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'c
 const num = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 const signed = (p: number) => `${p > 0 ? '+' : ''}${Math.round(p)}%`;
 const tone = (p: number, alert = false) => (alert ? 'text-red-600 font-semibold' : p > 0 ? 'text-amber-600' : 'text-emerald-600');
+/** What the server will store, so "1.500" (one thousand five hundred, as on the bill) is never a surprise (pendências 2) */
+function ConsumptionRead({ raw, unit }: { raw: string; unit: string }) {
+  const n = parseDecimal(raw);
+  if (!Number.isFinite(n) || n <= 0) return <span className="block text-xs text-red-600 mt-1">Número não reconhecido. Use vírgula para decimais (ex.: 12,5).</span>;
+  return <span className="block text-xs text-muted-foreground mt-1">Vai ser gravado: <b>{num(n)} {unit}</b>{/^\d{1,3}(\.\d{3})+$/.test(raw.trim()) ? ' (o ponto separa milhar; para decimal use vírgula)' : ''}</span>;
+}
+
 const FIXED: UtilityKind[] = ['ENERGY', 'WATER', 'PIPED_GAS', 'PHONE_INTERNET'];
 
 /** Contas de consumo (spec 2026-10-16): enter bills, history, Pro indicators */
@@ -169,6 +176,7 @@ export default function UtilityBillsPage() {
             {formAccount.unit && (
               <label className="block text-sm">Consumo ({formAccount.unit})
                 <input className="w-full border rounded p-2 bg-background mt-1" inputMode="decimal" placeholder={formAccount.kind === 'BOTTLED_GAS' ? 'botijões no mês' : 'como está na conta'} value={form.consumption} onChange={(e) => setForm({ ...form, consumption: e.target.value })} />
+                {form.consumption.trim() && <ConsumptionRead raw={form.consumption} unit={formAccount.unit} />}
               </label>
             )}
             <label className="block text-sm">Vencimento (opcional)

@@ -55,12 +55,13 @@ export async function createStaffMember(member: RestaurantMember, input: NewStaf
   // A person can only be a StaffMember at one restaurant at a time (userId is
   // globally unique on StaffMember). If this email already belongs to staff
   // at a different restaurant, refuse instead of silently overwriting their
-  // role/salary/commission there.
+  // role/salary/commission there. The message does not say why: the owner of one restaurant must not learn
+  // who works at another (pendências, IA de implantação).
   const existingMember = staffUser
     ? await prisma.staffMember.findUnique({ where: { userId: staffUser.id }, select: { restaurantId: true } })
     : null;
   if (existingMember && existingMember.restaurantId !== restaurantId) {
-    return { ok: false, status: 409, error: 'Este email já está cadastrado como funcionário em outro restaurante' };
+    return { ok: false, status: 409, error: 'Este e-mail não pode ser cadastrado aqui. Use outro e-mail para esta pessoa.' };
   }
 
   if (staffUser) {

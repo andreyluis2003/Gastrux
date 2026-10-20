@@ -121,6 +121,24 @@ describe('apply AI drafts', () => {
     expect(JSON.stringify(audit)).not.toContain(out.people[0].temporaryPassword);
   });
 
+  it('pendências: an e-mail of staff elsewhere is never revealed, on the review screen or in the result', async () => {
+    const other = await mkUser('outro', 'CASHIER', ridB);
+    await prisma.staffMember.create({ data: { restaurantId: ridB, userId: other.id, role: 'CASHIER' } });
+    try {
+      const d = await createDraft(ownerM, 'STAFF', { pessoas: [{ nome: 'Outro', email: other.email, papel: 'CAIXA' }] });
+      as(owner);
+      const g = await (await GET_DRAFT(req(), { params: { id: d.id } })).json();
+      expect(g.marks).not.toHaveProperty('emailsElsewhere');
+      const res = await APPLY(req({ payload: { pessoas: [{ nome: 'Outro', email: other.email, papel: 'CAIXA' }] } }), { params: { id: d.id } });
+      const out = await res.json();
+      expect(out.people[0]).toMatchObject({ ok: false, nome: 'Outro' });
+      expect(JSON.stringify(out)).not.toMatch(/outro restaurante|funcionário/i);
+      expect(await prisma.restaurantUser.count({ where: { restaurantId: rid, userId: other.id } })).toBe(0);
+    } finally {
+      await prisma.staffMember.deleteMany({ where: { userId: other.id } });
+    }
+  });
+
   it('junk from the review screen is refused naming the row, nothing written', async () => {
     const d = await createDraft(ownerM, 'MENU', { categorias: [{ nome: 'X', itens: [{ nome: 'a', descricao: '', preco: 1 }] }], incompleto: false });
     as(owner);

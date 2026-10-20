@@ -8,6 +8,7 @@ import {
 } from './rules';
 import { alertIfAbove } from './alert';
 import { syncUtilityPayable } from '@/lib/payables/service';
+import { isValidYmd } from '@/lib/dates';
 
 const KINDS = Object.keys(KIND_INFO) as UtilityKind[];
 
@@ -62,7 +63,9 @@ export async function upsertBill(
   const ym = parseMonth(body.referenceMonth, now);
   const amountCents = parseAmountCents(body.amount);
   const consumption = parseConsumption(body.consumption, account.kind as UtilityKind);
-  const dueDate = typeof body.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.dueDate) ? new Date(`${body.dueDate}T00:00:00.000Z`) : null;
+  const noDueDate = body.dueDate === undefined || body.dueDate === null || body.dueDate === '';
+  if (!noDueDate && !isValidYmd(body.dueDate)) throw new UtilityError('Vencimento inválido');
+  const dueDate = noDueDate ? null : new Date(`${body.dueDate}T00:00:00.000Z`);
   const notes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim().slice(0, 300) : null;
   const key = { accountId_referenceMonth: { accountId: account.id, referenceMonth: monthDate(ym) } };
   const previous = await prisma.utilityBill.findUnique({ where: key });
