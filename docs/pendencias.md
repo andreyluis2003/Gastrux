@@ -47,7 +47,11 @@ Nenhum.
 
 - **Teste instável**: `__tests__/integration/api/consumption-default.test.ts` ("by default: sales, manual
   exits and losses") falhou uma vez na rodada completa de 2026-10-19 e passa sozinho, com e sem as correções
-  M-1/M-2/M-5. Provável dependência de dados de outro teste no mesmo banco; investigar.
+  M-1/M-2/M-5. A mensagem da falha não foi guardada (só o resumo). Investigado em 2026-10-19: não reproduz
+  (5 de 5 sozinho; suíte completa 971/971); a rota não usa cache; o `createdAt` vem do relógio do processo de
+  teste (o Prisma o manda no INSERT), então não é diferença de relógio com o banco no Docker. Suspeita:
+  memória baixa no PC (~0,8 GB livres), como as falhas antigas de PrismaClientInitializationError. Nas
+  próximas rodadas completas, guardar a saída inteira (sem `grep`) para ter a mensagem se voltar.
 
 - O teste do gateway arredonda para cima os dias que faltam (`remainingTrialDays`, Math.ceil): até 1 dia
   grátis a mais para quem assina no meio do teste.
