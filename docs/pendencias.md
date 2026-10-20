@@ -22,6 +22,41 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - **/admin/alertas-smart** ("Alertas Smart", só pelo endereço): não estava na auditoria; o dono não decidiu.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
+## Telas que não funcionam (achadas nos artigos da Central de Ajuda, 2026-10-20)
+
+Nenhum artigo da /ajuda ensina estas telas (o teste `help-seed-articles.test.ts` impede citar Cashback,
+Previsões e Relatório executivo). Todas estão no menu e esperam decisão do dono.
+
+- **Fidelidade e Cashback** (Clientes e marketing): nenhuma venda gera pontos nem cashback. `POST /api/cashback`
+  (credita o cashback e soma `Customer.totalSpent`) não é chamado por nenhuma tela nem pelo fechamento de conta;
+  os pontos só entram por `/api/indicacao`. Os "marcos" de `/dashboard/loyalty/milestones` são gravados e nunca
+  aplicados a pedido nenhum. `/dashboard/loyalty` não tem botão para criar programa (o programa padrão só nasce em
+  `lib/loyalty/get-program.ts`, chamado pelo cashback e pela indicação). O site (why-gastrux.tsx e /pricing) vende
+  "Campanhas e programa de fidelidade" no Business.
+- **Clientes (CRM)**: "Total gasto", "Total de pedidos", ticket médio e segmento (VIP/Regular/Ocasional) nunca são
+  atualizados pelas vendas (só o `POST /api/cashback`, que ninguém chama, soma `totalSpent`). Cliente só entra
+  cadastrado à mão ou pelo site de delivery com e-mail. As anotações (Interações, Pro) funcionam.
+- **Campanhas**: exigem um provedor de WhatsApp configurado (Meta, Take Blip ou Zenvia) e template aprovado; a lista
+  de destinatários é digitada (telefone|nome|1=valor) e as variáveis são JSON. Não testado de ponta a ponta.
+- **Relatórios > Financeiro** (`/dashboard/financeiro`): o "Resumo de Hoje" e os métodos de pagamento vêm de
+  `Payment` (só pagamentos online), `CashFlowRecord` (lançamentos manuais do Fluxo de Caixa) e `Order`, não do
+  critério do Caixa/DRE (`salesInRange`). **Previsões** (`/api/financial/calculate-forecast`): "Receita" é a média
+  de um pagamento, "Pedidos" soma 1 por pedido e divide pelo número de pedidos (sempre 1), a média ponderada soma
+  pesos sem dividir e a confiança é fixa (0,7/0,75/0,85). **Análises** (`/api/financial/metrics`) e **Fluxo de
+  Caixa** não foram conferidos. Só o link para a DRE está certo.
+- **Relatórios > Relatório executivo (PDF)**: `app/api/reports/executive/route.ts` gera o PDF em
+  `apps.abacus.ai/api/createConvertHtmlToPdfRequest` com `ABACUSAI_API_KEY`. Sem a chave em produção, todo PDF
+  falha. O CMV do PDF vem das movimentações de estoque, não da DRE.
+- **Comissões**: a regra (% das vendas ou R$ por conta) só é escolhida ao adicionar a pessoa em Equipe e acessos;
+  não há tela para mudar depois (o `PUT /api/admin/staff/[id]` existe).
+- **Planejamento de produção**: a cozinha vê os botões Novo Plano, Inserir Item, Editar e Deletar, mas a API recusa
+  (401) e a tela só diz "Erro ao criar plano".
+- **Vendas e Lucratividade** (páginas): `useEffect` vem depois de um `return` condicional (`status === 'loading'`),
+  contra a regra dos hooks do React. Não deu erro em produção, mas pode dar "Rendered more hooks".
+
+Corrigidos no mesmo dia: limite de lojas no teste grátis, números do painel e dos alertas de Várias lojas, quem vê
+e copia fichas entre lojas, Lucratividade (base, último dia, planilha falsa) e o status em inglês na lista de planos.
+
 ## E-mails de onboarding (decisão do dono, opção A, 2026-10-19)
 
 Sequência nova em `lib/onboarding/emails.ts` (Resend): boas-vindas, dia 1, dia 7, dia 14, só para o dono de

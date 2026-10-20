@@ -45,6 +45,22 @@ it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a p
   expect(a?.categorySlug).toBe('pdv-e-caixa');
   for (const fact of ['Nova conta', 'Parcelar', 'Repetir todo mês', 'gaveta', 'Desfazer pagamento', 'competência', 'CMV']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
 });
+
+it('the 2026-10-20 articles: reports, production plan, shifts and commissions, several stores', () => {
+  const facts: Record<string, [string, string[]]> = {
+    relatorios: ['financeiro', ['Lucratividade', 'margem de contribuição', 'sem custo', 'DRE', 'Baixar planilha (CSV)', 'Consumo de insumos']],
+    'planejamento-producao': ['cardapio-e-receitas', ['Novo Plano', 'Inserir Item', 'Custo estimado', 'não dá baixa no estoque']],
+    'turnos-comissoes': ['equipe-e-lojas', ['Folga', 'não registra ponto', '% das vendas', 'R$ por conta fechada', 'Fechar período', 'Marcar como paga']],
+    'varias-lojas': ['equipe-e-lojas', ['Business tem 2 lojas', 'Nova Unidade', 'Alertas Cruzados', 'Sincronizar Fichas', 'Acessar']],
+  };
+  for (const [slug, [category, list]] of Object.entries(facts)) {
+    const a = HELP_ARTICLES.find((x) => x.slug === slug);
+    expect([slug, a?.categorySlug]).toEqual([slug, category]);
+    for (const fact of list) expect([slug, fact, a?.content.includes(fact)]).toEqual([slug, fact, true]);
+  }
+  // Loyalty, cashback, the Financeiro forecasts and the PDF report do not work today: no article teaches them
+  for (const a of HELP_ARTICLES) for (const word of ['Cashback', 'Previsões', 'Relatório executivo']) expect([a.slug, word, a.content.includes(word)]).toEqual([a.slug, word, false]);
+});
 import { prisma } from '@/lib/prisma';
 
 // Exact 2026-10-11 texts (their hashes are in LEGACY_DEFAULT_HASHES)

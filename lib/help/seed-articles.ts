@@ -55,7 +55,8 @@ export const HELP_CATEGORIES = [
   { slug: 'fiscal', name: 'Nota fiscal', icon: 'FileText', order: 6, description: 'NFC-e: o que é preciso e como configurar' },
   { slug: 'integracao-delivery', name: 'Delivery', icon: 'Truck', order: 7, description: 'Site de delivery próprio e pedidos' },
   { slug: 'faturamento-e-assinatura', name: 'Assinatura', icon: 'Receipt', order: 8, description: 'Planos, faturas e cancelamento' },
-  { slug: 'financeiro', name: 'Financeiro', icon: 'BarChart3', order: 9, description: 'DRE e contas de consumo' },
+  { slug: 'financeiro', name: 'Financeiro', icon: 'BarChart3', order: 9, description: 'DRE, contas de consumo e relatórios' },
+  { slug: 'equipe-e-lojas', name: 'Equipe e lojas', icon: 'Users', order: 10, description: 'Turnos, comissões e várias lojas' },
 ];
 
 export const HELP_ARTICLES = [
@@ -651,6 +652,137 @@ Se você lança a folha em Contas a pagar, a DRE usa o valor lançado. Sem isso,
 3. Lance as contas de luz, água e gás em Contas de consumo
 
 > O "Pergunte ao Gastrux" também responde sobre a DRE ("qual foi meu resultado em setembro?").`,
+  },
+  {
+    categorySlug: 'financeiro',
+    slug: 'relatorios',
+    title: 'Quais relatórios o Gastrux tem?',
+    summary: 'Vendas, Lucratividade e Consumo de insumos mostram o que foi vendido, a margem de cada item e o que saiu do estoque.',
+    keywords: 'relatórios, relatorio, vendas, lucratividade, margem, ticket médio, mais vendidos, consumo, insumos, planilha, csv, exportar',
+    order: 3,
+    content: `Os relatórios ficam no menu **Relatórios**, só para o dono e o gerente. Em Vendas e Lucratividade, os dias seguem o horário de Brasília e o último dia do período entra inteiro.
+
+## Vendas
+
+O total vendido, o número de vendas e o ticket médio do período, com os mesmos números do Caixa e da DRE: comandas e vendas de balcão pagas, pagamento na mesa e delivery. Abaixo, os itens mais vendidos (pelo preço cobrado) e as vendas por categoria do cardápio. Item que não está no cardápio aparece em "Sem categoria".
+
+## Lucratividade
+
+Para cada item vendido: quanto vendeu, a receita, o custo da ficha técnica e a **margem de contribuição** (receita menos o custo da ficha). Mostra os itens que mais dão margem e os com margem abaixo de 20%.
+
+Item sem custo na ficha (sem insumos, ou com insumos sem custo) aparece como "sem custo" e fica fora da margem média. Mantenha as fichas e o custo dos insumos em dia.
+
+A margem de contribuição não é o lucro do restaurante: aluguel, folha e contas não entram aqui. O resultado do mês está na **DRE**.
+
+## Consumo de insumos
+
+O que saiu do estoque de cada insumo no período (7 dias a 1 ano): baixa automática das vendas, saídas manuais e perdas. Você também pode ver entradas e ajustes no filtro **Tipo de Movimentação**.
+
+## CMV e Contas de consumo
+
+O CMV tem um artigo próprio ("Como o Gastrux calcula o CMV?"), assim como as contas de luz, água e gás.
+
+## Planilha
+
+Vendas e Lucratividade têm o botão **Baixar planilha (CSV)**, e Consumo de insumos tem **Exportar CSV**. O arquivo abre no Excel e no Google Planilhas.`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
+    slug: 'planejamento-producao',
+    title: 'Como uso o planejamento de produção?',
+    summary: 'Monte o plano do dia com as fichas técnicas e as quantidades, e veja o custo estimado da produção.',
+    keywords: 'planejamento, produção, plano, pré-preparo, mise en place, quantidade, custo estimado, cozinha',
+    order: 3,
+    content: `## Onde fica
+
+**Mais recursos > Planejamento de produção**. O dono e o gerente criam e mudam os planos; a cozinha consulta.
+
+## Criando um plano
+
+1. Toque em **Novo Plano**, escolha a **Data do Plano** e, se quiser, escreva observações
+2. Toque em **Criar Plano** e abra o plano na lista
+3. Em **Inserir Item**, escolha a ficha técnica e a quantidade a produzir
+
+A quantidade é em unidades do item vendido (porções, espetos, pratos). O **Custo estimado** de cada item sai da ficha técnica, com o custo dos insumos na hora em que você insere o item. Embaixo aparece o **Custo Total** do plano.
+
+## Durante o dia
+
+Em **Editar**, mude o **Status** (Rascunho, Confirmado, Em Produção, Concluído ou Cancelado) e as observações. Cada item pode ter a quantidade corrigida ou ser removido.
+
+O plano é um roteiro para a cozinha: ele não dá baixa no estoque e não cria lista de compras. O estoque baixa quando o item é vendido. Para receitas que você produz em quantidade diferente da ficha, use **Mais recursos > Escalonar receita**.`,
+  },
+  {
+    categorySlug: 'equipe-e-lojas',
+    slug: 'turnos-comissoes',
+    title: 'Como monto os turnos e pago as comissões da equipe?',
+    summary: 'Turnos é a escala da semana; Comissões calcula o que cada pessoa ganhou sobre as contas que abriu.',
+    keywords: 'turnos, escala, folga, feriado, comissão, comissões, garçom, percentual, por conta, pagamento, quinzena',
+    order: 1,
+    content: `As duas telas ficam em **Mais recursos**, para o dono e o gerente. Quem aparece nelas é a equipe cadastrada em **Equipe > Equipe e acessos**.
+
+## Turnos
+
+A tela mostra a semana, de segunda a domingo, com uma linha por pessoa. Use as setas para trocar de semana.
+
+1. Toque em **Turno**
+2. Escolha o **Funcionário**, a **Data**, a **Entrada**, a **Saída** e o **Tipo**: Normal, Estendido, Reduzido, Folga ou Feriado
+3. Toque em **Salvar**
+
+É um turno por pessoa por dia: salvar de novo o mesmo dia troca o turno. A escala serve para organizar a equipe: ela não registra ponto e não entra na folha.
+
+## A regra de comissão
+
+Ao adicionar a pessoa em **Equipe e acessos**, escolha o **Tipo Comissão**:
+
+- **% das vendas**: um percentual sobre o valor dos itens das contas que ela abriu
+- **R$ por conta fechada**: um valor fixo por conta
+
+Só contam as contas fechadas. Conta cancelada não entra, e a taxa de serviço também não.
+
+## Acompanhando e pagando
+
+Em **Comissões**, veja por **Semana** (segunda a domingo), **Quinzena** (1 a 15 e 16 ao fim do mês) ou **Mês**: as vendas, as contas fechadas e a comissão de cada pessoa. Em **Pagamento**, escolha se a equipe recebe por semana, quinzena ou mês.
+
+Quando o período termina:
+
+1. Escolha a visão do seu pagamento e o período que terminou
+2. Toque em **Fechar período**: as comissões viram **Pendente**
+3. Em **Fechamentos**, toque em **Aprovar** e depois em **Marcar como paga**
+
+Antes de aprovar, **Ajustar** soma um valor (use o sinal de menos para um desconto) com o motivo. **Cancelar** pede o motivo.`,
+  },
+  {
+    categorySlug: 'equipe-e-lojas',
+    slug: 'varias-lojas',
+    title: 'Como cadastro e acompanho várias lojas?',
+    summary: 'No plano Business você tem 2 lojas: compare faturamento, vendas e CMV e copie fichas técnicas de uma para outra.',
+    keywords: 'várias lojas, multi-loja, filial, unidade, segunda loja, franquia, comparar lojas, sincronizar fichas',
+    order: 2,
+    content: `## Quem pode
+
+**Configurações > Várias lojas**. O plano Business tem 2 lojas (contando a primeira); o Enterprise, quantas precisar. Só o dono cria uma loja. O dono e o gerente veem os números das lojas onde têm esse papel.
+
+## Criando a segunda loja
+
+1. Toque em **Nova Unidade**
+2. Informe o nome e, se quiser, cidade, estado, endereço, telefone e e-mail
+3. Toque em **Criar Unidade**
+
+A loja nova tem o mesmo plano da primeira (inclusive os dias do teste grátis). Ela começa vazia: cadastre a equipe, o cardápio e as mesas, ou copie as fichas técnicas (abaixo).
+
+Para trabalhar em uma loja, toque em **Acessar** ao lado dela.
+
+## Dashboard
+
+Escolha 7, 30 ou 90 dias. Para cada loja: faturamento, vendas (com as de hoje), ticket médio, CMV, fichas e insumos. Os números são os mesmos do Caixa e da DRE de cada loja. A lista vem em ordem de faturamento.
+
+## Alertas Cruzados
+
+Com 2 lojas, o Gastrux compara os últimos 30 dias e avisa quando o CMV de uma está bem acima do da outra ou passa de 40%, quando uma fatura muito menos, quando uma loja não vendeu nada e quando uma tem 5 ou mais insumos abaixo do estoque mínimo.
+
+## Sincronizar Fichas
+
+Copia fichas técnicas de uma loja para a outra: escolha a **Unidade Origem**, a **Unidade Destino** e as fichas, e toque em **Sincronizar**. Os insumos que faltam são criados na loja de destino. Uma ficha que já existe lá (mesmo código) não é copiada de novo. O estoque e o cardápio digital não são copiados.`,
   },
 ];
 
