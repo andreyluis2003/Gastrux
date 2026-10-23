@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Card, BackButton } from '@/components/ui';
-import { Download, FileText, BarChart3, PieChart as PieChartIcon, Zap } from 'lucide-react';
+import { ExternalLink, FileText, BarChart3, PieChart as PieChartIcon, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ReportType {
@@ -23,72 +23,60 @@ export default function RelatoriosPage() {
     {
       id: 'cmv',
       name: 'CMV (Custo de Mercadoria Vendida)',
-      description: 'Análise detalhada de custos e insumos utilizados',
+      description: 'O CMV da DRE e os itens que mais pesam no custo',
       icon: <BarChart3 className="w-6 h-6" />,
       color: 'bg-blue-50 border-blue-200',
     },
     {
       id: 'menu-engineering',
       name: 'Engenharia de Cardápio',
-      description: 'Classificação BCG (STAR, WORKHORSE, PUZZLE, DOG)',
+      description: 'Estrela, Cavalo de Batalha, Enigma e Abacaxi, pelas vendas',
       icon: <PieChartIcon className="w-6 h-6" />,
       color: 'bg-purple-50 border-purple-200',
     },
     {
       id: 'waste',
       name: 'Desperdício e Perdas',
-      description: 'Análise de resíduos por ingrediente e motivo',
+      description: 'Desperdício por motivo e por insumo',
       icon: <Zap className="w-6 h-6" />,
       color: 'bg-red-50 border-red-200',
     },
     {
       id: 'comprehensive',
-      name: 'Relatório Executivo Completo',
-      description: 'Combina CMV, Menu Engineering e Desperdício',
+      name: 'Relatório Executivo Completo (Business)',
+      description: 'Resumo, CMV, engenharia de cardápio e desperdício',
       icon: <FileText className="w-6 h-6" />,
       color: 'bg-green-50 border-green-200',
     },
   ];
 
+  // A page to print or save as PDF (lib/reports/executive.ts): the tab opens on the click, so the browser
+  // does not block it, and closes again if the report is refused
   const handleGenerateReport = async () => {
     if (!selectedReport) {
       toast.error('Selecione um tipo de relatório');
       return;
     }
-
+    const tab = window.open('', '_blank');
     try {
       setLoading(true);
-
-      const payload = {
-        reportType: selectedReport,
-        days,
-        includeRecipes,
-      };
-
-      const response = await fetch('/api/reports/executive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error('Erro ao gerar relatório');
-
-      // Download PDF
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-${selectedReport}-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.success('Relatório gerado com sucesso!');
-      setSelectedReport(null);
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-      toast.error('Erro ao gerar relatório');
+      const params = new URLSearchParams({ type: selectedReport, days: String(days), recipes: includeRecipes ? '1' : '0' });
+      const response = await fetch(`/api/reports/executive?${params}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || 'Erro ao gerar relatório');
+      }
+      const html = await response.text();
+      if (!tab) {
+        toast.error('O navegador bloqueou a nova aba. Permita pop-ups para o Gastrux e tente de novo.');
+        return;
+      }
+      tab.document.open();
+      tab.document.write(html);
+      tab.document.close();
+    } catch (error: any) {
+      tab?.close();
+      toast.error(error.message || 'Erro ao gerar relatório');
     } finally {
       setLoading(false);
     }
@@ -152,7 +140,7 @@ export default function RelatoriosPage() {
             </div>
           </div>
 
-          {selectedReport === 'comprehensive' && (
+          {(selectedReport === 'comprehensive' || selectedReport === 'menu-engineering') && (
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -162,7 +150,7 @@ export default function RelatoriosPage() {
                 className="w-4 h-4 rounded"
               />
               <label htmlFor="include-recipes" className="text-sm text-gray-700">
-                Incluir detalhes de receitas
+                Incluir a recomendação de cada item do cardápio
               </label>
             </div>
           )}
@@ -176,14 +164,14 @@ export default function RelatoriosPage() {
         className={`w-full ${!selectedReport ? 'opacity-50 cursor-not-allowed' : ''}`}
         size="lg"
       >
-        <Download className="w-4 h-4 mr-2" />
-        {loading ? 'Gerando relatório...' : 'Gerar e Baixar Relatório (PDF)'}
+        <ExternalLink className="w-4 h-4 mr-2" />
+        {loading ? 'Gerando relatório...' : 'Abrir relatório'}
       </Button>
 
       {/* Info */}
       <Card className="p-4 bg-blue-50 border-blue-200">
         <p className="text-sm text-blue-900">
-          <strong>Dica:</strong> Os relatórios são gerados em PDF com formatação profissional, pronto para apresentação aos stakeholders ou para arquivo.
+          <strong>Dica:</strong> o relatório abre numa nova aba. Toque em <strong>Imprimir ou salvar em PDF</strong> e escolha "Salvar como PDF" para guardar o arquivo.
         </p>
       </Card>
     </div>

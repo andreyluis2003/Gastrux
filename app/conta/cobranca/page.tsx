@@ -58,13 +58,9 @@ export default function CobrancaPage() {
     }
   }
 
-  const downloadInvoice = (id: string, number: string) => {
-    const link = document.createElement('a')
-    link.href = `/api/invoices/${id}/pdf`
-    link.download = `${number}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+  // The invoice opens in a new tab, with a button to print or save it as PDF
+  const openInvoice = (id: string) => {
+    window.open(`/api/invoices/${id}/pdf`, '_blank', 'noopener')
   }
 
   if (loading) {
@@ -193,7 +189,7 @@ export default function CobrancaPage() {
                           </Badge>
                         </td>
                         <td className="py-3">
-                          <Button size="sm" variant="outline" onClick={() => downloadInvoice(inv.id, inv.number)}>
+                          <Button size="sm" variant="outline" onClick={() => openInvoice(inv.id)}>
                             <Download className="h-3 w-3 mr-1" />
                             PDF
                           </Button>

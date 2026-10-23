@@ -38,13 +38,20 @@ Previsões e Relatório executivo). Todas estão no menu e esperam decisão do d
   cadastrado à mão ou pelo site de delivery com e-mail. As anotações (Interações, Pro) funcionam.
 - **Campanhas**: exigem um provedor de WhatsApp configurado (Meta, Take Blip ou Zenvia) e template aprovado; a lista
   de destinatários é digitada (telefone|nome|1=valor) e as variáveis são JSON. Não testado de ponta a ponta.
-- **Relatórios > Financeiro** (`/dashboard/financeiro`): o "Resumo de Hoje" e os métodos de pagamento vêm de
+- ~~**Relatórios > Financeiro**~~ (resolvido 2026-10-23: `lib/finance/overview.ts` + `/api/financeiro/resumo`, com os
+  números da DRE e do Caixa e a previsão do mês; Previsões e Análises redirecionam para o Financeiro, Fluxo de Caixa
+  para o Histórico de caixas. Ficaram sem tela: `/api/financial/{dashboard,summary,forecasts,calculate-forecast,
+  metrics,cash-flow}`, para a limpeza das rotas). Era assim: o "Resumo de Hoje" e os métodos de pagamento vinham de
   `Payment` (só pagamentos online), `CashFlowRecord` (lançamentos manuais do Fluxo de Caixa) e `Order`, não do
   critério do Caixa/DRE (`salesInRange`). **Previsões** (`/api/financial/calculate-forecast`): "Receita" é a média
   de um pagamento, "Pedidos" soma 1 por pedido e divide pelo número de pedidos (sempre 1), a média ponderada soma
   pesos sem dividir e a confiança é fixa (0,7/0,75/0,85). **Análises** (`/api/financial/metrics`) e **Fluxo de
   Caixa** não foram conferidos. Só o link para a DRE está certo.
-- **Relatórios > Relatório executivo (PDF)**: `app/api/reports/executive/route.ts` gera o PDF em
+- ~~**Relatórios > Relatório executivo (PDF)**~~ (resolvido 2026-10-23: `lib/reports/executive.ts`, página para
+  imprimir ou salvar em PDF no navegador, com o CMV da DRE e a engenharia de cardápio de `lib/menu-engineering/
+  analyze.ts`; a fatura de Minha assinatura > Cobrança também virou página, com os campos do cliente escapados.
+  Ainda usam `lib/pdf-generator.ts` (Abacus), sem tela: `/api/reports/{comprehensive,forecasts,production-planning,
+  stock-status,suppliers}`, para a limpeza das rotas). Era assim: `app/api/reports/executive/route.ts` gerava o PDF em
   `apps.abacus.ai/api/createConvertHtmlToPdfRequest` com `ABACUSAI_API_KEY`. Sem a chave em produção, todo PDF
   falha. O CMV do PDF vem das movimentações de estoque, não da DRE.
 - ~~**Comissões**~~ (resolvido 2026-10-23, "Editar remuneração" em Equipe e acessos): a regra só era escolhida ao

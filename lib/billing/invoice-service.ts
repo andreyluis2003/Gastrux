@@ -116,6 +116,10 @@ function buildInvoiceEmail(invoice: any): string {
   </body></html>`
 }
 
+// The invoice is now a page in the browser (2026-10-23): customer text must not become HTML
+const escHtml = (v: unknown) =>
+  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)
+
 export function buildInvoicePdfHtml(invoice: any): string {
   const total = typeof invoice.total?.toNumber === 'function' ? invoice.total.toNumber() : Number(invoice.total || 0)
   const subtotal = typeof invoice.subtotal?.toNumber === 'function' ? invoice.subtotal.toNumber() : Number(invoice.subtotal || 0)
@@ -125,7 +129,7 @@ export function buildInvoicePdfHtml(invoice: any): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head>
 <meta charset="UTF-8" />
-<title>${invoice.number}</title>
+<title>${escHtml(invoice.number)}</title>
 <style>
   body { font-family: system-ui, sans-serif; color: #111827; padding: 40px; margin: 0; }
   .header { display: flex; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
@@ -143,11 +147,15 @@ export function buildInvoicePdfHtml(invoice: any): string {
   .paid { background: #d1fae5; color: #065f46; }
   .issued { background: #dbeafe; color: #1e40af; }
   .overdue { background: #fee2e2; color: #991b1b; }
+  .bar { text-align: right; margin-bottom: 16px; }
+  .bar button { background: #335538; color: #fff; border: 0; border-radius: 6px; padding: 10px 16px; font-size: 14px; cursor: pointer; }
+  @media print { .bar { display: none; } body { padding: 0; } }
 </style></head><body>
+<div class="bar"><button type="button" onclick="window.print()">Imprimir ou salvar em PDF</button></div>
   <div class="header">
     <div class="logo">Gastrux</div>
     <div class="invoice-number">
-      <h1>${invoice.number}</h1>
+      <h1>${escHtml(invoice.number)}</h1>
       <p>Emitida em ${new Date(invoice.createdAt).toLocaleDateString('pt-BR')}</p>
       <p><span class="status ${invoice.status === 'PAID' ? 'paid' : invoice.status === 'OVERDUE' ? 'overdue' : 'issued'}">${invoice.status}</span></p>
     </div>
@@ -159,14 +167,14 @@ export function buildInvoicePdfHtml(invoice: any): string {
     </div>
     <div class="party">
       <h3>Para</h3>
-      <p><strong>${invoice.customerName}</strong></p>
-      <p>${invoice.customerEmail}</p>
-      ${invoice.customerDocument ? `<p>${invoice.customerDocument}</p>` : ''}
+      <p><strong>${escHtml(invoice.customerName)}</strong></p>
+      <p>${escHtml(invoice.customerEmail)}</p>
+      ${invoice.customerDocument ? `<p>${escHtml(invoice.customerDocument)}</p>` : ''}
     </div>
   </div>
   <div class="description">
     <h3>Descrição</h3>
-    <p>${invoice.description}</p>
+    <p>${escHtml(invoice.description)}</p>
   </div>
   <div class="totals">
     <div class="totals-row"><span>Subtotal</span><span>${invoice.currency} ${subtotal.toFixed(2)}</span></div>

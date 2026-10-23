@@ -41,6 +41,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '3c66bbb8df87a6e6725fd2f3c6d2a267ec21944f4273e14fdd153eddc6970b7c', // teste-gratis (before the sales per month and fichas técnicas limits)
   '4a7897cd78a0223844fdd4fbba22e5eec613af7c4ba3ff6e05df24a83d36888a', // turnos-comissoes (2026-10-20, before Editar remuneração)
   '24e420ce5854167428ea970c39c1cf41b5daaf01ff20ef60221209a85d36525f', // planejamento-producao (2026-10-20, before the cook without costs)
+  '2c6a185cddba47c6af0046cff712621a7b28e5fa44ca665e1014107e1e66748c', // relatorios (2026-10-20, before Financeiro and Relatório executivo)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -659,7 +660,7 @@ Se você lança a folha em Contas a pagar, a DRE usa o valor lançado. Sem isso,
     categorySlug: 'financeiro',
     slug: 'relatorios',
     title: 'Quais relatórios o Gastrux tem?',
-    summary: 'Vendas, Lucratividade e Consumo de insumos mostram o que foi vendido, a margem de cada item e o que saiu do estoque.',
+    summary: 'Vendas, Lucratividade, Consumo de insumos, Financeiro e o Relatório executivo para imprimir ou salvar em PDF.',
     keywords: 'relatórios, relatorio, vendas, lucratividade, margem, ticket médio, mais vendidos, consumo, insumos, planilha, csv, exportar',
     order: 3,
     content: `Os relatórios ficam no menu **Relatórios**, só para o dono e o gerente. Em Vendas e Lucratividade, os dias seguem o horário de Brasília e o último dia do período entra inteiro.
@@ -679,6 +680,26 @@ A margem de contribuição não é o lucro do restaurante: aluguel, folha e cont
 ## Consumo de insumos
 
 O que saiu do estoque de cada insumo no período (7 dias a 1 ano): baixa automática das vendas, saídas manuais e perdas. Você também pode ver entradas e ajustes no filtro **Tipo de Movimentação**.
+
+## Financeiro
+
+Um resumo com os mesmos números do Caixa e da DRE:
+
+- **Últimos 30 dias**: receita, resultado (receita menos CMV e despesas), margem líquida e ticket médio, com a variação sobre os 30 dias anteriores
+- **Hoje**: quanto vendeu e quantas vendas
+- **Previsão do mês**: o que vendeu no mês dividido pelos dias que passaram, vezes os dias do mês. Aparece a partir do dia 3, ao lado de quanto fechou o mês passado
+- As formas de pagamento dos 30 dias e atalhos para DRE, Contas a pagar, Contas de consumo, Vendas, Lucratividade e Histórico de caixas
+
+## Relatório executivo
+
+Escolha o relatório e o período (7 a 90 dias) e toque em **Abrir relatório**. Ele abre numa nova aba; toque em **Imprimir ou salvar em PDF** e escolha "Salvar como PDF" para guardar o arquivo.
+
+- **CMV**: o CMV da DRE e os itens que mais pesam no custo
+- **Engenharia de Cardápio**: cada ficha técnica como Estrela, Cavalo de Batalha, Enigma ou Abacaxi, pelas vendas, com a recomendação de cada uma se você marcar a opção
+- **Desperdício e Perdas**: o custo do desperdício por motivo e os insumos mais desperdiçados
+- **Relatório Executivo Completo** (plano Business): um resumo e os três juntos
+
+Se o navegador bloquear a nova aba, permita pop-ups para o Gastrux.
 
 ## CMV e Contas de consumo
 
