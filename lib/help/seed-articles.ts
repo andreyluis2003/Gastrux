@@ -39,6 +39,8 @@ const LEGACY_DEFAULT_HASHES = new Set([
   'e637112bcbb515bb07f62712d3ad6eb6fa286053d2d49051a5da578890a6d395', // teste-gratis (2026-10-18 version, before 'assinar durante o teste')
   '50bdca4036da85cdde76704e94fd1e506118a67157978ee63b4606abaa309b9d', // cadastrar-receita (cost inside the product, before 'Escalonar receita')
   '3c66bbb8df87a6e6725fd2f3c6d2a267ec21944f4273e14fdd153eddc6970b7c', // teste-gratis (before the sales per month and fichas técnicas limits)
+  '4a7897cd78a0223844fdd4fbba22e5eec613af7c4ba3ff6e05df24a83d36888a', // turnos-comissoes (2026-10-20, before Editar remuneração)
+  '24e420ce5854167428ea970c39c1cf41b5daaf01ff20ef60221209a85d36525f', // planejamento-producao (2026-10-20, before the cook without costs)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -695,7 +697,7 @@ Vendas e Lucratividade têm o botão **Baixar planilha (CSV)**, e Consumo de ins
     order: 3,
     content: `## Onde fica
 
-**Mais recursos > Planejamento de produção**. O dono e o gerente criam e mudam os planos; a cozinha consulta.
+**Mais recursos > Planejamento de produção**. O dono e o gerente criam e mudam os planos e veem os custos; a cozinha vê os planos e as quantidades.
 
 ## Criando um plano
 
@@ -732,12 +734,12 @@ A tela mostra a semana, de segunda a domingo, com uma linha por pessoa. Use as s
 
 ## A regra de comissão
 
-Ao adicionar a pessoa em **Equipe e acessos**, escolha o **Tipo Comissão**:
+Em **Equipe e acessos**, ao adicionar a pessoa ou depois, em **Editar remuneração**, escolha o **Tipo Comissão**:
 
 - **% das vendas**: um percentual sobre o valor dos itens das contas que ela abriu
 - **R$ por conta fechada**: um valor fixo por conta
 
-Só contam as contas fechadas. Conta cancelada não entra, e a taxa de serviço também não.
+Só contam as contas fechadas. Conta cancelada não entra, e a taxa de serviço também não. Mudar a regra vale para os períodos ainda não fechados; os já fechados não mudam.
 
 ## Acompanhando e pagando
 

@@ -47,12 +47,6 @@ export default function SalesReportPage() {
   const [period, setPeriod] = useState('month');
   const [exporting, setExporting] = useState(false);
 
-  if (status === 'loading') return <LoadingSkeleton count={5} />;
-  if (status === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
-  }
-
   useEffect(() => {
     const today = new Date();
     const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -124,6 +118,13 @@ export default function SalesReportPage() {
       setExporting(false);
     }
   };
+
+  // After every hook: returning before the useEffect broke the rules of hooks
+  if (status === 'loading') return <LoadingSkeleton count={5} />;
+  if (status === 'unauthenticated') {
+    router.push('/auth/signin');
+    return null;
+  }
 
   return (
     <div className="space-y-6 p-4 sm:space-y-6 sm:p-6">

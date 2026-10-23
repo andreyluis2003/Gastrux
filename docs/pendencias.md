@@ -47,12 +47,13 @@ Previsões e Relatório executivo). Todas estão no menu e esperam decisão do d
 - **Relatórios > Relatório executivo (PDF)**: `app/api/reports/executive/route.ts` gera o PDF em
   `apps.abacus.ai/api/createConvertHtmlToPdfRequest` com `ABACUSAI_API_KEY`. Sem a chave em produção, todo PDF
   falha. O CMV do PDF vem das movimentações de estoque, não da DRE.
-- **Comissões**: a regra (% das vendas ou R$ por conta) só é escolhida ao adicionar a pessoa em Equipe e acessos;
-  não há tela para mudar depois (o `PUT /api/admin/staff/[id]` existe).
-- **Planejamento de produção**: a cozinha vê os botões Novo Plano, Inserir Item, Editar e Deletar, mas a API recusa
-  (401) e a tela só diz "Erro ao criar plano".
-- **Vendas e Lucratividade** (páginas): `useEffect` vem depois de um `return` condicional (`status === 'loading'`),
-  contra a regra dos hooks do React. Não deu erro em produção, mas pode dar "Rendered more hooks".
+- ~~**Comissões**~~ (resolvido 2026-10-23, "Editar remuneração" em Equipe e acessos): a regra só era escolhida ao
+  adicionar a pessoa. O `PUT /api/admin/staff/[id]` checava o papel global e gravava cargo e status sem validar;
+  agora só remuneração e horário (`lib/staff/pay.ts`), papel na loja, auditado.
+- ~~**Planejamento de produção**~~ (resolvido 2026-10-23): a cozinha via botões que falhavam e os custos; as rotas
+  checavam o papel global (um caixa mudava planos). Agora papel na loja, `canManage` e plano sem custo para a cozinha.
+- ~~**Vendas e Lucratividade** (páginas)~~ (resolvido 2026-10-23): `useEffect` vinha depois de um `return`
+  condicional, contra a regra dos hooks do React.
 
 Corrigidos no mesmo dia: limite de lojas no teste grátis, números do painel e dos alertas de Várias lojas, quem vê
 e copia fichas entre lojas, Lucratividade (base, último dia, planilha falsa) e o status em inglês na lista de planos.

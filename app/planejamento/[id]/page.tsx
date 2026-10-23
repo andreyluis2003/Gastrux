@@ -19,7 +19,8 @@ import { toast } from 'sonner';
 interface ProductionItem {
   id: string;
   quantity: number;
-  estimatedCost: number;
+  /** null for the cook: costs are the owner's and the manager's */
+  estimatedCost: number | null;
   recipe: {
     id: string;
     name: string;
@@ -34,6 +35,8 @@ interface ProductionPlan {
   notes?: string;
   items: ProductionItem[];
   createdAt: string;
+  /** Owner or manager here: the cook only reads the plan */
+  canManage: boolean;
 }
 
 export default function ProductionPlanDetailPage() {
@@ -120,7 +123,8 @@ export default function ProductionPlanDetailPage() {
       });
       if (!res.ok) throw new Error('Erro ao salvar');
       const updated = await res.json();
-      setPlan(updated);
+      // The PUT answer has no canManage: keep the one of the page (only a manager gets here)
+      setPlan({ ...updated, canManage: true });
       setShowEditDialog(false);
       toast.success('Plano atualizado com sucesso');
     } catch (error) {
@@ -247,7 +251,7 @@ export default function ProductionPlanDetailPage() {
     );
   }
 
-  const totalCost = plan.items.reduce((sum, item) => sum + item.estimatedCost, 0);
+  const totalCost = plan.items.reduce((sum, item) => sum + (item.estimatedCost ?? 0), 0);
 
   return (
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
@@ -263,7 +267,7 @@ export default function ProductionPlanDetailPage() {
             <p className="text-slate-600">{formatDate(new Date(plan.planDate))}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        {plan.canManage && <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={handleOpenAddItemDialog}
@@ -287,7 +291,7 @@ export default function ProductionPlanDetailPage() {
             <Trash2 className="h-4 w-4 mr-2" />
             {deleting ? 'Deletando...' : 'Deletar'}
           </Button>
-        </div>
+        </div>}
       </div>
 
       {/* Plan Information */}
@@ -322,7 +326,7 @@ export default function ProductionPlanDetailPage() {
                     <h3 className="font-semibold text-lg">{item.recipe.name}</h3>
                     <p className="text-sm text-slate-600">{item.recipe.code}</p>
                   </div>
-                  <div className="flex gap-1">
+                  {plan.canManage && <div className="flex gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -342,17 +346,19 @@ export default function ProductionPlanDetailPage() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  </div>
+                  </div>}
                 </div>
                 <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-slate-600">Quantidade:</span>
                     <span className="font-medium">{item.quantity}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-slate-600">Custo estimado:</span>
-                    <span className="font-medium">R$ {item.estimatedCost.toFixed(2)}</span>
-                  </div>
+                  {item.estimatedCost != null && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-600">Custo estimado:</span>
+                      <span className="font-medium">R$ {item.estimatedCost.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}
@@ -363,10 +369,12 @@ export default function ProductionPlanDetailPage() {
       {/* Summary */}
       <Card className="p-6 bg-slate-50 dark:bg-slate-900/50">
         <div className="space-y-2">
-          <div className="flex justify-between text-lg">
-            <span className="font-semibold">Custo Total:</span>
-            <span className="font-bold text-emerald-600">R$ {totalCost.toFixed(2)}</span>
-          </div>
+          {plan.canManage && (
+            <div className="flex justify-between text-lg">
+              <span className="font-semibold">Custo Total:</span>
+              <span className="font-bold text-emerald-600">R$ {totalCost.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm text-slate-600">
             <span>Total de itens:</span>
             <span>{plan.items.length}</span>

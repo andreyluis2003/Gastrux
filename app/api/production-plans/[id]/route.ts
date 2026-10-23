@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { withoutCost } from '@/lib/production-plans/view';
+import { MANAGER_ROLES, getRestaurantMember, isManager, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { withLiveCost } from '@/lib/recipes/cost-map';
 
 export const dynamic = 'force-dynamic';
@@ -40,7 +42,9 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    return NextResponse.json(plan);
+    const me = await getRestaurantMember();
+    const canManage = !!me && isManager(me);
+    return NextResponse.json({ ...(canManage ? plan : withoutCost(plan)), canManage });
   } catch (error) {
     console.error('Error fetching production plan:', error);
     return NextResponse.json(
@@ -57,9 +61,12 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
     const user = session?.user as any;
-    if (!session || user?.role === 'COOK') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // The role in THIS restaurant: the global session role let a cashier (and an owner elsewhere who cooks here) change plans
+    const gate = await requireRestaurantRole(MANAGER_ROLES, 'Só o dono e o gerente mudam o planejamento de produção');
+    if (!gate.ok) return gate.response;
 
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
@@ -118,9 +125,12 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     const user = session?.user as any;
-    if (!session || user?.role === 'COOK') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // The role in THIS restaurant: the global session role let a cashier (and an owner elsewhere who cooks here) change plans
+    const gate = await requireRestaurantRole(MANAGER_ROLES, 'Só o dono e o gerente mudam o planejamento de produção');
+    if (!gate.ok) return gate.response;
 
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {
@@ -208,9 +218,12 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     const user = session?.user as any;
-    if (!session || user?.role === 'COOK') {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    // The role in THIS restaurant: the global session role let a cashier (and an owner elsewhere who cooks here) change plans
+    const gate = await requireRestaurantRole(MANAGER_ROLES, 'Só o dono e o gerente mudam o planejamento de produção');
+    if (!gate.ok) return gate.response;
 
     const restaurantId = await getCurrentRestaurantId();
     if (!restaurantId) {

@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { withoutCost } from '@/lib/production-plans/view';
+import { MANAGER_ROLES, getRestaurantMember, isManager, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +29,10 @@ export async function GET(req: NextRequest) {
       include: { items: { include: { recipe: true } } },
       orderBy: { planDate: 'desc' },
     });
-    return NextResponse.json(plans);
+    // The cook reads the plans; changes and costs are the owner's and the manager's (as on Escalonar receita)
+    const me = await getRestaurantMember();
+    const canManage = !!me && isManager(me);
+    return NextResponse.json({ plans: canManage ? plans : plans.map(withoutCost), canManage });
   } catch (error) {
     console.error('Error fetching plans:', error);
     return NextResponse.json(
@@ -41,9 +46,12 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const user = session?.user as any;
   
-  if (!session?.user || (user?.role === 'COOK')) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
+  // The role in THIS restaurant: the global session role let a cashier (and an owner elsewhere who cooks here) change plans
+  const gate = await requireRestaurantRole(MANAGER_ROLES, 'Só o dono e o gerente mudam o planejamento de produção');
+  if (!gate.ok) return gate.response;
 
   try {
     const body = await req.json();

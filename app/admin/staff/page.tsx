@@ -33,6 +33,15 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   TERMINATED: { label: 'Desligado', color: 'bg-red-100 text-red-700' },
 };
 
+// The rule of lib/staff/commission-rules.ts, as the card shows it
+function commissionLabel(m: StaffMember): string {
+  const v = Number(m.commissionValue ?? 0);
+  if (!v) return 'Sem comissão';
+  return m.commissionType === 'FIXED'
+    ? `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} por conta fechada`
+    : `${v.toLocaleString('pt-BR')}% das vendas`;
+}
+
 const ROLE_MAP: Record<string, string> = {
   OWNER: 'Proprietário', MANAGER: 'Gerente', CASHIER: 'Caixa', COOK: 'Cozinheiro', ADMIN: 'Admin',
 };
@@ -48,6 +57,31 @@ export default function StaffPage() {
     baseSalary: '', commissionType: 'PERCENTAGE', commissionValue: '',
     defaultStartTime: '08:00', defaultEndTime: '18:00',
   });
+
+  // Edit pay (2026-10-23): the commission rule could only be chosen when adding the person
+  const [editing, setEditing] = useState<null | { id: string; commissionType: string; commissionValue: string; baseSalary: string; defaultStartTime: string; defaultEndTime: string }>(null);
+  const startEdit = (m: StaffMember) => setEditing({
+    id: m.id,
+    commissionType: m.commissionType === 'FIXED' ? 'FIXED' : 'PERCENTAGE',
+    commissionValue: m.commissionValue != null ? String(Number(m.commissionValue)).replace('.', ',') : '',
+    baseSalary: m.basesalary != null ? String(Number(m.basesalary)).replace('.', ',') : '',
+    defaultStartTime: m.defaultStartTime || '08:00',
+    defaultEndTime: m.defaultEndTime || '18:00',
+  });
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const { id, ...body } = editing;
+      const res = await fetch(`/api/admin/staff/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error);
+      toast.success('Remuneração atualizada. Vale para as comissões ainda não fechadas.');
+      setEditing(null);
+      fetchMembers();
+    } catch (e: any) { toast.error(e.message || 'Erro ao salvar'); }
+    finally { setSaving(false); }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -194,14 +228,44 @@ export default function StaffPage() {
                       {member.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{member.phone}</span>}
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{member.defaultStartTime} - {member.defaultEndTime}</span>
                       {member.basesalary && <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />R$ {Number(member.basesalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>}
+                      <span>Comissão: {commissionLabel(member)}</span>
                     </div>
                   </div>
                   {member.status !== 'TERMINATED' && (
-                    <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDeactivate(member.id)}>
-                      Desligar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => (editing?.id === member.id ? setEditing(null) : startEdit(member))}>
+                        Editar remuneração
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleDeactivate(member.id)}>
+                        Desligar
+                      </Button>
+                    </div>
                   )}
                 </div>
+                {editing?.id === member.id && (
+                  <div className="mt-4 border-t pt-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 block mb-1">Tipo Comissão</label>
+                        <select className="w-full border rounded-md px-3 py-2 text-sm" value={editing.commissionType} onChange={(e) => setEditing({ ...editing, commissionType: e.target.value })}>
+                          <option value="PERCENTAGE">% das vendas</option>
+                          <option value="FIXED">R$ por conta fechada</option>
+                        </select>
+                      </div>
+                      <div><label className="text-xs text-gray-600 block mb-1">Valor Comissão</label><Input inputMode="decimal" value={editing.commissionValue} onChange={(e) => setEditing({ ...editing, commissionValue: e.target.value })} placeholder={editing.commissionType === 'FIXED' ? 'Ex: 2,00 (R$ por conta)' : 'Ex: 5 (%)'} /></div>
+                      <div><label className="text-xs text-gray-600 block mb-1">Salário Base (R$)</label><Input inputMode="decimal" value={editing.baseSalary} onChange={(e) => setEditing({ ...editing, baseSalary: e.target.value })} placeholder="0,00" /></div>
+                      <div className="flex gap-2">
+                        <div className="flex-1"><label className="text-xs text-gray-600 block mb-1">Entrada</label><Input type="time" value={editing.defaultStartTime} onChange={(e) => setEditing({ ...editing, defaultStartTime: e.target.value })} /></div>
+                        <div className="flex-1"><label className="text-xs text-gray-600 block mb-1">Saída</label><Input type="time" value={editing.defaultEndTime} onChange={(e) => setEditing({ ...editing, defaultEndTime: e.target.value })} /></div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">A regra nova vale para os períodos de comissão ainda não fechados. Os já fechados não mudam.</p>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setEditing(null)}>Cancelar</Button>
+                      <Button size="sm" onClick={handleSaveEdit} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</Button>
+                    </div>
+                  </div>
+                )}
               </Card>
             );
           })

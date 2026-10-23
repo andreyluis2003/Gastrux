@@ -54,12 +54,6 @@ export default function ProfitabilityPage() {
   const [exporting, setExporting] = useState(false);
   const [sortBy, setSortBy] = useState<'margin' | 'profit'>('profit');
 
-  if (status === 'loading') return <LoadingSkeleton count={5} />;
-  if (status === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
-  }
-
   useEffect(() => {
     const today = new Date();
     const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -128,6 +122,13 @@ export default function ProfitabilityPage() {
       setExporting(false);
     }
   };
+
+  // After every hook: returning before the useEffect broke the rules of hooks
+  if (status === 'loading') return <LoadingSkeleton count={5} />;
+  if (status === 'unauthenticated') {
+    router.push('/auth/signin');
+    return null;
+  }
 
   return (
     <div className="space-y-6 p-4 sm:space-y-6 sm:p-6">

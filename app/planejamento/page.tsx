@@ -23,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function PlanejamentoPage() {
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [canManage, setCanManage] = useState(false);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -34,7 +35,8 @@ export default function PlanejamentoPage() {
       const res = await fetch('/api/production-plans');
       if (!res.ok) throw new Error('Erro ao buscar planos');
       const data = await res.json();
-      setPlans(data);
+      setPlans(data.plans ?? []);
+      setCanManage(!!data.canManage);
     } catch (error) {
       toast.error('Erro ao carregar planos');
     } finally {
@@ -52,12 +54,14 @@ export default function PlanejamentoPage() {
             <p className="text-slate-600">{t('planning.subtitle')}</p>
           </div>
         </div>
-        <Link href="/planejamento/novo">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('planning.new')}
-          </Button>
-        </Link>
+        {canManage && (
+          <Link href="/planejamento/novo">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('planning.new')}
+            </Button>
+          </Link>
+        )}
       </div>
 
       {loading ? (
@@ -83,7 +87,7 @@ export default function PlanejamentoPage() {
                     <p className="text-xs text-slate-500 mt-1">Status: {STATUS_LABEL[plan.status] ?? plan.status}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-semibold">R$ {plan.totalCost?.toFixed(2)}</p>
+                    {plan.totalCost != null && <p className="text-lg font-semibold">R$ {plan.totalCost.toFixed(2)}</p>}
                   </div>
                 </div>
               </Card>
