@@ -87,6 +87,7 @@ export class FocusNFeClient implements NFeProvider {
       quantidade_comercial: Number(item.quantity).toFixed(4),
       valor_unitario_comercial: Number(item.unitPrice).toFixed(4),
       valor_bruto: Number(item.totalPrice).toFixed(2),
+      ...(item.discount ? { valor_desconto: Number(item.discount).toFixed(2) } : {}),
       unidade_tributavel: item.unit || 'UN',
       quantidade_tributavel: Number(item.quantity).toFixed(4),
       valor_unitario_tributavel: Number(item.unitPrice).toFixed(4),

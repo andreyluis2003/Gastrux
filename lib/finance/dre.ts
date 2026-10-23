@@ -20,15 +20,22 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   // 1. RECEITA BRUTA - the Caixa criterion (owner 2026-10-16): paid comandas and counter sales,
   // pay at the table after refunds, and delivery orders without a comanda; the service charge is inside
   const sales = await salesInRange(restaurantId, start, endExclusive);
-  const receitaBruta = sales.totalCents / 100;
-  const receitaDineIn = sales.salaoCents / 100;
+  // Cashback used on the bills closed in the period (spec 2026-10-23 §8): the drawer got the total with the
+  // discount, so the gross revenue adds it back and the deductions take it out again
+  const cashbackUsed = await prisma.orderSession.aggregate({
+    where: { restaurantId, status: 'CLOSED', closedAt: { gte: start, lt: endExclusive }, cashbackUsedCents: { gt: 0 } },
+    _sum: { cashbackUsedCents: true },
+  });
+  const cashback = (cashbackUsed._sum.cashbackUsedCents ?? 0) / 100;
+  const receitaBruta = sales.totalCents / 100 + cashback;
+  const receitaDineIn = sales.salaoCents / 100 + cashback;
   const receitaDelivery = sales.deliveryCents / 100;
   const taxaServico = sales.serviceCents / 100;
 
   // 2. DEDUÇÕES - taxes and discounts of the delivery orders (comanda discounts are already net)
   const impostos = sales.deliveryTaxesCents / 100;
   const descontos = sales.deliveryDiscountCents / 100;
-  const deducoes = impostos + descontos;
+  const deducoes = impostos + descontos + cashback;
   const receitaLiquida = receitaBruta - deducoes;
 
   // 3. CMV (Custo de Mercadoria Vendida) - from CMV snapshots or estimate
@@ -159,6 +166,7 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
       deducoes: {
         impostos,
         descontos,
+        cashback,
         total: deducoes,
       },
       receitaLiquida,

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
 import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
+import { apportionDiscount } from '@/lib/cashback/rules';
 import { createDocumentWithNextNumber, findReusableRejected } from '@/lib/nfe/numbering';
 import { resolveItemsFiscalData } from '@/lib/nfe/fiscal-data';
 import { noteLabel } from './access-key';
@@ -100,7 +101,9 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
       position: idx,
     };
   });
-  const totalAmount = lines.reduce((sum, line) => sum + Math.round(line.totalPrice * 100), 0) / 100;
+  // Cashback used on the bill is a discount on the note, spread over the items (spec 2026-10-23 §8)
+  const discounts = apportionDiscount(lines.map((l) => Math.round(l.totalPrice * 100)), orderSession.cashbackUsedCents ?? 0);
+  const totalAmount = (lines.reduce((sum, line) => sum + Math.round(line.totalPrice * 100), 0) - discounts.reduce((a, b) => a + b, 0)) / 100;
 
   const reusable = await findReusableRejected(orderSessionId);
   const previous = (reusable?.dataSnapshot ?? {}) as Partial<NFeEmitPayload>;
@@ -195,6 +198,7 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
       cest: fiscal.items[idx].cest,
       icmsOrigin: fiscal.items[idx].origin,
       icmsCST: fiscal.items[idx].csosn,
+      ...(discounts[idx] > 0 ? { discount: discounts[idx] / 100 } : {}),
     })),
     totalAmount,
     paymentMethod,

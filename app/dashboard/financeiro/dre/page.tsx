@@ -22,7 +22,7 @@ interface DREData {
     receitaDelivery: number;
     taxaServico?: number;
     receitaCaixa: number;
-    deducoes: { impostos: number; descontos: number; total: number };
+    deducoes: { impostos: number; descontos: number; cashback?: number; total: number };
     receitaLiquida: number;
     cmv: number;
     lucroBruto: number;
@@ -270,6 +270,7 @@ export default function DREPage() {
               <div className="mb-4 border-l-2 border-red-200 pl-4">
                 <DRELine label="Impostos" value={d.deducoes.impostos} negative />
                 <DRELine label="Descontos Concedidos" value={d.deducoes.descontos} negative />
+                {(d.deducoes.cashback ?? 0) > 0 && <DRELine label="Cashback usado" value={d.deducoes.cashback ?? 0} negative />}
                 <DRELine label="Total Deduções" value={d.deducoes.total} bold negative />
               </div>
             )}

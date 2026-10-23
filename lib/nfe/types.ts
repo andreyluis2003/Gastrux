@@ -11,6 +11,8 @@ export interface NFeEmitItem {
   cest?: string;
   icmsOrigin?: string;
   icmsCST?: string; // CST/CSOSN
+  /** Discount on this item in reais (the bill's cashback, spread over the items) */
+  discount?: number;
 }
 
 export interface NFeEmitPayload {
