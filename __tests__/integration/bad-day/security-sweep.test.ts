@@ -5,7 +5,6 @@
  *   closed without it (one accepted anyone when its variable was unset, another used "default-secret");
  * - the delivery-status webhook needs its token;
  * - menu, prices, money and settings are changed by the owner or a manager, never by a cashier;
- * - a public reservation never returns the stored guest profile.
  */
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
@@ -23,7 +22,6 @@ import { NextRequest } from 'next/server';
 import { POST as messagingWebhook } from '../../../app/api/messaging/webhook/[provider]/route';
 import { POST as createMenuItem } from '../../../app/api/cardapio/itens/route';
 import { POST as createModifier } from '../../../app/api/modifiers/route';
-import { POST as createReservation } from '../../../app/api/reservations/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -94,18 +92,5 @@ describe('security sweep of the rest of the API', () => {
     as(A.ownerId, A.restaurantId);
     const res = await createModifier(json('http://x/api/modifiers', { name: 'Borda', priceAdjustment: 5 }));
     expect([401, 403]).not.toContain(res.status);
-  });
-
-  it('a public reservation does not return the stored guest profile', async () => {
-    const email = `cliente-${tag}@sweep.test`;
-    await prisma.guestProfile.create({ data: { restaurantId: A.restaurantId, name: 'Cliente Real', email, phone: '+5511988887777' } });
-    const res = await createReservation(json('http://x/api/reservations', {
-      restaurantId: A.restaurantId, guestName: 'Outra pessoa', guestEmail: email, partySize: 2,
-      reservedAt: new Date(Date.now() + 86400000).toISOString(),
-    }));
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.guest).toBeUndefined();
-    expect(JSON.stringify(body)).not.toContain('+5511988887777');
   });
 });

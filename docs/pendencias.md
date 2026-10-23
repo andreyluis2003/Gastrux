@@ -83,11 +83,13 @@ send-day7, send-onboarding, check-onboarding-emails e `lib/email-templates/onboa
 - ~~**Outros e-mails ainda pela Abacus.ai**~~ (decisão do dono, 2026-10-23): os alertas da Plataforma
   (`lib/admin-alerts.ts`) saem pelo Resend; os segmentados (`check-segmented-emails`, send-new-user, send-inactive,
   send-early-adopter) e `/api/admin/batch-email-send` (com `lib/email-ab-test.ts`) foram apagados.
-- **Lembrete de reserva** (`/api/email/send-reminder`, `/api/reservations/send-reminders`): o dono aprovou passar para o
-  Resend, mas a cadeia nunca funcionou (nada cria `ReservationReminder`, a rota `/api/notifications/send-email` que ela
-  chama não existe, nenhum cron a dispara) e as próprias Reservas são tela escondida (`/admin/reservations` e a página
-  pública `/reservations/[restaurantId]` sem link no menu, na ajuda ou na IA). Espera o dono decidir se as Reservas viram
-  recurso de verdade (então o lembrete entra junto) ou saem.
+- ~~**Lembrete de reserva**~~ (2026-10-23, decisão do dono: apagar as Reservas, tela escondida que nunca foi usada):
+  saíram `/admin/reservations` (leva ao Início), a página pública `/reservations/[restaurantId]` (404), `/api/reservations/*`,
+  `/api/admin/reservations/*` e `/api/email/send-reminder`.
+- **Tabelas das Reservas**: `reservations`, `reservation_reminders` e `guest_profiles` continuam no banco (ainda citadas por
+  `app/api/admin/tables/[id]`, que recusa apagar mesa com reserva, por `lib/kds-integration.ts` e pela relação
+  `Order.reservationId`). Apagar numa migração própria, depois de conferir em produção o que elas guardam, como foi feito
+  com a fidelidade e a voz.
 - Os campos antigos da sequência em `users` (emailSentDay3/Day21/TrialEnding, emailVariant*, emailDay*OpenedAt)
   ficaram sem uso; apagar numa migração futura, junto com os que a tela de funil (`/api/analytics/conversion-funnel`) lê.
 
