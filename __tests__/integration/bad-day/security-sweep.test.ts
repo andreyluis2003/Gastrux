@@ -51,8 +51,6 @@ describe('security sweep of the rest of the API', () => {
   afterAll(async () => {
     process.env = env;
     const ids = [A.restaurantId, B.restaurantId];
-    await prisma.voiceCall.deleteMany({ where: { restaurantId: { in: ids } } });
-    await prisma.voiceAgentConfig.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.reservation.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.guestProfile.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.itemModifier.deleteMany({ where: { restaurantId: { in: ids } } });

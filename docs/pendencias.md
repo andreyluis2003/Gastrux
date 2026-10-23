@@ -20,9 +20,9 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
   suppliers,demand}`, com `lib/pdf-generator.ts` (Abacus), `lib/report-templates.ts`, `lib/voice/`, `lib/loyalty/` e
   `hooks/use-restaurant-data.ts`. Páginas que levavam a elas e agora redirecionam: /admin/indicacao → Cashback;
   /dashboard/reports e /dashboard/reports/demand (Previsão de demanda, com PDF de mentira) → Financeiro.
-- **Tabelas sem uso no banco**: `loyalty_*` (programa, contas, marcos, transações), `voice_agent_configs`,
-  `voice_calls` e as das rotas apagadas continuam no schema. Apagar numa migração própria, depois de o dono
-  confirmar que não há nada a guardar (apagar tabela não tem volta).
+- ~~**Tabelas sem uso no banco**~~ (2026-10-23, decisão do dono depois de conferir produção: só os restaurantes de
+  teste dele): migração `20261023180000_drop_old_loyalty_and_voice` apaga `loyalty_*` (6 tabelas), `voice_agent_configs`,
+  `voice_calls` e os tipos `LoyaltyTier`, `VoiceProvider`, `VoiceCallStatus` e `VoiceCallOutcome`.
 - ~~**/admin/alertas-smart**~~ (2026-10-23, decisão do dono): apagada com `/api/alertas/smart`; o endereço leva ao Início.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 

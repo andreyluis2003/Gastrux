@@ -1640,7 +1640,6 @@ model Reservation {
   guest        GuestProfile?         @relation(fields: [guestId], references: [id])
   restaurant   Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   table        Table?                @relation(fields: [tableId], references: [id])
-  voiceCalls   VoiceCall[]
 
   @@index([restaurantId])
   @@index([guestEmail])
@@ -1696,7 +1695,6 @@ model Order {
   voucherBrand        String?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
-  loyaltyTransactions LoyaltyTransaction[]
   items               OrderItem[]
   prepTimes           OrderPrepTime[]
   orderSession        OrderSession?
@@ -2525,9 +2523,7 @@ model Customer {
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
   interactions        CustomerInteraction[]
-  loyaltyAccounts     CustomerLoyaltyAccount[]
   customerSegment     CustomerSegment?
-  loyaltyTransactions LoyaltyTransaction[]
   orders              Order[]
   orderSessions       OrderSession[]           @relation("OrderSessionCustomer")
   cashbackCredits     CashbackCredit[]
@@ -2564,106 +2560,6 @@ model CustomerInteraction {
   @@index([followUpDate])
   @@index([createdAt])
   @@map("customer_interactions")
-}
-
-model LoyaltyProgram {
-  id                 String                   @id @default(cuid())
-  name               String
-  description        String?
-  active             Boolean                  @default(true)
-  pointsPerReal      Decimal                  @default(1)
-  minPointsToRedeem  Int                      @default(100)
-  pointsExpiryMonths Int                      @default(12)
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  customerAccounts   CustomerLoyaltyAccount[]
-  milestones         LoyaltyMilestone[]       @relation("programMilestones")
-  rewards            LoyaltyReward[]
-  transactions       LoyaltyTransaction[]
-  restaurantId       String?
-
-  @@index([active])
-  @@index([createdAt])
-  @@index([restaurantId])
-  @@map("loyalty_programs")
-}
-
-model CustomerLoyaltyAccount {
-  id                  String               @id @default(cuid())
-  customerId          String
-  programId           String
-  currentPoints       Int                  @default(0)
-  totalPointsEarned   Int                  @default(0)
-  totalPointsRedeemed Int                  @default(0)
-  active              Boolean              @default(true)
-  tier                LoyaltyTier          @default(BRONZE)
-  joinedAt            DateTime             @default(now())
-  lastActivityAt      DateTime             @default(now())
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  program             LoyaltyProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
-  transactions        LoyaltyTransaction[]
-
-  @@unique([customerId, programId])
-  @@index([customerId])
-  @@index([programId])
-  @@index([tier])
-  @@index([currentPoints])
-  @@index([lastActivityAt])
-  @@map("customer_loyalty_accounts")
-}
-
-model LoyaltyTransaction {
-  id            String                 @id @default(cuid())
-  customerId    String
-  accountId     String
-  programId     String
-  type          TransactionType
-  amount        Int
-  reason        String
-  orderId       String?
-  rewardId      String?
-  balanceBefore Int
-  balanceAfter  Int
-  createdAt     DateTime               @default(now())
-  account       CustomerLoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  customer      Customer               @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  order         Order?                 @relation(fields: [orderId], references: [id])
-  program       LoyaltyProgram         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  reward        LoyaltyReward?         @relation(fields: [rewardId], references: [id])
-
-  @@index([customerId])
-  @@index([accountId])
-  @@index([type])
-  @@index([orderId])
-  @@index([createdAt])
-  @@map("loyalty_transactions")
-}
-
-model LoyaltyReward {
-  id                 String               @id @default(cuid())
-  programId          String
-  name               String
-  description        String?
-  pointsCost         Int
-  type               RewardType
-  value              Decimal?
-  active             Boolean              @default(true)
-  maxRedemptions     Int?
-  currentRedemptions Int                  @default(0)
-  validFrom          DateTime             @default(now())
-  validUntil         DateTime?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  program            LoyaltyProgram       @relation(fields: [programId], references: [id], onDelete: Cascade)
-  transactions       LoyaltyTransaction[]
-
-  @@index([programId])
-  @@index([active])
-  @@index([pointsCost])
-  @@index([createdAt])
-  @@map("loyalty_rewards")
 }
 
 model CashFlowRecord {
@@ -2984,8 +2880,6 @@ model Restaurant {
   platformNotes           PlatformClientNote[]
   tableSections           TableSection[]
   tables                  Table[]
-  voiceAgentConfig        VoiceAgentConfig?
-  voiceCalls              VoiceCall[]
   wasteLogs               WasteLog[]
   whatsappConfig          WhatsAppConfig?
   whatsappConversations   WhatsAppConversation[]
@@ -3345,40 +3239,6 @@ model AIInsight {
   @@map("ai_insights")
 }
 
-model LoyaltyMilestone {
-  id              String         @id @default(cuid())
-  programId       String
-  name            String
-  description     String?
-  orderCount      Int
-  bonusPoints     Int            @default(0)
-  discountPercent Decimal?
-  freeItem        String?
-  active          Boolean        @default(true)
-  redemptionCount Int            @default(0)
-  notifyCustomer  Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  program         LoyaltyProgram @relation("programMilestones", fields: [programId], references: [id], onDelete: Cascade)
-
-  @@unique([programId, orderCount])
-  @@index([programId, active])
-  @@map("loyalty_milestones")
-}
-
-model LoyaltyMilestoneRedemption {
-  id            String   @id @default(cuid())
-  milestoneId   String
-  customerId    String
-  pointsAwarded Int      @default(0)
-  orderId       String?
-  createdAt     DateTime @default(now())
-
-  @@index([milestoneId, customerId])
-  @@index([customerId])
-  @@map("loyalty_milestone_redemptions")
-}
-
 model WhatsAppConfig {
   id                  String     @id @default(cuid())
   restaurantId        String     @unique
@@ -3549,68 +3409,6 @@ model MenuEngineeringSnapshot {
   @@index([recipeId])
   @@index([classification])
   @@map("menu_engineering_snapshots")
-}
-
-model VoiceAgentConfig {
-  id                  String        @id @default(cuid())
-  restaurantId        String        @unique
-  provider            VoiceProvider @default(MOCK)
-  twilioAccountSid    String?
-  twilioAuthToken     String?
-  twilioPhoneNumber   String?
-  isActive            Boolean       @default(false)
-  language            String        @default("pt-BR")
-  voice               String        @default("Polly.Camila-Neural")
-  greeting            String        @default("Olá! Aqui é a assistente virtual do restaurante. Como posso ajudar?")
-  goodbye             String        @default("Obrigada pelo contato. Até breve!")
-  outsideHoursMessage String        @default("No momento estamos fora do horário de atendimento. Por favor, ligue de volta durante nosso horário comercial.")
-  transferMessage     String        @default("Vou transferir para um atendente humano. Aguarde um momento, por favor.")
-  allowReservations   Boolean       @default(true)
-  allowInfo           Boolean       @default(true)
-  allowTransfer       Boolean       @default(true)
-  transferNumber      String?
-  businessHours       Json?
-  minAdvanceMinutes   Int           @default(60)
-  maxAdvanceDays      Int           @default(60)
-  maxPartySize        Int           @default(12)
-  defaultDurationMin  Int           @default(90)
-  totalCalls          Int           @default(0)
-  totalReservations   Int           @default(0)
-  totalTransferred    Int           @default(0)
-  lastActivityAt      DateTime?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
-  restaurant          Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@map("voice_agent_configs")
-}
-
-model VoiceCall {
-  id            String            @id @default(cuid())
-  restaurantId  String
-  callSid       String?           @unique
-  fromNumber    String?
-  toNumber      String?
-  status        VoiceCallStatus   @default(IN_PROGRESS)
-  outcome       VoiceCallOutcome?
-  transcript    Json              @default("[]")
-  draftData     Json?
-  reservationId String?
-  durationSec   Int?
-  recordingUrl  String?
-  isSimulation  Boolean           @default(false)
-  startedAt     DateTime          @default(now())
-  endedAt       DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  reservation   Reservation?      @relation(fields: [reservationId], references: [id])
-  restaurant    Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@index([restaurantId])
-  @@index([status])
-  @@index([startedAt])
-  @@index([reservationId])
-  @@map("voice_calls")
 }
 
 model MessagingProviderConfig {
@@ -4175,13 +3973,6 @@ enum InteractionStatus {
   FOLLOW_UP
 }
 
-enum LoyaltyTier {
-  BRONZE
-  SILVER
-  GOLD
-  PLATINUM
-}
-
 enum TransactionType {
   EARNING
   REDEMPTION
@@ -4452,26 +4243,6 @@ enum MenuEngineeringClass {
   HORSE
   PUZZLE
   DOG
-}
-
-enum VoiceProvider {
-  TWILIO
-  MOCK
-}
-
-enum VoiceCallStatus {
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  ABANDONED
-}
-
-enum VoiceCallOutcome {
-  RESERVATION_CREATED
-  INFO_PROVIDED
-  TRANSFERRED
-  HANG_UP
-  NO_INTENT
 }
 
 enum MessagingProvider {

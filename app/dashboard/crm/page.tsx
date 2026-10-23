@@ -23,7 +23,6 @@ interface Customer {
   totalSpent: number | string;
   totalOrders: number;
   lastOrderAt?: Date;
-  loyaltyAccounts: any[];
 }
 
 export default function CRMPage() {
