@@ -2,6 +2,7 @@ import { restaurantTier } from '@/lib/tier-guard';
 import { prisma } from '@/lib/prisma';
 import type { RestaurantMember } from '@/lib/auth/restaurant-role';
 import { getSessionView } from '@/lib/caixa/sessions';
+import { loadBill } from '@/lib/comanda/bill-service';
 import { nightRows } from '@/lib/daily-count/service';
 import { computeDre } from '@/lib/finance/dre';
 import { itemSalesInRange } from '@/lib/finance/item-sales';
@@ -68,17 +69,20 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
       case 'mesas_agora': {
         const open = await prisma.orderSession.findMany({
           where: { restaurantId: rid, status: { in: ['OPEN', 'SENT_TO_KITCHEN', 'READY'] } },
-          select: { tableNumber: true, openedAt: true, payAtWaiterRequestedAt: true, items: { select: { quantity: true, price: true } } },
+          select: { id: true, tableNumber: true, openedAt: true, payAtWaiterRequestedAt: true },
           orderBy: { openedAt: 'asc' },
         });
         // Never the comanda customerName: it is personal data (spec §4.2)
-        const mesas = open.map((s) => {
+        const mesas = await Promise.all(open.map(async (s) => {
           const minutos = Math.max(0, Math.round((now.getTime() - s.openedAt.getTime()) / 60000));
           if (member.role === 'COOK') return { mesa: s.tableNumber, abertaHaMinutos: minutos };
-          return { mesa: s.tableNumber, abertaHaMinutos: minutos, valorAberto: Math.round(s.items.reduce((t, i) => t + Number(i.price) * i.quantity, 0) * 100) / 100,
-            chamouGarcom: !!s.payAtWaiterRequestedAt };
-        });
-        return { ok: true, data: { mesas, observacao: 'valor aproximado, sem taxa de serviço' } };
+          // The bill the Vender screen shows: add-ons, service charge, cashback and what was already paid (pendências M5)
+          const bill = await loadBill(prisma, rid, s.id);
+          const reais = (cents: number) => Math.round(cents) / 100;
+          return { mesa: s.tableNumber, abertaHaMinutos: minutos, total: reais(bill?.totalCents ?? 0), pago: reais(bill?.paidCents ?? 0),
+            valorAberto: reais(bill?.remainingCents ?? 0), chamouGarcom: !!s.payAtWaiterRequestedAt };
+        }));
+        return { ok: true, data: { mesas, observacao: 'total com taxa de serviço e adicionais; valorAberto é o que falta pagar' } };
       }
       case 'contagem_dia': {
         const night = await prisma.dailyCount.findFirst({ where: { restaurantId: rid, status: 'OPEN' }, select: { id: true, openedAt: true } });

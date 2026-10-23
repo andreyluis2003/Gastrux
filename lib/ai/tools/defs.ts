@@ -21,7 +21,7 @@ const DEFS = [
   { name: 'caixa_turno', roles: [...M, 'CASHIER'], schema: closed({}),
     description: 'Turnos de caixa abertos agora: quando abriu, troco inicial, vendas do turno, valor esperado por forma de pagamento e despesas.' },
   { name: 'mesas_agora', roles: [...M, 'CASHIER', 'COOK'], schema: closed({}),
-    description: 'Mesas e comandas abertas agora: número da mesa, há quanto tempo está aberta, valor aproximado em aberto e se chamou o garçom para pagar.' },
+    description: 'Mesas e comandas abertas agora: número da mesa, há quanto tempo está aberta, total da conta (com adicionais e taxa de serviço), quanto já foi pago, quanto falta e se chamou o garçom para pagar.' },
   { name: 'contagem_dia', roles: [...M, 'CASHIER', 'COOK'], schema: closed({}),
     description: 'Contagem de espetos / contagem do dia: a noite aberta (início, montados, vendidos, perdas, deveria ter por item) e as últimas 7 noites fechadas com as diferenças.' },
   { name: 'validades', roles: [...M, 'COOK'], schema: closed({}),

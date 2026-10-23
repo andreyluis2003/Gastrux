@@ -79,6 +79,15 @@ describe('askQuestion', () => {
     expect(r.body.answer).toContain('Não consegui concluir');
   });
 
+  it('pendências M3: the last round may not call tools, so it answers with what the earlier rounds found', async () => {
+    const create = script(...Array.from({ length: 5 }, () => toolUse('plano')), text('Você está no plano business.'));
+    const r = await askQuestion(p.owner, { question: 'loop curto' });
+    expect(create).toHaveBeenCalledTimes(6);
+    expect(create.mock.calls[4][0].tool_choice).toBeUndefined();
+    expect(create.mock.calls[5][0].tool_choice).toEqual({ type: 'none' });
+    expect(r.body.answer).toBe('Você está no plano business.');
+  });
+
   it('API errors: 503, not counted; refusal and max_tokens become messages', async () => {
     const create = jest.fn().mockRejectedValue(new Error('upstream 500')); // any API or network failure
     (getAnthropic as jest.Mock).mockReturnValue({ messages: { create } });

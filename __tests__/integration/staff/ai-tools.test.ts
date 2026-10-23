@@ -63,6 +63,42 @@ describe('AI tools', () => {
     expect(Object.keys(ck.data.mesas[0]).sort()).toEqual(['abertaHaMinutos', 'mesa']);
   });
 
+  it('pendências M5: mesas_agora counts the add-ons and what was already paid, like the bill', async () => {
+    const extra = await prisma.itemModifier.create({ data: { restaurantId: rid, name: 'Queijo extra', priceAdjustment: 2 } });
+    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: owner.id, status: 'OPEN', tableNumber: 7,
+      items: { create: [{ recipeId: espeto.id, quantity: 1, price: 10, modifiers: { create: [{ modifierId: extra.id, priceAdjustment: 2 }] } }] } } });
+    const shift = await prisma.cashSession.findFirst({ where: { restaurantId: rid } });
+    await prisma.cashSessionEntry.create({ data: { restaurantId: rid, cashSessionId: shift.id, createdById: owner.id, type: 'RECEIPT', method: 'PIX', amountCents: 500, orderSessionId: s.id } });
+    try {
+      const own = await runTool(m(owner), 'mesas_agora', {});
+      expect(own.data.mesas.find((x) => x.mesa === 7)).toMatchObject({ total: 12, pago: 5, valorAberto: 7 });
+    } finally {
+      await prisma.cashSessionEntry.deleteMany({ where: { orderSessionId: s.id } });
+      await prisma.orderSession.delete({ where: { id: s.id } });
+      await prisma.itemModifier.delete({ where: { id: extra.id } });
+    }
+  });
+
+  it('pendências M8: contas_consumo only reads (accounts, bills, payables, alerts and audit unchanged)', async () => {
+    const acc = await prisma.utilityAccount.create({ data: { restaurantId: rid, kind: 'ENERGY', name: 'Luz' } });
+    await prisma.utilityBill.create({ data: { accountId: acc.id, restaurantId: rid, referenceMonth: new Date('2026-09-01'), amountCents: 45000, consumption: 300, createdById: owner.id } });
+    const snapshot = async () => JSON.stringify([
+      await prisma.utilityAccount.findMany({ where: { restaurantId: rid }, orderBy: { id: 'asc' } }),
+      await prisma.utilityBill.findMany({ where: { restaurantId: rid }, orderBy: { id: 'asc' } }),
+      await prisma.payable.count({ where: { restaurantId: rid } }),
+      await prisma.notification.count({ where: { restaurantId: rid } }),
+      await prisma.auditLog.count({ where: { restaurantId: rid } }),
+    ]);
+    try {
+      const before = await snapshot();
+      const r = await runTool(m(owner), 'contas_consumo', {});
+      expect(r.data.contas).toEqual([expect.objectContaining({ conta: 'Luz', valor: 450 })]);
+      expect(await snapshot()).toBe(before);
+    } finally {
+      await prisma.utilityAccount.delete({ where: { id: acc.id } });
+    }
+  });
+
   it('contas_a_pagar: the summary for the manager; refused for the cook (spec 2026-10-18 contas a pagar)', async () => {
     const today = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
     const day = (s) => new Date(s + 'T00:00:00.000Z');

@@ -95,6 +95,8 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
         max_tokens: withFiles ? 16000 : detailed ? 3000 : 1500,
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         tools,
+        // The last round answers with what the earlier rounds found: its tool results would never be sent (pendências M3)
+        ...(round === MAX_ROUNDS - 1 ? { tool_choice: { type: 'none' } } : {}),
         output_config: { effort: detailed || withFiles ? 'medium' : 'low' },
         messages,
       } as Anthropic.MessageCreateParamsNonStreaming,

@@ -192,16 +192,18 @@ Registro em `.superpowers/sdd/2026-10-16-ia-assistente/progress.md` (só local, 
 
 ### Abertos
 
-- **M3**: os resultados da 6ª rodada de ferramentas são descartados.
-- **M5**: `mesas_agora` ignora adicionais e pagamentos parciais.
-- **M6**: `AiQuestion.user` em Cascade: apagar um funcionário apaga as perguntas dele e libera cota do mês.
+- **M6**: `AiQuestion.user` em Cascade: apagar um funcionário apagaria as perguntas dele e liberaria cota do mês.
+  Hoje nenhuma parte do Gastrux apaga usuário (a exclusão da LGPD em `lib/lgpd-compliance.ts` está comentada);
+  resolver junto com o item 14 das contas de consumo, quando a exclusão existir.
 - **M7**: falta uma tela de custo da IA por restaurante para a plataforma; no Starter a caixa "Análise detalhada"
   não aparece travada de início; o contador só aparece depois da primeira resposta.
-- **M8**: nenhum teste prova que `contas_consumo` não grava nada.
 
 ### Resolvidos
 
 - M7 (parte): negrito aparecia com asteriscos. bbe89b9.
+- 2026-10-23: M3 (a última rodada vai com `tool_choice: none` e responde com o que as anteriores acharam), M5
+  (`mesas_agora` usa a conta da tela Vender: total com adicionais e taxa, pago e falta) e M8 (teste prova que
+  `contas_consumo` não grava nada). Testes em `ai-ask.test.ts` e `ai-tools.test.ts`.
 
 ## Contas de consumo (2026-10-16)
 
