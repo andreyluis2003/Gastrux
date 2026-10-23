@@ -127,6 +127,8 @@ export async function discardDraft(member: RestaurantMember, id: string) {
   const d = await prisma.aiDraft.findFirst({ where: { id, restaurantId: member.restaurantId } });
   if (!d) return { status: 404, body: { error: 'Rascunho não encontrado' } };
   if (stateOf(d) !== 'PENDING') return { status: 409, body: { error: 'Este rascunho não está mais pendente.', result: d.result } };
-  await prisma.aiDraft.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'DISCARDED' } });
+  // Lost the race with a confirm: say so instead of "descartado" (pendências)
+  const done = await prisma.aiDraft.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'DISCARDED' } });
+  if (done.count === 0) return { status: 409, body: { error: 'Este rascunho não está mais pendente.' } };
   return { status: 200, body: { ok: true } };
 }

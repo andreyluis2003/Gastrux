@@ -107,11 +107,22 @@ export default function ReviewDraftPage() {
     }
   };
 
+  // Only a 200 means discarded (pendências: a 404/409 or no network showed "descartado" anyway)
   const discard = async () => {
     setBusy(true);
+    setError(null);
     try {
-      await fetch(`/api/ai/drafts/${id}/discard`, { method: 'POST' });
+      const res = await fetch(`/api/ai/drafts/${id}/discard`, { method: 'POST' });
+      if (res.status === 409) {
+        // Confirmed, discarded or expired meanwhile: show what it really is
+        const fresh = await fetch(`/api/ai/drafts/${id}`, { cache: 'no-store' });
+        if (fresh.ok) setData(await fresh.json());
+        return;
+      }
+      if (!res.ok) { const body = await res.json().catch(() => ({})); setError(body.error || 'Não foi possível descartar'); return; }
       setData({ ...data, state: 'DISCARDED' });
+    } catch {
+      setError('Sem conexão: o rascunho não foi descartado. Tente de novo.');
     } finally {
       setBusy(false);
     }
@@ -126,6 +137,7 @@ export default function ReviewDraftPage() {
             <>
               <p><strong>{result.created}</strong> {result.created === 1 ? 'item criado' : 'itens criados'} no cardápio.</p>
               {result.skipped?.length > 0 && <p className="text-muted-foreground">Pulados (já existiam): {result.skipped.join(', ')}</p>}
+              {result.repeated?.length > 0 && <p className="text-muted-foreground">Repetidos no rascunho (entraram uma vez só): {result.repeated.join(', ')}</p>}
               {result.removedExample > 0 && <p className="text-muted-foreground">Removido o cardápio de exemplo ({result.removedExample} itens).</p>}
               <Link href="/admin/cardapio" className="font-medium text-primary underline">Ver cardápio</Link>
             </>
@@ -160,7 +172,12 @@ export default function ReviewDraftPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="/admin/staff" className="font-medium text-primary underline">Ver equipe</Link>
+              {result.people?.some((p: any) => p.ok) ? (
+                <Link href="/admin/staff" className="font-medium text-primary underline">Ver equipe</Link>
+              ) : (
+                // Nobody was hired: the draft is still pending, so fix the e-mails and confirm again
+                <Button variant="outline" onClick={() => setResult(null)}>Corrigir e confirmar de novo</Button>
+              )}
             </>
           )}
         </Card>

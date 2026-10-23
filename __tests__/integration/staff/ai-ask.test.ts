@@ -138,6 +138,8 @@ describe('askQuestion', () => {
     expect(call).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000 });
     expect(create.mock.calls[0][1]).toEqual({ timeout: 180_000, maxRetries: 0 });
     expect(call.messages[0].content[0]).toMatchObject({ type: 'image' });
+    // Pendências: the photos are sent again every tool round; a cache point after them makes rounds 2+ cheap
+    expect(call.messages[0].content.at(-1)).toMatchObject({ type: 'text', cache_control: { type: 'ephemeral' } });
     const log = await prisma.aiQuestion.findFirst({ where: { restaurantId: p.rid }, orderBy: { createdAt: 'desc' } });
     expect(log.attachments).toEqual({ images: 1, pdf: false });
   });

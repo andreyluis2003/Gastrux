@@ -46,6 +46,15 @@ describe('proposal tools', () => {
     expect(await prisma.menuItem.count({ where: { restaurantId: rid } })).toBe(0);
   });
 
+  it('pendências: a draft made in round 1 still reaches the owner when round 2 fails (503)', async () => {
+    const create = script(toolUse('propor_mesas', { quantidade: 2, inicio: 30, area: 'Varanda', lugares: 4 }));
+    create.mockRejectedValueOnce(new Error('overloaded'));
+    const r = await askQuestion(owner, { question: 'crie 2 mesas na varanda' });
+    expect(r.status).toBe(503);
+    expect(r.body.drafts).toEqual([expect.objectContaining({ kind: 'TABLES' })]);
+    expect((await prisma.aiDraft.findUnique({ where: { id: r.body.drafts[0].id } })).status).toBe('PENDING');
+  });
+
   it('propor_mesas and propor_equipe create drafts only', async () => {
     const r1 = await runTool(owner, 'propor_mesas', { quantidade: 10, inicio: 1, area: 'Salão', lugares: 4 }, new Date(), {});
     expect(r1).toMatchObject({ ok: true, data: { resumo: 'Mesas 1 a 10, Salão, 4 lugares' } });

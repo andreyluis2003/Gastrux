@@ -45,10 +45,15 @@ export async function applyDraft(member: RestaurantMember, id: string, body: any
       }
       const created: string[] = [];
       const skipped: string[] = [];
+      // A second copy inside the same draft is not "já existiam" (pendências)
+      const repeated: string[] = [];
+      const inDraft = new Set<string>();
       for (const [ci, c] of p.categorias.entries()) {
         let cat = await tx.menuCategory.findFirst({ where: { restaurantId: rid, active: true, name: { equals: c.nome, mode: 'insensitive' } }, select: { id: true } });
         if (!cat) cat = await tx.menuCategory.create({ data: { restaurantId: rid, name: c.nome, position: 100 + ci, active: true }, select: { id: true } });
         for (const [ii, it] of c.itens.entries()) {
+          if (inDraft.has(normName(it.nome))) { repeated.push(it.nome); continue; }
+          inDraft.add(normName(it.nome));
           if (existing.has(normName(it.nome))) { skipped.push(it.nome); continue; }
           existing.add(normName(it.nome));
           const mi = await tx.menuItem.create({
@@ -60,7 +65,7 @@ export async function applyDraft(member: RestaurantMember, id: string, body: any
       }
       // Sold at once like any item created on the Cardápio screen: a ficha simples each (2026-10-12)
       await ensureMenuItemRecipes(tx, rid, created);
-      result = { created: created.length, skipped, removedExample };
+      result = { created: created.length, skipped, repeated, removedExample };
     } else {
       const p = v.value as TablesPayload;
       let removedExample = 0;
@@ -115,6 +120,9 @@ async function applyStaff(member: RestaurantMember, id: string, payload: unknown
     }
   }
   // The stored result never carries a password
-  await prisma.aiDraft.update({ where: { id }, data: { result: { people: people.map(({ temporaryPassword: _pw, ...rest }) => rest) } } });
+  const result = { people: people.map(({ temporaryPassword: _pw, ...rest }) => rest) };
+  // Nobody was hired: the draft goes back to pending, so the owner fixes the e-mails and confirms again (pendências)
+  const nobody = people.every((p) => !p.ok);
+  await prisma.aiDraft.update({ where: { id }, data: nobody ? { status: 'PENDING', appliedAt: null, appliedById: null, result } : { result } });
   return { status: 200, body: { people } };
 }

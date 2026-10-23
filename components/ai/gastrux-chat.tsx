@@ -76,8 +76,12 @@ export function GastruxChat() {
   }, [isOpen]);
 
   const hasUser = !!session?.user;
+  // The onboarding endpoint answers owner, manager and admin only (app/api/ai/onboarding): the cashier and the
+  // cook skip it instead of a 403 per session. Read again each time the chat opens, so the card follows what
+  // was confirmed on the review screen (pendências)
+  const managesOnboarding = ['OWNER', 'MANAGER', 'ADMIN'].includes(((session?.user as any)?.role as string) ?? '');
   useEffect(() => {
-    if (!hasUser) return;
+    if (!hasUser || !managesOnboarding) return;
     let cancelled = false;
     fetch('/api/ai/onboarding', { cache: 'no-store' })
       .then(async (res) => {
@@ -87,7 +91,7 @@ export function GastruxChat() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [hasUser]);
+  }, [hasUser, managesOnboarding, isOpen]);
 
   // "Fazer com a IA" in Primeiros passos: open the chat with the request filled in, not sent
   useEffect(() => {
@@ -168,6 +172,7 @@ export function GastruxChat() {
           role: 'assistant',
           content: data.error || 'Desculpe, não consegui processar sua pergunta. Tente novamente.',
           link: (res.status === 429 || res.status === 403) ? data.upgradeUrl : undefined,
+          drafts: data.drafts?.length ? data.drafts : undefined,
         }]);
       }
     } catch {

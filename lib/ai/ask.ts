@@ -76,7 +76,8 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
     role: 'user',
     content: (() => {
       const text = buildUserMessage({ question, history, role: member.role, restaurantName: restaurant?.name ?? 'Restaurante', plan: tier, now });
-      return withFiles ? [...attachmentBlocks(attachments), { type: 'text' as const, text }] : text;
+      // The files go again in every tool round: a cache point after them makes rounds 2+ cheap (pendências)
+      return withFiles ? [...attachmentBlocks(attachments), { type: 'text' as const, text, cache_control: { type: 'ephemeral' as const } }] : text;
     })(),
   }];
   const totals = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
@@ -146,6 +147,7 @@ async function ask(client: Anthropic, member: RestaurantMember, b: { history?: u
   } catch (e) {
     console.error('[ai] log update failed:', (e as Error)?.message ?? e);
   }
-  if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit, free: null, drafts: [] } };
+  // A draft made before the failure exists: the owner still gets its button (pendências)
+  if (error) return { status: 503, body: { error: UNAVAILABLE, used, limit, free: null, drafts } };
   return { status: 200, body: { answer, used: used + 1, limit, model, free: null, drafts } };
 }

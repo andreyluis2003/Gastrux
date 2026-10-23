@@ -165,19 +165,8 @@ Da revisão final de 2026-10-17 (sessão 5f0672cc). O registro original foi apag
 
 ### Abertos
 
-- **Rascunho de equipe gasto quando todos falham** (`lib/ai/drafts/apply.ts`, apply de STAFF): o rascunho vira
-  APPLIED antes de as pessoas serem criadas. Se todas falham (e-mail já é equipe em outro restaurante, limite do
-  plano), nada é feito e reabrir só diz "já confirmado". Correção: voltar para PENDING quando
-  `people.every(p => !p.ok)`, ou checar e-mails e limite antes de marcar. Desde b8ef71f o Starter cheio é
-  recusado antes do rascunho, o que reduz o caso.
-- **Rascunho perdido num erro da rodada seguinte** (`lib/ai/ask.ts`): se `propor_*` criou o rascunho na rodada 1
-  e a rodada 2 falha, o 503 volta com `drafts: []` e o dono não vê o botão. Correção: devolver `drafts` também no 503.
-- **Descartar ignora falha** (`app/implantacao/revisar/[id]/page.tsx`, `discard`): mostra "descartado" mesmo com
-  404/409/erro de rede; `discardDraft` responde 200 quando o `updateMany` não achou nada (perdeu a corrida com o apply).
-- **Nomes repetidos dentro do mesmo rascunho**: a segunda cópia aparece em "Pulados (já existiam)", o que engana.
-- **Fotos reenviadas a cada rodada sem `cache_control`**: um ponto de cache no último anexo baratearia as rodadas 2+.
-- **Busca da implantação para todos os papéis**: o chat chama `/api/ai/onboarding` também para caixa e cozinha
-  (um 403 por sessão), e o cartão/contador não se atualiza depois de confirmar, só ao recarregar.
+Nenhum.
+
 - ~~**E-mail de outro restaurante revelado**~~ (RESOLVIDO 2026-10-20): a revisão do rascunho não marca mais
   "Já é funcionário em outro restaurante" e a Equipe (`lib/staff/create-member.ts`) recusa com "Este e-mail não pode
   ser cadastrado aqui. Use outro e-mail para esta pessoa.", sem dizer o motivo. A recusa continua (a pessoa só pode
@@ -185,6 +174,15 @@ Da revisão final de 2026-10-17 (sessão 5f0672cc). O registro original foi apag
 
 ### Resolvidos
 
+- 2026-10-23 (testes em `__tests__/integration/staff/ai-drafts*.test.ts` e `ai-ask.test.ts`):
+  - Rascunho de equipe em que todos falham volta para pendente; a tela mostra "Corrigir e confirmar de novo".
+  - Rascunho criado antes de um erro da rodada seguinte volta também no 503, e o chat mostra o botão dele.
+  - Descartar responde 409 quando perdeu a corrida com um "Confirmar", e a tela só diz "descartado" com 200 (em
+    409 relê o estado; sem internet, avisa que não descartou).
+  - Nome repetido dentro do mesmo rascunho aparece em "Repetidos no rascunho", não em "Pulados (já existiam)".
+  - Fotos e PDF: ponto de cache depois dos anexos, para as rodadas 2+ saírem mais baratas.
+  - O chat só lê o cartão da implantação para dono, gerente e admin, e relê a cada vez que abre (sem teste
+    automatizado: é só a tela).
 - Área das mesas com maiúscula/minúscula diferente, numeração depois das mesas existentes, mesas de exemplo
   removíveis. b8ef71f.
 

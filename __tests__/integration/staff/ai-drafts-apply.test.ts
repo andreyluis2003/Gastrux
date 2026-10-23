@@ -57,7 +57,7 @@ describe('apply AI drafts', () => {
     as(owner);
     const res = await APPLY(req({ payload: { categorias: [{ nome: 'Bebidas', itens: [{ nome: 'coca-cola', descricao: '', preco: 7 }, { nome: 'Guaraná', descricao: '', preco: '6,50' }] }], incompleto: false }, removeExample: true }), { params: { id: d.id } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ created: 1, skipped: ['coca-cola'], removedExample: 1 });
+    expect(await res.json()).toEqual({ created: 1, skipped: ['coca-cola'], repeated: [], removedExample: 1 });
     const g = await prisma.menuItem.findFirst({ where: { restaurantId: rid, name: 'Guaraná' } });
     expect(Number(g.price)).toBe(6.5);
     expect(g.recipeId).not.toBeNull();
@@ -139,6 +139,35 @@ describe('apply AI drafts', () => {
     }
   });
 
+  it('pendências: staff draft where everyone fails stays pending, and can be confirmed again with a fixed e-mail', async () => {
+    const other = await mkUser('outra', 'CASHIER', ridB);
+    await prisma.staffMember.create({ data: { restaurantId: ridB, userId: other.id, role: 'CASHIER' } });
+    try {
+      const d = await createDraft(ownerM, 'STAFF', { pessoas: [{ nome: 'Rita', email: other.email, papel: 'CAIXA' }] });
+      as(owner);
+      const failed = await (await APPLY(req({ payload: { pessoas: [{ nome: 'Rita', email: other.email, papel: 'CAIXA' }] } }), { params: { id: d.id } })).json();
+      expect(failed.people[0].ok).toBe(false);
+      expect((await prisma.aiDraft.findUnique({ where: { id: d.id } })).status).toBe('PENDING');
+      const fixed = `rita-${tag}@gastrux.test`;
+      const again = await APPLY(req({ payload: { pessoas: [{ nome: 'Rita', email: fixed, papel: 'CAIXA' }] } }), { params: { id: d.id } });
+      expect(again.status).toBe(200);
+      expect((await again.json()).people[0]).toMatchObject({ ok: true, nome: 'Rita' });
+      createdUserIds.push((await prisma.user.findUnique({ where: { email: fixed } })).id);
+      expect((await prisma.aiDraft.findUnique({ where: { id: d.id } })).status).toBe('APPLIED');
+    } finally {
+      await prisma.staffMember.deleteMany({ where: { userId: other.id } });
+    }
+  });
+
+  it('pendências: a name repeated inside the draft is reported as repeated, not as "já existiam"', async () => {
+    const nome = `Pastel ${tag}`;
+    const payload = { categorias: [{ nome: 'Salgados', itens: [{ nome, descricao: '', preco: 8 }, { nome: nome.toUpperCase(), descricao: '', preco: 8 }] }], incompleto: false };
+    const d = await createDraft(ownerM, 'MENU', payload);
+    as(owner);
+    const out = await (await APPLY(req({ payload, removeExample: false }), { params: { id: d.id } })).json();
+    expect(out).toMatchObject({ created: 1, skipped: [], repeated: [nome.toUpperCase()] });
+  });
+
   it('junk from the review screen is refused naming the row, nothing written', async () => {
     const d = await createDraft(ownerM, 'MENU', { categorias: [{ nome: 'X', itens: [{ nome: 'a', descricao: '', preco: 1 }] }], incompleto: false });
     as(owner);
@@ -172,6 +201,22 @@ describe('apply AI drafts', () => {
     expect((await DISCARD(req(), { params: { id: d.id } })).status).toBe(200);
     expect((await prisma.aiDraft.findUnique({ where: { id: d.id } })).status).toBe('DISCARDED');
   });
+
+  it('pendências: a discard that loses the race with a confirm says so (409), never "descartado"', async () => {
+    const d = await createDraft(ownerM, 'TABLES', { quantidade: 1, inicio: 70, area: 'Varanda', lugares: 2 });
+    as(owner);
+    // A confirm holding the draft's row: the discard reads PENDING, then waits on the row and finds it APPLIED
+    const applying = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "ai_drafts" WHERE "id" = ${d.id} FOR UPDATE`;
+      await new Promise((r) => setTimeout(r, 800));
+      await tx.aiDraft.update({ where: { id: d.id }, data: { status: 'APPLIED', appliedAt: new Date() } });
+    }, { timeout: 10_000 });
+    await new Promise((r) => setTimeout(r, 200));
+    const res = await DISCARD(req(), { params: { id: d.id } });
+    await applying;
+    expect(res.status).toBe(409);
+    expect((await prisma.aiDraft.findUnique({ where: { id: d.id } })).status).toBe('APPLIED');
+  }, 30000);
 
   // Homolog 2026-10-17: the sign-up seeds 'Salão principal' with Mesas 1-2 de exemplo; the AI made 'Salão' 1-8 and the
   // restaurant ended with two Mesa 1 and two Mesa 2
