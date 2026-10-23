@@ -23,7 +23,7 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - **Tabelas sem uso no banco**: `loyalty_*` (programa, contas, marcos, transações), `voice_agent_configs`,
   `voice_calls` e as das rotas apagadas continuam no schema. Apagar numa migração própria, depois de o dono
   confirmar que não há nada a guardar (apagar tabela não tem volta).
-- **/admin/alertas-smart** ("Alertas Smart", só pelo endereço): não estava na auditoria; o dono não decidiu.
+- ~~**/admin/alertas-smart**~~ (2026-10-23, decisão do dono): apagada com `/api/alertas/smart`; o endereço leva ao Início.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
 ## Telas que não funcionam (achadas nos artigos da Central de Ajuda, 2026-10-20)
