@@ -157,6 +157,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Visão da plataforma', href: '/admin/platform' },
       { label: 'Clientes', href: '/admin/customers' },
       { label: 'Usuários', href: '/admin/users' },
+      { label: 'Custo da IA', href: '/admin/platform/ia' },
       { label: 'Auditoria', href: '/admin/audit-logs' },
       { label: 'Suporte', href: '/admin/support' },
       { label: 'Onboarding', href: '/admin/onboarding' },

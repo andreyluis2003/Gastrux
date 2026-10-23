@@ -196,12 +196,14 @@ Registro em `.superpowers/sdd/2026-10-16-ia-assistente/progress.md` (só local, 
 - **M6**: `AiQuestion.user` em Cascade: apagar um funcionário apagaria as perguntas dele e liberaria cota do mês.
   Hoje nenhuma parte do Gastrux apaga usuário (a exclusão da LGPD em `lib/lgpd-compliance.ts` está comentada);
   resolver junto com o item 14 das contas de consumo, quando a exclusão existir.
-- **M7**: falta uma tela de custo da IA por restaurante para a plataforma; no Starter a caixa "Análise detalhada"
-  não aparece travada de início; o contador só aparece depois da primeira resposta.
+- **M7 (resto)**: o contador de perguntas do chat só aparece depois da primeira resposta (não há leitura do uso ao
+  abrir). A caixa "Análise detalhada" do Starter deixou de importar: desde 2026-10-18 o Starter é "sem plano", sem IA.
 
 ### Resolvidos
 
 - M7 (parte): negrito aparecia com asteriscos. bbe89b9.
+- M7 (parte, 2026-10-23): Plataforma > Custo da IA (`/admin/platform/ia`, `lib/admin/ai-costs.ts`): por restaurante e mês de
+  Brasília, perguntas contra o limite, custo em US$ (soma também as chamadas com erro), tokens, detalhadas, com arquivo e erros.
 - 2026-10-23: M3 (a última rodada vai com `tool_choice: none` e responde com o que as anteriores acharam), M5
   (`mesas_agora` usa a conta da tela Vender: total com adicionais e taxa, pago e falta) e M8 (teste prova que
   `contas_consumo` não grava nada). Testes em `ai-ask.test.ts` e `ai-tools.test.ts`.
