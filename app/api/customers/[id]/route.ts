@@ -5,6 +5,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { balanceCents, customerPurchases90d } from '@/lib/cashback/service';
+import { cashbackStatement as cashbackStatementOf } from '@/lib/cashback/crm';
+import { formatPhone, normalizePhone, segmentOf } from '@/lib/cashback/rules';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,15 +31,6 @@ export async function GET(
     const customer = await prisma.customer.findFirst({
       where: { id: params.id, restaurantId },
       include: {
-        loyaltyAccounts: {
-          include: {
-            program: true,
-            transactions: {
-              orderBy: { createdAt: 'desc' },
-              take: 10,
-            },
-          },
-        },
         interactions: {
           orderBy: { createdAt: 'desc' },
         },
@@ -54,7 +48,13 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(customer);
+    // Cashback and segment (spec 2026-10-23 §9, §10): the old loyalty account card is gone
+    const [cashbackBalanceCents, purchases90d, cashbackStatement] = await Promise.all([
+      balanceCents(prisma, restaurantId, customer.id),
+      customerPurchases90d(restaurantId, customer.id),
+      cashbackStatementOf(restaurantId, customer.id),
+    ]);
+    return NextResponse.json({ ...customer, segment: segmentOf(purchases90d), purchases90d, cashbackBalanceCents, cashbackStatement });
   } catch (error) {
     console.error('Error fetching customer:', error);
     return NextResponse.json(
@@ -89,19 +89,29 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, email, phone, address, city, state, zipCode, segment, status } = body;
+    const { name, email, address, city, state, zipCode, status } = body;
+    // The phone is how the cashier finds the customer (unique in the restaurant); the segment is computed (2026-10-23)
+    let phoneData = {};
+    if (body.phone !== undefined) {
+      const phoneDigits = body.phone ? normalizePhone(body.phone) : null;
+      if (body.phone && !phoneDigits) return NextResponse.json({ error: 'Celular inválido: use DDD e número' }, { status: 400 });
+      if (phoneDigits) {
+        const other = await prisma.customer.findUnique({ where: { restaurantId_phoneDigits: { restaurantId, phoneDigits } }, select: { id: true } });
+        if (other && other.id !== params.id) return NextResponse.json({ error: 'Já existe um cliente com este celular' }, { status: 409 });
+      }
+      phoneData = { phoneDigits, phone: phoneDigits ? formatPhone(phoneDigits) : null };
+    }
 
     const customer = await prisma.customer.update({
       where: { id: params.id },
       data: {
         name,
-        email,
-        phone,
+        email: email === '' ? null : email,
+        ...phoneData,
         address,
         city,
         state,
         zipCode,
-        segment,
         status,
       },
     });

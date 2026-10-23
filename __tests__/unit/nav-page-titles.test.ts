@@ -37,7 +37,6 @@ const TITLE: Record<string, [string, string?]> = {
   '/dashboard/financeiro/contas': ['app/dashboard/financeiro/contas/page.tsx'],
   '/relatorios': ['app/relatorios/page.tsx'],
   '/dashboard/crm': ['app/dashboard/crm/page.tsx'],
-  '/dashboard/loyalty': ['app/dashboard/loyalty/page.tsx'],
   '/admin/cashback': ['app/admin/cashback/page.tsx'],
   '/admin/messaging/campaigns': ['app/admin/messaging/campaigns/page.tsx'],
   '/admin/delivery-site': ['components/delivery/delivery-site-client.tsx'],

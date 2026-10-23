@@ -109,7 +109,6 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Clientes e marketing',
     links: [
       { label: 'Clientes (CRM)', href: '/dashboard/crm', roles: MANAGERS },
-      { label: 'Fidelidade', href: '/dashboard/loyalty', roles: MANAGERS },
       { label: 'Cashback', href: '/admin/cashback', roles: MANAGERS },
       { label: 'Campanhas', href: '/admin/messaging/campaigns', roles: MANAGERS },
       { label: 'Site de delivery', href: '/admin/delivery-site', roles: MANAGERS },

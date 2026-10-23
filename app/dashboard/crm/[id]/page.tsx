@@ -6,14 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
-import { Mail, Phone, MapPin, Wallet, Plus, MessageSquare, TrendingUp } from 'lucide-react';
-import Link from 'next/link';
+import { Mail, Phone, MapPin, Wallet, Plus, MessageSquare, Gift } from 'lucide-react';
 import { formatBRL } from '@/lib/formatters';
+import { SEGMENT_LABEL } from '@/lib/cashback/rules';
 
 interface Customer {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone?: string;
   address?: string;
   city?: string;
@@ -25,7 +25,10 @@ interface Customer {
   totalOrders: number;
   averageTicket: number | string;
   lastOrderAt?: string;
-  loyaltyAccounts: any[];
+  // Spec 2026-10-23: cashback and the segment of the last 90 days
+  cashbackBalanceCents: number;
+  cashbackStatement: Array<{ kind: 'CREDIT' | 'USE'; amountCents: number; at: string; expiresAt: string | null; reversed: boolean }>;
+  purchases90d: number;
   interactions: any[];
   orders: any[];
 }
@@ -134,7 +137,7 @@ export default function CustomerDetailPage() {
             <Mail className="h-5 w-5 text-gray-400" />
             <div>
               <p className="text-xs text-gray-500 uppercase">Email</p>
-              <p className="font-medium">{customer.email}</p>
+              <p className="font-medium">{customer.email || '—'}</p>
             </div>
           </div>
           {customer.phone && (
@@ -167,7 +170,7 @@ export default function CustomerDetailPage() {
           <p className="text-2xl font-bold">{formatBRL(customer.totalSpent)}</p>
         </Card>
         <Card className="p-6">
-          <p className="text-xs text-gray-500 uppercase">Total de Pedidos</p>
+          <p className="text-xs text-gray-500 uppercase">Compras</p>
           <p className="text-2xl font-bold">{customer.totalOrders}</p>
         </Card>
         <Card className="p-6">
@@ -176,37 +179,33 @@ export default function CustomerDetailPage() {
         </Card>
         <Card className="p-6">
           <p className="text-xs text-gray-500 uppercase">Segmento</p>
-          <p className="text-2xl font-bold">{customer.segment || 'N/A'}</p>
+          <p className="text-2xl font-bold">{SEGMENT_LABEL[customer.segment as keyof typeof SEGMENT_LABEL] ?? '—'}</p>
+          <p className="text-xs text-gray-500">{customer.purchases90d} {customer.purchases90d === 1 ? 'compra' : 'compras'} em 90 dias</p>
         </Card>
       </div>
 
-      {/* Loyalty Account */}
-      {customer.loyaltyAccounts.length > 0 && (
-        <Card className="border-l-4 border-l-purple-500 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Conta de Fidelização</h2>
-            <Link href={`/dashboard/loyalty/customer/${customerId}`}>
-              <Button variant="outline" size="sm">
-                Ver Detalhes
-              </Button>
-            </Link>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {customer.loyaltyAccounts.map((account) => (
-              <div key={account.id} className="rounded-lg border border-purple-200 bg-purple-50 p-4">
-                <p className="text-sm font-medium text-gray-600">{account.program.name}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-purple-600" />
-                  <p className="text-2xl font-bold text-purple-900">{account.currentPoints}</p>
-                  <span className="text-sm text-gray-600">pontos</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-600">Tier: {account.tier}</p>
-              </div>
+      {/* Cashback (spec 2026-10-23) */}
+      <Card className="border-l-4 border-l-emerald-500 p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold flex items-center gap-2"><Gift className="h-5 w-5 text-emerald-600" /> Cashback</h2>
+          <p className="text-2xl font-bold text-emerald-700">{formatBRL(customer.cashbackBalanceCents / 100)}</p>
+        </div>
+        {customer.cashbackStatement.length === 0 ? (
+          <p className="text-sm text-gray-500">Nenhuma movimentação. O crédito entra quando uma conta com o celular deste cliente é fechada.</p>
+        ) : (
+          <ul className="text-sm divide-y">
+            {customer.cashbackStatement.map((m, i) => (
+              <li key={i} className={`flex justify-between py-2 ${m.reversed ? 'text-gray-400 line-through' : ''}`}>
+                <span>
+                  {new Date(m.at).toLocaleDateString('pt-BR')} · {m.kind === 'CREDIT' ? 'Ganhou' : 'Usou'}
+                  {m.kind === 'CREDIT' && m.expiresAt && !m.reversed ? ` (vale até ${new Date(m.expiresAt).toLocaleDateString('pt-BR')})` : ''}
+                </span>
+                <span className={m.kind === 'CREDIT' ? 'text-emerald-700 font-medium' : 'font-medium'}>{m.kind === 'CREDIT' ? '+' : '−'} {formatBRL(m.amountCents / 100)}</span>
+              </li>
             ))}
-          </div>
-        </Card>
-      )}
+          </ul>
+        )}
+      </Card>
 
       {/* Interactions */}
       <Card className="p-6">

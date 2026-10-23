@@ -26,7 +26,7 @@ const ROUTES: Array<[string, string, string, any?]> = [
   ['loyalty/milestones/route', 'GET', M], ['loyalty/milestones/route', 'POST', M],
   ['loyalty/milestones/[id]/route', 'PATCH', M, { id: 'x' }], ['loyalty/milestones/[id]/route', 'DELETE', M, { id: 'x' }],
   ['loyalty/programs/route', 'GET', M], ['loyalty/redeem/route', 'POST', M],
-  ['financial/summary/route', 'GET', M], ['financial/dashboard/route', 'GET', M], ['financeiro/resumo/route', 'GET', M],
+  ['financial/summary/route', 'GET', M], ['financial/dashboard/route', 'GET', M], ['financeiro/resumo/route', 'GET', M], ['cashback/settings/route', 'GET', M], ['cashback/settings/route', 'PUT', M], ['cashback/summary/route', 'GET', M],
   ['pagamentos/route', 'GET', M],
   ['reports/profitability/route', 'GET', M],
   ['reports/executive/route', 'GET', M],

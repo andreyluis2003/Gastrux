@@ -7,7 +7,8 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
-import { Plus, Search, Mail, Phone, Wallet, TrendingUp } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Wallet } from 'lucide-react';
+import { SEGMENT_LABEL } from '@/lib/cashback/rules';
 import Link from 'next/link';
 import { formatBRL } from '@/lib/formatters';
 
@@ -61,17 +62,19 @@ export default function CRMPage() {
     }
   };
 
+  // The search and the segment filter the list (they were read only when the page opened)
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    const t = setTimeout(fetchCustomers, 300);
+    return () => clearTimeout(t);
+  }, [search, segment]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
   };
 
   const handleCreateCustomer = async () => {
-    if (!newCustomer.name || !newCustomer.email) {
-      toast.error('Nome e email são obrigatórios');
+    if (!newCustomer.name || (!newCustomer.phone && !newCustomer.email)) {
+      toast.error('Informe o nome e o celular (ou o e-mail)');
       return;
     }
 
@@ -103,6 +106,7 @@ export default function CRMPage() {
     VIP: 'bg-purple-100 text-purple-800',
     REGULAR: 'bg-blue-100 text-blue-800',
     OCCASIONAL: 'bg-gray-100 text-gray-800',
+    INACTIVE: 'bg-red-50 text-red-700',
   };
 
   return (
@@ -127,7 +131,7 @@ export default function CRMPage() {
         <div className="relative">
           <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
           <Input
-            placeholder="Buscar cliente"
+            placeholder="Buscar por nome, celular ou e-mail"
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             className="pl-10"
@@ -144,8 +148,13 @@ export default function CRMPage() {
           <option value="VIP">VIP</option>
           <option value="REGULAR">Regular</option>
           <option value="OCCASIONAL">Ocasional</option>
+          <option value="INACTIVE">Inativo</option>
         </select>
       </div>
+      <p className="text-xs text-gray-500">
+        Segmento pelas compras dos últimos 90 dias: VIP com 10 ou mais, Regular de 3 a 9, Ocasional 1 ou 2, Inativo sem compra.
+        O cliente entra aqui quando o caixa digita o celular na conta ou pelo site de delivery.
+      </p>
 
       {/* New Customer Dialog */}
       {showNewDialog && (
@@ -162,7 +171,7 @@ export default function CRMPage() {
             />
             <input
               type="email"
-              placeholder="Email"
+              placeholder="E-mail (opcional)"
               value={newCustomer.email}
               onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
               className="w-full rounded-lg border border-gray-200 px-3 py-2"
@@ -170,7 +179,7 @@ export default function CRMPage() {
             />
             <input
               type="tel"
-              placeholder="Telefone"
+              placeholder="Celular com DDD"
               value={newCustomer.phone}
               onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
               className="w-full rounded-lg border border-gray-200 px-3 py-2"
@@ -230,15 +239,17 @@ export default function CRMPage() {
                             segmentColors[customer.segment] || 'bg-gray-100'
                           }`}
                         >
-                          {customer.segment}
+                          {SEGMENT_LABEL[customer.segment as keyof typeof SEGMENT_LABEL] ?? customer.segment}
                         </span>
                       )}
                     </div>
                     <div className="mt-2 flex flex-col gap-2 text-sm text-gray-600 sm:flex-row sm:gap-4">
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-4 w-4" />
-                        {customer.email}
-                      </div>
+                      {customer.email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="h-4 w-4" />
+                          {customer.email}
+                        </div>
+                      )}
                       {customer.phone && (
                         <div className="flex items-center gap-1">
                           <Phone className="h-4 w-4" />
@@ -252,13 +263,7 @@ export default function CRMPage() {
                       <Wallet className="h-5 w-5" />
                       {formatBRL(customer.totalSpent)}
                     </div>
-                    <p className="text-sm text-gray-600">{customer.totalOrders} pedidos</p>
-                    {customer.loyaltyAccounts?.length > 0 && (
-                      <p className="text-xs text-purple-600 flex items-center justify-end gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        {customer.loyaltyAccounts[0]?.currentPoints || 0} pontos
-                      </p>
-                    )}
+                    <p className="text-sm text-gray-600">{customer.totalOrders} {customer.totalOrders === 1 ? 'compra' : 'compras'}</p>
                   </div>
                 </div>
               </Card>

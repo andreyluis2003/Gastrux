@@ -1,118 +1,142 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { BackButton } from '@/components/ui/back-button';
-import { Gift, Users, TrendingUp, Coins, Loader2, Star, Award } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { formatBRL } from '@/lib/formatters';
+import { Gift, Loader2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { BackButton } from '@/components/ui/back-button';
 
-interface CashbackStats {
-  totalAccounts: number;
-  totalPointsIssued: number;
-  totalPointsRedeemed: number;
-  totalPointsActive: number;
-  recentTransactions: any[];
+// Spec docs/superpowers/specs/2026-10-23-cashback-design.md §9: the owner's rule and this month's numbers
+interface Settings { enabled: boolean; percent: number; validityMonths: number; minUseCents: number; available: boolean }
+interface Summary {
+  creditedMonthCents: number;
+  usedMonthCents: number;
+  openCents: number;
+  expiringCents: number;
+  movements: Array<{ kind: 'CREDIT' | 'USE'; amountCents: number; at: string; expiresAt: string | null; reversed: boolean; customerName?: string }>;
 }
 
+const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 export default function CashbackPage() {
-  const [stats, setStats] = useState<CashbackStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [form, setForm] = useState({ enabled: true, percent: '5', validityMonths: '6', minUse: '10' });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function load() {
+    (async () => {
       try {
-        const res = await fetch('/api/cashback/stats');
-        if (res.ok) {
-          setStats(await res.json());
-        }
-      } catch { /* ignore */ }
-      setLoading(false);
-    }
-    load();
+        const [s, m] = await Promise.all([fetch('/api/cashback/settings', { cache: 'no-store' }), fetch('/api/cashback/summary', { cache: 'no-store' })]);
+        const st = await s.json();
+        if (!s.ok) throw new Error(st.error);
+        setSettings(st);
+        setForm({ enabled: st.enabled, percent: String(st.percent).replace('.', ','), validityMonths: String(st.validityMonths), minUse: String(st.minUseCents / 100).replace('.', ',') });
+        if (m.ok) setSummary(await m.json());
+      } catch (e: any) {
+        toast.error(e.message || 'Erro ao carregar o cashback');
+      }
+    })();
   }, []);
 
+  async function save() {
+    setSaving(true);
+    try {
+      const minUseCents = Math.round(Number(form.minUse.replace(',', '.')) * 100);
+      const res = await fetch('/api/cashback/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: form.enabled, percent: form.percent, validityMonths: Number(form.validityMonths), minUseCents }),
+      });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out.error);
+      setSettings(out);
+      toast.success('Cashback salvo');
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!settings) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>;
+
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
+    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
+      <div>
         <BackButton />
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Gift className="h-6 w-6 text-purple-600" /> Cashback</h1>
-          <p className="text-sm text-gray-500">Sistema de créditos e fidelidade</p>
-        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-2 mt-1"><Gift className="h-7 w-7 text-emerald-600" /> Cashback</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          O cliente ganha um crédito em reais a cada compra e usa como desconto na próxima. O caixa digita o celular do cliente ao fechar a conta.
+        </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1"><Users className="h-4 w-4 text-blue-600" /><span className="text-xs text-gray-500">Clientes</span></div>
-          <p className="text-xl font-bold">{loading ? '-' : stats?.totalAccounts || 0}</p>
+      {!settings.available ? (
+        <Card className="p-5 bg-amber-50 border-amber-200 space-y-2">
+          <p className="font-semibold text-amber-900">O cashback é do plano Business.</p>
+          <p className="text-sm text-amber-900">No seu plano, o celular do cliente na conta já soma as compras em Clientes (CRM).</p>
+          <Link href="/pricing"><Button size="sm">Ver planos</Button></Link>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1"><Coins className="h-4 w-4 text-green-600" /><span className="text-xs text-gray-500">Pontos Emitidos</span></div>
-          <p className="text-xl font-bold">{loading ? '-' : stats?.totalPointsIssued || 0}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1"><Star className="h-4 w-4 text-yellow-600" /><span className="text-xs text-gray-500">Pontos Ativos</span></div>
-          <p className="text-xl font-bold">{loading ? '-' : stats?.totalPointsActive || 0}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1"><Award className="h-4 w-4 text-purple-600" /><span className="text-xs text-gray-500">Resgatados</span></div>
-          <p className="text-xl font-bold">{loading ? '-' : stats?.totalPointsRedeemed || 0}</p>
-        </Card>
-      </div>
-
-      {/* Config */}
-      <Card className="p-6">
-        <h2 className="font-bold text-lg mb-4">Configuração do Cashback</h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-purple-50 rounded-lg p-4">
-            <p className="text-sm text-purple-700 font-medium">Taxa de Cashback</p>
-            <p className="text-3xl font-bold text-purple-800">5%</p>
-            <p className="text-xs text-purple-600 mt-1">De cada pedido vira crédito</p>
-          </div>
-          <div className="bg-green-50 rounded-lg p-4">
-            <p className="text-sm text-green-700 font-medium">Valor do Ponto</p>
-            <p className="text-3xl font-bold text-green-800">R$ 1,00</p>
-            <p className="text-xs text-green-600 mt-1">1 ponto = R$ 1,00 de desconto</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Recent transactions */}
-      <Card className="p-6">
-        <h2 className="font-bold text-lg mb-4">Transações Recentes</h2>
-        {loading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-purple-600" /></div>
-        ) : stats?.recentTransactions && stats.recentTransactions.length > 0 ? (
-          <div className="space-y-2">
-            {stats.recentTransactions.map((t: any, i: number) => (
-              <div key={i} className={`flex items-center justify-between p-3 rounded-lg ${t.type === 'EARNING' ? 'bg-green-50' : 'bg-red-50'}`}>
-                <div>
-                  <p className="text-sm font-medium">{t.reason}</p>
-                  <p className="text-xs text-gray-500">{new Date(t.createdAt).toLocaleDateString('pt-BR')}</p>
-                </div>
-                <span className={`font-bold ${t.type === 'EARNING' ? 'text-green-600' : 'text-red-600'}`}>
-                  {t.type === 'EARNING' ? '+' : ''}{t.amount} pts
-                </span>
+      ) : (
+        <>
+          <Card className="p-5 space-y-4">
+            <label className="flex items-center gap-2 font-medium">
+              <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+              Cashback ligado
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Percentual de cada compra (%)</label>
+                <Input inputMode="decimal" value={form.percent} onChange={(e) => setForm({ ...form, percent: e.target.value })} />
+                <p className="text-xs text-gray-500 mt-1">De 0,5% a 30%. Sem a taxa de serviço e a entrega.</p>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500 text-center py-4">Nenhuma transação ainda. O cashback é creditado automaticamente ao completar pedidos.</p>
-        )}
-      </Card>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Validade (meses)</label>
+                <Input type="number" min={1} max={24} value={form.validityMonths} onChange={(e) => setForm({ ...form, validityMonths: e.target.value })} />
+                <p className="text-xs text-gray-500 mt-1">O crédito mais antigo é usado primeiro.</p>
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">Mínimo para usar (R$)</label>
+                <Input inputMode="decimal" value={form.minUse} onChange={(e) => setForm({ ...form, minUse: e.target.value })} />
+              </div>
+            </div>
+            <div className="flex justify-end"><Button onClick={save} disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</Button></div>
+          </Card>
 
-      <Card className="p-4 bg-purple-50 border-purple-200">
-        <h3 className="font-bold text-sm text-purple-800 mb-2">Como funciona</h3>
-        <ul className="text-sm text-purple-700 space-y-1">
-          <li>• Cliente recebe 5% do valor do pedido em pontos automaticamente</li>
-          <li>• Pontos podem ser usados como desconto em pedidos futuros</li>
-          <li>• Mínimo de 10 pontos para resgate</li>
-          <li>• Pontos expiram em 12 meses</li>
-        </ul>
-      </Card>
+          {summary && (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <Card className="p-4"><p className="text-xs text-gray-500">Creditado no mês</p><p className="text-xl font-bold">{brl(summary.creditedMonthCents)}</p></Card>
+                <Card className="p-4"><p className="text-xs text-gray-500">Usado no mês</p><p className="text-xl font-bold">{brl(summary.usedMonthCents)}</p></Card>
+                <Card className="p-4"><p className="text-xs text-gray-500">Saldo dos clientes</p><p className="text-xl font-bold">{brl(summary.openCents)}</p></Card>
+                <Card className="p-4"><p className="text-xs text-gray-500">Vence em 30 dias</p><p className="text-xl font-bold">{brl(summary.expiringCents)}</p></Card>
+              </div>
+              <Card className="p-0 overflow-hidden">
+                <h2 className="font-semibold px-4 pt-4 pb-2">Últimas movimentações</h2>
+                {summary.movements.length === 0 ? (
+                  <p className="px-4 pb-4 text-sm text-gray-500">Nenhuma movimentação ainda. O crédito entra quando uma conta com o celular do cliente é fechada.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {summary.movements.map((m, i) => (
+                        <tr key={i} className={`border-t ${m.reversed ? 'text-gray-400 line-through' : ''}`}>
+                          <td className="px-4 py-2">{new Date(m.at).toLocaleDateString('pt-BR')}</td>
+                          <td className="px-4 py-2">{m.customerName}</td>
+                          <td className="px-4 py-2">{m.kind === 'CREDIT' ? 'Ganhou' : 'Usou'}</td>
+                          <td className={`px-4 py-2 text-right font-medium ${m.kind === 'CREDIT' ? 'text-emerald-700' : ''}`}>{m.kind === 'CREDIT' ? '+' : '−'} {brl(m.amountCents)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </Card>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
