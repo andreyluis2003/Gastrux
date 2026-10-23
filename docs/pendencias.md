@@ -12,13 +12,17 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 
 ### Abertos
 
-- **Rotas da API sem tela**: ficaram de propósito, para uma limpeza separada (algumas têm testes ou outros
-  usos). Conferir cada uma antes de apagar: `/api/stock/quick-movement` (citada em security-fixes.test.ts),
-  `/api/invoices/process-ocr` (o resto de `/api/invoices` serve a tela de faturas em /conta/cobranca),
-  `/api/cost-analysis/{ingredient-summary,ingredient-trends,supplier-comparison,recipe-costs,price-alerts}`
-  (passam no teste de isolamento read-isolation), `/api/alerts`, `/api/smart-alerts/{rules,check}`,
-  `/api/pos/{transactions,settings}` (o `/api/pos/webhook` é outra coisa), `/api/demand-forecast`,
-  `/api/admin/voice/*` e `/api/voice/webhook/*` (testados no security-sweep do bad-day).
+- ~~**Rotas da API sem tela**~~ (apagadas em 2026-10-23, nenhuma tela as chamava): `/api/stock/quick-movement`,
+  `/api/invoices/process-ocr`, `/api/cost-analysis/*`, `/api/alerts`, `/api/smart-alerts/*`, `/api/pos/{transactions,settings}`
+  (as da tela PDV são `/api/admin/pos/*` e ficam; `/api/pos/webhook` também), `/api/demand-forecast`, `/api/admin/voice/*`,
+  `/api/voice/webhook/*`, `/api/loyalty/*`, `/api/cashback` (GET/POST antigos), `/api/cashback/{stats,redeem}`,
+  `/api/indicacao`, `/api/financial/*`, `/api/reports/{comprehensive,forecasts,production-planning,stock-status,
+  suppliers,demand}`, com `lib/pdf-generator.ts` (Abacus), `lib/report-templates.ts`, `lib/voice/`, `lib/loyalty/` e
+  `hooks/use-restaurant-data.ts`. Páginas que levavam a elas e agora redirecionam: /admin/indicacao → Cashback;
+  /dashboard/reports e /dashboard/reports/demand (Previsão de demanda, com PDF de mentira) → Financeiro.
+- **Tabelas sem uso no banco**: `loyalty_*` (programa, contas, marcos, transações), `voice_agent_configs`,
+  `voice_calls` e as das rotas apagadas continuam no schema. Apagar numa migração própria, depois de o dono
+  confirmar que não há nada a guardar (apagar tabela não tem volta).
 - **/admin/alertas-smart** ("Alertas Smart", só pelo endereço): não estava na auditoria; o dono não decidiu.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
@@ -28,9 +32,8 @@ Nenhum artigo da /ajuda ensina estas telas (o teste `help-seed-articles.test.ts`
 Previsões e Relatório executivo). Todas estão no menu e esperam decisão do dono.
 
 - ~~**Fidelidade e Cashback**~~ e ~~**Clientes (CRM)**~~ (resolvidos 2026-10-23 pelo cashback, spec
-  `docs/superpowers/specs/2026-10-23-cashback-design.md`, migração `20261023120000_cashback`). Ficaram sem tela, para a
-  limpeza das rotas: as tabelas `loyalty_*` e as rotas `/api/loyalty/*`, `/api/cashback` (GET/POST antigos, pontos),
-  `/api/cashback/stats`, `/api/cashback/redeem`, `/api/indicacao` e `lib/loyalty/get-program.ts`. Delivery só acumula
+  `docs/superpowers/specs/2026-10-23-cashback-design.md`, migração `20261023120000_cashback`). As rotas antigas foram
+  apagadas na limpeza de 2026-10-23 (ver "Telas escondidas"). Delivery só acumula
   (spec §4.a): usar o saldo no site espera o código de confirmação pelo WhatsApp (verificação da Meta).
   Era assim: nenhuma venda gerava pontos nem cashback. `POST /api/cashback`
   (credita o cashback e soma `Customer.totalSpent`) não é chamado por nenhuma tela nem pelo fechamento de conta;
@@ -44,8 +47,7 @@ Previsões e Relatório executivo). Todas estão no menu e esperam decisão do d
   de destinatários é digitada (telefone|nome|1=valor) e as variáveis são JSON. Não testado de ponta a ponta.
 - ~~**Relatórios > Financeiro**~~ (resolvido 2026-10-23: `lib/finance/overview.ts` + `/api/financeiro/resumo`, com os
   números da DRE e do Caixa e a previsão do mês; Previsões e Análises redirecionam para o Financeiro, Fluxo de Caixa
-  para o Histórico de caixas. Ficaram sem tela: `/api/financial/{dashboard,summary,forecasts,calculate-forecast,
-  metrics,cash-flow}`, para a limpeza das rotas). Era assim: o "Resumo de Hoje" e os métodos de pagamento vinham de
+  para o Histórico de caixas. As rotas `/api/financial/*` foram apagadas na limpeza de 2026-10-23). Era assim: o "Resumo de Hoje" e os métodos de pagamento vinham de
   `Payment` (só pagamentos online), `CashFlowRecord` (lançamentos manuais do Fluxo de Caixa) e `Order`, não do
   critério do Caixa/DRE (`salesInRange`). **Previsões** (`/api/financial/calculate-forecast`): "Receita" é a média
   de um pagamento, "Pedidos" soma 1 por pedido e divide pelo número de pedidos (sempre 1), a média ponderada soma
@@ -53,9 +55,8 @@ Previsões e Relatório executivo). Todas estão no menu e esperam decisão do d
   Caixa** não foram conferidos. Só o link para a DRE está certo.
 - ~~**Relatórios > Relatório executivo (PDF)**~~ (resolvido 2026-10-23: `lib/reports/executive.ts`, página para
   imprimir ou salvar em PDF no navegador, com o CMV da DRE e a engenharia de cardápio de `lib/menu-engineering/
-  analyze.ts`; a fatura de Minha assinatura > Cobrança também virou página, com os campos do cliente escapados.
-  Ainda usam `lib/pdf-generator.ts` (Abacus), sem tela: `/api/reports/{comprehensive,forecasts,production-planning,
-  stock-status,suppliers}`, para a limpeza das rotas). Era assim: `app/api/reports/executive/route.ts` gerava o PDF em
+  analyze.ts`; a fatura de Minha assinatura > Cobrança também virou página, com os campos do cliente escapados. As rotas que ainda usavam `lib/pdf-generator.ts` (Abacus) foram
+  apagadas com ele na limpeza de 2026-10-23). Era assim: `app/api/reports/executive/route.ts` gerava o PDF em
   `apps.abacus.ai/api/createConvertHtmlToPdfRequest` com `ABACUSAI_API_KEY`. Sem a chave em produção, todo PDF
   falha. O CMV do PDF vem das movimentações de estoque, não da DRE.
 - ~~**Comissões**~~ (resolvido 2026-10-23, "Editar remuneração" em Equipe e acessos): a regra só era escolhida ao
@@ -82,7 +83,7 @@ send-day7, send-onboarding, check-onboarding-emails e `lib/email-templates/onboa
 - **Outros e-mails ainda pela Abacus.ai** (`sendNotificationEmail` em `lib/email-service.ts` ou fetch direto para
   apps.abacus.ai): os segmentados (`/api/email/check-segmented-emails`, send-new-user, send-inactive,
   send-early-adopter), `/api/admin/batch-email-send`, lembrete de reserva (`/api/email/send-reminder`),
-  `lib/admin-alerts.ts` e `lib/pdf-generator.ts`. Sem `NOTIF_ID_*` em produção eles não saem. Rever texto e
+  e `lib/admin-alerts.ts`. Sem `NOTIF_ID_*` em produção eles não saem. Rever texto e
   passar para Resend (`sendTransactionalEmail`) ou apagar, um por um.
 - Os campos antigos da sequência em `users` (emailSentDay3/Day21/TrialEnding, emailVariant*, emailDay*OpenedAt)
   ficaram sem uso; apagar numa migração futura, junto com os que a tela de funil (`/api/analytics/conversion-funnel`) lê.

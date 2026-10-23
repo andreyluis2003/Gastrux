@@ -3,8 +3,6 @@
  * Launch checklist f2-security (2026-09-28): the rest of the API. Each case states the DESIRED behaviour:
  * - jobs for the platform (e-mail batches, counters, onboarding e-mails) need CRON_SECRET and fail
  *   closed without it (one accepted anyone when its variable was unset, another used "default-secret");
- * - the voice webhooks only accept requests signed by the restaurant's Twilio token (a forged POST
- *   could make the agent create reservations);
  * - the delivery-status webhook needs its token;
  * - menu, prices, money and settings are changed by the owner or a manager, never by a cashier;
  * - a public reservation never returns the stored guest profile.
@@ -23,12 +21,10 @@ import { POST as cleanupCounters } from '../../../app/api/admin/cleanup-transact
 // The Abacus onboarding routes (send-onboarding, check-onboarding-emails) left on 2026-10-19 for this one
 import { POST as sendOnboarding, GET as checkOnboarding } from '../../../app/api/email/onboarding-sequence/route';
 import { NextRequest } from 'next/server';
-import { POST as voiceIncoming } from '../../../app/api/voice/webhook/incoming/route';
 import { POST as messagingWebhook } from '../../../app/api/messaging/webhook/[provider]/route';
 import { POST as createMenuItem } from '../../../app/api/cardapio/itens/route';
 import { POST as createModifier } from '../../../app/api/modifiers/route';
 import { POST as createReservation } from '../../../app/api/reservations/route';
-import { computeTwilioSignature } from '../../../lib/voice/twilio-signature';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -81,40 +77,6 @@ describe('security sweep of the rest of the API', () => {
       process.env.CRON_SECRET = 'segredo-de-teste-123';
       expect((await cleanupCounters(json('http://x/api/admin/cleanup-transaction-counters', {}, { Authorization: 'Bearer errado' }))).status).toBe(401);
       expect((await cleanupCounters(json('http://x/api/admin/cleanup-transaction-counters', {}, { Authorization: 'Bearer segredo-de-teste-123' }))).status).toBe(200);
-    });
-  });
-
-  describe('voice webhooks only accept Twilio, signed with the restaurant token', () => {
-    const TOKEN = 'twilio-token-de-teste';
-    const PHONE = `+5511${String(Date.now()).slice(-8)}`;
-    const form = (params: Record<string, string>) => { const f = new URLSearchParams(params); return f.toString(); };
-    const call = (params: Record<string, string>, signature?: string) =>
-      voiceIncoming(new Request('https://gastrux.test/api/voice/webhook/incoming', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...(signature ? { 'X-Twilio-Signature': signature } : {}) },
-        body: form(params),
-      }) as any);
-
-    beforeAll(async () => {
-      process.env.NEXTAUTH_URL = 'https://gastrux.test';
-      await prisma.voiceAgentConfig.create({ data: { restaurantId: A.restaurantId, twilioAuthToken: TOKEN, twilioPhoneNumber: PHONE, isActive: true } });
-    });
-
-    it('a forged call (no or wrong signature) creates nothing', async () => {
-      process.env.NEXTAUTH_URL = 'https://gastrux.test';
-      const params = { CallSid: `CA-forged-${tag}`, From: '+5511999999999', To: PHONE };
-      await call(params);
-      await call(params, 'assinatura-falsa');
-      expect(await prisma.voiceCall.count({ where: { callSid: params.CallSid } })).toBe(0);
-    });
-
-    it('a call signed with the restaurant token is answered and recorded', async () => {
-      process.env.NEXTAUTH_URL = 'https://gastrux.test';
-      const params = { CallSid: `CA-real-${tag}`, From: '+5511999999999', To: PHONE };
-      const sig = computeTwilioSignature(TOKEN, 'https://gastrux.test/api/voice/webhook/incoming', params);
-      const res = await call(params, sig);
-      expect(res.status).toBe(200);
-      expect(await prisma.voiceCall.count({ where: { callSid: params.CallSid, restaurantId: A.restaurantId } })).toBe(1);
     });
   });
 

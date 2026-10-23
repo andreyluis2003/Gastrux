@@ -16,29 +16,17 @@ const tag = crypto.randomBytes(4).toString('hex');
 const as = (u) => { const s = { user: u, expires: '2099-01-01' }; getServerSession.mockResolvedValue(s); getServerSessionNext.mockResolvedValue(s); };
 
 const M = 'managers';
-const F = 'front';
 // [route module, method, who may call it, params]
 const ROUTES: Array<[string, string, string, any?]> = [
   ['customers/route', 'GET', M], ['customers/route', 'POST', M],
   ['customers/[id]/route', 'GET', M, { id: 'x' }], ['customers/[id]/route', 'PUT', M, { id: 'x' }],
   ['customers/[id]/interactions/route', 'GET', M, { id: 'x' }], ['customers/[id]/interactions/route', 'POST', M, { id: 'x' }],
-  ['loyalty/accounts/[customerId]/route', 'GET', M, { customerId: 'x' }],
-  ['loyalty/milestones/route', 'GET', M], ['loyalty/milestones/route', 'POST', M],
-  ['loyalty/milestones/[id]/route', 'PATCH', M, { id: 'x' }], ['loyalty/milestones/[id]/route', 'DELETE', M, { id: 'x' }],
-  ['loyalty/programs/route', 'GET', M], ['loyalty/redeem/route', 'POST', M],
-  ['financial/summary/route', 'GET', M], ['financial/dashboard/route', 'GET', M], ['financeiro/resumo/route', 'GET', M], ['cashback/settings/route', 'GET', M], ['cashback/settings/route', 'PUT', M], ['cashback/summary/route', 'GET', M],
+  ['financeiro/resumo/route', 'GET', M], ['cashback/settings/route', 'GET', M], ['cashback/settings/route', 'PUT', M], ['cashback/summary/route', 'GET', M],
   ['pagamentos/route', 'GET', M],
   ['reports/profitability/route', 'GET', M],
   ['reports/executive/route', 'GET', M],
   ['cmv/route', 'GET', M], ['cmv/history/route', 'GET', M], ['cmv/snapshot/route', 'POST', M],
   ['menu-engineering/route', 'GET', M], ['menu-engineering/history/route', 'GET', M], ['menu-engineering/snapshot/route', 'POST', M],
-  ['demand-forecast/route', 'GET', M], ['demand-forecast/route', 'POST', M],
-  ['cost-analysis/ingredient-summary/route', 'GET', M], ['cost-analysis/ingredient-trends/route', 'GET', M],
-  ['cost-analysis/price-alerts/route', 'GET', M], ['cost-analysis/price-alerts/route', 'POST', M],
-  ['cost-analysis/price-alerts/[id]/route', 'GET', M, { id: 'x' }], ['cost-analysis/price-alerts/[id]/route', 'PUT', M, { id: 'x' }],
-  ['cost-analysis/price-alerts/[id]/route', 'DELETE', M, { id: 'x' }],
-  ['cost-analysis/recipe-costs/route', 'GET', M], ['cost-analysis/supplier-comparison/route', 'GET', M],
-  ['pos/transactions/route', 'GET', F], ['pos/transactions/route', 'POST', F],
 ];
 
 describe('owner-and-manager routes refuse the cook and the cashier', () => {
