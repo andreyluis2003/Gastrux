@@ -46,6 +46,12 @@ it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a p
   for (const fact of ['Nova conta', 'Parcelar', 'Repetir todo mês', 'gaveta', 'Desfazer pagamento', 'competência', 'CMV']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
 });
 
+it('the Adicionais article (2026-10-23, the screen went into the menu)', () => {
+  const a = HELP_ARTICLES.find((x) => x.slug === 'adicionais');
+  expect(a?.categorySlug).toBe('cardapio-e-receitas');
+  for (const fact of ['Cardápio e produtos > Adicionais', 'Novo adicional', 'Criar adicional', 'Venda balcão', 'cozinha']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+});
+
 it('the cashback article (spec 2026-10-23)', () => {
   const a = HELP_ARTICLES.find((x) => x.slug === 'cashback');
   expect(a?.categorySlug).toBe('pdv-e-caixa');

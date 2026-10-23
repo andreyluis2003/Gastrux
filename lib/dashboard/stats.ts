@@ -120,7 +120,7 @@ export async function getDashboardStats(restaurantId: string, now = new Date()):
   };
 }
 
-/** Active insumos below the minimum set for them; same rule as the rest of the app (lib/ai/gather-restaurant-data.ts) */
+/** Active insumos below the minimum set for them; same rule as the rest of the app */
 export async function lowStockCount(restaurantId: string): Promise<number> {
   const rows = await prisma.$queryRaw<Array<{ n: number }>>`
     SELECT count(*)::int AS n

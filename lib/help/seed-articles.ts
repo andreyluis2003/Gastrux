@@ -368,6 +368,31 @@ O **Histórico** mostra as noites fechadas e os totais por item das últimas 4 s
   },
   {
     categorySlug: 'cardapio-e-receitas',
+    slug: 'adicionais',
+    title: 'Como cadastro adicionais (queijo extra, ponto da carne)?',
+    summary: 'Adicionais são opções que o garçom escolhe ao lançar um item na conta, com ou sem valor a mais.',
+    keywords: 'adicional, adicionais, extra, opção, modificador, ponto da carne, sem cebola, borda, acréscimo',
+    order: 2,
+    content: `## Para que serve
+
+Um adicional é uma opção que o garçom ou o caixa escolhe ao lançar um item: "Queijo extra" (+ R$ 3), "Bem passado" (sem valor), "Sem cebola". O valor entra na conta e o adicional vai junto para a cozinha.
+
+## Cadastrando
+
+1. Vá em **Cardápio e produtos > Adicionais** e toque em **Novo adicional**
+2. Dê o **nome**, uma **categoria** (por exemplo "Ponto da carne" ou "Extras") e o **valor a mais** (deixe 0,00 quando não muda o preço)
+3. Toque em **Criar adicional**
+
+Só o dono e o gerente cadastram e apagam adicionais.
+
+## No dia a dia
+
+Ao tocar num item na conta (**Vender**) ou na **Venda balcão**, aparecem os adicionais ativos, agrupados pela categoria. Escolha quantos quiser e confirme. O valor de cada um soma no preço do item, e a cozinha vê os adicionais no pedido.
+
+> Os adicionais aparecem para todos os itens. Use nomes claros, como "Ponto da carne: mal passado", para o garçom não escolher um adicional que não combina com o item.`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
     slug: 'cadastrar-receita',
     title: 'Como cadastro uma ficha técnica?',
     summary: 'A ficha técnica lista os insumos de uma porção; o custo sai do preço dos insumos.',

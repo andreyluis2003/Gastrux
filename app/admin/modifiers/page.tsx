@@ -43,15 +43,17 @@ export default function ModifiersPage() {
     priceAdjustment: '0.00',
   });
 
+  // Before any early return (rule of hooks: it crashed with React error #310 once the session loaded, 2026-10-23)
+  useEffect(() => {
+    if (status === 'authenticated') fetchModifiers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
   if (status === 'loading') return <LoadingSkeleton count={5} />;
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
     return null;
   }
-
-  useEffect(() => {
-    fetchModifiers();
-  }, []);
 
   const fetchModifiers = async () => {
     try {
@@ -63,7 +65,7 @@ export default function ModifiersPage() {
       setModifiers(data.modifiers || []);
     } catch (error) {
       console.error('Error fetching modifiers:', error);
-      toast.error('Erro ao carregar modificadores');
+      toast.error('Erro ao carregar os adicionais');
     } finally {
       setLoading(false);
     }
@@ -71,7 +73,7 @@ export default function ModifiersPage() {
 
   const handleCreate = async () => {
     if (!formData.name) {
-      toast.error('Nome do modificador é obrigatório');
+      toast.error('Diga o nome do adicional');
       return;
     }
 
@@ -89,7 +91,7 @@ export default function ModifiersPage() {
 
       if (!response.ok) throw new Error('Failed to create');
 
-      toast.success('Modificador criado com sucesso');
+      toast.success('Adicional criado');
       setFormData({
         name: '',
         category: '',
@@ -100,12 +102,12 @@ export default function ModifiersPage() {
       fetchModifiers();
     } catch (error) {
       console.error('Error creating modifier:', error);
-      toast.error('Erro ao criar modificador');
+      toast.error('Erro ao criar o adicional');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja deletar este modificador?')) return;
+    if (!confirm('Apagar este adicional?')) return;
 
     try {
       const response = await fetch(`/api/modifiers/${id}`, {
@@ -114,11 +116,11 @@ export default function ModifiersPage() {
 
       if (!response.ok) throw new Error('Failed to delete');
 
-      toast.success('Modificador deletado com sucesso');
+      toast.success('Adicional apagado');
       fetchModifiers();
     } catch (error) {
       console.error('Error deleting modifier:', error);
-      toast.error('Erro ao deletar modificador');
+      toast.error('Erro ao apagar o adicional');
     }
   };
 
@@ -130,7 +132,7 @@ export default function ModifiersPage() {
         <div>
           <div className="flex items-center gap-3">
             <BackButton />
-            <h1 className="text-xl font-bold sm:text-3xl">Modificadores de Itens</h1>
+            <h1 className="text-xl font-bold sm:text-3xl">Adicionais</h1>
           </div>
           <p className="text-sm text-muted-foreground">
             Configure opções e customizações para seus itens de cardápio
@@ -141,7 +143,7 @@ export default function ModifiersPage() {
           className="gap-2 w-full sm:w-auto"
         >
           <Plus size={18} />
-          Novo Modificador
+          Novo adicional
         </Button>
       </div>
 
@@ -153,7 +155,7 @@ export default function ModifiersPage() {
         </div>
       ) : activeModifiers.length === 0 ? (
         <Card className="p-8 text-center">
-          <p className="text-muted-foreground">Nenhum modificador criado ainda</p>
+          <p className="text-muted-foreground">Nenhum adicional cadastrado ainda</p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -210,7 +212,7 @@ export default function ModifiersPage() {
       {showNewDialog && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <Card className="p-6 space-y-4 w-full max-w-md max-h-screen overflow-y-auto">
-            <h3 className="font-semibold text-lg">Novo Modificador</h3>
+            <h3 className="font-semibold text-lg">Novo adicional</h3>
 
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
@@ -240,7 +242,7 @@ export default function ModifiersPage() {
               <Label htmlFor="description">Descrição</Label>
               <Input
                 id="description"
-                placeholder="Descrição do modificador"
+                placeholder="Descrição do adicional"
                 value={formData.description}
                 onChange={(e) =>
                   setFormData({ ...formData, description: e.target.value })
@@ -267,7 +269,7 @@ export default function ModifiersPage() {
                 onClick={handleCreate}
                 className="flex-1"
               >
-                Criar Modificador
+                Criar adicional
               </Button>
               <Button
                 onClick={() => setShowNewDialog(false)}

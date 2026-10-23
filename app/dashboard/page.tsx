@@ -4,7 +4,6 @@ import { Suspense } from 'react';
 import { authOptions } from '@/lib/auth';
 import { DashboardAlertsLoadingSkeleton } from '@/components/dashboard/dashboard-loading-skeleton';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
-import { AlertsBanner } from '@/components/ai/alerts-banner';
 import { FirstSteps } from '@/components/dashboard/first-steps';
 import { TodayPanel } from '@/components/dashboard/today-panel';
 import { firstSteps } from '@/lib/onboarding/first-steps';
@@ -38,7 +37,6 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50">
       <DashboardHeader userName={user.name || user.email || ''} />
       <main className="mx-auto max-w-6xl px-4 py-8 space-y-8">
-        <AlertsBanner />
         {/* The Vender button and what is left to set up (it can be closed), then the day */}
         <FirstSteps steps={steps} canSell={canSeeModule('/vender', user.role)} />
         {restaurantId && (

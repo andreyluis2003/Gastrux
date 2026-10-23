@@ -26,6 +26,24 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - ~~**/admin/alertas-smart**~~ (2026-10-23, decisão do dono): apagada com `/api/alertas/smart`; o endereço leva ao Início.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
+## Telas fora do menu, segunda revisão (decisão do dono, 2026-10-23)
+
+- **No menu agora**: Cardápio e produtos > Adicionais (`/admin/modifiers`; quebrava com o erro #310 do React, hook depois
+  de um `return`; artigo de ajuda "Como cadastro adicionais"); Plataforma > Feedback dos clientes e Roadmap. Teste novo
+  `page-hook-order.test.ts` confere a ordem dos hooks em toda tela do menu.
+- **Apagadas, com o endereço levando à tela certa**: Multi-unidade (→ Várias lojas), Relatório de desperdício (→ Desperdício),
+  Cardápio sazonal (→ Cardápio digital), Cardápio temporal e Combos com IA (→ Engenharia de cardápio), Agendamento (→ Pedidos
+  de delivery), Performance da equipe (→ Comissões), Vídeo de demonstração (→ Plataforma), Design e Configuração da IA
+  (→ Início), ANVISA (→ Validades) e `/dashboard/ai-insights` (→ Início). Com elas, as rotas `/api/multi-unidade`,
+  `/api/desperdicio/report`, `/api/cardapio/sazonal`, `/api/performance/equipe`, `/api/admin/demo-video`, `/api/admin/ai-config`,
+  `/api/ai-insights/*` (Abacus) e `/api/anvisa/*`, o aviso de alertas do Início e `lib/ai/llm-client`, `lib/ai/gather-restaurant-data`,
+  `lib/s3` e `lib/aws-config`. Ficam no banco, sem uso: `ai_insights` (o cardápio do QR ainda lê combos fixados), `ingredient_batches`.
+- **Ficam escondidas, de propósito**: QR na embalagem, ROI da migração e Campanha de reconquista (esperam o WhatsApp e a
+  integração com o iFood, como as Campanhas); PDV (`/admin/pdv`, recebe vendas de outro sistema; espera a decisão da maquininha).
+- **Para o dono decidir**: `/suporte/ia` é só uma janela com um chatbot da Abacus, sem link, e `/admin/ia-monitoring` acompanha
+  esse chatbot. Recomendação: apagar os dois (o Pergunte ao Gastrux faz esse papel). Também sem link: `/settings/referral`
+  (indicação de restaurantes, `/api/referrals/generate-code` pela Abacus), ainda não revisada.
+
 ## Telas que não funcionam (achadas nos artigos da Central de Ajuda, 2026-10-20)
 
 Nenhum artigo da /ajuda ensina estas telas (o teste `help-seed-articles.test.ts` impede citar Cashback,

@@ -62,6 +62,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Cardápio e produtos',
     links: [
       { label: 'Cardápio digital', href: '/admin/cardapio', roles: MANAGERS },
+      { label: 'Adicionais', href: '/admin/modifiers', roles: MANAGERS },
       { label: 'Fichas técnicas', href: '/receitas', roles: [...MANAGERS, 'COOK'] },
       { label: 'Insumos', href: '/insumos', roles: [...MANAGERS, 'COOK'] },
       { label: 'QR Codes das mesas', href: '/admin/tables/qrcodes', roles: MANAGERS },
@@ -158,6 +159,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Clientes', href: '/admin/customers' },
       { label: 'Usuários', href: '/admin/users' },
       { label: 'Custo da IA', href: '/admin/platform/ia' },
+      { label: 'Feedback dos clientes', href: '/admin/feedback' },
+      { label: 'Roadmap', href: '/admin/roadmap' },
       { label: 'Auditoria', href: '/admin/audit-logs' },
       { label: 'Suporte', href: '/admin/support' },
       { label: 'Onboarding', href: '/admin/onboarding' },
