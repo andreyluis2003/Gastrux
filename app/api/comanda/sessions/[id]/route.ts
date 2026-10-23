@@ -12,6 +12,7 @@ import { MANAGER_ROLES, recordAudit, requireRestaurantRole, type RestaurantMembe
 import { CASHIER_PLUS } from '@/lib/caixa/roles';
 import { CashRuleError, settlePayments } from '@/lib/caixa/rules';
 import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, reverseSaleEntries, type SaleTarget } from '@/lib/caixa/sale';
+import { onBillClosed, onBillReversed } from '@/lib/cashback/bill';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 import { billTotals, serviceApplies } from '@/lib/comanda/bill';
@@ -140,13 +141,14 @@ async function handlePUT(
           const itemsTotal = await comandaTotalCents(tx, params.id);
           const bill = await tx.orderSession.findUnique({
             where: { id: params.id },
-            select: { serviceChargeEligible: true, restaurant: { select: { serviceChargePercent: true } } },
+            select: { serviceChargeEligible: true, cashbackUsedCents: true, restaurant: { select: { serviceChargePercent: true } } },
           });
           const { serviceCents } = billTotals(itemsTotal, bill?.restaurant.serviceChargePercent ?? 0, {
             applies: serviceApplies(bill ?? {}),
             waived: body?.serviceCharge !== true,
           });
-          const total = itemsTotal + serviceCents;
+          // Cashback used on the bill screen is a discount (spec 2026-10-23 §7.1)
+          const total = Math.max(0, itemsTotal + serviceCents - (bill?.cashbackUsedCents ?? 0));
           // Legacy body (one paymentMethod, older devices): the whole total in that method
           const payments = read.legacy ? [{ method: read.payments[0].method, amount: (total / 100).toFixed(2) }] : read.payments;
           const settled = settlePayments(total, payments);
@@ -161,6 +163,7 @@ async function handlePUT(
           // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
           await settleSessionStock(tx, restaurantId, params.id);
           if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
+          await onBillClosed(tx, restaurantId, params.id);
           primaryMethod = toNfcePaymentMethod(settled.primaryMethod);
           changeCents = settled.changeCents;
         }
@@ -187,6 +190,8 @@ async function handlePUT(
           if (paid > 0) {
             await reverseSaleEntries(tx, { restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member!.userId, reason });
           }
+          // Its cashback credit is taken back and the cashback it used returns (spec 2026-10-23 §7.4)
+          await onBillReversed(tx, restaurantId, params.id, true);
         }
         return tx.orderSession.update({
           where: { id: params.id },
@@ -287,6 +292,7 @@ export async function DELETE(
         if (cashCents > 0) {
           await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason, kind: 'cancel' });
         }
+        await onBillReversed(tx, member.restaurantId, params.id, ownedSession.status === 'CLOSED');
       });
     } catch (error) {
       if (error instanceof CashRuleError) {

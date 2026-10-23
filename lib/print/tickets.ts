@@ -81,8 +81,11 @@ export interface Receipt {
   total: number;
   /** Service charge, outside the NFC-e (spec 2026-10-07, 4.5) */
   serviceCharge: number;
-  /** Items plus service charge: what the customer paid */
+  /** Items plus service charge minus cashback used: what the customer paid */
   grandTotal: number;
+  /** Cashback used as a discount and earned on this bill (spec 2026-10-23) */
+  cashbackUsed: number;
+  cashbackEarned: number;
   customerCPF: string | null;
   paymentMethod: string | null;
   nfce: null | {
@@ -115,12 +118,13 @@ export async function buildReceipt(restaurantId: string, sessionId: string): Pro
   });
   if (!session) return null;
 
-  const [doc, config] = await Promise.all([
+  const [doc, config, credit] = await Promise.all([
     prisma.nFeDocument.findFirst({
       where: { orderSessionId: sessionId, config: { restaurantId }, status: { in: ['authorized', 'processing', 'submitted'] } },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.nFeConfig.findFirst({ where: { restaurantId }, select: { cnpj: true, stateRegistration: true, companyName: true, tradeName: true, environment: true } }),
+    prisma.cashbackCredit.findFirst({ where: { restaurantId, orderSessionId: sessionId }, select: { amountCents: true } }),
   ]);
 
   const lines = session.items.map((item) => {
@@ -151,7 +155,9 @@ export async function buildReceipt(restaurantId: string, sessionId: string): Pro
     lines,
     total,
     serviceCharge: session.serviceChargeCents / 100,
-    grandTotal: (Math.round(total * 100) + session.serviceChargeCents) / 100,
+    grandTotal: Math.max(0, Math.round(total * 100) + session.serviceChargeCents - session.cashbackUsedCents) / 100,
+    cashbackUsed: session.cashbackUsedCents / 100,
+    cashbackEarned: (credit?.amountCents ?? 0) / 100,
     customerCPF: doc?.customerCPF ?? null,
     paymentMethod: snapshot.paymentMethod ?? null,
     nfce: doc

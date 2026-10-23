@@ -11,6 +11,8 @@ import type { PaymentInput } from '@/lib/caixa/rules';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { billTotals, onlinePaidCents, paidNetCents, serviceApplies, settlePartial } from './bill';
+import { balanceCents } from '@/lib/cashback/service';
+import { onBillClosed } from '@/lib/cashback/bill';
 
 /**
  * The bill of a comanda (spec 2026-10-07, 4.3): items, service charge, what the cash register already
@@ -37,6 +39,10 @@ export interface Bill {
   payments: BillPayment[];
   preBillPrintedAt: string | null;
   customerName: string | null;
+  /** Cashback used as a discount (spec 2026-10-23): already out of totalCents and remainingCents */
+  cashbackUsedCents: number;
+  /** The customer identified by phone; balanceCents is the cashback left to use */
+  customer: { id: string; name: string; phone: string | null; balanceCents: number } | null;
 }
 
 /** The description of a partial refund, also how a payment is known to be refunded already */
@@ -46,7 +52,8 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
   const s = await db.orderSession.findFirst({
     where: { id: sessionId, restaurantId },
     select: {
-      id: true, status: true, tableId: true, tableNumber: true, customerName: true,
+      id: true, status: true, tableId: true, tableNumber: true, customerName: true, cashbackUsedCents: true,
+      customer: { select: { id: true, name: true, phone: true } },
       serviceChargeCents: true, serviceChargeWaived: true, serviceChargeEligible: true, preBillPrintedAt: true,
       table: { select: { number: true } },
       restaurant: { select: { serviceChargePercent: true } },
@@ -82,9 +89,10 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
   const applies = serviceApplies(s);
   const percent = s.restaurant.serviceChargePercent;
   // A closed bill keeps the charge it was closed with; an open one follows the current choice
-  const totals = s.status === 'CLOSED'
+  const gross = s.status === 'CLOSED'
     ? { subtotalCents, serviceCents: s.serviceChargeCents, totalCents: subtotalCents + s.serviceChargeCents }
     : billTotals(subtotalCents, percent, { applies, waived: s.serviceChargeWaived });
+  const totals = { ...gross, totalCents: Math.max(0, gross.totalCents - s.cashbackUsedCents) };
   const paidCents = paidNetCents(entries) + onlineRows.reduce((sum, p) => sum + onlinePaidCents(p), 0);
 
   const refunds = entries.filter((e) => e.type === 'REFUND').map((e) => e.description ?? '');
@@ -134,6 +142,10 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
     payments,
     preBillPrintedAt: s.preBillPrintedAt?.toISOString() ?? null,
     customerName: s.customerName,
+    cashbackUsedCents: s.cashbackUsedCents,
+    customer: s.customer
+      ? { ...s.customer, balanceCents: await balanceCents(db, restaurantId, s.customer.id) }
+      : null,
   };
 }
 
@@ -260,7 +272,9 @@ export async function recordBillPayment(
       // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
       await settleSessionStock(tx, member.restaurantId, sessionId);
     }
-    return { closed, changeCents: settled.changeCents, customerName: bill.customerName };
+    // Cashback and CRM purchase of the identified customer (spec 2026-10-23 §7.1)
+    const cashbackEarnedCents = closed ? await onBillClosed(tx, member.restaurantId, sessionId) : 0;
+    return { closed, changeCents: settled.changeCents, customerName: bill.customerName, cashbackEarnedCents };
   });
 
   let nfce: unknown = null;
@@ -268,7 +282,7 @@ export async function recordBillPayment(
     nfce = await emitClosedBill(member, sessionId, input.customerCPF, result.customerName);
   }
   const bill = (await loadBill(prisma, member.restaurantId, sessionId))!;
-  return { bill, changeCents: result.changeCents, closed: result.closed, nfce };
+  return { bill, changeCents: result.changeCents, closed: result.closed, nfce, cashbackEarnedCents: result.cashbackEarnedCents };
 }
 
 /**

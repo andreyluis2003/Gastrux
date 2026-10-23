@@ -114,6 +114,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         else if (n?.nfce) toast.warning(n.message, { duration: 10000 });
         else if (n?.message) toast.info(n.message);
         if (n?.message) setNfceNote({ tone: n?.nfce?.status === 'authorized' ? 'ok' : 'warn', text: n.message });
+        if (out.cashbackEarnedCents > 0) toast.success(`${out.bill.customer?.name ?? 'O cliente'} ganhou ${brl(out.cashbackEarnedCents)} de cashback`, { duration: 15000 });
         onClosed();
       } else {
         toast.success(`Recebido. Falta ${brl(out.bill.remainingCents)}`);
@@ -126,6 +127,14 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
     } finally {
       setBusy(false);
     }
+  }
+
+  // Cashback as a discount (spec 2026-10-23 §7.1): the server caps it at the balance and at what is left
+  async function cashback(method: 'POST' | 'DELETE') {
+    const res = await fetch(`/api/comanda/sessions/${sessionId}/cashback`, { method, headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) { toast.error(out.error || 'Não foi possível usar o cashback'); load(); return; }
+    setBill(out);
   }
 
   async function refund(entryId: string) {
@@ -197,6 +206,15 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
             <span>{brl(bill.serviceCents)}</span>
           </label>
         )}
+        {bill.cashbackUsedCents > 0 && (
+          <div className="flex justify-between items-center text-emerald-700">
+            <span>Cashback usado</span>
+            <span className="flex items-center gap-2">
+              − {brl(bill.cashbackUsedCents)}
+              {!closed && <button className="text-xs underline" onClick={() => cashback('DELETE')}>tirar</button>}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{brl(bill.totalCents)}</span></div>
         {bill.payments.map((p) => (
           <div key={p.id} className={`flex justify-between items-center ${p.refunded ? 'line-through text-slate-400' : 'text-emerald-700'}`}>
@@ -258,6 +276,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
             <span>Receber agora</span>
             <Input className="w-32" inputMode="decimal" placeholder={(suggested / 100).toFixed(2).replace('.', ',')} value={amountText} onChange={(e) => setAmountText(e.target.value)} />
           </div>
+          <CustomerBox bill={bill} onBill={setBill} useCashback={() => cashback('POST')} />
           <Input placeholder="CPF na nota? (opcional)" value={cpf} onChange={(e) => setCpf(e.target.value)} />
           {shift.loading ? <p className="text-sm">Carregando caixa...</p> : !shift.shiftId && shift.register ? (
             <div className="rounded-md bg-amber-50 p-3 space-y-2">
@@ -281,6 +300,66 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         )}
       </div>
     </Shell>
+  );
+}
+
+/** The customer by phone (cashback and CRM, spec 2026-10-23): optional; a new phone asks the name */
+function CustomerBox({ bill, onBill, useCashback }: { bill: Bill; onBill: (b: Bill) => void; useCashback: () => void }) {
+  const [phone, setPhone] = useState('');
+  const [name, setName] = useState('');
+  const [needName, setNeedName] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function attach() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/comanda/sessions/${bill.sessionId}/customer`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, name: name.trim() || undefined }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 400 && /nome/i.test(out.error ?? '')) { setNeedName(true); return; }
+        toast.error(out.error || 'Não foi possível identificar o cliente');
+        return;
+      }
+      setNeedName(false); setPhone(''); setName('');
+      onBill(out);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function detach() {
+    const res = await fetch(`/api/comanda/sessions/${bill.sessionId}/customer`, { method: 'DELETE' });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) { toast.error(out.error || 'Não foi possível tirar o cliente'); return; }
+    onBill(out);
+  }
+
+  if (bill.customer) {
+    const c = bill.customer;
+    return (
+      <div className="rounded-md border p-3 text-sm space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span><strong>{c.name}</strong>{c.phone ? ` · ${c.phone}` : ''}</span>
+          <button className="text-xs underline" onClick={detach}>trocar</button>
+        </div>
+        {c.balanceCents > 0 && bill.cashbackUsedCents === 0 && (
+          <Button variant="outline" className="w-full" onClick={useCashback}>Usar cashback ({brl(c.balanceCents)})</Button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input inputMode="tel" placeholder="Celular do cliente (cashback), opcional" value={phone} onChange={(e) => { setPhone(e.target.value); setNeedName(false); }} />
+        <Button variant="outline" disabled={saving || phone.replace(/[^0-9]/g, '').length < 10 || (needName && !name.trim())} onClick={attach}>OK</Button>
+      </div>
+      {needName && <Input autoFocus placeholder="Cliente novo: nome" value={name} onChange={(e) => setName(e.target.value)} />}
+    </div>
   );
 }
 
