@@ -39,7 +39,7 @@ const FEATURES_COMPARISON = [
   { category: 'Operação', name: 'Pagamento na mesa (Pix e cartão pelo celular)' },
   { category: 'Operação', name: 'Etiquetas de manipulação' },
   { category: 'Clientes', name: 'Clientes (CRM)' },
-  { category: 'Clientes', name: 'Campanhas e fidelidade' },
+  { category: 'Clientes', name: 'Cashback e campanhas' },
 ];
 
 const getTierFeatureValue = (tierId: string, featureName: string) => {
@@ -78,7 +78,7 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Pagamento na mesa (Pix e cartão pelo celular)': tierId !== 'pro',
     'Etiquetas de manipulação': tierId === 'pro' ? 'Imprimir' : 'Imprimir + validades',
     'Clientes (CRM)': 'Com anotações',
-    'Campanhas e fidelidade': ['business', 'enterprise'].includes(tierId),
+    'Cashback e campanhas': ['business', 'enterprise'].includes(tierId),
   };
 
   return featureMap[featureName] ?? false;

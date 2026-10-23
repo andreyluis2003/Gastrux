@@ -46,6 +46,14 @@ it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a p
   for (const fact of ['Nova conta', 'Parcelar', 'Repetir todo mês', 'gaveta', 'Desfazer pagamento', 'competência', 'CMV']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
 });
 
+it('the cashback article (spec 2026-10-23)', () => {
+  const a = HELP_ARTICLES.find((x) => x.slug === 'cashback');
+  expect(a?.categorySlug).toBe('pdv-e-caixa');
+  for (const fact of ['Celular do cliente', 'Usar cashback', '5%', '6 meses', 'R$ 10', 'Business', 'site de delivery', 'Deduções', 'Venda balcão']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+  // The old points screen is gone: no article sends anyone there
+  for (const x of HELP_ARTICLES) expect([x.slug, x.content.includes('Fidelidade')]).toEqual([x.slug, false]);
+});
+
 it('the 2026-10-20 articles: reports, production plan, shifts and commissions, several stores', () => {
   const facts: Record<string, [string, string[]]> = {
     relatorios: ['financeiro', ['Lucratividade', 'margem de contribuição', 'sem custo', 'DRE', 'Baixar planilha (CSV)', 'Consumo de insumos', 'Previsão do mês', 'Abrir relatório', 'Imprimir ou salvar em PDF', 'Estrela']],
@@ -58,8 +66,6 @@ it('the 2026-10-20 articles: reports, production plan, shifts and commissions, s
     expect([slug, a?.categorySlug]).toEqual([slug, category]);
     for (const fact of list) expect([slug, fact, a?.content.includes(fact)]).toEqual([slug, fact, true]);
   }
-  // Loyalty and cashback earn nothing yet: no article teaches them (2026-10-23)
-  for (const a of HELP_ARTICLES) for (const word of ['Cashback', 'cashback', 'Fidelidade']) expect([a.slug, word, a.content.includes(word)]).toEqual([a.slug, word, false]);
 });
 import { prisma } from '@/lib/prisma';
 

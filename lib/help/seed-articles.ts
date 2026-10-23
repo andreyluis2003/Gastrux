@@ -42,6 +42,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '4a7897cd78a0223844fdd4fbba22e5eec613af7c4ba3ff6e05df24a83d36888a', // turnos-comissoes (2026-10-20, before Editar remuneração)
   '24e420ce5854167428ea970c39c1cf41b5daaf01ff20ef60221209a85d36525f', // planejamento-producao (2026-10-20, before the cook without costs)
   '2c6a185cddba47c6af0046cff712621a7b28e5fa44ca665e1014107e1e66748c', // relatorios (2026-10-20, before Financeiro and Relatório executivo)
+  'ecd65320ff340b387301f956eb4de94561b912cc803d925249f866af3cd20afc', // teste-gratis (before cashback replaced fidelidade)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -161,6 +162,50 @@ Ele só lê; nada muda no sistema sem você confirmar. Cada pessoa vê só o que
 ## Limites por plano
 
 Pro 50 perguntas por mês, Business 350 (no teste grátis, 350). O uso aparece em **Configurações > Uso da IA**.`,
+  },
+  {
+    categorySlug: 'pdv-e-caixa',
+    slug: 'cashback',
+    title: 'Como funciona o cashback?',
+    summary: 'O cliente ganha um crédito em reais a cada compra e usa como desconto na próxima. O caixa digita o celular ao fechar a conta.',
+    keywords: 'cashback, crédito, fidelidade, desconto, cliente, celular, pontos, saldo, voltar, recompensa',
+    order: 3,
+    content: `## O que é
+
+A cada compra, o cliente ganha um crédito em reais (por exemplo, 5% do que pagou) e usa esse crédito como desconto numa próxima conta. É do plano **Business** (e do teste grátis).
+
+## Configurando
+
+Em **Clientes e marketing > Cashback**, o dono ou o gerente define:
+
+- o **percentual** de cada compra (padrão 5%, de 0,5% a 30%)
+- a **validade** do crédito (padrão 6 meses)
+- o **mínimo para usar** (padrão R$ 10)
+- e pode desligar o cashback a qualquer momento
+
+O crédito é sobre o valor dos itens. Taxa de serviço, taxa de entrega e o próprio cashback usado não entram.
+
+## No fechamento da conta
+
+1. Na conta, digite o **Celular do cliente (cashback)** e toque em **OK**. Cliente novo: o Gastrux pede o nome
+2. Se o cliente tem saldo a partir do mínimo, aparece **Usar cashback (R$ X)**. Ele abate até o que falta pagar
+3. Receba o restante normalmente. Ao fechar, o cliente ganha o crédito da compra e o cupom mostra quanto ele ganhou
+
+Na **Venda balcão**, o campo do celular também existe: o cliente ganha o crédito, mas o saldo só é usado na conta. Venda feita sem internet ganha o crédito quando chegar ao servidor.
+
+No **site de delivery**, o cliente é reconhecido pelo celular do pedido e ganha o crédito quando o pedido é concluído. O saldo ainda não pode ser usado no site.
+
+## Validade e estorno
+
+O crédito mais antigo é usado primeiro. Crédito vencido sai do saldo sozinho. Se a conta for reaberta ou cancelada, o crédito que ela gerou é desfeito e o cashback que ela usou volta para o cliente.
+
+## Onde ver
+
+- **Clientes e marketing > Cashback**: quanto foi creditado e usado no mês, o saldo dos clientes, o que vence em 30 dias e as últimas movimentações
+- **Clientes (CRM)**: o saldo e o extrato de cada cliente
+- **DRE**: o cashback usado aparece em Deduções, como desconto
+
+> No plano Pro, o celular na conta já soma as compras do cliente no CRM, sem o cashback.`,
   },
   {
     categorySlug: 'pdv-e-caixa',
@@ -549,7 +594,7 @@ Nos dias 23, 27 e 30 do teste, o sino do Gastrux e o e-mail do dono avisam que o
 No rodapé do menu, abra **Minha assinatura** (só o dono vê) e escolha:
 
 - **Pro** (R$ 149 por mês): vender, caixa, nota fiscal, cozinha com 2 estações, estoque, fichas técnicas e CMV, 2 usuários
-- **Business** (R$ 199 por mês): tudo do Pro, mais pagamento na mesa pelo celular, controle de validades, indicadores das contas de consumo, campanhas e fidelidade, 5 usuários e 5 estações de cozinha
+- **Business** (R$ 199 por mês): tudo do Pro, mais pagamento na mesa pelo celular, controle de validades, indicadores das contas de consumo, cashback e campanhas, 5 usuários e 5 estações de cozinha
 
 Cada plano tem uma referência de vendas por mês: Pro 1.000 e Business 3.500. Passar dela só gera um aviso, nunca trava uma venda. Fichas técnicas: Pro 100 e Business 500.
 

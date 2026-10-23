@@ -27,7 +27,12 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 Nenhum artigo da /ajuda ensina estas telas (o teste `help-seed-articles.test.ts` impede citar Cashback,
 Previsões e Relatório executivo). Todas estão no menu e esperam decisão do dono.
 
-- **Fidelidade e Cashback** (Clientes e marketing): nenhuma venda gera pontos nem cashback. `POST /api/cashback`
+- ~~**Fidelidade e Cashback**~~ e ~~**Clientes (CRM)**~~ (resolvidos 2026-10-23 pelo cashback, spec
+  `docs/superpowers/specs/2026-10-23-cashback-design.md`, migração `20261023120000_cashback`). Ficaram sem tela, para a
+  limpeza das rotas: as tabelas `loyalty_*` e as rotas `/api/loyalty/*`, `/api/cashback` (GET/POST antigos, pontos),
+  `/api/cashback/stats`, `/api/cashback/redeem`, `/api/indicacao` e `lib/loyalty/get-program.ts`. Delivery só acumula
+  (spec §4.a): usar o saldo no site espera o código de confirmação pelo WhatsApp (verificação da Meta).
+  Era assim: nenhuma venda gerava pontos nem cashback. `POST /api/cashback`
   (credita o cashback e soma `Customer.totalSpent`) não é chamado por nenhuma tela nem pelo fechamento de conta;
   os pontos só entram por `/api/indicacao`. Os "marcos" de `/dashboard/loyalty/milestones` são gravados e nunca
   aplicados a pedido nenhum. `/dashboard/loyalty` não tem botão para criar programa (o programa padrão só nasce em

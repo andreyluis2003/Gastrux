@@ -54,7 +54,7 @@ export const BASE_PRICING_TIERS = {
       'Controle de validades com aviso',
       'Indicadores das contas de consumo e aviso de diferença na contagem',
       'Contas a pagar com avisos, repetição automática e boletos da nota de compra',
-      'Campanhas e programa de fidelidade',
+      'Cashback para seus clientes e campanhas',
       'Relatórios avançados',
       'Até 2 lojas',
       'Assistente com IA: 350 perguntas por mês',

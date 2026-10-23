@@ -16,7 +16,7 @@ const FEATURES: FeatureRow[] = [
   { feature: 'Cardápio digital com QR Code', plan: 'Todos' },
   { feature: 'Etiquetas de manipulação (controle de validades no Business)', plan: 'Todos' },
   { feature: 'Clientes: lista e histórico (anotações no Pro)', plan: 'Todos' },
-  { feature: 'Campanhas e programa de fidelidade', plan: 'Business ou superior' },
+  { feature: 'Cashback para seus clientes e campanhas', plan: 'Business ou superior' },
   { feature: 'Multi-loja', plan: 'Business (2 lojas) ou Enterprise' },
   { feature: 'NFC-e (com certificado e dados do contador)', plan: 'Todos' },
   { feature: 'Recebimento de pedidos externos por webhook (API)', plan: 'Pro ou superior' },
