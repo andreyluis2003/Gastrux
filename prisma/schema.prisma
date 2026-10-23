@@ -1825,6 +1825,11 @@ model OrderSession {
   mergedIntoId           String?
   /// The table asked to pay with the waiter (pay at the table); cleared by a payment or when the bill closes
   payAtWaiterRequestedAt DateTime?
+  /// The customer identified by phone at the bill (cashback and CRM, 2026-10-23)
+  customerId             String?
+  customer               Customer?             @relation("OrderSessionCustomer", fields: [customerId], references: [id])
+  /// Cashback used as a discount on this bill (lib/cashback/service.ts)
+  cashbackUsedCents      Int                   @default(0)
   onlinePayments         Payment[]             @relation("OrderSessionOnlinePayments")
   /// Every kitchen order of this comanda (orderId above keeps only the latest)
   kitchenOrders          Order[]               @relation("OrderComanda")
@@ -2499,8 +2504,11 @@ model OrderTrace {
 model Customer {
   id                  String                   @id @default(cuid())
   name                String
-  email               String                   @unique
+  /// Optional since the cashback (2026-10-23): the cashier identifies the customer by phone
+  email               String?                  @unique
   phone               String?
+  /// DDD + number, digits only (lib/cashback/rules.ts normalizePhone); one customer per phone in a restaurant
+  phoneDigits         String?
   birthDate           DateTime?
   address             String?
   city                String?
@@ -2521,7 +2529,11 @@ model Customer {
   customerSegment     CustomerSegment?
   loyaltyTransactions LoyaltyTransaction[]
   orders              Order[]
+  orderSessions       OrderSession[]           @relation("OrderSessionCustomer")
+  cashbackCredits     CashbackCredit[]
+  cashbackUses        CashbackUse[]
 
+  @@unique([restaurantId, phoneDigits])
   @@index([email])
   @@index([phone])
   @@index([status])
@@ -4896,4 +4908,52 @@ model Payable {
   @@index([restaurantId, status, dueDate])
   @@index([restaurantId, competenceMonth])
   @@map("payables")
+}
+
+/// The owner's cashback rule (spec docs/superpowers/specs/2026-10-23-cashback-design.md); no row = the defaults
+model CashbackSettings {
+  id             String   @id @default(cuid())
+  restaurantId   String   @unique
+  enabled        Boolean  @default(true)
+  percent        Decimal  @default(5) @db.Decimal(5, 2)
+  validityMonths Int      @default(6)
+  minUseCents    Int      @default(1000)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("cashback_settings")
+}
+
+/// Cashback earned by one sale (a closed bill or a completed delivery order), once per sale
+model CashbackCredit {
+  id             String    @id @default(cuid())
+  restaurantId   String
+  customerId     String
+  customer       Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderSessionId String?   @unique
+  orderId        String?   @unique
+  amountCents    Int
+  remainingCents Int
+  expiresAt      DateTime
+  reversedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([restaurantId, customerId])
+  @@map("cashback_credits")
+}
+
+/// Cashback used as a discount on a bill; allocations = [{ creditId, cents }] it came from
+model CashbackUse {
+  id             String    @id @default(cuid())
+  restaurantId   String
+  customerId     String
+  customer       Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderSessionId String    @unique
+  amountCents    Int
+  allocations    Json
+  reversedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([restaurantId, customerId])
+  @@map("cashback_uses")
 }
