@@ -43,6 +43,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '24e420ce5854167428ea970c39c1cf41b5daaf01ff20ef60221209a85d36525f', // planejamento-producao (2026-10-20, before the cook without costs)
   '2c6a185cddba47c6af0046cff712621a7b28e5fa44ca665e1014107e1e66748c', // relatorios (2026-10-20, before Financeiro and Relatório executivo)
   'ecd65320ff340b387301f956eb4de94561b912cc803d925249f866af3cd20afc', // teste-gratis (before cashback replaced fidelidade)
+  '5ff659663983995fad1368b4227d261d8d8682f1a98add0f5f381427c65e49e1', // contas-de-consumo (before the % of revenue only for a finished month)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -666,7 +667,7 @@ A conta entra no mês de referência, na linha **Contas de consumo**, em todos o
 
 ## Indicadores e aviso (plano Business)
 
-Comparação com o mês anterior, com a média de 3 meses e com o mesmo mês do ano passado, preço por kWh ou m³ e quanto a conta pesa no faturamento. O sino avisa quando o consumo fica 20% acima da média dos meses anteriores (precisa de 2 meses lançados).
+Comparação com o mês anterior, com a média de 3 meses e com o mesmo mês do ano passado, preço por kWh ou m³ e quanto a conta pesa no faturamento (só para mês que já terminou: o mês em andamento ainda não tem todas as vendas). O sino avisa quando o consumo fica 20% acima da média dos meses anteriores (precisa de 2 meses lançados).
 
 Uma conta que não usa mais pode ser desativada: ela sai da lista e o histórico fica guardado.`,
   },

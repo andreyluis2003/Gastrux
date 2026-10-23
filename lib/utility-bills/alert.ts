@@ -18,20 +18,24 @@ export async function alertIfAbove(restaurantId: string, accountId: string, ym: 
   const ind = indicators(account.kind as UtilityKind, ym, bills, null);
   if (!shouldAlert(ind)) return false;
   const dedupeKey = `utility:${accountId}:${ym}`;
-  const existing = await prisma.notification.findFirst({ where: { restaurantId, data: { path: ['dedupeKey'], equals: dedupeKey } }, select: { id: true } });
-  if (existing) return false;
   const text = alertText(account.name, account.kind as UtilityKind, ym, ind);
-  await prisma.notification.create({
-    data: {
-      restaurantId,
-      type: 'SYSTEM_INFO',
-      severity: 'HIGH',
-      title: text.title,
-      message: text.message,
-      actionUrl: '/dashboard/financeiro/contas',
-      actionLabel: 'Ver contas',
-      data: { kind: 'utility_above_average', dedupeKey, accountId, month: ym },
-    },
+  // Check and create under one lock: two saves at once rang the bell twice (pendências #3)
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${dedupeKey}))`;
+    const existing = await tx.notification.findFirst({ where: { restaurantId, data: { path: ['dedupeKey'], equals: dedupeKey } }, select: { id: true } });
+    if (existing) return false;
+    await tx.notification.create({
+      data: {
+        restaurantId,
+        type: 'SYSTEM_INFO',
+        severity: 'HIGH',
+        title: text.title,
+        message: text.message,
+        actionUrl: '/dashboard/financeiro/contas',
+        actionLabel: 'Ver contas',
+        data: { kind: 'utility_above_average', dedupeKey, accountId, month: ym },
+      },
+    });
+    return true;
   });
-  return true;
 }

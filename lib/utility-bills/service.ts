@@ -42,6 +42,8 @@ export async function updateAccount(member: RestaurantMember, id: string, body: 
   const account = await ownAccount(member, id);
   const data: { name?: string; active?: boolean } = {};
   if (typeof body.name === 'string' && body.name.trim()) {
+    // Only "Outra conta" has a name of its own (spec 2026-10-16; pendências #12)
+    if (account.kind !== 'OTHER') throw new UtilityError('Só "Outra conta" pode mudar de nome');
     data.name = body.name.trim().slice(0, 60);
     await assertNameFree(member.restaurantId, data.name, account.id);
   }
@@ -68,12 +70,18 @@ export async function upsertBill(
   const dueDate = noDueDate ? null : new Date(`${body.dueDate}T00:00:00.000Z`);
   const notes = typeof body.notes === 'string' && body.notes.trim() ? body.notes.trim().slice(0, 300) : null;
   const key = { accountId_referenceMonth: { accountId: account.id, referenceMonth: monthDate(ym) } };
-  const previous = await prisma.utilityBill.findUnique({ where: key });
-  const bill = await prisma.utilityBill.upsert({
-    where: key,
-    create: { accountId: account.id, restaurantId: member.restaurantId, referenceMonth: monthDate(ym), amountCents, consumption, dueDate, notes, createdById: member.userId },
-    update: { amountCents, consumption, dueDate, notes, updatedById: member.userId },
-    select: { id: true },
+  // One save of an account and month at a time: two at once both read "no previous", and the second one
+  // overwrote without audit (pendências #3, 2026-10-23)
+  const { previous, bill } = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`utility-bill:${account.id}:${ym}`}))`;
+    const previous = await tx.utilityBill.findUnique({ where: key });
+    const bill = await tx.utilityBill.upsert({
+      where: key,
+      create: { accountId: account.id, restaurantId: member.restaurantId, referenceMonth: monthDate(ym), amountCents, consumption, dueDate, notes, createdById: member.userId },
+      update: { amountCents, consumption, dueDate, notes, updatedById: member.userId },
+      select: { id: true },
+    });
+    return { previous, bill };
   });
   if (previous) {
     await recordAudit(member, {
@@ -119,8 +127,9 @@ export async function loadScreen(member: RestaurantMember, now = new Date()) {
       let ind: Indicators | null = null;
       if (insights) {
         const points: Record<string, BillPoint> = Object.fromEntries(bills.map((b) => [b.referenceMonth, { amountCents: b.amountCents, consumption: b.consumption }]));
-        if (!salesCache.has(ym)) salesCache.set(ym, await monthSalesCents(restaurantId, ym));
-        ind = indicators(kind, ym, points, salesCache.get(ym)!);
+        // Only a finished month: the month still running has part of its sales (pendências #6)
+        if (ym < cur && !salesCache.has(ym)) salesCache.set(ym, await monthSalesCents(restaurantId, ym));
+        ind = indicators(kind, ym, points, ym < cur ? salesCache.get(ym)! : null);
       }
       latest = { referenceMonth: ym, indicators: ind };
     }

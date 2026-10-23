@@ -128,7 +128,7 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   const despesasPessoal = pessoalOrigem === 'estimativa' ? estimativaPessoal : payrollCents / 100;
   const lastDay = new Date(Date.UTC(Number(endMonth.slice(0, 4)), Number(endMonth.slice(5, 7)), 0)).getUTCDate();
   const partialMonth = !startDate.endsWith('-01') || Number(endDate.slice(8, 10)) !== lastDay;
-  const contasConsumoMesInteiro = contasConsumo > 0 && partialMonth;
+  const contasConsumoNotaMesInteiro = contasConsumo > 0 && partialMonth;
   // Bills (and payroll bills) also count by their whole month
   const contasMesInteiro = (contasAPagar > 0 || payrollMonths.size > 0) && partialMonth;
 
@@ -181,7 +181,7 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
         taxasGateway,
         total: despesasTotais + taxasGateway,
       },
-      contasConsumoMesInteiro,
+      contasConsumoNotaMesInteiro,
       contasMesInteiro,
       pessoalOrigem,
       resultadoOperacional,

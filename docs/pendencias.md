@@ -213,21 +213,12 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 
 - ~~**2. Ponto no consumo**~~ (RESOLVIDO 2026-10-20): a leitura continua ("1.500" = 1500, como na conta), mas a
   tela mostra abaixo do campo "Vai ser gravado: 1.500 m³" e avisa que o ponto separa milhar.
-- **3. Duas gravações ao mesmo tempo** (`lib/utility-bills/service.ts` saveBill, `alert.ts`): duas gravações da
-  mesma conta e mês leem `previous = null`; a segunda sobrescreve sem auditoria e as duas dizem `corrected: false`.
-  O aviso é "verifica e cria" sem chave única, então o sino pode tocar duas vezes. Correção: auditoria numa
-  transação ou chave única para o aviso.
-- **6. % das vendas usa mês parcial** quando a última conta é do mês corrente (indicadores em service.ts):
-  exagera a fatia. Marcar "mês em andamento" ou usar o mês anterior.
-- **7. Nome do campo invertido**: `contasConsumoMesInteiro` (`lib/finance/dre.ts`) é `true` quando o período é
-  parcial (mostra a nota "entram pelo mês inteiro"). Renomear para `contasConsumoNotaMesInteiro`.
 - ~~**8/9. Data impossível dá 500**~~ (RESOLVIDO 2026-10-20: `isValidYmd` em `lib/dates.ts` na DRE, no vencimento
   e no período da IA, que dava RangeError com mês 13; vencimento inválido agora é 400 em vez de virar vazio): a DRE agora valida o formato AAAA-MM-DD (c3b8637), mas uma data como
   `2026-02-31` ainda não volta 400; o mesmo vale para `dueDate` em saveBill (`lib/utility-bills/service.ts:65`,
   só regex). A tela não manda isso; a API aceita.
-- **12. Pequenas diferenças da spec**: o gráfico do Pro mostra uma série por mês (consumo ou valor), não as duas;
-  o PATCH da conta deixa renomear qualquer tipo (a spec diz só "Outra"; a tela não renomeia); o GET devolve
-  cerca de 15 meses em vez de 13 (inofensivo).
+- **12. Pequenas diferenças da spec** (o resto foi resolvido em 2026-10-23): o gráfico mostra uma série por mês
+  (consumo ou valor), não as duas; o GET devolve cerca de 15 meses em vez de 13 (inofensivo).
 - **14. `createdById` com ON DELETE RESTRICT** (`UtilityBill`, migração 20261016150000_utility_bills): apagar um
   usuário que lançou contas vai falhar. Hoje não existe exclusão de usuário (a da LGPD está comentada);
   resolver quando ela existir.
@@ -239,6 +230,10 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
   num mês fora da lista), 5 (aviso sem ano e sino para meses antigos) e 11 (conta fixa duplicada em vez de
   reativar). Todos na publicação b6b05cf.
 - 10: desativar sem confirmação, 24388c2. 13: a tela usa `shouldAlert` em vez de repetir a regra.
+- 2026-10-23 (testes em `utility-bills.test.ts` e `utility-dre.test.ts`): 3 (gravar a mesma conta e mês espera a
+  outra gravação, com trava; o aviso checa e cria sob trava, toca uma vez), 6 (% do faturamento só para mês que já
+  terminou; ajuda e IA dizem isso), 7 (`contasConsumoNotaMesInteiro`, também na resposta da IA, que lia ao contrário)
+  e 12 em parte (só "Outra conta" muda de nome pela API).
 
 ## Contagem de espetos (2026-10-16)
 

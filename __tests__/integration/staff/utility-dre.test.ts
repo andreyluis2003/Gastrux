@@ -46,14 +46,14 @@ describe('DRE: contas de consumo', () => {
   it('September shows the September bills, typed late or not; not August, not other restaurants', async () => {
     const body = await dre('2026-09-01', '2026-09-30');
     expect(body.dre.despesasOperacionais.contasConsumo).toBe(4240);
-    expect(body.dre.contasConsumoMesInteiro).toBe(false);
+    expect(body.dre.contasConsumoNotaMesInteiro).toBe(false);
   });
 
   it('a period spanning August and September takes both; a partial month is flagged', async () => {
     expect((await dre('2026-08-01', '2026-09-30')).dre.despesasOperacionais.contasConsumo).toBe(5340);
     const partial = await dre('2026-09-10', '2026-09-20');
     expect(partial.dre.despesasOperacionais.contasConsumo).toBe(4240);
-    expect(partial.dre.contasConsumoMesInteiro).toBe(true);
+    expect(partial.dre.contasConsumoNotaMesInteiro).toBe(true);
   });
 
   it('the line enters the operating expenses total', async () => {

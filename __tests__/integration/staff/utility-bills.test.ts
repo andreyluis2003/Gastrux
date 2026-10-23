@@ -157,3 +157,89 @@ describe('contas de consumo', () => {
     expect(await prisma.notification.count({ where: { restaurantId: p.rid } })).toBe(before);
   });
 });
+
+// Pendências #3 (2026-10-23): two saves of the same bill at once both read "no previous", the second overwrote
+// without audit, and the alert's "check then create" could ring twice
+describe('contas de consumo: two saves of the same bill at once', () => {
+  beforeAll(() => { jest.useFakeTimers({ now: new Date('2026-10-16T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] }); });
+  afterAll(() => { jest.useRealTimers(); });
+  let b;
+  beforeAll(async () => { b = await setup('business'); }, 60000);
+  afterAll(async () => {
+    try { await prisma.notification.deleteMany({ where: { restaurantId: b.rid } }); } catch {}
+    try { await prisma.restaurant.deleteMany({ where: { id: b.rid } }); } catch {}
+    try { await prisma.user.deleteMany({ where: { id: { in: b.userIds } } }); } catch {}
+  });
+
+  it('one creates, the other corrects it with an audit, and the bell rings once', async () => {
+    as(b.owner);
+    const energy = await account({ kind: 'ENERGY' });
+    for (const [m, kwh] of [['2026-06', 1000], ['2026-07', 1000], ['2026-08', 1000]]) await save({ accountId: energy.id, referenceMonth: m, amount: 1000, consumption: kwh });
+    const results = [];
+    for (let round = 0; round < 5; round++) {
+      const ym = `2026-0${round + 1}`; // months without history: no alert, only the audit race
+      const [x, y] = await Promise.all([
+        save({ accountId: energy.id, referenceMonth: ym, amount: 100, consumption: 10 }),
+        save({ accountId: energy.id, referenceMonth: ym, amount: 200, consumption: 20 }),
+      ]);
+      results.push([(await x.json()).corrected, (await y.json()).corrected].sort());
+    }
+    expect(results).toEqual(Array(5).fill([false, true]));
+    const ids = (await prisma.utilityBill.findMany({ where: { accountId: energy.id, referenceMonth: { lt: new Date('2026-06-01') } }, select: { id: true } })).map((r) => r.id);
+    expect(await prisma.auditLog.count({ where: { restaurantId: b.rid, entityType: 'UtilityBill', entityId: { in: ids } } })).toBe(5);
+    // September far above June-August, saved twice at once: one alert
+    await Promise.all([
+      save({ accountId: energy.id, referenceMonth: '2026-09', amount: 2000, consumption: 2000 }),
+      save({ accountId: energy.id, referenceMonth: '2026-09', amount: 2000, consumption: 2100 }),
+    ]);
+    expect(await prisma.notification.count({ where: { restaurantId: b.rid, data: { path: ['dedupeKey'], equals: `utility:${energy.id}:2026-09` } } })).toBe(1);
+  }, 60000);
+});
+
+// Pendências #6 (2026-10-23): the bill of the month still running was divided by half a month of sales
+describe('contas de consumo: % of revenue only for a finished month', () => {
+  beforeAll(() => { jest.useFakeTimers({ now: new Date('2026-10-16T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask', 'hrtime', 'performance', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback'] }); });
+  afterAll(() => { jest.useRealTimers(); });
+  let b;
+  beforeAll(async () => { b = await setup('business'); }, 60000);
+  afterAll(async () => {
+    try { await prisma.order.deleteMany({ where: { restaurantId: b.rid } }); } catch {}
+    try { await prisma.restaurant.deleteMany({ where: { id: b.rid } }); } catch {}
+    try { await prisma.user.deleteMany({ where: { id: { in: b.userIds } } }); } catch {}
+  });
+
+  it('September shows its share of sales; October (still running) does not', async () => {
+    as(b.owner);
+    for (const at of ['2026-09-15T20:00:00Z', '2026-10-10T20:00:00Z']) {
+      await prisma.order.create({ data: { restaurantId: b.rid, orderNumber: `UB${tag}${seq++}`, status: 'COMPLETED', total: 10000, createdAt: new Date(at) } });
+    }
+    const water = await account({ kind: 'WATER' });
+    const gas = await account({ kind: 'PIPED_GAS' });
+    await save({ accountId: water.id, referenceMonth: '2026-09', amount: 500, consumption: 10 });
+    await save({ accountId: gas.id, referenceMonth: '2026-10', amount: 500, consumption: 10 });
+    const sc = await screen();
+    expect(sc.accounts.find((a) => a.id === water.id).latest.indicators.revenuePct).toBeCloseTo(5, 5);
+    expect(sc.accounts.find((a) => a.id === gas.id).latest.indicators.revenuePct).toBeNull();
+  });
+});
+
+// Pendências #12 (2026-10-23): only "Outra conta" has a name of its own (spec); the fixed kinds keep theirs
+describe('contas de consumo: renaming', () => {
+  let b;
+  beforeAll(async () => { b = await setup('pro'); }, 60000);
+  afterAll(async () => {
+    try { await prisma.restaurant.deleteMany({ where: { id: b.rid } }); } catch {}
+    try { await prisma.user.deleteMany({ where: { id: { in: b.userIds } } }); } catch {}
+  });
+
+  it('a fixed kind cannot be renamed; "Outra" can', async () => {
+    as(b.owner);
+    const energy = await account({ kind: 'ENERGY' });
+    const other = await account({ kind: 'OTHER', name: 'Aluguel do freezer' });
+    const res = await EDIT_ACCOUNT(req('PATCH', { name: 'Minha luz' }), { params: { id: energy.id } });
+    expect(res.status).toBe(400);
+    expect((await prisma.utilityAccount.findUnique({ where: { id: energy.id } })).name).toBe('Energia');
+    expect((await EDIT_ACCOUNT(req('PATCH', { name: 'Freezer alugado' }), { params: { id: other.id } })).status).toBe(200);
+    expect((await prisma.utilityAccount.findUnique({ where: { id: other.id } })).name).toBe('Freezer alugado');
+  });
+});
