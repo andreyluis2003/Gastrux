@@ -4,6 +4,8 @@
  * Envia notificações críticas para o administrador do sistema
  */
 
+import { sendTransactionalEmail } from '@/lib/email/transactional';
+
 interface SendAdminAlertParams {
   notificationId: string;
   subject: string;
@@ -74,40 +76,13 @@ export async function sendAdminAlert(params: SendAdminAlertParams) {
       subject,
       htmlBody,
       recipientEmail = DEFAULT_ADMIN_EMAIL,
-      appUrl = process.env.NEXTAUTH_URL || '',
-      appName = appUrl ? new URL(appUrl).hostname.split('.')[0] : 'Gastrux',
     } = params;
-
-    const senderEmail = process.env.SENDER_EMAIL || `noreply@${appUrl ? new URL(appUrl).hostname : 'gastrux.com'}`;
 
     // Fire Telegram alert in parallel (non-blocking, no-op if not configured)
     sendTelegramAlert(subject, htmlToPlain(htmlBody)).catch(() => {});
 
-    const response = await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        app_id: process.env.WEB_APP_ID,
-        notification_id: notificationId,
-        subject,
-        body: htmlBody,
-        is_html: true,
-        recipient_email: recipientEmail,
-        sender_email: senderEmail,
-        sender_alias: `${appName} - Alertas`,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!result.success) {
-      if (result.notification_disabled) {
-        console.log('Admin notification disabled, skipping email');
-        return true;
-      }
-      throw new Error(result.message || 'Failed to send alert');
-    }
+    // Resend (owner, 2026-10-23): Abacus needed NOTIF_ID_* keys production never had, so these never left
+    await sendTransactionalEmail({ to: recipientEmail, subject, html: htmlBody, notificationId });
 
     console.log(`Admin alert sent: ${subject}`);
     return true;

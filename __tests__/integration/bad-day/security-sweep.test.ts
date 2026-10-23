@@ -16,7 +16,6 @@ jest.mock('../../../lib/whatsapp/get-restaurant', () => ({ getCurrentRestaurantI
 
 import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
-import { POST as batchEmail } from '../../../app/api/admin/batch-email-send/route';
 import { POST as cleanupCounters } from '../../../app/api/admin/cleanup-transaction-counters/route';
 // The Abacus onboarding routes (send-onboarding, check-onboarding-emails) left on 2026-10-19 for this one
 import { POST as sendOnboarding, GET as checkOnboarding } from '../../../app/api/email/onboarding-sequence/route';
@@ -67,7 +66,6 @@ describe('security sweep of the rest of the API', () => {
     it('with no secret configured, a request without credentials is refused (it used to pass)', async () => {
       delete process.env.CRON_SECRET;
       delete process.env.ADMIN_CLEANUP_SECRET;
-      expect((await batchEmail(json('http://x/api/admin/batch-email-send', { emailType: 'day3' }))).status).toBe(401);
       expect((await cleanupCounters(json('http://x/api/admin/cleanup-transaction-counters', {}, { 'X-Admin-Secret': 'default-secret' }))).status).toBe(401);
       expect((await sendOnboarding(json('http://x/api/email/onboarding-sequence', {}))).status).toBe(401);
       expect((await checkOnboarding(new NextRequest('http://x/api/email/onboarding-sequence'))).status).toBe(401);

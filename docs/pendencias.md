@@ -80,11 +80,14 @@ send-day7, send-onboarding, check-onboarding-emails e `lib/email-templates/onboa
 
 ### Abertos
 
-- **Outros e-mails ainda pela Abacus.ai** (`sendNotificationEmail` em `lib/email-service.ts` ou fetch direto para
-  apps.abacus.ai): os segmentados (`/api/email/check-segmented-emails`, send-new-user, send-inactive,
-  send-early-adopter), `/api/admin/batch-email-send`, lembrete de reserva (`/api/email/send-reminder`),
-  e `lib/admin-alerts.ts`. Sem `NOTIF_ID_*` em produção eles não saem. Rever texto e
-  passar para Resend (`sendTransactionalEmail`) ou apagar, um por um.
+- ~~**Outros e-mails ainda pela Abacus.ai**~~ (decisão do dono, 2026-10-23): os alertas da Plataforma
+  (`lib/admin-alerts.ts`) saem pelo Resend; os segmentados (`check-segmented-emails`, send-new-user, send-inactive,
+  send-early-adopter) e `/api/admin/batch-email-send` (com `lib/email-ab-test.ts`) foram apagados.
+- **Lembrete de reserva** (`/api/email/send-reminder`, `/api/reservations/send-reminders`): o dono aprovou passar para o
+  Resend, mas a cadeia nunca funcionou (nada cria `ReservationReminder`, a rota `/api/notifications/send-email` que ela
+  chama não existe, nenhum cron a dispara) e as próprias Reservas são tela escondida (`/admin/reservations` e a página
+  pública `/reservations/[restaurantId]` sem link no menu, na ajuda ou na IA). Espera o dono decidir se as Reservas viram
+  recurso de verdade (então o lembrete entra junto) ou saem.
 - Os campos antigos da sequência em `users` (emailSentDay3/Day21/TrialEnding, emailVariant*, emailDay*OpenedAt)
   ficaram sem uso; apagar numa migração futura, junto com os que a tela de funil (`/api/analytics/conversion-funnel`) lê.
 
