@@ -13,7 +13,7 @@ import { brl, reaisToCents } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
-import { nextEqualShare, shareForItems, splitEqually } from '@/lib/comanda/bill';
+import { nextEqualShare, serviceRow, shareForItems, splitEqually } from '@/lib/comanda/bill';
 import { noteLabel } from '@/lib/nfe/access-key';
 import type { Bill } from '@/lib/comanda/bill-service';
 
@@ -61,6 +61,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
 
   if (!bill) return <Shell onCancel={onCancel}><p>Carregando...</p></Shell>;
   const closed = bill.status === 'CLOSED';
+  const service = serviceRow(bill, closed);
 
   // What to receive now: the whole remainder, one person's equal share, or the picked items' share
   const suggested = mode === 'equal'
@@ -197,11 +198,11 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
 
       <div className="border-t pt-2 space-y-1 text-sm">
         <div className="flex justify-between"><span>Subtotal</span><span>{brl(bill.subtotalCents)}</span></div>
-        {bill.applies && bill.percent > 0 && (
+        {service.show && (
           <label className="flex justify-between items-center gap-2">
             <span className="flex items-center gap-2">
-              <input type="checkbox" disabled={closed} checked={!bill.waived} onChange={(e) => toggleService(e.target.checked)} />
-              Taxa de serviço ({bill.percent}%){bill.waived ? ' — cliente não quis pagar' : ''}
+              {service.editable && <input type="checkbox" checked={service.charged} onChange={(e) => toggleService(e.target.checked)} />}
+              Taxa de serviço ({bill.percent}%){service.charged ? '' : ' — cliente não quis pagar'}
             </span>
             <span>{brl(bill.serviceCents)}</span>
           </label>

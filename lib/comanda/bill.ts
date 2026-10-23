@@ -22,6 +22,15 @@ export function billTotals(subtotalCents: number, percent: number, opts: { appli
   return { subtotalCents, serviceCents, totalCents: subtotalCents + serviceCents };
 }
 
+/**
+ * The service charge row of the bill screen: a choice while open; once closed, the charge it was closed
+ * with, read from the amount, as text (2026-10-23: a disabled checkbox looked unticked on a closed bill)
+ */
+export function serviceRow(bill: { applies: boolean; percent: number; waived: boolean; serviceCents: number }, closed: boolean) {
+  if (closed) return { show: bill.serviceCents > 0 || (bill.applies && bill.percent > 0), editable: false, charged: bill.serviceCents > 0 };
+  return { show: bill.applies && bill.percent > 0, editable: true, charged: !bill.waived };
+}
+
 /** What the cash register holds for this bill: receipts, minus change given back, minus refunds */
 export function paidNetCents(entries: Array<{ type: string; method: string; amountCents: number; direction?: 'IN' | 'OUT' | null }>): number {
   return entries.reduce((sum, e) => sum + entryEffect(e as Parameters<typeof entryEffect>[0]), 0);
