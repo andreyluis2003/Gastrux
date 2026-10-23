@@ -7,6 +7,8 @@ import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery-payments/choice';
 import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/delivery-payments/order-input';
+import { formatPhone, normalizePhone } from '@/lib/cashback/rules';
+import { findCustomerByPhone } from '@/lib/cashback/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,30 +128,26 @@ export async function POST(req: NextRequest) {
 
     const orderNumber = generateOrderNumber();
 
-    // Find or create customer, scoped to this restaurant. Customer.email is
-    // globally unique (not per-restaurant), so if this email already belongs
-    // to a customer at a different restaurant, skip linking a Customer to
-    // this order rather than misattributing someone else's CRM record or
-    // crashing on the unique constraint.
+    // The customer of this restaurant by phone (cashback and CRM, spec 2026-10-23 §7.3); the e-mail is optional
+    // and globally unique, so it is saved only when no other customer has it. Without a valid phone, by e-mail.
     let customer = null;
-    if (customerEmail) {
-      customer = await prisma.customer.findFirst({ where: { email: customerEmail, restaurantId } });
+    const phoneDigits = normalizePhone(customerPhone);
+    const emailFree = async () => !customerEmail || !(await prisma.customer.findUnique({ where: { email: customerEmail } }));
+    if (phoneDigits) {
+      customer = await findCustomerByPhone(prisma, restaurantId, phoneDigits);
       if (!customer) {
-        const emailTakenElsewhere = await prisma.customer.findUnique({ where: { email: customerEmail } });
-        if (!emailTakenElsewhere) {
-          customer = await prisma.customer.create({
-            data: {
-              restaurantId,
-              name: customerName,
-              email: customerEmail,
-              phone: customerPhone,
-              address: deliveryAddress,
-              city: deliveryCity || '',
-              zipCode: deliveryZipCode || '',
-            },
-          });
-        }
+        customer = await prisma.customer.create({
+          data: {
+            restaurantId, name: customerName, phone: formatPhone(phoneDigits), phoneDigits,
+            email: (await emailFree()) ? customerEmail || null : null,
+            address: deliveryAddress, city: deliveryCity || '', zipCode: deliveryZipCode || '',
+          },
+        });
+      } else if (!customer.email && customerEmail && (await emailFree())) {
+        customer = await prisma.customer.update({ where: { id: customer.id }, data: { email: customerEmail } });
       }
+    } else if (customerEmail) {
+      customer = await prisma.customer.findFirst({ where: { email: customerEmail, restaurantId } });
     }
 
     // Customer-supplied text that goes into the order note: each value is collapsed to one

@@ -44,6 +44,9 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [search, setSearch] = useState('');
   const [cpf, setCpf] = useState('');
+  // The customer for the cashback and the CRM (spec 2026-10-23 §7.2): earns, never uses; a new phone needs the name
+  const [phone, setPhone] = useState('');
+  const [customerName, setCustomerName] = useState('');
   // Payments of the sale and this device's cash shift (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md §8.3)
   const [payments, setPayments] = useState<PanelPayment[]>([]);
   const shift = useDeviceShift();
@@ -94,6 +97,8 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           clientId,
           items: lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
           customerCPF: cpf.replace(/\D/g, '') || undefined,
+          customerPhone: phone.trim() || undefined,
+          customerName: customerName.trim() || undefined,
           cashSessionId: shift.shiftId,
           payments: payments.map((p) => ({ method: p.method, amount: toApiAmount(p.amount) })),
           // Made without internet: the server records it in this shift even if it closes before the sale arrives
@@ -102,7 +107,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         },
       });
       if (result.queued) {
-        toast.info('Sem internet: venda guardada neste aparelho. Ela é registrada e a NFC-e emitida quando a internet voltar.', { duration: 10000 });
+        toast.info(`Sem internet: venda guardada neste aparelho. Ela é registrada e a NFC-e emitida quando a internet voltar${phone.trim() ? '; o cashback entra quando a venda chegar' : ''}.`, { duration: 10000 });
       } else {
         const data = await result.response.json().catch(() => ({}));
         if (!result.response.ok) {
@@ -111,6 +116,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           return;
         }
         if (data.changeCents > 0) toast.success(`Troco: ${brl(data.changeCents)}`, { duration: 15000 });
+        if (data.cashbackEarnedCents > 0) toast.success(`O cliente ganhou ${brl(data.cashbackEarnedCents)} de cashback`, { duration: 15000 });
         saleNotices.add(`counter-sale-done:${clientId}`);
         toast.success('Venda registrada', {
           action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${clientId}`) },
@@ -125,6 +131,8 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       }
       setCart({});
       setCpf('');
+      setPhone('');
+      setCustomerName('');
       setPayments([]);
       onDone?.();
     } finally {
@@ -165,6 +173,16 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           <label htmlFor="counter-cpf" className="text-sm font-semibold block mb-1">CPF na nota?</label>
           <Input id="counter-cpf" placeholder="Opcional" value={cpf} onChange={(e) => setCpf(e.target.value)} />
         </div>
+        <div>
+          <label htmlFor="counter-phone" className="text-sm font-semibold block mb-1">Celular do cliente (cashback)</label>
+          <Input id="counter-phone" inputMode="tel" placeholder="Opcional" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+        {phone.trim() && (
+          <div>
+            <label htmlFor="counter-customer" className="text-sm font-semibold block mb-1">Nome (cliente novo)</label>
+            <Input id="counter-customer" placeholder="Só se for a primeira compra" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm h-10">
           <input type="checkbox" checked={toKitchen} onChange={(e) => setToKitchen(e.target.checked)} /> Enviar para a cozinha
         </label>

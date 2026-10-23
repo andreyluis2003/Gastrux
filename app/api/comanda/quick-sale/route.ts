@@ -9,6 +9,9 @@ import { sendSessionToKitchen } from '@/lib/kds/send-session';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
 import { CashRuleError, settlePayments } from '@/lib/caixa/rules';
 import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, type SaleTarget } from '@/lib/caixa/sale';
+import { onBillClosed } from '@/lib/cashback/bill';
+import { normalizePhone } from '@/lib/cashback/rules';
+import { findCustomerByPhone, upsertCustomerByPhone } from '@/lib/cashback/service';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 
@@ -20,7 +23,9 @@ const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
  * POST /api/comanda/quick-sale - a counter sale ("venda balcão") in ONE request, so a device can
  * make it offline and send it later (the offline queue replays it with the same Idempotency-Key).
  * Body: { clientId, items: [{ menuItemId?, recipeId?, quantity?, modifierIds? }], customerCPF?,
- *         customerName?, sendToKitchen?, cashSessionId, payments: [{ method, amount }], queuedAt? }
+ *         customerName?, customerPhone?, sendToKitchen?, cashSessionId, payments: [{ method, amount }], queuedAt? }
+ * customerPhone identifies the customer for the cashback and the CRM (spec 2026-10-23 §7.2): it earns,
+ * never uses (the sale can be made offline); a bad phone, or a new one without a name, never blocks the sale.
  *         (legacy: paymentMethod instead of payments, paid in full in the default register shift)
  * The device chooses the comanda id (clientId), so a replay finds the sale it already made. Prices
  * come from the menu. The sale is paid and closed at once: its payments and change enter the cash
@@ -53,6 +58,7 @@ async function handlePOST(request: Request) {
     if (existing.status === 'OPEN' && (await prisma.cashSessionEntry.count({ where: { orderSessionId: clientId } })) > 0) {
       const closed = await prisma.orderSession.update({ where: { id: clientId }, data: { status: 'CLOSED', closedAt: new Date() } });
       await settleSessionStock(prisma, member.restaurantId, clientId);
+      await prisma.$transaction((tx) => onBillClosed(tx, member.restaurantId, clientId));
       return NextResponse.json({ session: closed, alreadyRecorded: true });
     }
     // A replay also settles a closed sale whose stock was never settled (reconciled: never twice)
@@ -74,8 +80,11 @@ async function handlePOST(request: Request) {
     // All or nothing: the comanda, its lines and its cash entries
     await prisma.$transaction(async (tx) => {
       target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: body?.cashSessionId, replay, legacy: read.legacy });
+      const phone = normalizePhone(body?.customerPhone);
+      const known = phone ? await findCustomerByPhone(tx, member.restaurantId, phone) : null;
+      const customer = known ?? (phone && typeof customerName === 'string' && customerName.trim() ? await upsertCustomerByPhone(tx, member.restaurantId, phone, customerName) : null);
       await tx.orderSession.create({
-        data: { id: clientId, restaurantId: member.restaurantId, userId: member.userId, status: 'OPEN', customerName: customerName || 'Balcão' },
+        data: { id: clientId, restaurantId: member.restaurantId, userId: member.userId, status: 'OPEN', customerName: customerName || customer?.name || 'Balcão', customerId: customer?.id ?? null },
       });
       for (const item of items) {
         await addComandaItem(tx, member.restaurantId, clientId, item);
@@ -116,6 +125,7 @@ async function handlePOST(request: Request) {
   });
   // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
   await settleSessionStock(prisma, member.restaurantId, clientId);
+  const cashbackEarnedCents = await prisma.$transaction((tx) => onBillClosed(tx, member.restaurantId, clientId));
   const nfce = await autoEmitNFCe({
     restaurantId: member.restaurantId,
     orderSessionId: clientId,
@@ -127,7 +137,7 @@ async function handlePOST(request: Request) {
 
   // The plan counts sales per month and only warns (owner decision 2026-10-09)
   await noteSalesThresholds(member.restaurantId);
-  return NextResponse.json({ session, kitchen, nfce, changeCents }, { status: 201 });
+  return NextResponse.json({ session, kitchen, nfce, changeCents, cashbackEarnedCents }, { status: 201 });
 }
 
 // Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)

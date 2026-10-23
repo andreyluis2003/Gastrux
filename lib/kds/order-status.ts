@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getOrCreateLoyaltyProgram } from '@/lib/loyalty/get-program';
+import { creditSale, recordPurchase } from '@/lib/cashback/service';
 
 /**
  * Kitchen order status changes (PUT /api/kds/orders/[id]).
@@ -108,24 +108,19 @@ async function deductOrderStock(tx: any, restaurantId: string, orderId: string) 
   }
 }
 
-/** 5% cashback for an identified customer, once: only after this call claimed the completion. */
+/**
+ * Cashback and CRM purchase of an identified delivery customer (spec 2026-10-23 §7.3), once: only after this call
+ * claimed the completion. A comanda's kitchen order is not a sale: its bill credits when it closes. The base is the
+ * items (subtotal), never the delivery fee. It replaced 5% in loyalty points that no screen ever used.
+ */
 async function creditCashback(order: any) {
-  if (!order.customerId) return;
+  if (!order.customerId || order.orderSessionId) return;
   try {
-    const cashback = Math.floor((Number(order.total || 0) * 5) / 100);
-    if (cashback <= 0) return;
-    const program = await getOrCreateLoyaltyProgram(order.restaurantId);
-    let account = await prisma.customerLoyaltyAccount.findFirst({ where: { customerId: order.customerId, programId: program.id } });
-    if (!account) account = await prisma.customerLoyaltyAccount.create({ data: { customerId: order.customerId, programId: program.id } });
-    await prisma.loyaltyTransaction.create({
-      data: {
-        customerId: order.customerId, accountId: account.id, programId: program.id, type: 'EARNING', amount: cashback,
-        reason: 'Cashback 5%', orderId: order.id, balanceBefore: account.currentPoints, balanceAfter: account.currentPoints + cashback,
-      },
-    });
-    await prisma.customerLoyaltyAccount.update({
-      where: { id: account.id },
-      data: { currentPoints: { increment: cashback }, totalPointsEarned: { increment: cashback }, lastActivityAt: new Date() },
+    const subtotalCents = Math.round(Number(order.subtotal ?? order.total ?? 0) * 100);
+    const totalCents = Math.round(Number(order.total ?? 0) * 100);
+    await prisma.$transaction(async (tx) => {
+      await recordPurchase(tx, order.customerId, totalCents, new Date());
+      await creditSale(tx, { restaurantId: order.restaurantId, customerId: order.customerId, baseCents: subtotalCents, orderId: order.id });
     });
   } catch (err) {
     console.error('Auto cashback error:', err);
