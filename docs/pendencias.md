@@ -38,9 +38,8 @@ Previsões e Relatório executivo). Todas estão no menu e esperam decisão do d
   aplicados a pedido nenhum. `/dashboard/loyalty` não tem botão para criar programa (o programa padrão só nasce em
   `lib/loyalty/get-program.ts`, chamado pelo cashback e pela indicação). O site (why-gastrux.tsx e /pricing) vende
   "Campanhas e programa de fidelidade" no Business.
-- **Clientes (CRM)**: "Total gasto", "Total de pedidos", ticket médio e segmento (VIP/Regular/Ocasional) nunca são
-  atualizados pelas vendas (só o `POST /api/cashback`, que ninguém chama, soma `totalSpent`). Cliente só entra
-  cadastrado à mão ou pelo site de delivery com e-mail. As anotações (Interações, Pro) funcionam.
+- ~~**Clientes (CRM)**~~ (resolvido 2026-10-23 pelo cashback: total gasto, compras, ticket médio e segmento vêm das
+  vendas com o celular do cliente). Era assim: esses números nunca eram atualizados pelas vendas.
 - **Campanhas**: exigem um provedor de WhatsApp configurado (Meta, Take Blip ou Zenvia) e template aprovado; a lista
   de destinatários é digitada (telefone|nome|1=valor) e as variáveis são JSON. Não testado de ponta a ponta.
 - ~~**Relatórios > Financeiro**~~ (resolvido 2026-10-23: `lib/finance/overview.ts` + `/api/financeiro/resumo`, com os
@@ -247,13 +246,6 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 
 ### Abertos
 
-- **M2. Desfazer durante um fechamento** (`lib/daily-count/service.ts` deleteEntry): não pega a trava da noite.
-  Uma exclusão gravada entre a leitura e o commit do fechamento tira um lançamento que a linha congelada já
-  contou: a pessoa acha que desfez, mas o fechamento o inclui. Correção: transação com `SELECT … FOR UPDATE` na
-  noite e checar o status de novo.
-- **M4. P2002 dentro da transação** (`lib/daily-count/service.ts` openNight): o retry depois do P2002 roda numa
-  transação que o Postgres já abortou e dá 500. Só acontece nos primeiros toques de um restaurante sem nenhuma
-  noite. Correção: abrir a noite com `prisma` antes da transação, ou `INSERT … ON CONFLICT DO NOTHING`.
 - **M6. Venda gravada no milissegundo do fechamento**: um item com `createdAt < closedAt` cujo commit chega depois
   da leitura do fechamento não entra em nenhuma noite. Janela de milissegundos; só anotado.
 - **M8. Diferenças da spec**: título do aviso "Contagem com diferença" (spec: "Contagem de 15/10: …",
@@ -263,11 +255,13 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 - **M9. Espeto cancelado na cozinha depois de assado** não conta como vendido nem como perda, então aparece em
   "faltam". withdraw-line/kds-cancel gravam perda de insumo, mas não LOSS na contagem. Opção: somar em perda
   automaticamente, ou explicar na tela.
-- **M10. Teste fraco**: `daily-count-close.test.ts` (lançamento durante o fechamento) aceita os dois resultados e
-  não prova a espera da trava. Um teste determinístico seguraria a trava com `FOR UPDATE`, mandaria o lançamento
-  e só então faria o commit.
-- **M11. Histórico agrupado pelo nome** (`lib/daily-count/history.ts`, byItem): uma receita renomeada vira duas
-  linhas. Agrupar por recipeId com o nome mais recente.
+
+### Resolvidos (2026-10-23, teste `__tests__/integration/staff/daily-count-locks.test.ts`)
+
+- M2: desfazer um lançamento espera o fechamento em andamento (trava da noite) e é recusado se ela fechou.
+- M4: a primeira noite nasce com `INSERT … ON CONFLICT DO NOTHING` (`createMany skipDuplicates`); o 500 sumiu.
+- M10: testes que seguram a trava da noite e só então mandam o lançamento ou o desfazer.
+- M11: o histórico soma por receita, com o nome mais recente; receita apagada continua pelo nome.
 
 ### Resolvidos (na publicação eb2ee7e)
 

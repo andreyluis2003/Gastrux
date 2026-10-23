@@ -16,16 +16,10 @@ export async function openNight(db: Db, restaurantId: string): Promise<{ id: str
   const select = { id: true, openedAt: true } as const;
   const found = await db.dailyCount.findFirst({ where: { restaurantId, status: 'OPEN' }, select });
   if (found) return found;
-  try {
-    return await db.dailyCount.create({ data: { restaurantId }, select });
-  } catch (e) {
-    // Two first taps at once: the other one created it
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      const again = await db.dailyCount.findFirst({ where: { restaurantId, status: 'OPEN' }, select });
-      if (again) return again;
-    }
-    throw e;
-  }
+  // Two first taps at once: ON CONFLICT DO NOTHING, then read the one that won. A caught P2002 would
+  // leave a surrounding transaction aborted (pendências M4, 2026-10-23)
+  await db.dailyCount.createMany({ data: [{ restaurantId }], skipDuplicates: true });
+  return db.dailyCount.findFirstOrThrow({ where: { restaurantId, status: 'OPEN' }, select });
 }
 
 /** Items of a night: active recipes marked for the count, plus any recipe with an entry in this night */
@@ -127,7 +121,12 @@ export async function deleteEntry(member: RestaurantMember, entryId: string, now
   const openingLocked = entry.kind === 'OPENING' && (await prisma.dailyCount.count({ where: { restaurantId: member.restaurantId, status: 'CLOSED' } })) > 0;
   if (openingLocked) throw new DailyCountError('A sobra da noite anterior não pode ser apagada', 409);
   if (!canDelete(member, entry, now, false)) throw new DailyCountError('Só o gerente apaga este lançamento', 403);
-  await prisma.dailyCountEntry.delete({ where: { id: entry.id } });
+  // Wait for a close in progress and check again: the frozen line may already count this entry (pendências M2)
+  await prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<{ status: string }[]>`SELECT "status"::text AS "status" FROM "daily_counts" WHERE "id" = ${entry.countId} FOR UPDATE`;
+    if (locked[0]?.status !== 'OPEN') throw new DailyCountError('Esta contagem já foi fechada', 409);
+    await tx.dailyCountEntry.delete({ where: { id: entry.id } });
+  }, { timeout: 20_000, maxWait: 10_000 });
   if (entry.userId !== member.userId || now.getTime() - entry.createdAt.getTime() > UNDO_MS) {
     await recordAudit(member, { action: 'DELETE', entityType: 'DailyCountEntry', entityId: entry.id, changes: { kind: entry.kind, quantity: entry.quantity, recipeId: entry.recipeId, by: entry.userId } });
   }

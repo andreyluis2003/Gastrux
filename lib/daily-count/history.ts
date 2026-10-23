@@ -8,14 +8,17 @@ export async function loadHistory(restaurantId: string, weeks: number, now = new
     orderBy: { closedAt: 'desc' },
     include: { lines: { orderBy: { recipeName: 'asc' } }, closedBy: { select: { name: true } } },
   });
-  // Missing and extra apart (review I4): netting them let a night with missing espetos read as 0
+  // Missing and extra apart (review I4): netting them let a night with missing espetos read as 0.
+  // One row per recipe under its latest name: nights come newest first (pendências M11, a renamed recipe made two)
   const byItem = new Map<string, { recipeName: string; sold: number; loss: number; difference: number; missing: number; extra: number }>();
   for (const n of nights) {
     for (const l of n.lines) {
-      const it = byItem.get(l.recipeName) ?? { recipeName: l.recipeName, sold: 0, loss: 0, difference: 0, missing: 0, extra: 0 };
+      // A deleted recipe leaves recipeId null: those go by the name they were frozen with
+      const key = l.recipeId ?? `name:${l.recipeName}`;
+      const it = byItem.get(key) ?? { recipeName: l.recipeName, sold: 0, loss: 0, difference: 0, missing: 0, extra: 0 };
       it.sold += l.sold; it.loss += l.loss; it.difference += l.difference;
       if (l.difference < 0) it.missing += -l.difference; else it.extra += l.difference;
-      byItem.set(l.recipeName, it);
+      byItem.set(key, it);
     }
   }
   return {
