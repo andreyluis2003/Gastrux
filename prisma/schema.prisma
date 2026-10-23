@@ -4924,35 +4924,40 @@ model CashbackSettings {
   @@map("cashback_settings")
 }
 
-/// Cashback earned by one sale (a closed bill or a completed delivery order), once per sale
+/// Cashback earned by one sale (a closed bill or a completed delivery order), once per sale. A reversed credit
+/// moves its source to reversedSessionId/reversedOrderId, so the sale closed again gets a new credit
 model CashbackCredit {
-  id             String    @id @default(cuid())
-  restaurantId   String
-  customerId     String
-  customer       Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  orderSessionId String?   @unique
-  orderId        String?   @unique
-  amountCents    Int
-  remainingCents Int
-  expiresAt      DateTime
-  reversedAt     DateTime?
-  createdAt      DateTime  @default(now())
+  id                String    @id @default(cuid())
+  restaurantId      String
+  customerId        String
+  customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderSessionId    String?   @unique
+  orderId           String?   @unique
+  amountCents       Int
+  remainingCents    Int
+  expiresAt         DateTime
+  reversedAt        DateTime?
+  reversedSessionId String?
+  reversedOrderId   String?
+  createdAt         DateTime  @default(now())
 
   @@index([restaurantId, customerId])
   @@map("cashback_credits")
 }
 
-/// Cashback used as a discount on a bill; allocations = [{ creditId, cents }] it came from
+/// Cashback used as a discount on a bill; allocations = [{ creditId, cents }] it came from. A removed or reversed
+/// use moves its bill to reversedSessionId, so the bill can use cashback again
 model CashbackUse {
-  id             String    @id @default(cuid())
-  restaurantId   String
-  customerId     String
-  customer       Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  orderSessionId String    @unique
-  amountCents    Int
-  allocations    Json
-  reversedAt     DateTime?
-  createdAt      DateTime  @default(now())
+  id                String    @id @default(cuid())
+  restaurantId      String
+  customerId        String
+  customer          Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderSessionId    String?   @unique
+  reversedSessionId String?
+  amountCents       Int
+  allocations       Json
+  reversedAt        DateTime?
+  createdAt         DateTime  @default(now())
 
   @@index([restaurantId, customerId])
   @@map("cashback_uses")

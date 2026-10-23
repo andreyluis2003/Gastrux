@@ -31,6 +31,8 @@ CREATE TABLE "cashback_credits" (
     "remainingCents" INTEGER NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "reversedAt" TIMESTAMP(3),
+    "reversedSessionId" TEXT,
+    "reversedOrderId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "cashback_credits_pkey" PRIMARY KEY ("id")
@@ -41,7 +43,8 @@ CREATE TABLE "cashback_uses" (
     "id" TEXT NOT NULL,
     "restaurantId" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
-    "orderSessionId" TEXT NOT NULL,
+    "orderSessionId" TEXT,
+    "reversedSessionId" TEXT,
     "amountCents" INTEGER NOT NULL,
     "allocations" JSONB NOT NULL,
     "reversedAt" TIMESTAMP(3),
