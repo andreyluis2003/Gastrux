@@ -53,7 +53,7 @@ export async function withdrawFromKitchen(input: {
         : await tx.orderItem.updateMany({ where: { id: item.id, quantity: item.quantity, status: { not: 'CANCELLED' } }, data: { quantity: item.quantity - quantity } });
       if (moved.count === 0) return 'not-found' as const;
       if (KITCHEN_STARTED.includes(order.status)) {
-        await recordKitchenLoss(tx, { restaurantId, orderId: order.id, orderNumber: order.orderNumber, items: [{ ...item, quantity }], reason: input.reason });
+        await recordKitchenLoss(tx, { restaurantId, orderId: order.id, orderNumber: order.orderNumber, items: [{ ...item, quantity }], reason: input.reason, userId: input.userId });
       }
       return 'withdrawn' as const;
     });

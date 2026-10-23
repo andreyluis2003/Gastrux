@@ -250,16 +250,16 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
   `lib/daily-count/close.ts`); menu sempre "Contagem do dia", inclusive para espetaria (`lib/navigation/app-nav.ts`);
   rota `/contagem-do-dia` (spec: `/contagem`, que já era a contagem de estoque); histórico "por semana (últimas 4)"
   virou um total de 4 semanas (`lib/daily-count/history.ts`).
-- **M9. Espeto cancelado na cozinha depois de assado** não conta como vendido nem como perda, então aparece em
-  "faltam". withdraw-line/kds-cancel gravam perda de insumo, mas não LOSS na contagem. Opção: somar em perda
-  automaticamente, ou explicar na tela.
-
 ### Resolvidos (2026-10-23, teste `__tests__/integration/staff/daily-count-locks.test.ts`)
 
 - M2: desfazer um lançamento espera o fechamento em andamento (trava da noite) e é recusado se ela fechou.
 - M4: a primeira noite nasce com `INSERT … ON CONFLICT DO NOTHING` (`createMany skipDuplicates`); o 500 sumiu.
 - M10: testes que seguram a trava da noite e só então mandam o lançamento ou o desfazer.
 - M11: o histórico soma por receita, com o nome mais recente; receita apagada continua pelo nome.
+- M9 (decisão do dono): espeto cancelado depois de a cozinha começar (pedido inteiro ou item tirado da comanda) entra
+  sozinho como perda "Cancelado na cozinha" da noite aberta (`recordKitchenCountLoss`, teste
+  `daily-count-kitchen-loss.test.ts`). Caso raro que sai errado: a cozinha cancela e a linha continua na conta e é
+  cobrada; aí ele conta como vendido e como perda (a contagem mostra uma sobra).
 
 ### Resolvidos (na publicação eb2ee7e)
 

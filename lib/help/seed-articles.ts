@@ -44,6 +44,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '2c6a185cddba47c6af0046cff712621a7b28e5fa44ca665e1014107e1e66748c', // relatorios (2026-10-20, before Financeiro and Relatório executivo)
   'ecd65320ff340b387301f956eb4de94561b912cc803d925249f866af3cd20afc', // teste-gratis (before cashback replaced fidelidade)
   '5ff659663983995fad1368b4227d261d8d8682f1a98add0f5f381427c65e49e1', // contas-de-consumo (before the % of revenue only for a finished month)
+  '4db86b302c0b9737add2a14c4225914ce18612d7bac5d735a9254c15e15b4377', // contagem-do-dia (before the kitchen cancel became a loss)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -351,7 +352,7 @@ Na ficha técnica do item (**Cardápio e produtos > Fichas técnicas**), ligue *
 Abra **Vender > Contagem do dia**:
 
 - **Montados**: toque em +1, +10, +20 ou **Outro valor** sempre que montar mais.
-- **Perda**: toque em **Perda** e escolha o motivo (Caiu, Queimou, Venceu ou Outro).
+- **Perda**: toque em **Perda** e escolha o motivo (Caiu, Queimou, Venceu ou Outro). Um espeto que a cozinha já tinha começado e foi cancelado (o pedido inteiro ou o item tirado da comanda) entra sozinho como perda, com o motivo "Cancelado na cozinha".
 - **Vendidos** entram sozinhos: comandas, balcão, QR Code, WhatsApp e site de delivery. Pedidos de aplicativos como o iFood só contam se forem lançados no Gastrux.
 - Lançou errado? Quem lançou desfaz em até 2 minutos. Depois disso, só o dono ou o gerente.
 

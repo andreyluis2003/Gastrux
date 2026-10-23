@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { getMpClientForRestaurant } from './mercadopago-connect/connection-service';
 import { cancelConnectPayment } from './mercadopago-connect/payments';
 import { createPaymentAlert } from './payment-alert-service';
+import { recordKitchenCountLoss } from './daily-count/service';
 
 /** Order statuses in which the kitchen has already started (ingredients are being or were used). */
 const KITCHEN_STARTED = ['PREPARING', 'READY'];
@@ -61,7 +62,7 @@ export async function cancelOrder(
     // An item already withdrawn from the comanda had its loss recorded then (lib/kds/withdraw-line.ts)
     const live = order.items.filter((item) => item.status !== 'CANCELLED');
     const loss = KITCHEN_STARTED.includes(order.status)
-      ? await recordKitchenLoss(tx, { restaurantId: order.restaurantId, orderId: order.id, orderNumber: order.orderNumber, items: live, reason: opts.reason })
+      ? await recordKitchenLoss(tx, { restaurantId: order.restaurantId, orderId: order.id, orderNumber: order.orderNumber, items: live, reason: opts.reason, userId: opts.userId })
       : { recorded: false, ingredients: 0, estimatedCost: 0 };
 
     // Payments of this order: a pending one is called off (a late PIX must not be accepted for a dead
@@ -158,9 +159,11 @@ async function settlePaymentsOfCancelledOrder(order: any, payments: CancelPaymen
  */
 export async function recordKitchenLoss(
   tx: any,
-  opts: { restaurantId: string; orderId: string; orderNumber: string; items: any[]; reason?: string }
+  opts: { restaurantId: string; orderId: string; orderNumber: string; items: any[]; reason?: string; userId?: string }
 ): Promise<{ recorded: boolean; ingredients: number; estimatedCost: number }> {
   const loss = { recorded: false, ingredients: 0, estimatedCost: 0 };
+  // The espetos also become a loss of the open daily count (pendências M9)
+  await recordKitchenCountLoss(tx, opts.restaurantId, opts.items.map((i) => ({ recipeId: i.recipeId, quantity: i.quantity })), { userId: opts.userId, reason: opts.reason });
   const used = new Map<string, { quantity: number; ingredient: any }>();
   for (const item of opts.items) {
     for (const ri of item.recipe?.ingredients ?? []) {

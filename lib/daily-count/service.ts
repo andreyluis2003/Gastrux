@@ -22,6 +22,33 @@ export async function openNight(db: Db, restaurantId: string): Promise<{ id: str
   return db.dailyCount.findFirstOrThrow({ where: { restaurantId, status: 'OPEN' }, select });
 }
 
+/**
+ * An espeto the kitchen had started and that was cancelled is a loss of the open night (pendências M9, owner
+ * 2026-10-23): neither sold nor counted, it showed as "faltam". Only recipes marked for the count; without a user
+ * (an integration cancelling) the entry is in the owner's name. Waits for a close in progress, like addEntry.
+ */
+export async function recordKitchenCountLoss(
+  tx: Prisma.TransactionClient,
+  restaurantId: string,
+  items: { recipeId: string; quantity: number }[],
+  opts: { userId?: string | null; reason?: string | null } = {},
+) {
+  const ids = [...new Set(items.map((i) => i.recipeId))];
+  if (!ids.length) return;
+  const counted = new Set((await tx.recipe.findMany({ where: { id: { in: ids }, restaurantId, dailyCount: true }, select: { id: true } })).map((r) => r.id));
+  const lost = items.filter((i) => counted.has(i.recipeId) && i.quantity > 0);
+  if (!lost.length) return;
+  const userId = opts.userId || (await tx.restaurant.findUnique({ where: { id: restaurantId }, select: { ownerId: true } }))?.ownerId;
+  if (!userId) return;
+  const night = await openNight(tx, restaurantId);
+  const locked = await tx.$queryRaw<{ status: string }[]>`SELECT "status"::text AS "status" FROM "daily_counts" WHERE "id" = ${night.id} FOR UPDATE`;
+  const target = locked[0]?.status === 'OPEN' ? night : await openNight(tx, restaurantId);
+  const reason = opts.reason?.trim() ? `Cancelado na cozinha: ${opts.reason.trim()}`.slice(0, 200) : 'Cancelado na cozinha';
+  await tx.dailyCountEntry.createMany({
+    data: lost.map((i) => ({ countId: target.id, restaurantId, recipeId: i.recipeId, kind: 'LOSS' as const, quantity: i.quantity, reason, userId })),
+  });
+}
+
 /** Items of a night: active recipes marked for the count, plus any recipe with an entry in this night */
 export async function nightItems(db: Db, restaurantId: string, countId: string): Promise<{ recipeId: string; name: string }[]> {
   const withEntries = await db.dailyCountEntry.findMany({ where: { countId, restaurantId }, select: { recipeId: true }, distinct: ['recipeId'] });
