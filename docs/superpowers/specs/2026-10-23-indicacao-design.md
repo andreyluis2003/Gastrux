@@ -2,14 +2,15 @@
 
 Pedido do dono: "quero um programa de indicação de verdade", com o link de indicação funcionando no cadastro, o
 desconto aplicado na fatura (Stripe ou Mercado Pago) e uma regra clara. O dono pediu para pular as perguntas e
-receber a proposta montada: as regras abaixo marcadas **(proposta)** são escolhas minhas, para ele confirmar.
+receber a proposta montada. Em 2026-10-23 ele confirmou: 15 dias a mais de teste para o indicado, 1 mês grátis com
+limite de 12 por ano para quem indica, e no Mercado Pago testar a pausa de um ciclo no sandbox antes de decidir.
 
 A versão anterior (apagada em 2026-10-23, commit 60f1891) prometia "R$ 50 em créditos" que a cobrança nunca usava,
 e o link `/?ref=` não era lido no cadastro. Os campos `users.referralCode`, `referredByUserId`, `referralBonus*`,
 `referralTier` e a tabela `referral_history` ficaram no banco, sem uso: este design não depende deles e pode
 substituí-los numa migração própria.
 
-## A regra (proposta)
+## A regra (confirmada pelo dono)
 
 - **Quem indica** é o dono de um restaurante no Gastrux, em qualquer plano ou no teste.
 - **Quem é indicado** é um restaurante novo: e-mail e CNPJ (quando houver) que nunca tiveram conta no Gastrux.
@@ -29,11 +30,12 @@ substituí-los numa migração própria.
 - **Stripe:** um crédito no saldo do cliente (`customers.createBalanceTransaction`, valor negativo) igual a uma
   mensalidade do plano atual. O Stripe abate sozinho da próxima fatura, mensal ou anual. No plano anual, o crédito
   vale uma mensalidade (1/12 do valor mensal do plano, não do anual) e abate da renovação.
-- **Mercado Pago (assinatura por preapproval):** o MP não tem crédito nem cupom em assinatura. A proposta é
-  **estornar automaticamente a próxima mensalidade aprovada** (`refundPayment`, que o Gastrux já usa), no valor de
-  uma mensalidade. O cliente vê a cobrança e a devolução no cartão. Alternativa a conferir no sandbox: pausar a
-  assinatura por um ciclo e retomar sozinha (`updatePreApproval` já tem `paused`), que evita a cobrança mas depende
-  de acertar a data de retomada.
+- **Mercado Pago (assinatura por preapproval):** o MP não tem crédito nem cupom em assinatura. **Decisão do dono:
+  testar primeiro no sandbox a pausa de um ciclo** (`updatePreApproval` já tem `paused`): pausar depois da cobrança
+  aprovada e retomar antes da seguinte, sem cobrar o mês grátis. O teste precisa mostrar que o MP não cobra durante a
+  pausa, que a retomada volta a cobrar na data certa e o que acontece com a data quando a pausa atravessa o dia da
+  cobrança. Só se a pausa falhar no sandbox, o caminho é o estorno automático da mensalidade (`refundPayment`, que o
+  Gastrux já usa), e o dono decide de novo antes.
 - Cada mês grátis vira uma linha com o estado: **aguardando** (indicado em teste), **ganho** (indicado pagou),
   **usado** (abatido ou estornado, com o id da cobrança), **cancelado** (reembolso ou cancelamento em 7 dias, ou
   limite do ano). Nada é aplicado duas vezes: a aplicação é idempotente por linha.
@@ -80,9 +82,8 @@ substituí-los numa migração própria.
   dos e-mails, dentro das regras acima.
 - Se a alternativa de pausa do MP for confirmada no sandbox, usá-la no lugar do estorno.
 
-## Para o dono confirmar
+## Decisões do dono (2026-10-23)
 
-1. O indicado ganha 15 dias a mais de teste (45 no total)?
-2. Quem indica ganha 1 mês grátis quando o indicado paga a primeira mensalidade, com limite de 12 por ano?
-3. No Mercado Pago, aceitar a cobrança com estorno automático (o cliente vê as duas no cartão), ou testar primeiro a
-   pausa de um ciclo no sandbox?
+1. O indicado ganha 15 dias a mais de teste (45 no total): sim.
+2. Quem indica ganha 1 mês grátis quando o indicado paga a primeira mensalidade, com limite de 12 por ano: sim.
+3. Mercado Pago: testar antes a pausa de um ciclo no sandbox. O plano começa por esse teste; o Stripe não depende dele.
