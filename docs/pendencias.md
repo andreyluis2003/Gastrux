@@ -43,10 +43,10 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - ~~**/suporte/ia e /admin/ia-monitoring**~~ (apagados em 2026-10-23, decisão do dono): um chatbot da Abacus numa janela, sem
   link, e o painel que o acompanhava; com `/api/ai-support/*` e `lib/ai-support`. Os endereços levam à Central de ajuda e ao
   Custo da IA. A tabela `ai_support_interactions` fica no banco, sem uso.
-- **Indicação de restaurantes** (`/settings/referral`, `/api/referrals/*`), revisada em 2026-10-23, espera o dono: a tela promete
-  "Indique amigos e ganhe R$ 50 em créditos", mas o crédito só é somado em `users.referralBonusEarned` e nada da cobrança o usa;
-  o link `/?ref=` não é lido no cadastro (o indicado precisa digitar o código); o link cai em `restaurantes.abacusai.app` quando
-  falta `NEXTAUTH_URL`. A página `/settings`, que leva até ela, também não tem link (repete Minha conta e Minha assinatura).
+- ~~**Indicação de restaurantes**~~ (apagada em 2026-10-23, decisão do dono): `/settings/referral` (→ Início), `/api/referrals/*` e
+  `lib/referral-tiers.ts`; `/settings` (→ Minha conta). Prometia "ganhe R$ 50 em créditos" que a cobrança nunca usava, e o link
+  `/?ref=` não era lido no cadastro. Os campos `users.referral*` e a tabela `referral_history` ficam no banco, sem uso. Um
+  programa de indicação de verdade (link lido no cadastro, desconto na fatura, regra clara) fica para o backlog, se o dono quiser.
 
 ## Telas que não funcionam (achadas nos artigos da Central de Ajuda, 2026-10-20)
 
