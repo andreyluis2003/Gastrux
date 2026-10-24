@@ -26,6 +26,21 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - ~~**/admin/alertas-smart**~~ (2026-10-23, decisão do dono): apagada com `/api/alertas/smart`; o endereço leva ao Início.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
+## Programa de indicação (2026-10-24)
+
+Plano `docs/superpowers/plans/2026-10-24-indicacao.md`.
+
+### Abertos
+
+- **Mercado Pago (Tarefa 1 e 6):** o teste da pausa de um ciclo no sandbox precisa das contas de teste do dono (token do
+  vendedor de teste em `MP_SANDBOX_ACCESS_TOKEN` e o comprador de teste); script `scripts/mp-pause-experiment.ts`. Até o
+  resultado, o mês de quem assina pelo Mercado Pago fica "Mês ganho (guardado)". Se a pausa falhar, o dono decide de novo.
+- **Rotina diária no servidor (dono):** linha no crontab `0 11 * * * /root/gastrux-cron.sh /api/referrals/daily`.
+- **Contador:** como emitir a NFS-e de uma mensalidade com o mês grátis (Stripe: desconto na fatura) antes do primeiro
+  mês grátis real.
+- **Cadastro pelo Google:** usa o cookie do link (lido no servidor); não tem teste automático (os eventos do NextAuth).
+- **Colunas antigas** `users.referral*` e a tabela `referral_history` continuam no banco, sem uso.
+
 ## Plataformas de delivery, parte 3: iFood (2026-10-24)
 
 Plano `docs/superpowers/plans/2026-10-24-ifood.md`. O código está pronto; a loja só conecta depois da homologação.

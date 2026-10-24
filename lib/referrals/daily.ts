@@ -77,7 +77,7 @@ async function tellEarned(r: Due) {
     subject: 'Você ganhou 1 mês grátis no Gastrux',
     html: `<p>Olá${owner.name ? `, ${escape(owner.name)}` : ''}!</p>
 <p><strong>${escape(r.referred.name)}</strong>, que se cadastrou pelo seu link, já é assinante do Gastrux.</p>
-<p>Você ganhou <strong>1 mês grátis</strong> do seu plano: ele é descontado na sua próxima mensalidade. Se você ainda está no teste, o mês fica guardado para a primeira.</p>
+<p>Você ganhou <strong>1 mês grátis</strong> do seu plano. Na assinatura pelo cartão, ele é descontado da sua próxima mensalidade; se você ainda está no teste, fica guardado para a primeira. Acompanhe em Minha assinatura &gt; Indique e ganhe.</p>
 <p>Obrigado por indicar o Gastrux!</p>`,
   }).catch((e) => console.error('[referral] earned e-mail failed:', e?.message ?? e));
 }

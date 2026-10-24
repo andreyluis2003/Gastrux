@@ -337,6 +337,12 @@ export default function PricingPage() {
             </a>
           </p>
 
+          {/* Referral program (plan 2026-10-24 indicacao) */}
+          <p className="text-center text-sm text-slate-600 dark:text-slate-400 mt-3">
+            <strong>Indique o Gastrux e ganhe 1 mês grátis</strong> para cada restaurante que assinar pelo seu link. Quem
+            chega pelo link testa 45 dias.
+          </p>
+
           {/* Trust badges */}
           <div className="mt-12 flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-2">

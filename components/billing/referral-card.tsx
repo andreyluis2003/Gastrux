@@ -44,7 +44,7 @@ export function ReferralCard() {
         <h3 className="text-lg font-bold">Indique e ganhe</h3>
         <p className="text-sm text-muted-foreground">
           {mine.rule}. Quem se cadastra pelo link ganha 45 dias de teste. O mês é liberado 7 dias depois da primeira
-          mensalidade do indicado e descontado na sua próxima fatura (até 12 por ano).
+          mensalidade do indicado (até 12 por ano). <a href="/ajuda/indique-e-ganhe" className="underline">Como funciona</a>
         </p>
       </div>
 

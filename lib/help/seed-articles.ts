@@ -707,6 +707,39 @@ A conta fica **só para consulta**: você vê tudo, mas não vende nem cadastra,
   },
   {
     categorySlug: 'faturamento-e-assinatura',
+    slug: 'indique-e-ganhe',
+    title: 'Como funciona o Indique e ganhe?',
+    summary: 'Ganhe 1 mês grátis para cada restaurante que assinar pelo seu link; quem chega pelo link testa 45 dias.',
+    keywords: 'indicação, indique, indicar, ganhe, mês grátis, link, código, convite, desconto',
+    order: 3,
+    content: `## A regra
+
+Ganhe **1 mês grátis** do seu plano para cada restaurante que **assinar** pelo seu link. Quem chega pelo link ganha **45 dias** de teste grátis (em vez de 30).
+
+## Onde está o seu link
+
+Em **Minha assinatura > Indique e ganhe** (só o dono vê): o link, o código, os botões **Copiar link** e **WhatsApp**, e a lista de quem se cadastrou.
+
+Quem abre o link tem 60 dias para se cadastrar. Também dá para digitar o código no cadastro, no campo **Código de indicação (opcional)**.
+
+## Quando o mês grátis chega
+
+1. O restaurante indicado se cadastra: aparece na lista como **Em teste**
+2. Ele paga a primeira mensalidade: **Pagou: confirmando**
+3. Sete dias depois, se ele continua assinando: **Mês ganho**, e você recebe um e-mail
+4. Na assinatura pelo cartão, o mês entra como crédito e é descontado da sua próxima mensalidade: **Mês usado**
+
+Se você ainda está no teste, o mês fica **guardado** e é descontado da sua primeira mensalidade. Na assinatura pelo Mercado Pago, o mês também fica guardado até o desconto automático nesse meio de pagamento ser liberado.
+
+## Limites
+
+- Até **12 meses grátis por ano**.
+- Indicar a si mesmo (outra loja sua) não conta, nem contas internas.
+- Se o indicado cancelar ou for reembolsado nos 7 dias depois da primeira mensalidade, a indicação é cancelada.
+- O indicado que só testa e não assina não gera mês grátis.`,
+  },
+  {
+    categorySlug: 'faturamento-e-assinatura',
     slug: 'como-cancelar',
     title: 'Como cancelo minha assinatura?',
     summary: 'O dono cancela em Minha assinatura, sem multa.',
