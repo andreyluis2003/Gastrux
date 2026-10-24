@@ -123,6 +123,31 @@
 - [ ] **Step 4: Rodar** o teste novo e as pastas `api`, `bad-day` e `vender` (o webhook antigo usa `createOrderFromExternalOrder`) → PASS.
 - [ ] **Step 5: Commit** `feat(delivery): one ingest pipeline with values, accept and customer`.
 
+### Task 4b: O cardápio digital (site de delivery) pela mesma esteira, com "Retirar no local"
+
+Pedido do dono (2026-10-23, durante a execução): os pedidos feitos pelo cardápio digital, cujo link o restaurante manda
+ao cliente pelo WhatsApp, inclusive para o cliente buscar no local, chegam pelo formato próprio do Gastrux.
+
+**Files:**
+- Modify: `prisma/schema.prisma` e a migração `20261024120000_order_api` (ainda não publicada): `DeliveryPlatform` ganha `delivery_site`
+- Modify: `app/api/public/delivery/order/route.ts` (monta um `OrderApiInput` e chama `ingestDeliveryOrder` com a integração `delivery_site` do restaurante, criada na primeira vez como a `gastrux_api`)
+- Modify: `app/delivery/[restaurantId]/page.tsx` (opção "Retirar no local": sem endereço nem taxa de entrega)
+- Test: `__tests__/integration/api/delivery-site-ingest.test.ts`
+
+**Interfaces:**
+- Consumes: `ingestDeliveryOrder`, `OrderApiInput` (a resposta do site continua a mesma: `{ success, order: { id, orderNumber, total, ... } }`).
+- O pedido do site vira `ExternalOrder` da plataforma `delivery_site` com o código `DLV-...` de hoje; cria o cliente pelo celular
+  (como hoje); aceite sozinho ou "Aceitar" pela mesma regra; aparece em Pedidos de delivery como "Cardápio digital".
+
+- [ ] **Step 1: Testes que falham:** pedido do site com entrega fica igual para o cliente (mesma resposta) e aparece como
+  `ExternalOrder` `delivery_site` com o pedido da cozinha e o total certo; pedido com `retirada: true` não exige endereço nem
+  cobra taxa e a cozinha vê "RETIRADA NO LOCAL"; com `deliveryAutoAccept: false` o pedido do site espera o "Aceitar"; os
+  testes atuais do site (`__tests__/integration/api/delivery-*.test.ts`) continuam passando.
+- [ ] **Step 2: Rodar** → FAIL.
+- [ ] **Step 3: Implementar.**
+- [ ] **Step 4: Rodar** este teste e a pasta `api` → PASS.
+- [ ] **Step 5: Commit** `feat(delivery): the digital menu goes through the order pipeline, with pickup`.
+
 ### Task 5: As rotas públicas da API
 
 **Files:**
