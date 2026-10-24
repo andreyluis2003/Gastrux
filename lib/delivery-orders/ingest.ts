@@ -5,6 +5,7 @@ import { createOrderFromExternalOrder } from '@/lib/kds-integration';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { formatPhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
+import { sanitizeCustomerNote } from '@/lib/delivery-payments/order-input';
 import type { OrderApiInput } from './input';
 import { notifyOrderStatus } from './callback';
 
@@ -48,7 +49,8 @@ export function kitchenNote(input: OrderApiInput): string {
     !input.retirada && e?.referencia ? `Referência: ${e.referencia}` : '',
     input.agendadoPara ? `AGENDADO PARA ${input.agendadoPara.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '',
     p.pago ? `Pagamento: ${FORM_LABEL[p.forma]} (já pago)` : `Pagamento na ${input.retirada ? 'retirada' : 'entrega'}: ${FORM_LABEL[p.forma]}${change}`,
-    input.observacao ?? '',
+    // Never a line of its own: a note reading "Pagamento: PIX (já pago)" must not pass for the payment line (final review 2026-10-24)
+    sanitizeCustomerNote(input.observacao),
     `Cliente: ${input.cliente.nome} - ${formatPhone(input.cliente.celular)}`,
   ].filter(Boolean).join('\n');
 }
@@ -79,6 +81,18 @@ async function kitchenOrderOf(externalOrderId: string): Promise<string | null> {
   return (await prisma.order.findUnique({ where: { externalOrderId }, select: { id: true } }))?.id ?? null;
 }
 
+/**
+ * The answer to an order sent again (final review 2026-10-24): the code must be of this same integration (two senders
+ * numbering their orders the same way must not swallow each other's orders), and an accepted order whose kitchen order
+ * failed gets it now, so a resend recovers it.
+ */
+async function answerResend(existing: ExternalOrder, restaurantId: string, integrationId: string) {
+  if (existing.integrationId !== integrationId) throw new DeliveryOrderError('Este código já é de outro pedido do restaurante: mande um código diferente', 409);
+  let kitchenOrderId = await kitchenOrderOf(existing.id);
+  if (!kitchenOrderId && existing.status === 'CONFIRMED') kitchenOrderId = (await acceptDeliveryOrder(restaurantId, existing.id, {})).kitchenOrderId;
+  return { externalOrder: existing, kitchenOrderId, duplicate: true };
+}
+
 export async function ingestDeliveryOrder(args: {
   restaurantId: string;
   integrationId: string;
@@ -89,7 +103,7 @@ export async function ingestDeliveryOrder(args: {
   const { restaurantId, integrationId, input } = args;
   const key = { restaurantId_externalOrderId: { restaurantId, externalOrderId: input.codigo } };
   const existing = await prisma.externalOrder.findUnique({ where: key });
-  if (existing) return { externalOrder: existing, kitchenOrderId: await kitchenOrderOf(existing.id), duplicate: true };
+  if (existing) return answerResend(existing, restaurantId, integrationId);
 
   const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { deliveryAutoAccept: true } });
   const customerId = OWN_CUSTOMERS.includes(args.platform) ? await customerFor(restaurantId, input) : null;
@@ -106,7 +120,7 @@ export async function ingestDeliveryOrder(args: {
         deliveryCity: input.entrega?.cidade, deliveryZipcode: input.entrega?.cep,
         items: JSON.stringify(input.itens.map((it) => ({
           externalItemId: it.codigo, name: it.nome, quantity: it.quantidade, price: it.precoUnitario,
-          specialInstructions: [...(it.adicionais ?? []).map((ad) => `+ ${ad.nome}`), it.observacao].filter(Boolean).join(' · ') || undefined,
+          specialInstructions: [...(it.adicionais ?? []).map((ad) => `+ ${ad.nome}`), sanitizeCustomerNote(it.observacao)].filter(Boolean).join(' · ') || undefined,
         }))),
         specialInstructions: kitchenNote(input),
       },
@@ -116,7 +130,7 @@ export async function ingestDeliveryOrder(args: {
     if (e?.code !== 'P2002') throw e;
     const winner = await prisma.externalOrder.findUnique({ where: key });
     if (!winner) throw e;
-    return { externalOrder: winner, kitchenOrderId: await kitchenOrderOf(winner.id), duplicate: true };
+    return answerResend(winner, restaurantId, integrationId);
   }
 
   if (restaurant?.deliveryAutoAccept !== false) {

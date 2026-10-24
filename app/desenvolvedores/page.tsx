@@ -118,6 +118,7 @@ export default function DevelopersPage() {
           <li><code>401</code>: chave inválida ou revogada.</li>
           <li><code>403</code>: o plano do restaurante não tem a API, ou ele não está recebendo pedidos agora.</li>
           <li><code>404</code>: pedido que não é desta chave. <code>413</code>: pedido maior que 256 KB.</li>
+          <li><code>409</code>: o <code>codigo</code> já é de um pedido de outra origem do restaurante (o cardápio digital ou outra integração): use códigos próprios, como um prefixo do seu sistema.</li>
         </ul>
       </section>
 

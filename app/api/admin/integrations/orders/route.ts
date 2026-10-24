@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { prisma } from '@/lib/prisma';
 import { DELIVERY_ROLES } from '@/lib/delivery-orders/roles';
+import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,8 @@ export async function GET(request: NextRequest) {
   const platform = searchParams.get('platform');
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 200);
   const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
-  const where: any = { restaurantId };
+  // An order paid online shows once paid, as in the kitchen: an abandoned checkout of the site is not an order (final review 2026-10-24)
+  const where: any = { restaurantId, OR: [{ internalOrder: { is: null } }, { internalOrder: { is: KITCHEN_VISIBLE_ORDER_WHERE } }] };
   if (status) where.status = status;
   if (platform) where.integration = { platform };
   const [orders, total, restaurant] = await Promise.all([

@@ -48,6 +48,30 @@ migração `20261024120000_order_api`.
   o cartão de vendas do Caixa soma o bruto de um pedido da API com desconto.
 - **Sem limite de envios** em `/api/v1/pedidos`: uma chave vazada pode mandar muitos pedidos até ser revogada.
 - **"Delivery: cardápio digital" na DRE** soma todo pedido de delivery que não veio da API (inclusive o do bot de WhatsApp sem comanda).
+- **Revisão final por um revisor separado (2026-10-24)**: corrigidos o código repetido de outra origem (agora 409), o pedido
+  aceito cuja ida para a cozinha falhou (agora alerta e o reenvio recupera), o pedido do site pago online que não foi pago
+  (some de Pedidos de delivery até o pagamento) e a observação que se passava pela linha de pagamento. Ficaram, por extenso:
+  - **Prefixo da chave curto**: `OrderApiKey.prefix` é único mas tem só 4 letras aleatórias (cerca de 14,8 milhões de
+    combinações); com uns mil restaurantes, há cerca de 3% de chance de alguma criação de chave falhar com "Não foi possível
+    criar a chave". Corrigir com prefixo maior ou nova tentativa no P2002.
+  - **Código longo cortado**: `codigo` acima de 80 letras é cortado em silêncio (`lib/delivery-orders/input.ts`), e dois
+    códigos com os mesmos 80 primeiros caracteres viram o mesmo pedido. Melhor recusar com 400.
+  - **Reenvio com plano travado**: o POST confere o plano e "recebendo pedidos" antes de procurar o pedido repetido; o
+    reenvio de um pedido já aceito recebe 403 se o plano travou no meio. Procurar o repetido primeiro.
+  - **Dois envios simultâneos**: o que perde a corrida pode responder "aguardando_aceite"/aceito false enquanto o outro
+    responde "aceito".
+  - **Aviso de status repetido**: `followKitchen` avisa a cada mudança da cozinha, mesmo quando o pedido da esteira não
+    mudou (ex.: em espera), e o outro sistema recebe avisos iguais. Avisar só quando o status público mudou.
+  - **"Concluir" na cozinha vira "entregue"**: se a cozinha conclui quando o pedido sai, o sistema de origem ouve "entregue"
+    na saída e "saiu_para_entrega" quase nunca aparece. Documentar em /desenvolvedores ou mapear para "saiu" na entrega.
+  - **Cashback sobre o valor sem desconto**: `creditCashback` usa o subtotal bruto; pedido de R$ 100 com R$ 20 de desconto
+    ganha cashback sobre R$ 100. Usar subtotal menos desconto.
+  - **Arredondamento**: `createKdsOrder` grava `total = subtotal + fees` sem arredondar centavos.
+  - **Consulta por chave**: `GET /api/v1/pedidos/[codigo]` filtra pela integração, não pela chave (a chave B do mesmo
+    restaurante lê os pedidos da chave A), e a página diz "pedido que não é desta chave"; um código com "/" não pode ser consultado.
+  - **Tempo do aviso**: o limite de 5 s do envio é de inatividade; um servidor que responde devagar segura a conexão por mais tempo.
+  - **Primeiro pedido simultâneo**: `ownIntegration` pode dar P2002 se os dois primeiros pedidos chegam juntos (no site
+    vira "tente novamente").
 - **Partes 2 e 3** (Keeta, 99Food e Rappi pelo Open Delivery; iFood pela Merchant API) esperam as contas de desenvolvedor
   da Gastrux em cada plataforma, que só o dono pode criar.
 

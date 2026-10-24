@@ -3,7 +3,7 @@ import { restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { isTierFeatureEnabled, restaurantTier } from '@/lib/tier-guard';
 import { authenticateOrderApiKey } from '@/lib/delivery-orders/api-keys';
 import { parseOrderApiInput } from '@/lib/delivery-orders/input';
-import { ingestDeliveryOrder } from '@/lib/delivery-orders/ingest';
+import { DeliveryOrderError, ingestDeliveryOrder } from '@/lib/delivery-orders/ingest';
 import { publicStatus } from '@/lib/delivery-orders/status';
 import { prisma } from '@/lib/prisma';
 
@@ -37,7 +37,14 @@ export async function POST(req: NextRequest) {
   const parsed = parseOrderApiInput(body);
   if (!parsed.ok) return NextResponse.json({ erro: parsed.error }, { status: 400 });
 
-  const r = await ingestDeliveryOrder({ restaurantId: auth.restaurantId, integrationId: auth.integrationId, apiKeyId: auth.apiKeyId, platform: 'gastrux_api', input: parsed.value });
+  let r: Awaited<ReturnType<typeof ingestDeliveryOrder>>;
+  try {
+    r = await ingestDeliveryOrder({ restaurantId: auth.restaurantId, integrationId: auth.integrationId, apiKeyId: auth.apiKeyId, platform: 'gastrux_api', input: parsed.value });
+  } catch (e) {
+    // The code of another origin of the restaurant (409, final review 2026-10-24)
+    if (e instanceof DeliveryOrderError) return NextResponse.json({ erro: e.message }, { status: e.status });
+    throw e;
+  }
   const kitchen = r.kitchenOrderId ? await prisma.order.findUnique({ where: { id: r.kitchenOrderId }, select: { status: true } }) : null;
   const status = publicStatus(r.externalOrder.status, kitchen?.status ?? null);
   return NextResponse.json(

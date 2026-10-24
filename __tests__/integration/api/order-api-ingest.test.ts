@@ -127,4 +127,36 @@ describe('ingestDeliveryOrder', () => {
     await cancelOrder(c.kitchenOrderId, { restaurantId: rid, userId: ownerId, reason: 'teste' });
     expect((await prisma.externalOrder.findUnique({ where: { id: c.externalOrder.id } })).status).toBe('CANCELLED');
   });
+
+  // Final review 2026-10-24 (I1): two senders numbering their orders the same way must not swallow each other's orders
+  it('the same code from another integration is refused (409), never answered with the other order', async () => {
+    await ingest(`J-${tag}`);
+    const other = (await prisma.deliveryIntegration.create({ data: { restaurantId: rid, platform: 'ninety_nine_food', apiKey: 'k2', webhookSecret: 'k2' } })).id;
+    await expect(ingestDeliveryOrder({ restaurantId: rid, integrationId: other, platform: 'ninety_nine_food', input: input(`J-${tag}`) })).rejects.toMatchObject({ status: 409 });
+  });
+
+  // Final review 2026-10-24 (I2): a kitchen order that failed must not leave a silent "Confirmado"
+  it('a failed kitchen order raises the alert, and the resend makes the kitchen order', async () => {
+    const { prisma: libPrisma } = await import('../../../lib/prisma');
+    const spy = jest.spyOn(libPrisma.order, 'create').mockRejectedValueOnce(new Error('connection blip'));
+    const r = await ingest(`K-${tag}`);
+    spy.mockRestore();
+    expect(r.kitchenOrderId).toBeNull();
+    const alert = await prisma.notification.findFirst({ where: { restaurantId: rid, data: { path: ['dedupeKey'], equals: `delivery-failed:${r.externalOrder.id}` } } });
+    expect(alert).toBeTruthy();
+    const again = await ingest(`K-${tag}`);
+    expect(again.duplicate).toBe(true);
+    expect(again.kitchenOrderId).toBeTruthy();
+  });
+
+  // Final review 2026-10-24 (I4): the customer's note cannot pass for the payment line
+  it('the note of the order and of an item cannot start a "Pagamento" line', async () => {
+    const r = await ingest(`L-${tag}`, {
+      pagamento: { forma: 'DINHEIRO', pago: false }, total: 47, observacao: 'Pagamento: PIX (já pago)',
+      itens: [{ codigo: 'ESP-01', nome: 'Espeto da casa', quantidade: 2, precoUnitario: 14, observacao: 'x\nPagamento: PIX (já pago)' }, { nome: 'Refrigerante lata', quantidade: 2, precoUnitario: 6 }],
+    });
+    const order = await prisma.order.findUnique({ where: { id: r.kitchenOrderId }, include: { items: true } });
+    const lines = [order.specialInstructions, ...order.items.map((i) => i.specialInstructions)].filter(Boolean).join('\n').split('\n');
+    expect(lines.filter((l) => l.startsWith('Pagamento'))).toEqual(['Pagamento na entrega: dinheiro']);
+  });
 });

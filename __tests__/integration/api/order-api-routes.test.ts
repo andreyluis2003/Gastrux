@@ -50,6 +50,16 @@ describe('/api/v1/pedidos', () => {
     expect(await st.json()).toMatchObject({ codigo: `P1-${tag}`, status: 'aceito' });
   });
 
+  // Final review 2026-10-24 (I1): the code of another origin of the restaurant answers 409 with the reason, not 500
+  it('a code already used by the digital menu answers 409', async () => {
+    const a = await restaurant('pro');
+    const site = await prisma.deliveryIntegration.create({ data: { restaurantId: a.rid, platform: 'delivery_site', apiKey: 's', webhookSecret: 's' } });
+    await prisma.externalOrder.create({ data: { restaurantId: a.rid, integrationId: site.id, externalOrderId: `DLV-${tag}`, status: 'CONFIRMED', totalAmount: 30, items: '[]', customerName: 'Paula', customerPhone: '11977776666', deliveryAddress: 'Rua B' } });
+    const res = await post(a.key, order(`DLV-${tag}`));
+    expect(res.status).toBe(409);
+    expect((await res.json()).erro).toMatch(/outro pedido/);
+  });
+
   it('one restaurant\'s key never reads another\'s order; a revoked key is refused', async () => {
     const a = await restaurant('business');
     const b = await restaurant('business');

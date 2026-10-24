@@ -110,4 +110,16 @@ describe('order API screens', () => {
     expect((await prisma.menuItem.findUnique({ where: { id: b.id } })).code).toBe('ESP-B');
     expect((await NEW_ITEM(req('POST', { categoryId: category.id, name: 'Espeto C', price: 10, code: 'com espaço!' }))).status).toBe(400);
   });
+
+  // Final review 2026-10-24 (I3): a site order paid online shows only once paid (an abandoned checkout is not an active order)
+  it('an unpaid online site order stays out of Pedidos de delivery until the payment is approved', async () => {
+    const site = (await prisma.deliveryIntegration.create({ data: { restaurantId: rid, platform: 'delivery_site', apiKey: 's', webhookSecret: 's' } })).id;
+    const ext = await prisma.externalOrder.create({ data: { restaurantId: rid, integrationId: site, externalOrderId: `DLV-${tag}`, status: 'CONFIRMED', totalAmount: 30, items: '[]', customerName: 'Paula', customerPhone: '11977776666', deliveryAddress: 'Rua B', paymentMethod: 'ONLINE_PIX' } });
+    const order = await prisma.order.create({ data: { restaurantId: rid, orderNumber: `DLV-${tag}`, orderType: 'DELIVERY', status: 'PENDING', subtotal: 30, total: 30, paymentMethod: 'ONLINE_PIX', paymentStatus: 'PENDING', externalOrderId: ext.id } });
+    as(owner);
+    const ids = async () => (await (await LIST(req('GET'))).json()).orders.map((o) => o.id);
+    expect(await ids()).not.toContain(ext.id);
+    await prisma.order.update({ where: { id: order.id }, data: { paymentStatus: 'APPROVED' } });
+    expect(await ids()).toContain(ext.id);
+  });
 });

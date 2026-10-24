@@ -125,6 +125,16 @@ export async function createOrderFromExternalOrder(
     return order;
   } catch (error) {
     console.error('Error creating order from external order:', error);
+    // Never a silent "Confirmado" that is not cooking (final review 2026-10-24): the restaurant hears it
+    const ext = await prisma.externalOrder.findUnique({ where: { id: externalOrderId }, select: { id: true, restaurantId: true, externalOrderId: true } }).catch(() => null);
+    if (ext) {
+      await alertDeliveryProblem(ext, {
+        kind: 'failed',
+        severity: 'CRITICAL',
+        title: 'Pedido de delivery NÃO foi para a cozinha',
+        message: `O pedido ${ext.externalOrderId} foi aceito, mas não chegou à cozinha por uma falha. Prepare pelo pedido em Pedidos de delivery; quando o sistema mandar o pedido de novo, ele entra na cozinha.`,
+      });
+    }
     return null;
   }
 }
