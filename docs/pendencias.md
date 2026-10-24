@@ -40,9 +40,13 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
   `lib/s3` e `lib/aws-config`. Ficam no banco, sem uso: `ai_insights` (o cardápio do QR ainda lê combos fixados), `ingredient_batches`.
 - **Ficam escondidas, de propósito**: QR na embalagem, ROI da migração e Campanha de reconquista (esperam o WhatsApp e a
   integração com o iFood, como as Campanhas); PDV (`/admin/pdv`, recebe vendas de outro sistema; espera a decisão da maquininha).
-- **Para o dono decidir**: `/suporte/ia` é só uma janela com um chatbot da Abacus, sem link, e `/admin/ia-monitoring` acompanha
-  esse chatbot. Recomendação: apagar os dois (o Pergunte ao Gastrux faz esse papel). Também sem link: `/settings/referral`
-  (indicação de restaurantes, `/api/referrals/generate-code` pela Abacus), ainda não revisada.
+- ~~**/suporte/ia e /admin/ia-monitoring**~~ (apagados em 2026-10-23, decisão do dono): um chatbot da Abacus numa janela, sem
+  link, e o painel que o acompanhava; com `/api/ai-support/*` e `lib/ai-support`. Os endereços levam à Central de ajuda e ao
+  Custo da IA. A tabela `ai_support_interactions` fica no banco, sem uso.
+- **Indicação de restaurantes** (`/settings/referral`, `/api/referrals/*`), revisada em 2026-10-23, espera o dono: a tela promete
+  "Indique amigos e ganhe R$ 50 em créditos", mas o crédito só é somado em `users.referralBonusEarned` e nada da cobrança o usa;
+  o link `/?ref=` não é lido no cadastro (o indicado precisa digitar o código); o link cai em `restaurantes.abacusai.app` quando
+  falta `NEXTAUTH_URL`. A página `/settings`, que leva até ela, também não tem link (repete Minha conta e Minha assinatura).
 
 ## Telas que não funcionam (achadas nos artigos da Central de Ajuda, 2026-10-20)
 
