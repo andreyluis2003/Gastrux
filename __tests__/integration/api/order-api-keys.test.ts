@@ -94,6 +94,16 @@ describe('order API keys', () => {
     expect((await refused.json()).upgradeUrl).toBe('/pricing');
   });
 
+  // Security review 2026-10-23: the URL parser rewrites an IPv4 inside IPv6 in hex (::ffff:a00:1), which a regex
+  // on the dotted form missed; NAT64, 6to4 and IPv4-compatible forms reach IPv4 addresses too
+  it('IPv6 forms that carry a private IPv4, and other non-public IPv6, are refused', async () => {
+    for (const url of ['https://[::ffff:10.0.0.1]/', 'https://[::ffff:127.0.0.1]/', 'https://[::ffff:169.254.169.254]/', 'https://[64:ff9b::a00:1]/',
+      'https://[2002:a00:1::]/', 'https://[::a00:1]/', 'https://[::]/', 'https://[fe80::1]/', 'https://[fd00::1]/', 'https://[ff02::1]/', 'https://[2001:db8::1]/']) {
+      expect([url, await isSafeCallbackUrl(url)]).toEqual([url, false]);
+    }
+    expect(await isSafeCallbackUrl('https://[2606:4700:4700::1111]/')).toBe(true);
+  });
+
   it('the callback address: https on the internet only', async () => {
     as(a.MANAGER);
     const { id } = await (await CREATE(req('POST', { name: 'Com aviso' }))).json();
