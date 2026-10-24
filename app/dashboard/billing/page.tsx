@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { formatDate, formatBRL } from '@/lib/formatters';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 import { useI18n } from '@/lib/i18n';
+import { ReferralCard } from '@/components/billing/referral-card';
 
 interface SubscriptionStatus {
   subscriptionTier: string;
@@ -168,6 +169,9 @@ export default function BillingPage() {
                 <Button variant="outline" onClick={() => router.push('/conta/cobranca')}>{t('billing.manage')}</Button>
               </div>
             </Card>
+
+            {/* Referral program (plan 2026-10-24 indicacao): the card shows only to the owner */}
+            <ReferralCard />
 
             {/* Upgrade Card */}
             {subscription?.subscriptionTier !== 'enterprise' && (

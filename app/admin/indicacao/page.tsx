@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
-// Removed 2026-10-23 with the old loyalty (owner: only cashback): a referral only gave points, which bought nothing.
-// The cashback is on the Cashback screen (spec docs/superpowers/specs/2026-10-23-cashback-design.md)
+// The old referral (points that bought nothing) was removed on 2026-10-23; the real program of 2026-10-24
+// (plan indicacao) lives on Minha assinatura > Indique e ganhe
 export default function OldReferralPage() {
-  redirect('/admin/cashback');
+  redirect('/dashboard/billing#indique');
 }
