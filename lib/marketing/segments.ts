@@ -374,6 +374,65 @@ export const SEGMENTS: Segment[] = [
     },
     color: 'from-orange-700 to-red-800',
   },
+  // Padaria and cafeteria (owner, 2026-10-23). Only what works today: sale by weight and encomendas come later
+  {
+    slug: 'padaria',
+    name: 'Sistema para Padaria',
+    shortName: 'Padaria',
+    emoji: '🥖',
+    metaTitle: 'Sistema para Padaria | Gastrux',
+    metaDescription: 'Sistema para padarias: custo de cada pão e salgado, fornadas planejadas, contagem do que sobrou, caixa e NFC-e.',
+    heroHeadline: 'Controle de verdade para a sua padaria',
+    heroDescription: 'Saiba quanto custa cada pão, salgado e fatia de bolo, planeje as fornadas do dia e confira no fim do dia o que foi vendido e o que sobrou.',
+    painPoints: [
+      'Não saber quanto custa de verdade um pão francês ou um sonho',
+      'Fornada demais vira perda; fornada de menos vira fila',
+      'Farinha, manteiga e fermento acabando sem aviso',
+      'Caixa do balcão que nunca bate no fim do dia',
+    ],
+    benefits: [
+      { icon: 'Calculator', title: 'Custo de Cada Produto', description: 'Ficha técnica do pão, do salgado e do bolo: o Gastrux mostra o custo e a margem de cada um.' },
+      { icon: 'Calendar', title: 'Planejamento das Fornadas', description: 'Planeje quanto produzir de cada item no dia e veja quanto a fornada custa.' },
+      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Quantos pães e salgados saíram do forno, quantos foram vendidos e quantos sobraram.' },
+      { icon: 'Thermometer', title: 'Etiquetas e Validades', description: 'Etiqueta de manipulação com data de preparo e validade para o que vai para a vitrine.' },
+      { icon: 'Zap', title: 'Venda de Balcão Rápida', description: 'Venda em poucos toques no caixa, com NFC-e ao fechar a venda.' },
+      { icon: 'Gift', title: 'Cashback', description: 'O cliente da manhã ganha crédito em reais a cada compra e volta para usar (plano Business).' },
+    ],
+    cta: {
+      headline: 'Pronto para profissionalizar sua padaria?',
+      description: 'Custo de cada produto, fornadas planejadas e caixa conferido.',
+    },
+    color: 'from-amber-500 to-orange-600',
+  },
+  {
+    slug: 'cafeteria',
+    name: 'Sistema para Cafeteria',
+    shortName: 'Cafeteria',
+    emoji: '☕',
+    metaTitle: 'Sistema para Cafeteria | Gastrux',
+    metaDescription: 'Sistema para cafeterias: custo de cada café, adicionais como bebida vegetal e dose extra, balcão rápido, cashback e NFC-e.',
+    heroHeadline: 'O sistema certo para a sua cafeteria',
+    heroDescription: 'Do espresso ao latte com bebida vegetal: saiba a margem de cada bebida, venda rápido no balcão e traga o cliente de volta com cashback.',
+    painPoints: [
+      'Café especial caro e margem de cada bebida desconhecida',
+      'Adicionais (dose extra, bebida vegetal) que ninguém cobra direito',
+      'Pão de queijo e bolo do dia que sobram sem controle',
+      'Cliente fiel sem nenhum motivo para voltar',
+    ],
+    benefits: [
+      { icon: 'Calculator', title: 'Margem de Cada Bebida', description: 'Ficha técnica do espresso, do cappuccino e do latte, com o custo do grão e do leite.' },
+      { icon: 'Layers', title: 'Adicionais', description: 'Dose extra, bebida vegetal e chantilly como adicionais com preço próprio no pedido.' },
+      { icon: 'Zap', title: 'Balcão Rápido', description: 'Pedido pelo nome do cliente, comanda para a cozinha e pagamento em poucos toques.' },
+      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Pão de queijo e fatias de bolo: quanto saiu do forno, quanto vendeu, quanto sobrou.' },
+      { icon: 'Gift', title: 'Cashback', description: 'O cliente ganha crédito em reais a cada compra e usa como desconto na próxima (plano Business).' },
+      { icon: 'Receipt', title: 'NFC-e Automática', description: 'A nota do consumidor sai ao fechar a venda, com o certificado digital e os dados do contador.' },
+    ],
+    cta: {
+      headline: 'Pronto para organizar sua cafeteria?',
+      description: 'Margem de cada bebida, balcão rápido e cliente que volta.',
+    },
+    color: 'from-yellow-700 to-amber-900',
+  },
 ];
 
 export function getSegmentBySlug(slug: string): Segment | undefined {

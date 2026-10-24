@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { GastruxLogo } from '@/components/brand/logo';
 import { SiteFooter } from '@/components/marketing/site-footer';
 import { useSearchParams } from 'next/navigation';
+import { SEGMENTS } from '@/lib/marketing/segments';
 import { Button } from '@/components/ui/button';
 import {
   Calculator,
@@ -42,14 +43,9 @@ interface FormData {
   segmento: string;
 }
 
+// The same business types as the site and the signup (lib/marketing/segments.ts), so padaria and cafeteria are apart
 const SEGMENTOS = [
-  { value: 'restaurante', label: 'Restaurante / Self-service' },
-  { value: 'pizzaria', label: 'Pizzaria' },
-  { value: 'hamburgueria', label: 'Hamburgueria' },
-  { value: 'delivery', label: 'Delivery / Dark Kitchen' },
-  { value: 'bar', label: 'Bar / Pub' },
-  { value: 'espetaria', label: 'Espetaria' },
-  { value: 'cafeteria', label: 'Cafeteria / Padaria' },
+  ...SEGMENTS.filter((s) => s.slug !== 'franquias').map((s) => ({ value: s.slug, label: s.shortName })),
   { value: 'outro', label: 'Outro' },
 ];
 
@@ -67,7 +63,7 @@ export default function CalculadoraPage() {
     comprasMes: '',
     funcionarios: '',
     aluguel: '',
-    segmento: 'restaurante',
+    segmento: 'restaurantes',
   });
   const [email, setEmail] = useState('');
   const [leadSent, setLeadSent] = useState(false);
@@ -90,7 +86,7 @@ export default function CalculadoraPage() {
         comprasMes: Number(c) || '',
         funcionarios: Number(f) || '',
         aluguel: Number(a) || '',
-        segmento: s || 'restaurante',
+        segmento: s || 'restaurantes',
       });
       setStep('result');
     }

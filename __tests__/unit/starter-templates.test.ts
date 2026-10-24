@@ -29,6 +29,9 @@ describe('starter templates ("Comece com", lib/onboarding/starter-templates.ts)'
     expect(counted('lanchonete')).toEqual(['COX']);
     expect(counted('marmitaria')).toEqual(['CMO', 'FRG', 'LIN', 'MAC']);
     expect(counted('doceria')).toEqual(['BOL', 'BRI', 'MOR', 'MOU']);
+    // Padaria and cafeteria (owner, 2026-10-23): the fornada and what goes in the display case are counted
+    expect(counted('padaria')).toEqual(['BOL', 'COX', 'PFR', 'SON']);
+    expect(counted('cafeteria')).toEqual(['BOL', 'PQJ']);
     for (const slug of ['restaurantes', 'pizzaria', 'hamburgueria', 'japones', 'acai', 'bar']) expect([slug, counted(slug)]).toEqual([slug, []]);
   });
 
