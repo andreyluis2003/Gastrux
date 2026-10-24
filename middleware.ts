@@ -12,6 +12,7 @@ import { detectRegionFromCountry } from '@/lib/regional-config';
 import { getToken } from 'next-auth/jwt';
 import { entryRedirect } from '@/lib/navigation/entry';
 import { LOCK_CODE, LOCK_MESSAGE } from '@/lib/billing/plan-lock-text';
+import { normalizeReferralCode, REFERRAL_COOKIE, REFERRAL_COOKIE_MAX_AGE } from '@/lib/referrals/code';
 
 export const config = {
   matcher: [
@@ -175,6 +176,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+
+  // A referral link (gastrux.com/?ref=CODE, plan 2026-10-24 indicacao) is kept 60 days: a person who opens it today
+  // and signs up next week still gets the 45 days. Readable by the signup page, which shows who referred them.
+  const ref = isApiRoute(pathname) ? null : normalizeReferralCode(request.nextUrl.searchParams.get('ref'));
+  if (ref) response.cookies.set(REFERRAL_COOKIE, ref, { maxAge: REFERRAL_COOKIE_MAX_AGE, sameSite: 'lax', path: '/' });
 
   // ============================================
   // PARTE 1: REGIONAL ROUTING

@@ -8,6 +8,9 @@ import { resolveEffectiveRole } from './auth/effective-role';
 import bcryptjs from 'bcryptjs';
 import { trialEnd } from '@/lib/billing/plan-access';
 import { refreshPlanClaim } from '@/lib/billing/plan-claim';
+import { attachReferral, findReferrer } from '@/lib/referrals/signup';
+import { REFERRAL_TRIAL_BONUS_DAYS } from '@/lib/referrals/rules';
+import { REFERRAL_COOKIE } from '@/lib/referrals/code';
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? process.env.NODE_ENV === 'production';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
@@ -228,6 +231,21 @@ export const authOptions: NextAuthOptions = {
           await prisma.ingredientCategory.create({
             data: { name, restaurantId: restaurant.id },
           }).catch(() => {}); // ignore duplicates
+        }
+
+        // A referral link or code before "Entrar com Google" (plan 2026-10-24 indicacao): the cookie it left gives the
+        // 15 extra days here too. Outside a request (no cookies) nothing happens.
+        try {
+          const { cookies } = await import('next/headers');
+          const referrer = await findReferrer(cookies().get(REFERRAL_COOKIE)?.value);
+          if (referrer) {
+            const ends = new Date(trialEnd().getTime() + REFERRAL_TRIAL_BONUS_DAYS * 86_400_000);
+            await prisma.user.update({ where: { id: user.id }, data: { trialEndsAt: ends } });
+            await prisma.restaurant.update({ where: { id: restaurant.id }, data: { trialEndsAt: ends } });
+            await attachReferral(restaurant.id, referrer);
+          }
+        } catch (e) {
+          console.error('[Auth Event] referral at Google sign-up failed:', e);
         }
 
         console.log('[Auth Event] Restaurant created for Google SSO user:', restaurant.id);

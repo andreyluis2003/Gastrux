@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import bcryptjs from 'bcryptjs';
 import { trialEnd } from '@/lib/billing/plan-access';
 import { sendWelcomeIfDue } from '@/lib/onboarding/emails';
+import { attachReferral, findReferrer } from '@/lib/referrals/signup';
+import { REFERRAL_TRIAL_BONUS_DAYS } from '@/lib/referrals/rules';
+import { REFERRAL_COOKIE } from '@/lib/referrals/code';
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,8 +35,11 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcryptjs.hash(password, 10);
 
-    // Plans of 2026-10-18: 30 days of Business, no card (lib/billing/plan-access.ts)
-    const ends = trialEnd();
+    // Plans of 2026-10-18: 30 days of Business, no card (lib/billing/plan-access.ts). A referral link or code
+    // (plan 2026-10-24 indicacao) adds 15: the code typed in the form wins over the one the link left in the cookie.
+    const typedCode = typeof body.referralCode === 'string' && body.referralCode.trim() ? body.referralCode : null;
+    const referrer = await findReferrer(typedCode ?? req.cookies?.get?.(REFERRAL_COOKIE)?.value);
+    const ends = referrer ? new Date(trialEnd().getTime() + REFERRAL_TRIAL_BONUS_DAYS * 86_400_000) : trialEnd();
 
     // Create user as OWNER with auto-provisioned restaurant
     const restaurantName = name ? `Restaurante ${name}` : 'Meu Restaurante';
@@ -80,6 +86,8 @@ export async function POST(req: NextRequest) {
       where: { id: user.id },
       data: { currentRestaurantId: restaurant.id },
     });
+
+    if (referrer) await attachReferral(restaurant.id, referrer);
 
     // Seed default categories for the new restaurant
     const defaultCategories = ['Carnes', 'Vegetais', 'Laticínios', 'Temperos', 'Bebidas', 'Outros'];

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Chrome } from 'lucide-react';
 import { GastruxLogo } from '@/components/brand/logo';
 import { useAnalytics } from '@/hooks/use-analytics';
+import { normalizeReferralCode, REFERRAL_COOKIE, REFERRAL_COOKIE_MAX_AGE } from '@/lib/referrals/code';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -22,11 +23,36 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  // Referral (plan 2026-10-24 indicacao): the code comes from ?ref=, the cookie the link left, or typed here
+  const [referralCode, setReferralCode] = useState('');
+  const [referrerName, setReferrerName] = useState<string | null>(null);
 
   useEffect(() => {
     // Track signup page view
     trackEvent('signup_form_start', { event_category: 'conversion' });
   }, [trackEvent]);
+
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get('ref');
+    const fromCookie = document.cookie.split('; ').find((c) => c.startsWith(`${REFERRAL_COOKIE}=`))?.split('=')[1];
+    if (fromUrl || fromCookie) setReferralCode(fromUrl || fromCookie || '');
+  }, []);
+
+  useEffect(() => {
+    const code = normalizeReferralCode(referralCode);
+    if (!code) { setReferrerName(null); return; }
+    let alive = true;
+    fetch(`/api/referrals/lookup?code=${code}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (!alive) return;
+        setReferrerName(body?.name ?? null);
+        // "Entrar com Google" reads the code from this cookie on the server
+        if (body?.name) document.cookie = `${REFERRAL_COOKIE}=${code}; max-age=${REFERRAL_COOKIE_MAX_AGE}; path=/; samesite=lax`;
+      })
+      .catch(() => alive && setReferrerName(null));
+    return () => { alive = false; };
+  }, [referralCode]);
 
   async function handleGoogleSignIn() {
     if (!acceptedTerms) {
@@ -70,7 +96,7 @@ export default function SignUpPage() {
       const res = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, acceptedTerms: true }),
+        body: JSON.stringify({ email, password, name, acceptedTerms: true, referralCode: referralCode || undefined }),
       });
 
       const data = await res.json();
@@ -110,6 +136,12 @@ export default function SignUpPage() {
           <h1><GastruxLogo className="h-16" /></h1>
           <p className="text-sm text-slate-600">Crie sua conta</p>
         </div>
+
+        {referrerName && (
+          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-center text-sm text-green-800">
+            Indicado por <strong>{referrerName}</strong>: 45 dias grátis
+          </div>
+        )}
 
         <form onSubmit={handleSignUp} className="space-y-4">
           <div className="space-y-2">
@@ -161,6 +193,23 @@ export default function SignUpPage() {
               disabled={isLoading}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="referralCode">Código de indicação (opcional)</Label>
+            <Input
+              id="referralCode"
+              type="text"
+              placeholder="Ex.: ABC23D"
+              value={referralCode}
+              maxLength={12}
+              onChange={(e) => setReferralCode(e.target.value)}
+              disabled={isLoading}
+              autoCapitalize="characters"
+            />
+            {referralCode.trim() && !referrerName && normalizeReferralCode(referralCode) && (
+              <p className="text-xs text-slate-500">Código não encontrado: o teste grátis fica com 30 dias.</p>
+            )}
           </div>
 
           <label className="flex items-start gap-2 text-sm text-slate-600 cursor-pointer">
