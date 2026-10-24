@@ -6,7 +6,9 @@ import { pushPlatformStatus, type PlatformChange } from './platform-sync';
 /** What the kitchen tells the platform (iFood): the cancellation goes through Pedidos de delivery, with a reason */
 const TO_PLATFORM: Record<string, PlatformChange> = { PREPARING: 'preparing', READY: 'ready', COMPLETED: 'dispatch' };
 
-const FROM_KITCHEN: Record<string, 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED'> = {
+const BEFORE_READY: string[] = ['PENDING', 'CONFIRMED', 'PREPARING'];
+
+const FROM_KITCHEN:Record<string, 'PREPARING' | 'READY' | 'DELIVERED' | 'CANCELLED'> = {
   PREPARING: 'PREPARING', READY: 'READY', COMPLETED: 'DELIVERED', CANCELLED: 'CANCELLED',
 };
 
@@ -20,7 +22,12 @@ export async function followKitchen(externalOrderId: string, kitchenStatus: stri
     const ext = await prisma.externalOrder.findUnique({ where: { id: externalOrderId }, select: { status: true } });
     if (target && ext && canMoveExternalOrderStatus(ext.status, target)) {
       const moved = await prisma.externalOrder.updateMany({ where: { id: externalOrderId, status: ext.status }, data: { status: target } });
-      if (moved.count && !opts.fromPlatform && TO_PLATFORM[kitchenStatus]) await pushPlatformStatus(externalOrderId, TO_PLATFORM[kitchenStatus]);
+      if (moved.count && !opts.fromPlatform && TO_PLATFORM[kitchenStatus]) {
+        // A kitchen that skipped "Pronto" still tells the platform it is ready: that calls iFood's courier and the
+        // takeout customer (final review I2); "dispatch" alone only reaches iFood on the store's own delivery
+        if (kitchenStatus === 'COMPLETED' && BEFORE_READY.includes(ext.status)) await pushPlatformStatus(externalOrderId, 'ready');
+        await pushPlatformStatus(externalOrderId, TO_PLATFORM[kitchenStatus]);
+      }
       if (moved.count) {
         await prisma.deliveryLog.create({
           data: { externalOrderId, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: target, message: 'Status da cozinha', eventTimestamp: new Date() },

@@ -3,11 +3,14 @@ import { pollIfoodOnce } from './events';
 /**
  * The loop that polls the iFood events (plan 2026-10-24 ifood, Task 6), started once per server process from
  * instrumentation.ts. The next run is scheduled only after the previous one ends, so two polls never overlap and the
- * interval never drops below 30 s (homologation rule). A failed run is logged and the loop goes on.
+ * interval never drops below 30 s (homologation rule). A failed run is logged and the loop goes on. Across server
+ * processes (an overlapping deploy, a second replica) the lease in pollIfoodOnce lets one poll per 25 s.
  */
 let running = false;
 
-export function startIfoodPoller(run: () => Promise<unknown> = pollIfoodOnce, everyMs = 30_000): { stop(): void } {
+const pollKeepingLease = () => pollIfoodOnce({ holdMs: 25_000 });
+
+export function startIfoodPoller(run: () => Promise<unknown> = pollKeepingLease, everyMs = 30_000): { stop(): void } {
   if (running) return { stop() {} };
   running = true;
   let timer: ReturnType<typeof setTimeout> | null = null;

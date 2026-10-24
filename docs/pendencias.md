@@ -52,6 +52,24 @@ Plano `docs/superpowers/plans/2026-10-24-ifood.md`. O código está pronto; a lo
   registrado. Ver na homologação se o iFood pede que o Gastrux mostre ou confira esse código.
 - **Cabeçalho `x-request-homologation`** citado na página "Gerar pedido de teste" do iFood: ver na homologação se precisa ir
   nas chamadas.
+- **Revisão final (24/10/2026), itens menores que ficaram:**
+  - M1: a tela da cozinha espera a resposta do iFood ao mudar o status (até ~15 s por toque com o iFood fora do ar); dá
+    para mandar sem esperar, mas os testes contam as chamadas logo depois do toque.
+  - M2: dois pedidos de token ao mesmo tempo (o loop e uma ação na tela) podem gastar o mesmo refresh token; se o iFood
+    trocar o refresh token a cada uso, a loja fica "Com erro" até reconectar. Solução: um só pedido em andamento por loja e
+    salvar só se o refresh token ainda for o antigo.
+  - M5: preço por unidade arredondado (`total / quantidade`) pode errar centavos (R$ 10,00 / 3); usar quantidade 1 com o
+    total da linha quando a divisão não for exata, ou o `subTotal` do iFood como referência.
+  - M6: reconectar com uma conta de várias lojas grava os tokens novos antes de escolher a loja, com a loja antiga ainda
+    ligada; e o botão "Concluir" fica clicável depois que a lista de lojas aparece (responde 409).
+  - M7: Pausar só para de buscar; pedidos feitos antes de o iFood fechar a loja não chegam e o iFood cancela em 8 minutos.
+    Usar a interrupção de loja do iFood para fechar na hora. Desconectar com pedidos em andamento: avisar ou bloquear.
+  - M8: ligar o iFood mantém o apiKey/webhookSecret antigos de uma linha "ifood" criada pela rota antiga; trocar os dois
+    ao conectar.
+  - M9: um PLC cujo pedido o iFood sempre responde 404 é tentado a cada 30 s sem limite; a tabela `ifood_events` não tem
+    limpeza.
+  - O servidor falso de `__tests__/integration/api/ifood-events.test.ts` não filtra por `x-polling-merchants`, então o
+    teste "evento de loja não ligada" não reflete a produção.
 - **Status mudado à mão** em Pedidos de delivery também vai para o iFood (Em preparo, Pronto, Em entrega); se a cozinha
   depois marcar o mesmo passo, o iFood pode recusar a repetição (só fica registrado).
 

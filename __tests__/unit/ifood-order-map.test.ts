@@ -36,12 +36,25 @@ describe('mapIfoodOrder', () => {
     const { input, extraNote, platformData } = mapIfoodOrder(takeoutCash());
     expect(input.retirada).toBe(true);
     expect(input.entrega).toBeUndefined();
-    expect(input.pagamento).toEqual({ forma: 'DINHEIRO', pago: false, trocoPara: 100 });
+    // the change comes from what the customer pays iFood, not from the restaurant's total (final review I3)
+    expect(input.pagamento).toEqual({ forma: 'DINHEIRO', pago: false, trocoPara: undefined });
     expect(platformData.pickupCode).toBe('1234');
     const lines = extraNote.split('\n');
     expect(lines).toContain('Retirada');
     expect(lines).toContain('Código de retirada: 1234');
     expect(lines).toContain('Pagamento: Dinheiro (a cobrar) R$ 30,00');
+    expect(lines).toContain('Troco para R$ 100,00: levar R$ 70,00');
+  });
+
+  it('cash change counts the iFood service fee and an iFood coupon (final review I3)', () => {
+    const o = takeoutCash();
+    // items 30 + iFood service fee 1 - iFood coupon 5 = 26 to collect
+    o.total = { subTotal: 30, deliveryFee: 0, benefits: 5, orderAmount: 26, additionalFees: 1 };
+    o.benefits = [{ value: 5, target: 'CART', sponsorshipValues: [{ name: 'IFOOD', value: 5 }] }];
+    o.payments = { prepaid: 0, pending: 26, methods: [{ value: 26, currency: 'BRL', method: 'CASH', type: 'OFFLINE', cash: { changeFor: 50 } }] };
+    const { input, extraNote } = mapIfoodOrder(o);
+    expect(input.total).toBe(30);
+    expect(extraNote.split('\n')).toContain('Troco para R$ 50,00: levar R$ 24,00');
   });
 
   it('scheduled', () => {

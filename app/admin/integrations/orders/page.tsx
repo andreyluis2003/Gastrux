@@ -540,7 +540,7 @@ export default function DeliveryOrdersPage() {
                         </Button>
                       )}
 
-                      {['CONFIRMED', 'PREPARING', 'READY'].includes(order.status) && (
+                      {['CONFIRMED', 'PREPARING', 'READY'].includes(order.status) && (!isIfood(order) || canChangeSettings) && (
                         <Button
                           size="sm"
                           variant="destructive"

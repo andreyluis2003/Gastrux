@@ -38,7 +38,8 @@ async function linkedIntegrations(): Promise<Linked[]> {
 const displayOf = (ext: { platformData: unknown; externalOrderId: string }) =>
   ((ext.platformData ?? {}) as { displayId?: string }).displayId ?? ext.externalOrderId.slice(-6);
 
-const FROM_OTHER_SYSTEM: Record<string, 'PREPARING' | 'READY' | 'PICKED_UP'> = { SPS: 'PREPARING', RTP: 'READY', DSP: 'PICKED_UP' };
+// The codes iFood sent in the real test of 2026-10-24 (PRS = PREPARATION_STARTED; SPS is a grocery separation)
+const FROM_OTHER_SYSTEM: Record<string, 'PREPARING' | 'READY' | 'PICKED_UP'> = { PRS: 'PREPARING', RTP: 'READY', DSP: 'PICKED_UP' };
 
 async function moveForward(ext: { id: string; status: any }, target: any, message: string) {
   if (!canMoveExternalOrderStatus(ext.status, target)) return;
@@ -67,6 +68,9 @@ export async function processIfoodEvent(ev: IfoodEventPayload, integration: Link
       console.error('[ifood] order refused by the pipeline:', e.message);
     }
     await prisma.deliveryIntegration.update({ where: { id: integration.id }, data: { lastOrderAt: new Date(), totalOrdersSynced: { increment: 1 } } }).catch(() => {});
+    // Its cancellation came first (another batch) and found no order: apply it now (final review I1)
+    const cancelled = await prisma.ifoodEvent.findFirst({ where: { orderId: ev.orderId, code: 'CAN', id: { not: ev.id } }, select: { payload: true } });
+    if (cancelled) await processIfoodEvent(cancelled.payload as unknown as IfoodEventPayload, integration);
     return;
   }
 
@@ -75,7 +79,13 @@ export async function processIfoodEvent(ev: IfoodEventPayload, integration: Link
     where: { restaurantId_externalOrderId: { restaurantId: integration.restaurantId, externalOrderId: ev.orderId } },
     select: { id: true, restaurantId: true, externalOrderId: true, status: true, platformData: true, integrationId: true, internalOrder: { select: { id: true, status: true } } },
   });
-  if (!ext || ext.integrationId !== integration.id) return;
+  if (!ext) {
+    // The order is not in yet because its PLC failed: wait for it (not acknowledged, iFood repeats this event)
+    const waiting = await prisma.ifoodEvent.findFirst({ where: { orderId: ev.orderId, code: 'PLC', processedAt: null }, select: { id: true } });
+    if (waiting) throw new Error(`pedido ${ev.orderId} ainda não entrou: o evento ${code} espera o PLC`);
+    return;
+  }
+  if (ext.integrationId !== integration.id) return;
 
   if (code === 'CFM') {
     // Confirmed on iFood by another system (the iFood order manager): Gastrux follows, without confirming again
@@ -88,15 +98,21 @@ export async function processIfoodEvent(ev: IfoodEventPayload, integration: Link
 
   if (code === 'CAN') {
     const kitchen = ext.internalOrder;
+    const doneAlert = () => alertDeliveryProblem(ext, {
+      kind: 'ifood-cancelled-after-done', severity: 'CRITICAL', title: 'O iFood cancelou um pedido já concluído',
+      message: `O iFood cancelou o pedido #${displayOf(ext)}, que a cozinha já concluiu. A venda continua no Caixa: confira com o iFood.`,
+    });
     if (kitchen?.status === 'COMPLETED') {
-      await alertDeliveryProblem(ext, {
-        kind: 'ifood-cancelled-after-done', severity: 'CRITICAL', title: 'O iFood cancelou um pedido já concluído',
-        message: `O iFood cancelou o pedido #${displayOf(ext)}, que a cozinha já concluiu. A venda continua no Caixa: confira com o iFood.`,
-      });
+      await doneAlert();
       return;
     }
     if (kitchen && kitchen.status !== 'CANCELLED') {
-      await cancelOrder(kitchen.id, { restaurantId: ext.restaurantId, reason: 'Cancelado pelo iFood', fromPlatform: true });
+      const outcome = await cancelOrder(kitchen.id, { restaurantId: ext.restaurantId, reason: 'Cancelado pelo iFood', fromPlatform: true });
+      // The kitchen finished it between the read and the cancel (final review M4)
+      if (outcome.kind === 'completed') {
+        await doneAlert();
+        return;
+      }
     }
     await prisma.externalOrder.updateMany({ where: { id: ext.id, status: { notIn: ['CANCELLED', 'REJECTED', 'DELIVERED'] } }, data: { status: 'CANCELLED', disputeId: null, disputeExpiresAt: null } });
     return;
@@ -149,7 +165,50 @@ async function afterPoll(polled: Linked[]) {
   }
 }
 
-export async function pollIfoodOnce(): Promise<{ events: number; acked: number; failed: number }> {
+const LEASE = 'ifood-poll';
+/** Held while a poll runs: longer than any poll (100 merchants per call, 15 s per iFood call) */
+const LEASE_WHILE_POLLING_MS = 120_000;
+const STALE_CLAIM_MS = 120_000;
+
+/** Only one server process polls at a time (final review I5): two would read and process the same events */
+async function takeLease(): Promise<boolean> {
+  const rows = await prisma.$queryRaw<Array<{ name: string }>>`
+    INSERT INTO "poll_leases" ("name", "leaseUntil") VALUES (${LEASE}, now() + ${LEASE_WHILE_POLLING_MS} * interval '1 millisecond')
+    ON CONFLICT ("name") DO UPDATE SET "leaseUntil" = EXCLUDED."leaseUntil"
+    WHERE "poll_leases"."leaseUntil" < now()
+    RETURNING "name"`;
+  return rows.length > 0;
+}
+
+/** `holdMs`: how long the lease is kept after this poll, so another process skips its tick (the loop passes 25 s) */
+async function releaseLease(holdMs: number) {
+  await prisma.$executeRaw`UPDATE "poll_leases" SET "leaseUntil" = now() + ${holdMs} * interval '1 millisecond' WHERE "name" = ${LEASE}`.catch(() => {});
+}
+
+/** One poll at a time per event too: a claim older than 2 minutes (a crashed poll) is taken again */
+async function claimEvent(id: string): Promise<boolean> {
+  const claimed = await prisma.ifoodEvent.updateMany({
+    where: { id, processedAt: null, OR: [{ claimedAt: null }, { claimedAt: { lt: new Date(Date.now() - STALE_CLAIM_MS) } }] },
+    data: { claimedAt: new Date() },
+  });
+  return claimed.count === 1;
+}
+
+const createdAtOf = (ev: IfoodEventPayload) => {
+  const t = ev.createdAt ? Date.parse(ev.createdAt) : NaN;
+  return Number.isNaN(t) ? 0 : t;
+};
+
+export async function pollIfoodOnce(opts: { holdMs?: number } = {}): Promise<{ events: number; acked: number; failed: number }> {
+  if (!(await takeLease())) return { events: 0, acked: 0, failed: 0 };
+  try {
+    return await pollLinked();
+  } finally {
+    await releaseLease(opts.holdMs ?? 0);
+  }
+}
+
+async function pollLinked(): Promise<{ events: number; acked: number; failed: number }> {
   const linked = await linkedIntegrations();
   const byMerchant = new Map(linked.map((l) => [l.storeId, l]));
   const groups: Array<{ integration: Linked | null; members: Linked[] }> = [];
@@ -171,22 +230,27 @@ export async function pollIfoodOnce(): Promise<{ events: number; acked: number; 
     }
     result.events += events.length;
     const done = new Set<string>();
-    for (const ev of events) {
-      if (!ev?.id || done.has(ev.id)) continue;
-      const integration = byMerchant.get(ev.merchantId) ?? null;
+    // iFood does not promise the order of a batch: an order's CAN listed before its PLC must not be lost (final review I1)
+    const ordered = events.filter((ev) => ev?.id).sort((x, y) => createdAtOf(x) - createdAtOf(y));
+    for (const ev of ordered) {
+      if (done.has(ev.id)) continue;
+      // A store's own token polls only its own events: one of another merchant goes nowhere (final review I4)
+      const integration = g.integration ? (ev.merchantId === g.integration.storeId ? g.integration : null) : byMerchant.get(ev.merchantId) ?? null;
       await prisma.ifoodEvent.createMany({
         data: [{ id: ev.id, integrationId: integration?.id ?? null, merchantId: String(ev.merchantId ?? ''), orderId: ev.orderId ?? null, code: String(ev.code ?? ''), fullCode: ev.fullCode ?? null, payload: ev as any }],
         skipDuplicates: true,
       });
       const row = await prisma.ifoodEvent.findUnique({ where: { id: ev.id }, select: { processedAt: true } });
       if (!row?.processedAt) {
+        // Another poll is on it: neither processed nor acknowledged here
+        if (!(await claimEvent(ev.id))) continue;
         try {
           await processIfoodEvent(ev, integration);
           await prisma.ifoodEvent.update({ where: { id: ev.id }, data: { processedAt: new Date(), error: null } });
         } catch (e: any) {
           result.failed++;
           console.error(`[ifood] event ${ev.code} ${ev.id} failed:`, e?.message ?? e);
-          await prisma.ifoodEvent.update({ where: { id: ev.id }, data: { error: String(e?.message ?? e).slice(0, 500) } }).catch(() => {});
+          await prisma.ifoodEvent.update({ where: { id: ev.id }, data: { error: String(e?.message ?? e).slice(0, 500), claimedAt: null } }).catch(() => {});
           continue;
         }
       }

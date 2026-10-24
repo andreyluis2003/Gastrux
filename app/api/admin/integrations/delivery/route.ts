@@ -7,6 +7,13 @@ import { DeliveryPlatform } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
+const MANAGED_PLATFORMS = ['ifood', 'gastrux_api', 'delivery_site'];
+/** Never the secrets or the tokens back (final review 2026-10-24 I4) */
+const PUBLIC_FIELDS = {
+  id: true, platform: true, isActive: true, storeId: true, storeName: true, storePhone: true, storeAddress: true,
+  webhookActive: true, lastWebhookTest: true, syncStatus: true, createdAt: true,
+} as const;
+
 export const GET = safeHandler(async (req, context) => {
   if (context.role === 'COOK') {
     return ApiErrors.FORBIDDEN();
@@ -37,6 +44,12 @@ export const POST = safeHandler(async (req, context) => {
   }
 
   const { platform, apiKey, webhookSecret, storeId, storeName, storePhone, storeAddress } = await req.json();
+
+  // Connected by their own screens: here a store id typed by hand could take another restaurant's iFood orders
+  // (final review 2026-10-24 I4)
+  if (MANAGED_PLATFORMS.includes(platform)) {
+    return ApiErrors.INVALID_REQUEST({ message: 'Esta plataforma é conectada pela sua própria tela em Configurações' });
+  }
 
   if (!platform || !apiKey || !webhookSecret) {
     return ApiErrors.INVALID_REQUEST({
@@ -80,6 +93,7 @@ export const POST = safeHandler(async (req, context) => {
         webhookActive: true,
         lastWebhookTest: new Date(),
       },
+      select: PUBLIC_FIELDS,
     });
     return NextResponse.json(updated);
   }
@@ -99,6 +113,7 @@ export const POST = safeHandler(async (req, context) => {
       lastWebhookTest: new Date(),
       syncStatus: 'PENDING',
     },
+    select: PUBLIC_FIELDS,
   });
 
   return NextResponse.json(integration);

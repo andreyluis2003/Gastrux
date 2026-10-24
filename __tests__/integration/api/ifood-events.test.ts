@@ -110,6 +110,57 @@ describe('pollIfoodOnce', () => {
     expect((await extOf(orderId)).status).toBe('CONFIRMED');
   });
 
+  it('CAN listed before its PLC in one batch: the order never stays active (final review I1)', async () => {
+    const r = await restaurant();
+    const orderId = place(r);
+    const plc = event(r, 'PLC', orderId, { createdAt: new Date(Date.now() - 2000).toISOString() });
+    const can = event(r, 'CAN', orderId, { createdAt: new Date().toISOString() });
+    server.events.push(can, plc);
+    const res = await pollIfoodOnce();
+    expect(res.failed).toBe(0);
+    const ext = await extOf(orderId);
+    expect(ext.status).toBe('CANCELLED');
+    const kitchen = await prisma.order.findUnique({ where: { externalOrderId: ext.id } });
+    expect(kitchen === null || kitchen.status === 'CANCELLED').toBe(true);
+    const range = [new Date(Date.now() - 3600e3), new Date(Date.now() + 3600e3)];
+    expect((await salesInRange(r.rid, range[0], range[1])).deliveryCents).toBe(0);
+  });
+
+  it('PLC fails and its CAN comes first: the CAN waits, and the order ends cancelled (final review I1)', async () => {
+    const r = await restaurant();
+    const orderId = place(r);
+    const plc = event(r, 'PLC', orderId, { createdAt: new Date(Date.now() - 2000).toISOString() });
+    server.events.push(plc);
+    server.failGet = 1;
+    await pollIfoodOnce();
+    expect(await extOf(orderId)).toBeNull();
+    const can = event(r, 'CAN', orderId);
+    server.events.push(can);
+    server.failGet = 1;
+    await pollIfoodOnce();
+    // the PLC failed again: its CAN must not be acknowledged as done while the order is unknown
+    expect(server.acked).not.toContain(can.id);
+    await pollIfoodOnce();
+    expect(server.acked).toEqual(expect.arrayContaining([plc.id, can.id]));
+    const ext = await extOf(orderId);
+    expect(ext.status).toBe('CANCELLED');
+    const kitchen = await prisma.order.findUnique({ where: { externalOrderId: ext.id } });
+    expect(kitchen === null || kitchen.status === 'CANCELLED').toBe(true);
+  });
+
+  it('two polls at once (two server processes): one order, one confirm, no false alarm (final review I5)', async () => {
+    const r = await restaurant();
+    const orderId = place(r);
+    server.events.push(event(r, 'PLC', orderId));
+    await Promise.all([pollIfoodOnce(), pollIfoodOnce()]);
+    expect(await prisma.externalOrder.count({ where: { externalOrderId: orderId } })).toBe(1);
+    const ext = await extOf(orderId);
+    expect(await prisma.order.count({ where: { externalOrderId: ext.id } })).toBe(1);
+    expect(server.calls.filter((c) => c.path.endsWith('/confirm'))).toHaveLength(1);
+    expect(await prisma.notification.count({ where: { restaurantId: r.rid, severity: 'CRITICAL' } })).toBe(0);
+    expect(server.calls.filter((c) => c.path === '/events/v1.0/events:polling' && (c.headers['x-polling-merchants'] || '').includes(r.merchantId))).toHaveLength(1);
+  });
+
   it("an unlinked merchant's event is acked and creates nothing", async () => {
     const stranger = { merchantId: `m-unlinked-${tag}` };
     const orderId = place(stranger);

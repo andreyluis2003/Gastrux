@@ -59,11 +59,14 @@ export function mapIfoodOrder(order: any): { input: OrderApiInput; extraNote: st
 
   const methods = Array.isArray(order?.payments?.methods) ? order.payments.methods : [];
   const main = methods.find((m: any) => m?.type === 'OFFLINE') ?? methods[0];
-  const changeFor = num(main?.cash?.changeFor);
+  const changeFor = main?.method === 'CASH' ? num(main?.cash?.changeFor) : 0;
+  // The change comes from what the customer pays (the cash method's value: with iFood's service fee, without iFood's
+  // coupons), not from the restaurant's total, so it is a ticket line here and not trocoPara (final review I3)
+  const changeLine = changeFor > 0 ? `Troco para ${brl(changeFor)}: levar ${brl(round2(changeFor - num(main?.value)))}` : '';
   const pagamento: OrderApiInput['pagamento'] = {
     forma: FORM[str(main?.method)] ?? 'OUTRO',
     pago: num(order?.payments?.pending) === 0,
-    trocoPara: main?.method === 'CASH' && changeFor > 0 ? changeFor : undefined,
+    trocoPara: undefined,
   };
 
   const a = order?.delivery?.deliveryAddress ?? {};
@@ -100,6 +103,7 @@ export function mapIfoodOrder(order: any): { input: OrderApiInput; extraNote: st
       const label = [METHOD_LABEL[str(m?.method)] ?? (str(m?.method) || 'Outro'), str(m?.card?.brand, 30)].filter(Boolean).join(' ');
       return `Pagamento: ${label} (${m?.type === 'ONLINE' ? 'pago no iFood' : 'a cobrar'}) ${brl(round2(num(m?.value)))}`;
     }),
+    changeLine,
     ...shares.map((s: { by: string; value: number }) => `Cupom ${brl(s.value)} (${s.by === 'MERCHANT' ? 'pago pela loja' : s.by === 'IFOOD' ? 'pago pelo iFood' : `pago por ${s.by || 'parceiro'}`})`),
     doc ? `CPF/CNPJ na nota: ${doc}` : '',
     str(phone.number) ? `Telefone iFood: ${str(phone.number, 30)}${str(phone.localizer) ? ` (código ${str(phone.localizer, 20)})` : ''}` : '',

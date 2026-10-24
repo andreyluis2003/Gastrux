@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth';
 import { getServerSession as getServerSessionNext } from 'next-auth/next';
 import { GET, POST, DELETE } from '../../../app/api/admin/integrations/ifood/route';
 import { POST as LINK } from '../../../app/api/admin/platform/ifood-link/route';
+import { POST as LEGACY_POST } from '../../../app/api/admin/integrations/delivery/route';
 import { ifoodTransport, resetIfoodTokenCache } from '../../../lib/ifood/client';
 import { pollIfoodOnce } from '../../../lib/ifood/events';
 
@@ -115,6 +116,20 @@ describe('iFood connection', () => {
     expect((await DELETE()).status).toBe(200);
     const row = await prisma.deliveryIntegration.findUnique({ where: { restaurantId_platform: { restaurantId: a.rid, platform: 'ifood' } } });
     expect(row).toMatchObject({ isActive: false, storeId: null, oauthAccessToken: null, oauthRefreshToken: null });
+  });
+
+  it('the old delivery route cannot point a restaurant at an iFood store; the database refuses a store twice (final review I4)', async () => {
+    as(a.owner);
+    const res = await LEGACY_POST(req('POST', { platform: 'ifood', apiKey: 'k', webhookSecret: 's', storeId: `m-${tag}-2` }), {});
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    const rows = await prisma.deliveryIntegration.findMany({ where: { platform: 'ifood', storeId: `m-${tag}-2` } });
+    expect(rows.map((r) => r.restaurantId)).not.toContain(a.rid);
+    // two restaurants on one iFood store: refused by the unique index whatever the route
+    await expect(prisma.deliveryIntegration.upsert({
+      where: { restaurantId_platform: { restaurantId: pro.rid, platform: 'ifood' } },
+      create: { restaurantId: pro.rid, platform: 'ifood', apiKey: 'x', webhookSecret: 'y', storeId: `m-${tag}-2` },
+      update: { storeId: `m-${tag}-2` },
+    })).rejects.toThrow();
   });
 
   it('before the homologation (no credentials) the screen says so and start answers 409', async () => {

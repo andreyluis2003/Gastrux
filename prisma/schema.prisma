@@ -1473,6 +1473,8 @@ model DeliveryIntegration {
   apiKeys           OrderApiKey[]
 
   @@unique([restaurantId, platform])
+  /// One restaurant per platform store (final review 2026-10-24 I4): storeId routes the iFood events; NULLs never clash
+  @@unique([platform, storeId])
   @@index([restaurantId])
   @@map("delivery_integrations")
 }
@@ -1540,6 +1542,8 @@ model IfoodEvent {
   payload       Json
   receivedAt    DateTime  @default(now())
   processedAt   DateTime?
+  /// Taken by one poll at a time (two server processes, final review I5); a claim older than 2 minutes is taken again
+  claimedAt     DateTime?
   error         String?
 
   @@index([processedAt])
@@ -4808,4 +4812,12 @@ model OrderApiKey {
 
   @@index([restaurantId])
   @@map("order_api_keys")
+}
+
+/// Only one server process runs a periodic job at a time (the iFood polling, final review 2026-10-24 I5)
+model PollLease {
+  name       String   @id
+  leaseUntil DateTime
+
+  @@map("poll_leases")
 }

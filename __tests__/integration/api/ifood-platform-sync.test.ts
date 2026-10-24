@@ -94,6 +94,20 @@ describe('pushPlatformStatus (iFood)', () => {
     expect(ext.deliveryLogs.some((l) => /iFood/.test(l.message))).toBe(true);
   });
 
+  it('a kitchen that skips Pronto still tells iFood it is ready (final review I2)', async () => {
+    const r = await restaurant();
+    const own = await ingest(r, ownDelivery());
+    const byIfood = await ingest(r, ifoodDelivery());
+    const takeout = await ingest(r, takeoutCash());
+    calls = [];
+    for (const o of [own, byIfood, takeout]) await changeOrderStatus(r.rid, o.kitchenOrderId, 'COMPLETED');
+    const id = (o) => o.externalOrder.externalOrderId;
+    const by = (o) => calls.filter((c) => c.path.includes(id(o))).map((c) => c.path.split('/').pop());
+    expect(by(own)).toEqual(['readyToPickup', 'dispatch']);
+    expect(by(byIfood)).toEqual(['readyToPickup']);
+    expect(by(takeout)).toEqual(['readyToPickup']);
+  });
+
   it('kitchen READY sends readyToPickup; COMPLETED dispatches only on own delivery', async () => {
     const r = await restaurant();
     const own = await ingest(r, ownDelivery());

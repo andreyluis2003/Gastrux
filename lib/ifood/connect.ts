@@ -54,10 +54,16 @@ async function assertFree(restaurantId: string, merchantId: string) {
 }
 
 async function link(integrationId: string, merchant: { id: string; name: string }) {
-  await prisma.deliveryIntegration.update({
-    where: { id: integrationId },
-    data: { storeId: merchant.id, storeName: merchant.name, isActive: true, syncStatus: 'PENDING', syncError: null },
-  });
+  try {
+    await prisma.deliveryIntegration.update({
+      where: { id: integrationId },
+      data: { storeId: merchant.id, storeName: merchant.name, isActive: true, syncStatus: 'PENDING', syncError: null },
+    });
+  } catch (e: any) {
+    // Another restaurant took the store between the check and here (unique platform + storeId, final review I4)
+    if (e?.code === 'P2002') throw new IfoodConnectError('Esta loja do iFood já está ligada a outro restaurante do Gastrux', 409);
+    throw e;
+  }
 }
 
 export async function ifoodState(restaurantId: string) {
