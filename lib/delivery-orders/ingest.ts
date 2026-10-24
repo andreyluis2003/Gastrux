@@ -6,6 +6,7 @@ import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { formatPhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
 import type { OrderApiInput } from './input';
+import { notifyOrderStatus } from './callback';
 
 /**
  * One pipeline for incoming delivery orders (plan 2026-10-23 api-de-pedidos, Task 4): the Gastrux order API now, the
@@ -136,7 +137,7 @@ export async function ingestDeliveryOrder(args: {
 }
 
 export async function acceptDeliveryOrder(restaurantId: string, externalOrderId: string, _by: { userId?: string }): Promise<{ kitchenOrderId: string | null }> {
-  await prisma.externalOrder.updateMany({ where: { id: externalOrderId, restaurantId, status: 'PENDING' }, data: { status: 'CONFIRMED' } });
+  const moved = await prisma.externalOrder.updateMany({ where: { id: externalOrderId, restaurantId, status: 'PENDING' }, data: { status: 'CONFIRMED' } });
   const order = await prisma.externalOrder.findFirst({ where: { id: externalOrderId, restaurantId }, select: { id: true, status: true } });
   if (!order) throw new DeliveryOrderError('Pedido não encontrado', 404);
   if (order.status === 'CANCELLED' || order.status === 'REJECTED') throw new DeliveryOrderError('Este pedido foi cancelado', 409);
@@ -146,6 +147,8 @@ export async function acceptDeliveryOrder(restaurantId: string, externalOrderId:
     kitchenOrderId = (await createOrderFromExternalOrder(order.id))?.id ?? (await kitchenOrderOf(order.id));
     if (kitchenOrderId) await noteSalesThresholds(restaurantId).catch(() => {});
   }
+  // The sender hears "aceito" (never waits on its address)
+  if (moved.count > 0) void notifyOrderStatus(order.id);
   return { kitchenOrderId };
 }
 
@@ -158,4 +161,5 @@ export async function rejectDeliveryOrder(member: RestaurantMember, externalOrde
     throw exists ? new DeliveryOrderError('Este pedido já foi aceito ou cancelado', 409) : new DeliveryOrderError('Pedido não encontrado', 404);
   }
   await recordAudit(member, { action: 'UPDATE', entityType: 'ExternalOrder', entityId: externalOrderId, changes: { status: 'CANCELLED', reason: why } });
+  void notifyOrderStatus(externalOrderId);
 }
