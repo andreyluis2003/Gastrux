@@ -42,6 +42,16 @@ Plano `docs/superpowers/plans/2026-10-24-ifood.md`. O código está pronto; a lo
   mão; conferir no teste real (Tarefa 10) e corrigir o mapeamento se vier diferente.
 - **Despacho sem "pronto":** quando a cozinha pula o Pronto, o Gastrux manda só o "despachado"; o iFood pode recusar (fica
   registrado no pedido).
+- **Teste real (24/10/2026, loja de teste, 3 pedidos do Portal do Desenvolvedor):** chegada em 5 s, confirmação, Em
+  preparo, Pronto, Despachado e cancelamento com motivo (código 501) funcionaram; o iFood devolveu os eventos de cada passo.
+  A taxa de serviço do iFood (R$ 1, paga ao iFood) fica fora do total do restaurante, como deve.
+- **Pedido sem nenhum produto reconhecido** é confirmado no iFood mas não vai para a cozinha (toca o sino CRÍTICO, como na
+  parte 1). Decidir: para o iFood, deixar de confirmar sozinho quando nada foi reconhecido? Antes de ligar a primeira loja,
+  conferir o Código PDV dos produtos no iFood.
+- **Evento "código de entrega" (DELIVERY_DROP_CODE_REQUESTED)** chega em todo pedido de entrega própria e hoje só é
+  registrado. Ver na homologação se o iFood pede que o Gastrux mostre ou confira esse código.
+- **Cabeçalho `x-request-homologation`** citado na página "Gerar pedido de teste" do iFood: ver na homologação se precisa ir
+  nas chamadas.
 - **Status mudado à mão** em Pedidos de delivery também vai para o iFood (Em preparo, Pronto, Em entrega); se a cozinha
   depois marcar o mesmo passo, o iFood pode recusar a repetição (só fica registrado).
 
