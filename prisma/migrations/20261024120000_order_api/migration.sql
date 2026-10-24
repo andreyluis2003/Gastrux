@@ -9,6 +9,7 @@
 ALTER TYPE "DeliveryPlatform" ADD VALUE 'gastrux_api';
 ALTER TYPE "DeliveryPlatform" ADD VALUE 'keeta';
 ALTER TYPE "DeliveryPlatform" ADD VALUE 'ninety_nine_food';
+ALTER TYPE "DeliveryPlatform" ADD VALUE 'delivery_site';
 
 -- AlterTable
 ALTER TABLE "external_orders" ADD COLUMN     "apiKeyId" TEXT,

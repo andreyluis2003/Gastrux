@@ -3814,6 +3814,8 @@ enum DeliveryPlatform {
   gastrux_api
   keeta
   ninety_nine_food
+  /// The digital menu (site de delivery), pickup included (owner request 2026-10-23)
+  delivery_site
 }
 
 enum ExternalOrderStatus {

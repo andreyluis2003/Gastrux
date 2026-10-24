@@ -43,18 +43,21 @@ export async function createOrderFromExternalOrder(
     for (const item of items) {
       // A missing name or id must not become an empty filter (Prisma treats `contains: undefined`
       // as "no condition", which would match ANY recipe of the restaurant).
-      const matchers: any[] = [];
+      // The item's code first (a mapping of the platform, or the product code of the Cardápio digital, plan
+      // 2026-10-23 api-de-pedidos), the name only when no code matched
+      const byCode: any[] = [];
       if (item.externalItemId) {
-        matchers.push({
+        byCode.push({
           menuMappings: { some: { integrationId: externalOrder.integrationId, externalItemId: item.externalItemId } },
         });
+        byCode.push({ menuItems: { some: { restaurantId: externalOrder.restaurantId, code: item.externalItemId } } });
       }
-      if (typeof item.name === 'string' && item.name.trim()) {
-        matchers.push({ name: { contains: item.name.trim(), mode: 'insensitive' } });
-      }
-      const recipe = matchers.length
-        ? await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, OR: matchers } })
+      let recipe = byCode.length
+        ? await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, OR: byCode } })
         : null;
+      if (!recipe && typeof item.name === 'string' && item.name.trim()) {
+        recipe = await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, name: { contains: item.name.trim(), mode: 'insensitive' } } });
+      }
 
       if (recipe) {
         orderItems.push({
@@ -166,12 +169,23 @@ async function alertDeliveryProblem(
 
 async function createKdsOrder(externalOrder: any, externalOrderId: string, orderItems: any[], priority: any, unmappedList = '') {
   const orderNumber = await nextKdsOrderNumber();
+  // The order's values (plan 2026-10-23 api-de-pedidos): without them the order counted R$ 0 in the Caixa and the DRE.
+  // The DRE convention: total = items + delivery fee, the discount apart (it is deducted in Deduções)
+  const fees = Number(externalOrder.deliveryFee ?? 0);
+  const subtotal = Number(externalOrder.subtotal) > 0 ? Number(externalOrder.subtotal) : Math.max(0, Number(externalOrder.totalAmount ?? 0) - fees);
   return prisma.order.create({
     data: {
       restaurantId: externalOrder.restaurantId,
       orderNumber,
       orderType: 'DELIVERY',
       externalOrderId: externalOrderId,
+      subtotal,
+      fees,
+      discount: Number(externalOrder.discount ?? 0),
+      total: subtotal + fees,
+      paymentMethod: externalOrder.paymentMethod ?? undefined,
+      paymentStatus: externalOrder.paidOnline ? 'APPROVED' : 'PENDING',
+      customerId: externalOrder.customerId ?? undefined,
       priority,
       estimatedPrepTime: 30,
       // Items that could not be matched are written on the ticket so the kitchen does not
