@@ -2843,6 +2843,10 @@ model Restaurant {
   id                      String                    @id @default(cuid())
   name                    String
   cnpj                    String?                   @unique
+  /// Referral link code (plan 2026-10-24 indicacao): created on first use, gastrux.com/?ref=CODE
+  referralCode            String?                   @unique
+  referralsMade           Referral[]                @relation("ReferralReferrer")
+  referredBy              Referral?                 @relation("ReferralReferred")
   email                   String?
   phone                   String?
   website                 String?
@@ -4820,4 +4824,45 @@ model PollLease {
   leaseUntil DateTime
 
   @@map("poll_leases")
+}
+
+/// The referral program (spec 2026-10-23 indicacao): one row per referred restaurant, one free month for the referrer
+enum ReferralStatus {
+  /// the referred restaurant is in its trial
+  TRIAL
+  /// it paid its first charge; the month is earned after 7 more days of paying
+  CONFIRMING
+  /// earned, waiting to be applied (the referrer may still be in trial: "guardado")
+  EARNED
+  /// on the invoice: Stripe balance credit, or one Mercado Pago cycle skipped
+  APPLIED
+  CANCELLED
+}
+
+model Referral {
+  id                   String         @id @default(cuid())
+  referrerRestaurantId String
+  referredRestaurantId String         @unique
+  status               ReferralStatus @default(TRIAL)
+  /// STRIPE or MERCADO_PAGO: the gateway of the referred restaurant's first charge
+  gateway              String?
+  /// the Stripe invoice id or the Mercado Pago payment id of that first charge
+  firstChargeRef       String?
+  firstChargeAt        DateTime?
+  earnedAt             DateTime?
+  amountCents          Int?
+  appliedAt            DateTime?
+  /// the Stripe balance transaction id, or the Mercado Pago preapproval paused for one cycle
+  appliedRef           String?
+  /// Mercado Pago: when the paused subscription is resumed
+  resumeAt             DateTime?
+  cancelReason         String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  referrer             Restaurant     @relation("ReferralReferrer", fields: [referrerRestaurantId], references: [id], onDelete: Cascade)
+  referred             Restaurant     @relation("ReferralReferred", fields: [referredRestaurantId], references: [id], onDelete: Cascade)
+
+  @@index([referrerRestaurantId, status])
+  @@index([status])
+  @@map("referrals")
 }
