@@ -91,7 +91,7 @@ export async function checkTierLimit(
  */
 export function isTierFeatureEnabled(
   tier: string,
-  feature: 'kds' | 'qrMenu' | 'tablePayment' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'dailyCountAlert' | 'utilityInsights' | 'loyalty' | 'payableSeries' | 'payableAlerts' | 'payableFromNfe' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast'
+  feature: 'kds' | 'qrMenu' | 'tablePayment' | 'crm' | 'crmNotes' | 'crmCampaigns' | 'labelExpiry' | 'dailyCountAlert' | 'utilityInsights' | 'loyalty' | 'payableSeries' | 'payableAlerts' | 'payableFromNfe' | 'nfe' | 'customApi' | 'multiLocation' | 'advancedReports' | 'voiceAgent' | 'demandForecast' | 'orderApi' | 'deliveryPlatforms'
 ): boolean {
   const featureMap: Record<string, string[]> = {
     // Owner decision 2026-10-09: the KDS, the QR menu and the basic CRM (customer list and history) on
@@ -122,6 +122,10 @@ export function isTierFeatureEnabled(
     advancedReports: ['business', 'enterprise'],
     voiceAgent: ['pro', 'business', 'enterprise'],
     demandForecast: ['pro', 'business', 'enterprise'],
+    // Delivery platforms design (owner decision 2026-10-23): the Gastrux order API on Pro and up; Keeta, 99Food
+    // and iFood on Business and up
+    orderApi: ['pro', 'business', 'enterprise'],
+    deliveryPlatforms: ['business', 'enterprise'],
   };
 
   return (featureMap[feature] || []).includes(tier.toLowerCase());

@@ -1462,6 +1462,7 @@ model DeliveryIntegration {
   restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   externalOrders    ExternalOrder[]
   menuMappings      MenuItemMapping[]
+  apiKeys           OrderApiKey[]
 
   @@unique([restaurantId, platform])
   @@index([restaurantId])
@@ -1472,6 +1473,15 @@ model ExternalOrder {
   id                    String              @id @default(cuid())
   restaurantId          String
   integrationId         String
+  /// The OrderApiKey that sent it (Gastrux order API); its callback gets the status changes
+  apiKeyId              String?
+  subtotal              Float               @default(0)
+  discount              Float               @default(0)
+  paymentMethod         DeliveryPaymentMethod?
+  paidOnline            Boolean             @default(false)
+  scheduledFor          DateTime?
+  /// The restaurant's customer (Gastrux order API only: platform customers are the platform's)
+  customerId            String?
   externalOrderId       String
   externalCustomerId    String?
   internalOrderId       String?
@@ -2010,12 +2020,15 @@ model MenuItem {
   position     Int             @default(0)
   displayOnQR  Boolean         @default(true)
   displayOnWeb Boolean         @default(true)
+  /// Product code other systems send in the Gastrux order API (unique per restaurant)
+  code         String?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   images       MenuItemImage[]
   category     MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   recipe       Recipe?         @relation("MenuItemRecipe", fields: [recipeId], references: [id], onDelete: SetNull)
 
+  @@unique([restaurantId, code])
   @@index([categoryId])
   @@index([recipeId])
   @@index([restaurantId])
@@ -2811,6 +2824,9 @@ model Restaurant {
   commissionPayPeriod     CommissionPeriod          @default(MONTHLY)
   /// Service charge suggested on the bill (tables and named comandas); 0 turns it off (spec 2026-10-07, 4.3)
   serviceChargePercent    Int                       @default(10)
+  /// Delivery orders go to the kitchen without the "Aceitar" (owner decision 2026-10-23: on by default)
+  deliveryAutoAccept      Boolean                   @default(true)
+  orderApiKeys            OrderApiKey[]
   subscriptionStatus      String                    @default("active")
   billingCycleStart       DateTime?
   billingCycleEnd         DateTime?
@@ -3794,6 +3810,10 @@ enum DeliveryPlatform {
   ifood
   uber_eats
   rappi
+  /// The Gastrux order API (delivery platforms design 2026-10-23, part 1)
+  gastrux_api
+  keeta
+  ninety_nine_food
 }
 
 enum ExternalOrderStatus {
@@ -4732,4 +4752,26 @@ model CashbackUse {
 
   @@index([restaurantId, customerId])
   @@map("cashback_uses")
+}
+
+/// A key of the Gastrux order API (delivery platforms design 2026-10-23, part 1). Only the sha256 of the key is kept;
+/// the key is shown once, when it is created
+model OrderApiKey {
+  id             String              @id @default(cuid())
+  restaurantId   String
+  integrationId  String
+  name           String
+  prefix         String              @unique
+  keyHash        String              @unique
+  callbackUrl    String?
+  callbackSecret String
+  createdById    String
+  createdAt      DateTime            @default(now())
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  restaurant     Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  integration    DeliveryIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("order_api_keys")
 }
