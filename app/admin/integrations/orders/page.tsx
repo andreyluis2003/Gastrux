@@ -362,7 +362,7 @@ export default function DeliveryOrdersPage() {
                           </span>
                         </div>
                         <div className="mt-1.5 flex items-center gap-3">
-                          <span className="font-bold text-sm">#{order.externalOrderId.slice(-6)}</span>
+                          <span className="font-bold text-sm truncate max-w-[16rem]" title={order.externalOrderId}>#{order.externalOrderId}</span>
                           <span className="text-sm">{order.customerName}</span>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 truncate">
