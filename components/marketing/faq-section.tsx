@@ -27,7 +27,7 @@ const DEFAULT_FAQS: FAQ[] = [
   },
   {
     q: 'Integra com iFood e outros apps de delivery?',
-    a: 'Ainda não há conexão pronta com iFood, Rappi ou Uber Eats. Nos planos pagos, outros sistemas podem enviar pedidos à Gastrux por uma API (webhook), o que exige configuração técnica.',
+    a: 'Ainda não há conexão pronta com iFood, Keeta ou 99Food. Nos planos pagos, outros sistemas podem enviar pedidos à Gastrux por uma API (webhook), o que exige configuração técnica.',
   },
   {
     q: 'A Gastrux mostra o lucro do restaurante?',

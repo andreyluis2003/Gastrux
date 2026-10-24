@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { GastruxLogo } from '@/components/brand/logo';
 import { SiteFooter } from '@/components/marketing/site-footer';
-import { ArrowRight, Check, ShieldCheck, Beer, BarChart3, Package, Utensils, TrendingUp, Users, Brain, Truck, Smartphone, Clock, DollarSign, Layers, Zap, Star, Globe, ShoppingCart, Heart, Shield, Target, Percent, Award, CalendarDays, PieChart, Boxes, ThermometerSun, IceCream, Cake, Store, Send, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, ShieldCheck, Beer, BarChart3, Package, Utensils, TrendingUp, Users, Brain, Truck, Smartphone, Clock, DollarSign, Layers, Zap, Star, Globe, ShoppingCart, Heart, Shield, Target, Percent, Award, CalendarDays, PieChart, Boxes, ThermometerSun, IceCream, Cake, Store, Send, Loader2, BookOpen, Building2, Calculator, Calendar, Camera, ClipboardList, CreditCard, Gift, MapPin, MessageSquare, QrCode, Receipt, Snowflake, Thermometer, Timer, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Segment, SEGMENTS } from '@/lib/marketing/segments';
 import { FAQSection } from '@/components/marketing/faq-section';
@@ -13,6 +13,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3, Package, Utensils, TrendingUp, Users, Brain, Truck, Smartphone, Clock,
   DollarSign, Layers, Zap, Star, Globe, ShoppingCart, Heart, Shield, Target, Percent,
   Award, CalendarDays, PieChart, Boxes, ThermometerSun, IceCream, Cake, Store, Beer,
+  // Named by lib/marketing/segments.ts and missing until 2026-10-23 (they showed as a star)
+  BookOpen, Building2, Calculator, Calendar, Camera, ClipboardList, CreditCard, Gift, MapPin, MessageSquare, QrCode,
+  Receipt, Snowflake, Thermometer, Timer, Wallet,
 };
 
 function LeadCaptureSection({ segment, segmentName }: { segment: string; segmentName: string }) {

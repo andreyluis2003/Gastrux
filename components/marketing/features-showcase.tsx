@@ -30,7 +30,7 @@ const features = [
   {
     icon: Truck,
     title: 'Pedidos externos por API',
-    description: 'Sistemas de pedido podem enviar pedidos à Gastrux por webhook. Ainda não há conexão pronta com iFood, Rappi ou Uber Eats.',
+    description: 'Sistemas de pedido podem enviar pedidos à Gastrux por webhook. Ainda não há conexão pronta com iFood, Keeta ou 99Food.',
     color: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400',
   },
   {

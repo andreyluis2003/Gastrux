@@ -45,6 +45,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   'ecd65320ff340b387301f956eb4de94561b912cc803d925249f866af3cd20afc', // teste-gratis (before cashback replaced fidelidade)
   '5ff659663983995fad1368b4227d261d8d8682f1a98add0f5f381427c65e49e1', // contas-de-consumo (before the % of revenue only for a finished month)
   '4db86b302c0b9737add2a14c4225914ce18612d7bac5d735a9254c15e15b4377', // contagem-do-dia (before the kitchen cancel became a loss)
+  '106327f7a20c2d0c5dc46cc8fe38dee3cc6cd4ed873b95f57477dfe030d09671', // contagem-do-dia (before the other segments' examples were counted)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -345,7 +346,7 @@ Para o que é preparado antes de vender, como espetos e salgados. No fim da noit
 
 ## Quais itens entram
 
-Na ficha técnica do item (**Cardápio e produtos > Fichas técnicas**), ligue **Contar na contagem do dia**. No cardápio de exemplo de espetaria, os espetos e o pão de alho já vêm ligados.
+Na ficha técnica do item (**Cardápio e produtos > Fichas técnicas**), ligue **Contar na contagem do dia**. Nos cardápios de exemplo já vêm ligados os espetos e o pão de alho (espetaria), os salgados (lanchonete), as marmitas (marmitaria) e os doces e as fatias de bolo (doceria).
 
 ## Durante a noite
 

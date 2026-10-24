@@ -43,11 +43,11 @@ export const SEGMENTS: Segment[] = [
     ],
     benefits: [
       { icon: 'BarChart3', title: 'CMV Automático', description: 'Saiba exatamente o custo de cada prato em tempo real, sem planilhas.' },
-      { icon: 'Package', title: 'Estoque com Alertas', description: 'Baixa automática pelas vendas e alerta de estoque baixo; lotes com validade registrados.' },
-      { icon: 'Utensils', title: 'Cardápio Digital + QR', description: 'Cardápio digital com QR Code nas mesas e pedidos pelo celular (plano Business).' },
-      { icon: 'TrendingUp', title: 'DRE e Fluxo de Caixa', description: 'DRE e fluxo de caixa montados com as vendas e as despesas que você lançar.' },
+      { icon: 'Package', title: 'Estoque com Alertas', description: 'Baixa automática pelas vendas e alerta de estoque baixo; validade dos preparos com etiquetas (plano Business).' },
+      { icon: 'Utensils', title: 'Cardápio Digital + QR', description: 'Cardápio digital com QR Code nas mesas e pedidos pelo celular; no Business, o cliente também paga a conta pelo celular.' },
+      { icon: 'TrendingUp', title: 'DRE e Caixa', description: 'DRE montada com as vendas do caixa, as contas a pagar e as contas de consumo.' },
       { icon: 'Users', title: 'Gestão de Equipe', description: 'Escalas, comissões e permissões por função (garçom, caixa, cozinha, gerente).' },
-      { icon: 'Brain', title: 'Resumos com IA', description: 'Resumo diário e sugestões a partir das suas vendas e do seu estoque.' },
+      { icon: 'Brain', title: 'Pergunte ao Gastrux', description: 'Pergunte quanto vendeu, o que está acabando ou qual prato dá mais margem, e a IA responde com os seus números.' },
     ],
     cta: {
       headline: 'Pronto para transformar a gestão do seu restaurante?',
@@ -63,7 +63,7 @@ export const SEGMENTS: Segment[] = [
     metaTitle: 'Sistema para Delivery | Gastrux',
     metaDescription: 'Gerencie pedidos de delivery, estoque e margem por prato. KDS para a cozinha e pedidos pelo WhatsApp.',
     heroHeadline: 'Seu delivery organizado e lucrativo',
-    heroDescription: 'Organize os pedidos do delivery, a cozinha e o estoque, e saiba a margem de cada prato. Ainda não há conexão pronta com iFood, Rappi ou Uber Eats.',
+    heroDescription: 'Organize os pedidos do delivery, a cozinha e o estoque, e saiba a margem de cada prato. Ainda não há conexão pronta com iFood, Keeta ou 99Food.',
     painPoints: [
       'Pedidos chegando de vários apps sem controle',
       'Sem saber qual plataforma dá mais lucro',
@@ -74,9 +74,9 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Smartphone', title: 'Pedidos externos por API', description: 'Outros sistemas podem enviar pedidos à Gastrux por webhook (exige configuração técnica).' },
       { icon: 'BarChart3', title: 'Margem por prato', description: 'CMV e margem de contribuição de cada item do cardápio.' },
       { icon: 'Package', title: 'Estoque Integrado', description: 'Pedidos feitos na Gastrux baixam o estoque pela ficha técnica.' },
-      { icon: 'Clock', title: 'Tela da Cozinha', description: 'KDS mostra os pedidos na ordem e há quanto tempo cada um espera (plano Business).' },
+      { icon: 'Clock', title: 'Tela da Cozinha', description: 'A tela da cozinha mostra os pedidos na ordem e há quanto tempo cada um espera.' },
       { icon: 'MapPin', title: 'Status dos Pedidos', description: 'Acompanhe cada pedido do recebimento à saída para entrega.' },
-      { icon: 'MessageSquare', title: 'Bot WhatsApp', description: 'Receba pedidos direto pelo WhatsApp com cardápio interativo.' },
+      { icon: 'MessageSquare', title: 'Bot WhatsApp', description: 'Receba pedidos pelo WhatsApp com cardápio interativo, com o WhatsApp Business conectado.' },
     ],
     cta: {
       headline: 'Pronto para escalar seu delivery?',
@@ -100,12 +100,12 @@ export const SEGMENTS: Segment[] = [
       'Comunicação fragmentada entre unidades',
     ],
     benefits: [
-      { icon: 'Building2', title: 'Multi-Unidade', description: 'Painel com faturamento, pedidos, ticket médio e estoque baixo de cada unidade (Business: 2 lojas; Enterprise: ilimitadas).' },
+      { icon: 'Building2', title: 'Multi-Unidade', description: 'Painel com faturamento, vendas, ticket médio e CMV de cada loja, com os números do Caixa e da DRE (Business: 2 lojas; Enterprise: ilimitadas).' },
       { icon: 'BookOpen', title: 'Ficha Técnica Padrão', description: 'Copie as fichas técnicas de uma loja para as outras.' },
       { icon: 'BarChart3', title: 'Comparação entre Lojas', description: 'Compare faturamento, pedidos e ticket médio entre unidades.' },
-      { icon: 'Package', title: 'Lista de Compras', description: 'Lista de compras de cada loja a partir do estoque e dos fornecedores cadastrados.' },
+      { icon: 'Package', title: 'Lista de Compras', description: 'Compras de cada loja a partir do estoque e dos fornecedores cadastrados.' },
       { icon: 'Shield', title: 'Controle de Acesso', description: 'Permissões por unidade: o gerente vê só a loja dele, o dono vê todas.' },
-      { icon: 'TrendingUp', title: 'Relatórios por Unidade', description: 'DRE, CMV e fluxo de caixa de cada loja.' },
+      { icon: 'TrendingUp', title: 'Relatórios por Unidade', description: 'DRE e CMV de cada loja, com as vendas do caixa de cada uma.' },
     ],
     cta: {
       headline: 'Pronto para escalar suas franquias?',
@@ -131,10 +131,10 @@ export const SEGMENTS: Segment[] = [
     benefits: [
       { icon: 'Utensils', title: 'Adicionais', description: 'Cadastre adicionais com preço, como borda recheada ou queijo extra. Pizza meio a meio ainda não é suportada.' },
       { icon: 'Calculator', title: 'CMV por Sabor', description: 'Custo de cada sabor pela ficha técnica; para cada tamanho, uma ficha própria.' },
-      { icon: 'Truck', title: 'Delivery Integrado', description: 'Pedidos do WhatsApp e do balcão em uma tela só.' },
-      { icon: 'Timer', title: 'KDS para o Forno', description: 'Pedidos na tela da cozinha na ordem de chegada, com o tempo de espera de cada um (plano Business).' },
-      { icon: 'Package', title: 'Controle de Insumos', description: 'Estoque de massa, molho e queijo com alerta de estoque baixo e lotes com validade.' },
-      { icon: 'Star', title: 'Programa de Fidelidade', description: 'Pontos por compra e prêmio por número de pedidos, como uma pizza grátis no 10º (plano Business).' },
+      { icon: 'Truck', title: 'Delivery Integrado', description: 'Pedidos do site de delivery, do WhatsApp e do balcão chegam na mesma tela da cozinha.' },
+      { icon: 'Timer', title: 'KDS para o Forno', description: 'Pedidos na tela da cozinha na ordem de chegada, com o tempo de espera de cada um.' },
+      { icon: 'Package', title: 'Controle de Insumos', description: 'Estoque de massa, molho e queijo com baixa pelas vendas e alerta de estoque baixo.' },
+      { icon: 'Gift', title: 'Cashback', description: 'O cliente ganha crédito em reais a cada pizza e usa como desconto na próxima (plano Business).' },
     ],
     cta: {
       headline: 'Pronto para modernizar sua pizzaria?',
@@ -159,10 +159,10 @@ export const SEGMENTS: Segment[] = [
     ],
     benefits: [
       { icon: 'Utensils', title: 'Ficha Técnica por Blend', description: 'Custo de cada blend e de cada lanche pela ficha técnica.' },
-      { icon: 'Layers', title: 'Sugestão de Combos', description: 'A IA sugere combos a partir dos itens que mais saem juntos.' },
+      { icon: 'Layers', title: 'Adicionais', description: 'Bacon extra, queijo, ponto da carne: o garçom escolhe na conta e a cozinha vê no pedido.' },
       { icon: 'Truck', title: 'Pedidos pelo WhatsApp', description: 'Pedidos pelo WhatsApp com cardápio; ainda sem conexão pronta com apps de delivery.' },
-      { icon: 'Thermometer', title: 'Controle de Carnes', description: 'Estoque de carnes com lotes, validade e fornecedor registrados.' },
-      { icon: 'Timer', title: 'Tela da Cozinha', description: 'Pedidos na tela da chapa na ordem de chegada, com o tempo de espera de cada um (plano Business).' },
+      { icon: 'Thermometer', title: 'Controle de Carnes', description: 'Estoque de carnes com baixa pelas vendas e alerta de estoque baixo.' },
+      { icon: 'Timer', title: 'Tela da Cozinha', description: 'Pedidos na tela da chapa na ordem de chegada, com o tempo de espera de cada um.' },
       { icon: 'TrendingUp', title: 'Menu Engineering', description: 'Descubra quais burgers são estrelas e quais precisam sair do cardápio.' },
     ],
     cta: {
@@ -177,7 +177,7 @@ export const SEGMENTS: Segment[] = [
     shortName: 'Japonês',
     emoji: '🍣',
     metaTitle: 'Sistema para Restaurante Japonês | Gastrux',
-    metaDescription: 'Sistema para restaurantes japoneses. Ficha técnica de sushi, sashimi e temaki, e estoque de peixes com lotes e validade.',
+    metaDescription: 'Sistema para restaurantes japoneses. Ficha técnica de sushi, sashimi e temaki, estoque de peixes e validade dos preparos com etiquetas.',
     heroHeadline: 'O sistema ideal para restaurantes japoneses',
     heroDescription: 'Custo de cada peça de sushi, sashimi e temaki. Controle peixes frescos, alga nori e arroz com precisão.',
     painPoints: [
@@ -188,15 +188,15 @@ export const SEGMENTS: Segment[] = [
     ],
     benefits: [
       { icon: 'Utensils', title: 'Comanda por Mesa', description: 'Comanda digital por mesa, funcionando mesmo se a internet cair.' },
-      { icon: 'Package', title: 'Estoque de Peixes', description: 'Lotes de peixe com validade e fornecedor registrados.' },
+      { icon: 'Package', title: 'Estoque de Peixes', description: 'Estoque de peixes com baixa pelas vendas e validade dos preparos com etiquetas (plano Business).' },
       { icon: 'Calculator', title: 'CMV por Peça', description: 'Saiba o custo de cada peça de sushi, sashimi e temaki.' },
       { icon: 'BookOpen', title: 'Fichas Técnicas', description: 'Padronize a montagem de cada prato com gramagem exata.' },
-      { icon: 'QrCode', title: 'Pedido por QR Code', description: 'O cliente faz o pedido pelo celular na mesa (plano Business).' },
+      { icon: 'QrCode', title: 'Pedido por QR Code', description: 'O cliente faz o pedido pelo celular na mesa; no Business, também paga a conta pelo celular.' },
       { icon: 'BarChart3', title: 'Análise de Popularidade', description: 'Descubra quais peças são mais pedidas e ajuste o preparo.' },
     ],
     cta: {
       headline: 'Pronto para otimizar seu japonês?',
-      description: 'Controle cada peça de sushi e cada lote de peixe.',
+      description: 'Controle o custo de cada peça de sushi e o estoque de peixe.',
     },
     color: 'from-rose-600 to-pink-700',
   },
@@ -216,12 +216,12 @@ export const SEGMENTS: Segment[] = [
       'Controle de caixa manual gera furos',
     ],
     benefits: [
-      { icon: 'Zap', title: 'PDV Rápido', description: 'Tela de vendas otimizada para alto volume e agilidade no caixa.' },
+      { icon: 'Zap', title: 'PDV Rápido', description: 'Venda de balcão em poucos toques, com o celular do cliente para o cashback.' },
       { icon: 'Calculator', title: 'Custo por Item', description: 'Saiba a margem de cada salgado, suco e sanduíche.' },
-      { icon: 'Package', title: 'Estoque Simplificado', description: 'Controle de insumos sem complicação, só o essencial.' },
+      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Quantos salgados você fritou, vendeu e perdeu: no fim do dia, o Gastrux mostra quanto deveria sobrar.' },
       { icon: 'Wallet', title: 'Controle de Caixa', description: 'Abertura, sangria, fechamento e conferência de caixa.' },
       { icon: 'Smartphone', title: 'Pedidos WhatsApp', description: 'Receba pedidos pelo WhatsApp e integre com a produção.' },
-      { icon: 'Receipt', title: 'NFC-e Automática', description: 'A nota do consumidor sai ao fechar a conta (plano Business, com certificado e dados do contador).' },
+      { icon: 'Receipt', title: 'NFC-e Automática', description: 'A nota do consumidor sai ao fechar a conta, com o certificado digital e os dados do contador.' },
     ],
     cta: {
       headline: 'Pronto para modernizar sua lanchonete?',
@@ -247,10 +247,10 @@ export const SEGMENTS: Segment[] = [
     benefits: [
       { icon: 'Calendar', title: 'Planejamento de Produção', description: 'Planeje o que produzir e quanto de cada doce.' },
       { icon: 'Calculator', title: 'Precificação Exata', description: 'Calcule o custo de cada bolo, brigadeiro e sobremesa automaticamente.' },
-      { icon: 'BookOpen', title: 'Fichas Técnicas', description: 'Receitas padronizadas com gramagem exata para cada doce.' },
+      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Brigadeiros, fatias e doces de pote: no fim do dia, o Gastrux mostra quanto deveria sobrar.' },
       { icon: 'Package', title: 'Estoque de Insumos', description: 'Controle chocolate, farinha, manteiga e receba alertas de reposição.' },
       { icon: 'Camera', title: 'Cardápio Visual', description: 'Cardápio digital com fotos dos doces para encantar clientes.' },
-      { icon: 'Heart', title: 'Fidelidade', description: 'Pontos por compra e desconto por número de pedidos (plano Business).' },
+      { icon: 'Gift', title: 'Cashback', description: 'O cliente ganha crédito em reais a cada compra e usa como desconto na próxima (plano Business).' },
     ],
     cta: {
       headline: 'Pronto para profissionalizar sua doceria?',
@@ -264,7 +264,7 @@ export const SEGMENTS: Segment[] = [
     shortName: 'Marmitaria',
     emoji: '🍱',
     metaTitle: 'Sistema para Marmitaria | Gastrux',
-    metaDescription: 'Sistema para marmitarias. Custo por marmita, planejamento de produção, embalagens e previsão de demanda.',
+    metaDescription: 'Sistema para marmitarias. Custo por marmita, planejamento de produção, embalagens e contagem do dia.',
     heroHeadline: 'Gestão inteligente para marmitarias',
     heroDescription: 'Planeje a produção, controle o estoque de insumos e embalagens e saiba o custo de cada marmita.',
     painPoints: [
@@ -278,8 +278,8 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Calculator', title: 'Custo por Marmita', description: 'Saiba exatamente o custo de cada tipo de marmita.' },
       { icon: 'Package', title: 'Estoque + Embalagens', description: 'Controle insumos e embalagens descartáveis juntos.' },
       { icon: 'Truck', title: 'Pedidos pelo WhatsApp', description: 'Receba pedidos pelo WhatsApp com cardápio.' },
-      { icon: 'BarChart3', title: 'Previsão de Demanda', description: 'Previsão de vendas a partir do seu histórico (plano Pro).' },
-      { icon: 'Wallet', title: 'Fidelidade', description: 'Pontos por compra e prêmio por número de pedidos (plano Business).' },
+      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Quantas marmitas você montou, vendeu e perdeu: no fim do dia, o Gastrux mostra quanto deveria sobrar.' },
+      { icon: 'Gift', title: 'Cashback', description: 'O cliente ganha crédito em reais a cada marmita e usa como desconto na próxima (plano Business).' },
     ],
     cta: {
       headline: 'Pronto para escalar sua marmitaria?',
@@ -304,11 +304,11 @@ export const SEGMENTS: Segment[] = [
     ],
     benefits: [
       { icon: 'Utensils', title: 'Adicionais', description: 'Cadastre toppings e adicionais com preço; o custo sai da ficha técnica de cada copo.' },
-      { icon: 'Snowflake', title: 'Estoque de Polpa', description: 'Lotes de polpa congelada com validade e fornecedor registrados.' },
+      { icon: 'Snowflake', title: 'Estoque de Polpa', description: 'Estoque de polpa com baixa pelas vendas e alerta de estoque baixo.' },
       { icon: 'Calculator', title: 'CMV por Tamanho', description: 'Uma ficha técnica por tamanho mostra a margem de cada copo, do P ao GG.' },
-      { icon: 'Truck', title: 'Delivery Integrado', description: 'WhatsApp + balcão em uma tela só.' },
-      { icon: 'Star', title: 'Fidelidade', description: 'Prêmio por número de pedidos, como um copo grátis no 10º. Sem cartãozinho de papel (plano Business).' },
-      { icon: 'Sun', title: 'Previsão de Demanda', description: 'Previsão de vendas a partir do seu histórico (plano Pro).' },
+      { icon: 'Truck', title: 'Delivery Integrado', description: 'Pedidos do site de delivery, do WhatsApp e do balcão na mesma tela da cozinha.' },
+      { icon: 'Gift', title: 'Cashback', description: 'Crédito em reais a cada copo, usado como desconto no próximo. Sem cartãozinho de papel (plano Business).' },
+      { icon: 'Brain', title: 'Pergunte ao Gastrux', description: 'Pergunte quais tamanhos mais vendem e quanto sobra de margem em cada copo, e a IA responde com os seus números.' },
     ],
     cta: {
       headline: 'Pronto para crescer sua loja de açaí?',
@@ -336,7 +336,7 @@ export const SEGMENTS: Segment[] = [
       { icon: 'Beer', title: 'Custo por Copo', description: 'A ficha técnica mostra o custo de cada copo de chopp e de cada dose.' },
       { icon: 'Clock', title: 'Funciona sem Internet', description: 'Comanda e venda de balcão continuam se a internet cair.' },
       { icon: 'Package', title: 'Estoque de Bebidas', description: 'Controle garrafas, latas e barris, com baixa pelas vendas e alerta de estoque baixo.' },
-      { icon: 'Wallet', title: 'Controle de Caixa', description: 'Abertura, sangria, fechamento e conferência de caixa.' },
+      { icon: 'Smartphone', title: 'Pagamento na Mesa', description: 'O cliente paga a conta pelo celular, por PIX ou cartão, e divide com os amigos (plano Business).' },
       { icon: 'Users', title: 'Equipe e Permissões', description: 'Garçom, caixa e gerente, cada um com o acesso que precisa.' },
     ],
     cta: {
@@ -366,7 +366,7 @@ export const SEGMENTS: Segment[] = [
       { icon: 'DollarSign', title: 'Custo por Espeto', description: 'A ficha técnica mostra o custo e a margem de cada espeto.' },
       { icon: 'Package', title: 'Estoque de Carnes', description: 'Baixa pelas vendas e alerta quando a carne ou o carvão está acabando.' },
       { icon: 'Clock', title: 'Funciona sem Internet', description: 'Comanda e venda de balcão continuam se a internet cair.' },
-      { icon: 'Users', title: 'Equipe e Permissões', description: 'Garçom, caixa e gerente, cada um com o acesso que precisa.' },
+      { icon: 'ClipboardList', title: 'Contagem de Espetos', description: 'Montados, vendidos e perdas de cada espeto: no fim da noite, o Gastrux mostra quanto deveria sobrar.' },
     ],
     cta: {
       headline: 'Pronto para modernizar sua espetaria?',

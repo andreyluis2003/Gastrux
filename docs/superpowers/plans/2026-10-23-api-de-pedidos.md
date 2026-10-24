@@ -183,7 +183,7 @@
 **Files:**
 - Create: `app/desenvolvedores/page.tsx` (pública, sem login)
 - Modify: `lib/finance/month-sales.ts` e `lib/finance/dre.ts` (vendas delivery por origem: Site, API do Gastrux; as plataformas entram nas partes 2 e 3), `app/dashboard/financeiro/dre/page.tsx`
-- Modify: `lib/help/seed-articles.ts` (artigo "Como recebo pedidos de outros sistemas (API de pedidos)?"; hash antigo de artigos alterados), `lib/ai/knowledge/` (novo `delivery.ts` ou o arquivo de delivery existente), `lib/marketing/segments.ts` (todos os segmentos: "Recebe pedidos do seu site ou sistema pela API do Gastrux"), `lib/billing/pricing-tiers.ts` e `app/pricing/page.tsx` (Pro: "API de pedidos")
+- Modify: `lib/help/seed-articles.ts` (artigo "Como recebo pedidos de outros sistemas (API de pedidos)?"; hash antigo de artigos alterados), `lib/ai/knowledge/` (novo `delivery.ts` ou o arquivo de delivery existente), `lib/marketing/segments.ts` (todos os segmentos: "Recebe pedidos do seu site ou sistema pela API do Gastrux"), `lib/billing/pricing-tiers.ts` e `app/pricing/page.tsx` (Pro: "API de pedidos"), `components/marketing/faq-section.tsx` e `components/marketing/features-showcase.tsx` (hoje dizem que outros sistemas mandam pedidos por webhook, o que só passa a ser verdade com esta API; a pergunta do FAQ passa a apontar para `/desenvolvedores`), e o benefício "Pedidos externos por API" do segmento delivery
 - Modify: `docs/pendencias.md`, manual (Claude Doc `e47fd4d1-0a3f-4e2b-a96d-86475da2833e`)
 - Test: `__tests__/unit/help-seed-articles.test.ts`, `__tests__/unit/plan-copy.test.ts`, `__tests__/integration/staff/utility-dre.test.ts` ou um novo `__tests__/integration/api/dre-delivery-origin.test.ts`
 

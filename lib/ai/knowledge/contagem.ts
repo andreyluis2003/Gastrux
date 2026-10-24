@@ -1,7 +1,7 @@
 /** Knowledge: daily count / espetos (spec 2026-10-16 contagem-espetos). */
 export default `## Contagem do dia (contagem de espetos)
 Menu: Vender > Contagem do dia. Em espetarias o título é "Contagem de espetos". Todos os planos.
-- Serve para o que é preparado antes de vender (espetos, salgados). Vale para os itens com "Contar na contagem do dia" ligado na ficha técnica; no modelo Espetaria os espetos e o pão de alho já vêm ligados.
+- Serve para o que é preparado antes de vender (espetos, salgados). Vale para os itens com "Contar na contagem do dia" ligado na ficha técnica; nos cardápios de exemplo já vêm ligados os espetos e o pão de alho (espetaria), os salgados (lanchonete), as marmitas (marmitaria) e os doces e fatias de bolo (doceria). Restaurante, pizzaria, hamburgueria, japonês, açaí e bar fazem na hora: ligue nos itens que você prepara antes.
 - Uma noite vai de um fechamento ao próximo. Para cada item: Deveria ter = início + montados - vendidos - perdas.
 - Montados: botões +1, +10, +20 ou "Outro valor", a qualquer hora.
 - Perda: botão Perda, com motivo (Caiu, Queimou, Venceu, Outro). Espeto cancelado depois de a cozinha começar (pedido cancelado ou item tirado da comanda) entra sozinho como perda "Cancelado na cozinha".

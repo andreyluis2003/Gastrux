@@ -20,9 +20,16 @@ describe('starter templates ("Comece com", lib/onboarding/starter-templates.ts)'
     const counted = t.recipes.filter((r) => r.dailyCount).map((r) => r.key).sort();
     expect(counted).toEqual(['ALC', 'COR', 'FRG', 'KAF', 'LIN', 'PAO', 'QJC']);
     for (const r of t.recipes) expect([r.key, !!r.dailyCount]).toEqual([r.key, r.menuCategory === 'Espetos']);
-    for (const other of STARTER_TEMPLATES.filter((x) => x.slug !== 'espetaria')) {
-      expect([other.slug, other.recipes.some((r) => r.dailyCount)]).toEqual([other.slug, false]);
-    }
+  });
+
+  // Owner, 2026-10-23: what was built for the espetaria serves the other segments too. What is prepared before it
+  // is sold is counted; what is made to order is not
+  it('the other segments count what they prepare in advance', () => {
+    const counted = (slug: string) => templateFor(slug).recipes.filter((r) => r.dailyCount).map((r) => r.key).sort();
+    expect(counted('lanchonete')).toEqual(['COX']);
+    expect(counted('marmitaria')).toEqual(['CMO', 'FRG', 'LIN', 'MAC']);
+    expect(counted('doceria')).toEqual(['BOL', 'BRI', 'MOR', 'MOU']);
+    for (const slug of ['restaurantes', 'pizzaria', 'hamburgueria', 'japones', 'acai', 'bar']) expect([slug, counted(slug)]).toEqual([slug, []]);
   });
 
   for (const t of STARTER_TEMPLATES) {
