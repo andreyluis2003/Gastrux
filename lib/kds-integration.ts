@@ -50,7 +50,7 @@ export async function createOrderFromExternalOrder(
         byCode.push({
           menuMappings: { some: { integrationId: externalOrder.integrationId, externalItemId: item.externalItemId } },
         });
-        byCode.push({ menuItems: { some: { restaurantId: externalOrder.restaurantId, code: item.externalItemId } } });
+        byCode.push({ menuItems: { some: { restaurantId: externalOrder.restaurantId, code: String(item.externalItemId).trim().toUpperCase() } } });
       }
       let recipe = byCode.length
         ? await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, OR: byCode } })

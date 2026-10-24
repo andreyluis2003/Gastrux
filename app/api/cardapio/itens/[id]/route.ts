@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
+import { CODE_TAKEN, isCodeTaken, parseProductCode } from '@/lib/cardapio/product-code';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -71,6 +72,8 @@ export async function PUT(
       delete body.recipeId;
     }
     const { name, description, price, available, position, displayOnQR, displayOnWeb, recipeId, categoryId } = body;
+    const code = parseProductCode(body.code);
+    if (!code.ok) return NextResponse.json({ error: code.error }, { status: 400 });
 
     if (recipeId) {
       const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, restaurantId }, select: { id: true } });
@@ -86,9 +89,11 @@ export async function PUT(
       }
     }
 
+    try {
     await prisma.menuItem.update({
       where: { id: params.id },
       data: {
+        ...(code.code !== undefined && { code: code.code }),
         ...(name && { name }),
         ...(description !== undefined && { description }),
         ...(price !== undefined && { price: parseFloat(price) }),
@@ -100,6 +105,10 @@ export async function PUT(
         ...(categoryId !== undefined && { categoryId }),
       },
     });
+    } catch (e) {
+      if (isCodeTaken(e)) return NextResponse.json({ error: CODE_TAKEN }, { status: 400 });
+      throw e;
+    }
     // Unlinked from its ficha técnica, it keeps selling on a ficha simples; a ficha simples follows the
     // item's name and price (the comanda, the kitchen and the cupom show the ficha's name) (2026-10-12)
     await ensureMenuItemRecipes(prisma, restaurantId, [params.id]);

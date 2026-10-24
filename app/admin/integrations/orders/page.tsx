@@ -35,6 +35,8 @@ interface ExternalOrder {
     platform: string;
     storeName?: string;
   };
+  /** The Gastrux order API key that sent it (plan 2026-10-23 api-de-pedidos) */
+  apiKeyName?: string | null;
 }
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; icon: any }> = {
@@ -48,10 +50,11 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: str
   REJECTED: { label: 'Rejeitado', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: X },
 };
 
+// Only what works today (plan 2026-10-23 api-de-pedidos): the digital menu and the Gastrux order API. iFood, Keeta and
+// 99Food come with parts 2 and 3
 const PLATFORM_CONFIG: Record<string, { label: string; color: string; logo: string }> = {
-  ifood: { label: 'iFood', color: 'bg-red-500', logo: '🔴' },
-  rappi: { label: 'Rappi', color: 'bg-orange-500', logo: '🟠' },
-  uber_eats: { label: 'Uber Eats', color: 'bg-green-600', logo: '🟢' },
+  delivery_site: { label: 'Cardápio digital', color: 'bg-orange-600', logo: '🛒' },
+  gastrux_api: { label: 'API do Gastrux', color: 'bg-slate-700', logo: '🔗' },
 };
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'];
@@ -73,6 +76,8 @@ export default function DeliveryOrdersPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [autoAccept, setAutoAccept] = useState<boolean | null>(null);
+  const [canChangeSettings, setCanChangeSettings] = useState(false);
   const prevOrderCountRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -95,6 +100,8 @@ export default function DeliveryOrdersPage() {
       if (!res.ok) throw new Error('Erro');
       const data = await res.json();
       const fetched = data.orders || [];
+      setAutoAccept(data.autoAccept !== false);
+      setCanChangeSettings(!!data.canChangeSettings);
       // New order notification
       const pendingCount = fetched.filter((o: ExternalOrder) => o.status === 'PENDING').length;
       if (pendingCount > prevOrderCountRef.current && prevOrderCountRef.current > 0) {
@@ -119,6 +126,38 @@ export default function DeliveryOrdersPage() {
     return () => clearInterval(interval);
   }, [autoRefresh, fetchOrders]);
 
+  // Accept creates the kitchen order; reject needs a reason (plan 2026-10-23 api-de-pedidos)
+  const act = async (orderId: string, action: 'accept' | 'reject') => {
+    let reason: string | null = null;
+    if (action === 'reject') {
+      reason = window.prompt('Por que recusar este pedido? (o cliente ou o sistema de origem fica sabendo que foi cancelado)');
+      if (reason === null) return;
+    }
+    setUpdatingId(orderId);
+    try {
+      const res = await fetch(`/api/admin/integrations/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reason }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(body.error || 'Não foi possível atualizar o pedido'); return; }
+      toast.success(action === 'accept' ? 'Pedido aceito: foi para a cozinha' : 'Pedido recusado');
+      fetchOrders(false);
+    } catch {
+      toast.error('Sem conexão: tente de novo');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const saveAutoAccept = async (value: boolean) => {
+    const res = await fetch('/api/admin/delivery-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoAccept: value }) });
+    if (!res.ok) { toast.error('Não foi possível salvar o ajuste'); return; }
+    setAutoAccept(value);
+    toast.success(value ? 'Os pedidos vão direto para a cozinha' : 'Cada pedido espera o "Aceitar"');
+  };
+
   const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
     setUpdatingId(orderId);
     try {
@@ -127,7 +166,7 @@ export default function DeliveryOrdersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error('Erro');
+      if (!res.ok) { const body = await res.json().catch(() => ({})); toast.error(body.error || 'Erro ao atualizar pedido'); return; }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
       toast.success(`Pedido atualizado para: ${STATUS_CONFIG[newStatus].label}`);
     } catch {
@@ -184,7 +223,7 @@ export default function DeliveryOrdersPage() {
             <BackButton href="/dashboard" />
             <div>
               <h1 className="text-xl sm:text-2xl font-bold">Pedidos de delivery</h1>
-              <p className="text-sm text-muted-foreground">Gerencie pedidos de todas as plataformas</p>
+              <p className="text-sm text-muted-foreground">Pedidos do cardápio digital e dos sistemas ligados pela API de pedidos</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -201,6 +240,20 @@ export default function DeliveryOrdersPage() {
             </Button>
           </div>
         </div>
+
+        {autoAccept !== null && (
+          <Card className="p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm">
+              <p className="font-medium">Aceitar pedidos sozinho</p>
+              <p className="text-muted-foreground">{autoAccept ? 'O pedido vai direto para a cozinha.' : 'Cada pedido toca o alarme e espera o "Aceitar".'} Os pedidos do cardápio digital vão sempre direto.</p>
+            </div>
+            {canChangeSettings ? (
+              <Button size="sm" variant={autoAccept ? 'default' : 'outline'} onClick={() => saveAutoAccept(!autoAccept)}>{autoAccept ? 'Ligado' : 'Desligado'}</Button>
+            ) : (
+              <span className="text-sm font-medium">{autoAccept ? 'Ligado' : 'Desligado'}</span>
+            )}
+          </Card>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -254,9 +307,8 @@ export default function DeliveryOrdersPage() {
             className="px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
           >
             <option value="all">Todas Plataformas</option>
-            <option value="ifood">🔴 iFood</option>
-            <option value="rappi">🟠 Rappi</option>
-            <option value="uber_eats">🟢 Uber Eats</option>
+            <option value="delivery_site">🛒 Cardápio digital</option>
+            <option value="gastrux_api">🔗 API do Gastrux</option>
           </select>
         </div>
 
@@ -298,7 +350,7 @@ export default function DeliveryOrdersPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${platCfg.color} text-white`}>
-                            {platCfg.logo} {platCfg.label}
+                            {platCfg.logo} {platCfg.label}{order.apiKeyName ? `: ${order.apiKeyName}` : ''}
                           </span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${statusCfg.bg} ${statusCfg.color}`}>
                             <StatusIcon className="h-3 w-3" />
@@ -334,7 +386,7 @@ export default function DeliveryOrdersPage() {
                           size="sm"
                           className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                           disabled={isUpdating}
-                          onClick={(e) => { e.stopPropagation(); updateStatus(order.id, 'CONFIRMED'); }}
+                          onClick={(e) => { e.stopPropagation(); act(order.id, 'accept'); }}
                         >
                           <Check className="h-4 w-4 mr-1" />
                           Aceitar
@@ -343,10 +395,10 @@ export default function DeliveryOrdersPage() {
                           size="sm"
                           variant="destructive"
                           disabled={isUpdating}
-                          onClick={(e) => { e.stopPropagation(); updateStatus(order.id, 'REJECTED'); }}
+                          onClick={(e) => { e.stopPropagation(); act(order.id, 'reject'); }}
                         >
                           <X className="h-4 w-4 mr-1" />
-                          Rejeitar
+                          Recusar
                         </Button>
                       </div>
                     )}

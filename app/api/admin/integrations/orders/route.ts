@@ -1,64 +1,45 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { prisma } from '@/lib/prisma';
-import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { DELIVERY_ROLES } from '@/lib/delivery-orders/roles';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/admin/integrations/orders - Pedidos de delivery (plan 2026-10-23 api-de-pedidos, Task 7). The integration
+ * goes out as its platform and store name only: it used to carry the integration's apiKey and webhookSecret.
+ */
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || (session.user as any).role === 'COOK') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-    const restaurantId = await getCurrentRestaurantId();
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 400 });
-    }
-
-
-  try {
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    const platform = searchParams.get('platform');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
-
-    const where: any = { restaurantId };
-    if (status) where.status = status;
-    if (platform) {
-      where.integration = { platform };
-    }
-
-    const orders = await prisma.externalOrder.findMany({
+  const auth = await requireRestaurantRole([...DELIVERY_ROLES], 'Pedidos de delivery é da equipe do salão e do caixa');
+  if (!auth.ok) return auth.response;
+  const { restaurantId } = auth.member;
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get('status');
+  const platform = searchParams.get('platform');
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10) || 50, 1), 200);
+  const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+  const where: any = { restaurantId };
+  if (status) where.status = status;
+  if (platform) where.integration = { platform };
+  const [orders, total, restaurant] = await Promise.all([
+    prisma.externalOrder.findMany({
       where,
-      include: {
-        integration: true,
-        deliveryLogs: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
-      },
+      include: { integration: { select: { platform: true, storeName: true } }, deliveryLogs: { orderBy: { createdAt: 'desc' }, take: 5 } },
       orderBy: { orderReceivedAt: 'desc' },
       take: limit,
       skip: offset,
-    });
-
-    const total = await prisma.externalOrder.count({ where });
-
-    return NextResponse.json({
-      orders,
-      total,
-      limit,
-      offset,
-    });
-  } catch (error) {
-    console.error('[External Orders] Error fetching orders:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch orders' },
-      { status: 500 }
-    );
-  }
+    }),
+    prisma.externalOrder.count({ where }),
+    prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { deliveryAutoAccept: true } }),
+  ]);
+  const keyIds = [...new Set(orders.map((o) => o.apiKeyId).filter((x): x is string => !!x))];
+  const keyNames = new Map((await prisma.orderApiKey.findMany({ where: { id: { in: keyIds }, restaurantId }, select: { id: true, name: true } })).map((k) => [k.id, k.name]));
+  return NextResponse.json({
+    orders: orders.map((o) => ({ ...o, apiKeyName: o.apiKeyId ? keyNames.get(o.apiKeyId) ?? null : null })),
+    total,
+    limit,
+    offset,
+    autoAccept: restaurant?.deliveryAutoAccept !== false,
+    canChangeSettings: [...MANAGER_ROLES, 'ADMIN'].includes(auth.member.role),
+  });
 }

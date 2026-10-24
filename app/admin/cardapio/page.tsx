@@ -33,6 +33,8 @@ interface MenuItem {
   description?: string | null;
   price: string | number;
   recipeId?: string | null;
+  /** Product code for the Gastrux order API (plan 2026-10-23 api-de-pedidos) */
+  code?: string | null;
   available: boolean;
   active: boolean;
   displayOnQR: boolean;
@@ -63,6 +65,7 @@ export default function AdminCardapioPage() {
     description: '',
     price: '',
     recipeId: '',
+    code: '',
   });
 
   useEffect(() => {
@@ -144,12 +147,17 @@ export default function AdminCardapioPage() {
           description: newItem.description || null,
           price: newItem.price,
           recipeId: newItem.recipeId || null,
+          code: newItem.code || null,
           position: 0,
         }),
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error || 'Erro ao criar item');
+        return;
+      }
       toast.success('Item criado');
-      setNewItem({ name: '', description: '', price: '', recipeId: '' });
+      setNewItem({ name: '', description: '', price: '', recipeId: '', code: '' });
       setShowNewItem(null);
       fetchCategories();
     } catch (err) {
@@ -171,9 +179,14 @@ export default function AdminCardapioPage() {
           available: editingItem.available,
           displayOnQR: editingItem.displayOnQR,
           categoryId: editingItem.categoryId,
+          code: editingItem.code || null,
         }),
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error || 'Erro ao salvar item');
+        return;
+      }
       toast.success('Item atualizado');
       setEditingItem(null);
       fetchCategories();
@@ -336,6 +349,12 @@ export default function AdminCardapioPage() {
                     value={newItem.description}
                     onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                   />
+                  <Input
+                    placeholder="Código do produto (opcional, para a API de pedidos)"
+                    value={newItem.code}
+                    maxLength={40}
+                    onChange={(e) => setNewItem({ ...newItem, code: e.target.value })}
+                  />
                   <div>
                     <Label className="text-xs">Ficha técnica (opcional)</Label>
                     <select
@@ -459,6 +478,15 @@ export default function AdminCardapioPage() {
               <Input
                 value={editingItem.description || ''}
                 onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Código do produto (opcional)</Label>
+              <Input
+                value={editingItem.code || ''}
+                maxLength={40}
+                placeholder="Ex.: ESP-ALC. Outros sistemas mandam este código na API de pedidos"
+                onChange={(e) => setEditingItem({ ...editingItem, code: e.target.value })}
               />
             </div>
             <div>

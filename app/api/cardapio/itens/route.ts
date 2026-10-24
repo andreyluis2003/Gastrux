@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
+import { CODE_TAKEN, isCodeTaken, parseProductCode } from '@/lib/cardapio/product-code';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -51,6 +52,9 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { categoryId, name, description, price, recipeId, position } = body;
+    // The product code of the Gastrux order API (plan 2026-10-23 api-de-pedidos)
+    const code = parseProductCode(body.code);
+    if (!code.ok) return NextResponse.json({ error: code.error }, { status: 400 });
 
     if (!categoryId || !name || price === undefined) {
       return NextResponse.json(
@@ -81,18 +85,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const created = await prisma.menuItem.create({
-      data: {
-        categoryId,
-        name,
-        description,
-        price: parseFloat(price),
-        recipeId: recipeId || null,
-        position: position || 0,
-        restaurantId,
-      },
-      select: { id: true },
-    });
+    let created: { id: string };
+    try {
+      created = await prisma.menuItem.create({
+        data: {
+          categoryId,
+          name,
+          description,
+          price: parseFloat(price),
+          recipeId: recipeId || null,
+          position: position || 0,
+          restaurantId,
+          code: code.code ?? null,
+        },
+        select: { id: true },
+      });
+    } catch (e) {
+      if (isCodeTaken(e)) return NextResponse.json({ error: CODE_TAKEN }, { status: 400 });
+      throw e;
+    }
     // Without a ficha técnica it sells all the same: it gets a ficha simples (2026-10-12)
     await ensureMenuItemRecipes(prisma, restaurantId, [created.id]);
     const item = await prisma.menuItem.findUnique({ where: { id: created.id }, include: { category: true, images: true } });

@@ -54,6 +54,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/admin/integrations/whatsapp': ['app/admin/integrations/whatsapp/page.tsx'],
   '/admin/multi-location': ['app/admin/multi-location/page.tsx'],
   '/admin/modifiers': ['app/admin/modifiers/page.tsx'],
+  '/admin/integrations/api': ['app/admin/integrations/api/page.tsx'],
   '/admin/settings/ia': ['app/admin/settings/ia/page.tsx'],
 };
 // Titles that are not a fixed text: the Início header, the sales screen (no title), the night count (from its board),
