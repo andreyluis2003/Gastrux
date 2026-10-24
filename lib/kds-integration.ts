@@ -144,7 +144,7 @@ export async function createOrderFromExternalOrder(
  * notification, once per external order and kind (a platform replay must not raise it again).
  * Never throws: the order handling must not fail because the alert could not be stored.
  */
-async function alertDeliveryProblem(
+export async function alertDeliveryProblem(
   externalOrder: { id: string; restaurantId: string; externalOrderId: string },
   alert: { kind: string; severity?: 'HIGH' | 'CRITICAL'; title: string; message: string; items?: Array<{ name: string; quantity: number }> }
 ) {
