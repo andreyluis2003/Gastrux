@@ -9,6 +9,7 @@ import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery
 import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/delivery-payments/order-input';
 import { formatPhone, normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
+import { ownIntegration } from '@/lib/delivery-orders/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,11 +40,14 @@ export async function POST(req: NextRequest) {
       paymentMethod,
       changeFor,
       voucherBrand,
+      pickup,
     } = body;
+    // "Retirar no local" (owner request 2026-10-23): the customer picks the order up, no address and no delivery fee
+    const isPickup = pickup === true;
 
-    if (!restaurantId || !customerName || !customerPhone || !deliveryAddress || !items?.length) {
+    if (!restaurantId || !customerName || !customerPhone || (!deliveryAddress && !isPickup) || !items?.length) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios: restaurantId, customerName, customerPhone, deliveryAddress, items' },
+        { error: 'Campos obrigatórios: restaurantId, customerName, customerPhone, deliveryAddress (ou pickup), items' },
         { status: 400 }
       );
     }
@@ -112,7 +116,7 @@ export async function POST(req: NextRequest) {
     // deliveryFee has no server-side source of truth to validate against
     // (no delivery zone/fee config exists yet) - clamp it to non-negative
     // so a client can't submit a negative value to reduce the order total.
-    const safeDeliveryFee = Math.max(0, Number(deliveryFee) || 0);
+    const safeDeliveryFee = isPickup ? 0 : Math.max(0, Number(deliveryFee) || 0);
     const total = subtotal + safeDeliveryFee;
 
     // The payment choice is validated on the server against what this restaurant
@@ -124,7 +128,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: choiceResult.error }, { status: 400 });
     }
     const choice = choiceResult.choice;
-    const paymentNote = describePaymentForKitchen(choice, total);
+    const deliveryNote = describePaymentForKitchen(choice, total);
+    const paymentNote = isPickup ? deliveryNote.replace(/^Pagamento na entrega:/, 'Pagamento na retirada:') : deliveryNote;
 
     const orderNumber = generateOrderNumber();
 
@@ -140,7 +145,7 @@ export async function POST(req: NextRequest) {
           data: {
             restaurantId, name: customerName, phone: formatPhone(phoneDigits), phoneDigits,
             email: (await emailFree()) ? customerEmail || null : null,
-            address: deliveryAddress, city: deliveryCity || '', zipCode: deliveryZipCode || '',
+            address: isPickup ? '' : deliveryAddress, city: deliveryCity || '', zipCode: deliveryZipCode || '',
           },
         });
       } else if (!customer.email && customerEmail && (await emailFree())) {
@@ -158,44 +163,76 @@ export async function POST(req: NextRequest) {
     const noteCity = singleLine(deliveryCity);
     const noteZipCode = singleLine(deliveryZipCode);
     const noteReference = singleLine(deliveryReference);
+    // Only the server may write a line that starts with "Pagamento": every customer-supplied
+    // value is one line that begins with a fixed label (structural, not a word filter).
+    const kitchenNote = [
+      isPickup ? 'RETIRADA NO LOCAL' : '',
+      sanitizeCustomerNote(specialInstructions),
+      isPickup ? '' : `Endereço: ${singleLine(deliveryAddress)}${noteComplement ? ', ' + noteComplement : ''}`,
+      !isPickup && noteNeighborhood ? `Bairro: ${noteNeighborhood}` : '',
+      !isPickup && noteCity ? `Cidade: ${noteCity}` : '',
+      !isPickup && noteZipCode ? `CEP: ${noteZipCode}` : '',
+      !isPickup && noteReference ? `Referência: ${noteReference}` : '',
+      paymentNote,
+      `Cliente: ${singleLine(customerName)} - ${singleLine(customerPhone)}`,
+    ].filter(Boolean).join('\n');
 
-    const order = await prisma.order.create({
+    // The digital menu in the order pipeline (plan 2026-10-23 api-de-pedidos, Task 4b): the order is also an
+    // ExternalOrder of the restaurant's "Cardápio digital", so it shows in Pedidos de delivery with its values and
+    // its status. It is always accepted: an online payment attaches to the kitchen order created right below
+    const site = await ownIntegration(restaurantId, 'delivery_site');
+    const externalOrder = await prisma.externalOrder.create({
       data: {
-        restaurantId,
-        orderNumber,
-        orderType: 'DELIVERY',
-        status: 'PENDING',
-        paymentStatus: 'PENDING',
-        totalItems: orderItems.reduce((acc, i) => acc + i.quantity, 0),
-        subtotal,
-        fees: safeDeliveryFee,
-        total,
-        paymentMethod: choice.paymentMethod,
-        cashChangeFor: choice.changeFor,
-        voucherBrand: choice.voucherBrand,
-        // Only the server may write a line that starts with "Pagamento": every customer-supplied
-        // value is one line that begins with a fixed label (structural, not a word filter).
-        specialInstructions: [
-          sanitizeCustomerNote(specialInstructions),
-          `Endereço: ${singleLine(deliveryAddress)}${noteComplement ? ', ' + noteComplement : ''}`,
-          noteNeighborhood ? `Bairro: ${noteNeighborhood}` : '',
-          noteCity ? `Cidade: ${noteCity}` : '',
-          noteZipCode ? `CEP: ${noteZipCode}` : '',
-          noteReference ? `Referência: ${noteReference}` : '',
-          paymentNote,
-          `Cliente: ${singleLine(customerName)} - ${singleLine(customerPhone)}`,
-        ].filter(Boolean).join('\n'),
-        customerId: customer?.id || undefined,
-        items: {
-          create: orderItems.map((oi) => ({
-            recipeId: oi.recipeId,
-            quantity: oi.quantity,
-            specialInstructions: oi.specialInstructions,
-          })),
-        },
+        restaurantId, integrationId: site.id, externalOrderId: orderNumber, status: 'CONFIRMED',
+        totalAmount: total, subtotal, deliveryFee: safeDeliveryFee, discount: 0, platformFee: 0,
+        paymentMethod: choice.paymentMethod, paidOnline: false, customerId: customer?.id ?? null,
+        customerName: singleLine(customerName), customerPhone: phoneDigits ? formatPhone(phoneDigits) : singleLine(customerPhone),
+        customerEmail: customerEmail || null,
+        deliveryAddress: isPickup ? 'Retirada no local' : singleLine(deliveryAddress), deliveryCity: deliveryCity || null, deliveryZipcode: deliveryZipCode || null,
+        items: JSON.stringify(orderItems.map((oi) => ({ name: menuItems.find((m) => m.recipeId === oi.recipeId)?.name, quantity: oi.quantity }))),
+        specialInstructions: kitchenNote,
       },
-      include: { items: true },
+      select: { id: true },
     });
+
+    let order;
+    try {
+      order = await prisma.order.create({
+        data: {
+          restaurantId,
+          orderNumber,
+          orderType: 'DELIVERY',
+          status: 'PENDING',
+          paymentStatus: 'PENDING',
+          totalItems: orderItems.reduce((acc, i) => acc + i.quantity, 0),
+          subtotal,
+          fees: safeDeliveryFee,
+          total,
+          paymentMethod: choice.paymentMethod,
+          cashChangeFor: choice.changeFor,
+          voucherBrand: choice.voucherBrand,
+          // Only the server may write a line that starts with "Pagamento": every customer-supplied
+          // value is one line that begins with a fixed label (structural, not a word filter).
+          specialInstructions: kitchenNote,
+          customerId: customer?.id || undefined,
+          externalOrderId: externalOrder.id,
+          items: {
+            create: orderItems.map((oi) => ({
+              recipeId: oi.recipeId,
+              quantity: oi.quantity,
+              specialInstructions: oi.specialInstructions,
+            })),
+          },
+        },
+        include: { items: true },
+      });
+    } catch (error) {
+      // No kitchen order: the pipeline entry must not stay behind as a confirmed order without one
+      await prisma.externalOrder.delete({ where: { id: externalOrder.id } }).catch(() => {});
+      throw error;
+    }
+    await prisma.externalOrder.update({ where: { id: externalOrder.id }, data: { internalOrderId: order.id } });
+
     // The plan counts sales per month and only warns (owner decision 2026-10-09)
     await noteSalesThresholds(restaurantId);
 

@@ -140,6 +140,9 @@ export default function DeliveryPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  // "Retirar no local" (owner request 2026-10-23): no address and no delivery fee
+  const [pickup, setPickup] = useState(false);
+  const deliveryFee = pickup ? 0 : DELIVERY_FEE;
   const [deliveryNeighborhood, setDeliveryNeighborhood] = useState('');
   const [deliveryCity, setDeliveryCity] = useState('');
   const [deliveryZipCode, setDeliveryZipCode] = useState('');
@@ -215,7 +218,7 @@ export default function DeliveryPage() {
 
   const cartTotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((sum, i) => sum + i.quantity, 0), [cart]);
-  const grandTotal = cartTotal + DELIVERY_FEE;
+  const grandTotal = cartTotal + deliveryFee;
 
   const filteredCategories = useMemo(() => {
     if (!search.trim()) return categories;
@@ -284,7 +287,7 @@ export default function DeliveryPage() {
   }
 
   async function handleSubmitOrder() {
-    if (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim()) {
+    if (!customerName.trim() || !customerPhone.trim() || (!pickup && !deliveryAddress.trim())) {
       toast.error('Preencha nome, telefone e endereço');
       return;
     }
@@ -309,7 +312,8 @@ export default function DeliveryPage() {
       specialInstructions: scheduledDelivery && scheduledDate && scheduledTime
         ? `[AGENDADO: ${scheduledDate} às ${scheduledTime}] ${specialInstructions}`.trim()
         : specialInstructions,
-      deliveryFee: DELIVERY_FEE,
+      deliveryFee,
+      pickup,
       ...payment.payload,
     };
     // The signature is the whole request (cart, customer, address, notes, payment choice). If an online order
@@ -501,7 +505,7 @@ export default function DeliveryPage() {
           <p className="text-gray-600">Seu pedido <span className="font-bold">#{orderData?.orderNumber}</span> foi recebido.</p>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-1">
             <p className="text-sm"><span className="font-medium">Total:</span> {formatBRL(orderData?.total || 0)}</p>
-            <p className="text-sm"><span className="font-medium">Entrega em:</span> {deliveryAddress}</p>
+            <p className="text-sm">{pickup ? <><span className="font-medium">Retirada no local</span>{restaurant.address ? `: ${restaurant.address}` : ''}</> : <><span className="font-medium">Entrega em:</span> {deliveryAddress}</>}</p>
             <p className="text-sm">{pixPaid ? <><span className="font-medium">Status:</span> Pagamento confirmado ✔</> : orderData?.paymentSummary || 'Pagamento na entrega'}</p>
           </div>
           <p className="text-sm text-gray-500">Acompanhe seu pedido pelo telefone do restaurante.</p>
@@ -616,7 +620,7 @@ export default function DeliveryPage() {
               ))}
               <div className="border-t pt-2 mt-2 space-y-1">
                 <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatBRL(cartTotal)}</span></div>
-                <div className="flex justify-between text-sm"><span>Taxa de entrega</span><span>{formatBRL(DELIVERY_FEE)}</span></div>
+                {!pickup && <div className="flex justify-between text-sm"><span>Taxa de entrega</span><span>{formatBRL(deliveryFee)}</span></div>}
                 <div className="flex justify-between font-bold text-lg"><span>Total</span><span className="text-orange-600">{formatBRL(grandTotal)}</span></div>
               </div>
             </div>
@@ -639,8 +643,17 @@ export default function DeliveryPage() {
             </div>
           </Card>
 
+          {/* Delivery or pickup */}
+          <Card className="p-2 grid grid-cols-2 gap-2">
+            <Button type="button" variant={pickup ? 'outline' : 'default'} className={pickup ? '' : 'bg-orange-600 hover:bg-orange-700'} onClick={() => setPickup(false)}>Entregar</Button>
+            <Button type="button" variant={pickup ? 'default' : 'outline'} className={pickup ? 'bg-orange-600 hover:bg-orange-700' : ''} onClick={() => setPickup(true)}>Retirar no local</Button>
+          </Card>
+          {pickup && restaurant.address && (
+            <Card className="p-4 text-sm"><span className="font-medium">Retire em:</span> {restaurant.address}</Card>
+          )}
+
           {/* Delivery address */}
-          <Card className="p-4 space-y-3">
+          {!pickup && <Card className="p-4 space-y-3">
             <h3 className="font-bold text-sm flex items-center gap-2"><MapPin className="h-4 w-4" /> Endereço de Entrega</h3>
             <div>
               <label className="text-xs font-medium text-gray-600">Endereço *</label>
@@ -668,7 +681,7 @@ export default function DeliveryPage() {
               <label className="text-xs font-medium text-gray-600">Ponto de Referência</label>
               <Input placeholder="Próximo a..." value={deliveryReference} onChange={(e) => setDeliveryReference(e.target.value)} />
             </div>
-          </Card>
+          </Card>}
 
           {/* Agendamento */}
           <Card className="p-4">

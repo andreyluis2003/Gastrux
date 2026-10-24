@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { isTierFeatureEnabled, restaurantTier } from '@/lib/tier-guard';
 import { isSafeCallbackUrl } from './callback-url';
+import { ownIntegration } from './integrations';
 
 /** Gastrux order API keys (plan 2026-10-23 api-de-pedidos, Task 2). Only the sha256 of a key is stored. */
 export class ApiKeyError extends Error {
@@ -26,16 +27,6 @@ function randomBase62(length: number): string {
   return out;
 }
 
-/** The restaurant's Gastrux order API integration, created on the first key */
-async function apiIntegration(restaurantId: string) {
-  const random = () => crypto.randomBytes(24).toString('hex');
-  return prisma.deliveryIntegration.upsert({
-    where: { restaurantId_platform: { restaurantId, platform: 'gastrux_api' } },
-    create: { restaurantId, platform: 'gastrux_api', apiKey: random(), webhookSecret: random(), storeName: 'API do Gastrux', syncStatus: 'SUCCESS' },
-    update: {},
-    select: { id: true },
-  });
-}
 
 export async function createApiKey(member: RestaurantMember, name: unknown): Promise<{ id: string; key: string; prefix: string }> {
   const label = typeof name === 'string' ? name.trim().slice(0, 60) : '';
@@ -43,7 +34,7 @@ export async function createApiKey(member: RestaurantMember, name: unknown): Pro
   if (!isTierFeatureEnabled(await restaurantTier(member.restaurantId), 'orderApi')) {
     throw new ApiKeyError('A API de pedidos é dos planos Pro e Business', 403, { upgradeUrl: '/pricing' });
   }
-  const integration = await apiIntegration(member.restaurantId);
+  const integration = await ownIntegration(member.restaurantId, 'gastrux_api');
   const key = KEY_PREFIX + randomBase62(32);
   const row = await prisma.orderApiKey.create({
     data: {
