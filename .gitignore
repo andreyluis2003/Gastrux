@@ -90,3 +90,4 @@ Thumbs.db
 .superpowers/
 .github/agents/
 __tests__/integration/multi-tenant/read-isolation-report*.json
+.env.delivery-teste
