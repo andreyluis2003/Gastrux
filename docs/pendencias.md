@@ -42,6 +42,12 @@ migração `20261024120000_order_api`.
   registro do pedido); a página `/desenvolvedores` diz para consultar o status. O envio real por https (`callbackTransport.send`)
   não tem teste automatizado: os testes trocam o envio.
 - **Cancelar em Pedidos de delivery** um pedido já aceito é recusado: cancela-se pela tela da cozinha (exige gerente).
+- **Pedido aceito sem nenhum item reconhecido**: fica "Confirmado" sem pedido da cozinha (o sino avisa "NÃO foi para a
+  cozinha"), mas a API responde "aceito". Melhor: deixar o pedido parado à espera de correção e responder isso.
+- **Valor bruto no Caixa**: o pedido da cozinha guarda o total bruto (itens + taxa) e o desconto à parte, como a DRE espera;
+  o cartão de vendas do Caixa soma o bruto de um pedido da API com desconto.
+- **Sem limite de envios** em `/api/v1/pedidos`: uma chave vazada pode mandar muitos pedidos até ser revogada.
+- **"Delivery: cardápio digital" na DRE** soma todo pedido de delivery que não veio da API (inclusive o do bot de WhatsApp sem comanda).
 - **Partes 2 e 3** (Keeta, 99Food e Rappi pelo Open Delivery; iFood pela Merchant API) esperam as contas de desenvolvedor
   da Gastrux em cada plataforma, que só o dono pode criar.
 

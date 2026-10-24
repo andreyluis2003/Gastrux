@@ -110,4 +110,21 @@ describe('ingestDeliveryOrder', () => {
     expect((await prisma.order.findUnique({ where: { id: k.kitchenOrderId } })).customerId).toBeNull();
     expect(await prisma.customer.count({ where: { restaurantId: rid, phoneDigits: '11966660000' } })).toBe(0);
   });
+
+  // Final review 2026-10-24: the order of the pipeline stayed "Confirmado" while the kitchen moved it, so every
+  // site order sat among the active ones in Pedidos de delivery forever
+  it('the order follows the kitchen: preparing, ready, done; a kitchen cancel cancels it', async () => {
+    const r = await ingest(`H-${tag}`);
+    const status = async () => (await prisma.externalOrder.findUnique({ where: { id: r.externalOrder.id } })).status;
+    await changeOrderStatus(rid, r.kitchenOrderId, 'PREPARING');
+    expect(await status()).toBe('PREPARING');
+    await changeOrderStatus(rid, r.kitchenOrderId, 'READY');
+    expect(await status()).toBe('READY');
+    await changeOrderStatus(rid, r.kitchenOrderId, 'COMPLETED');
+    expect(await status()).toBe('DELIVERED');
+    const c = await ingest(`I-${tag}`);
+    const { cancelOrder } = await import('../../../lib/kds-cancel-order');
+    await cancelOrder(c.kitchenOrderId, { restaurantId: rid, userId: ownerId, reason: 'teste' });
+    expect((await prisma.externalOrder.findUnique({ where: { id: c.externalOrder.id } })).status).toBe('CANCELLED');
+  });
 });

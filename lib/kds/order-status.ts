@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { creditSale, recordPurchase } from '@/lib/cashback/service';
-import { notifyOrderStatus } from '@/lib/delivery-orders/callback';
+import { followKitchen } from '@/lib/delivery-orders/follow-kitchen';
 
 /**
  * Kitchen order status changes (PUT /api/kds/orders/[id]).
@@ -76,8 +76,8 @@ export async function changeOrderStatus(restaurantId: string, orderId: string, s
   }
 
   if (status === 'COMPLETED' && order) await creditCashback(order);
-  // An order of the Gastrux order API: the sender hears the new status (plan 2026-10-23 api-de-pedidos)
-  if (order?.externalOrderId) void notifyOrderStatus(order.externalOrderId);
+  // An order of the delivery pipeline follows the kitchen, and its sender hears the new status (plan 2026-10-23 api-de-pedidos)
+  if (order?.externalOrderId) await followKitchen(order.externalOrderId, status);
   return { kind: 'changed', order, from: current.status };
 }
 

@@ -4,7 +4,7 @@ import { getMpClientForRestaurant } from './mercadopago-connect/connection-servi
 import { cancelConnectPayment } from './mercadopago-connect/payments';
 import { createPaymentAlert } from './payment-alert-service';
 import { recordKitchenCountLoss } from './daily-count/service';
-import { notifyOrderStatus } from './delivery-orders/callback';
+import { followKitchen } from './delivery-orders/follow-kitchen';
 
 /** Order statuses in which the kitchen has already started (ingredients are being or were used). */
 const KITCHEN_STARTED = ['PREPARING', 'READY'];
@@ -118,7 +118,7 @@ export async function cancelOrder(
   }
 
   // An order of the Gastrux order API: the sender hears "cancelado" (plan 2026-10-23 api-de-pedidos)
-  if (result.kind === 'cancelled' && result.order?.externalOrderId) void notifyOrderStatus(result.order.externalOrderId);
+  if (result.kind === 'cancelled' && result.order?.externalOrderId) await followKitchen(result.order.externalOrderId, 'CANCELLED');
   return result;
 }
 
