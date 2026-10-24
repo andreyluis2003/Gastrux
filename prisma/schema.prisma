@@ -1457,6 +1457,14 @@ model DeliveryIntegration {
   syncError         String?
   totalOrdersSynced Int               @default(0)
   lastOrderAt       DateTime?
+  /// iFood (plan 2026-10-24 ifood): the store's tokens (distributed app) and the userCode verifier, encrypted
+  /// with lib/security/credential-crypto; storeId is the iFood merchantId
+  oauthAccessToken  String?
+  oauthRefreshToken String?
+  oauthExpiresAt    DateTime?
+  oauthVerifier     String?
+  /// The last successful poll of the platform's events (the store shows "Desconectada" when it is old)
+  lastPolledAt      DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -1500,6 +1508,13 @@ model ExternalOrder {
   orderReceivedAt       DateTime            @default(now())
   estimatedDeliveryTime DateTime?
   deliveredAt           DateTime?
+  /// What the platform says beyond the pipeline fields (iFood: displayId, orderType, deliveredBy, pickupCode)
+  platformData          Json?
+  /// When the platform heard "confirmed" (a failed confirm is retried while this is null)
+  platformConfirmedAt   DateTime?
+  /// A customer's cancellation request waiting for the restaurant's answer (iFood handshake dispute)
+  disputeId             String?
+  disputeExpiresAt      DateTime?
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   deliveryLogs          DeliveryLog[]
@@ -1512,6 +1527,23 @@ model ExternalOrder {
   @@index([status])
   @@index([orderReceivedAt])
   @@map("external_orders")
+}
+
+/// An event of the iFood Merchant API, kept by its id so a repeated event is processed once (plan 2026-10-24 ifood)
+model IfoodEvent {
+  id            String    @id
+  integrationId String?
+  merchantId    String
+  orderId       String?
+  code          String
+  fullCode      String?
+  payload       Json
+  receivedAt    DateTime  @default(now())
+  processedAt   DateTime?
+  error         String?
+
+  @@index([processedAt])
+  @@map("ifood_events")
 }
 
 model MenuItemMapping {
