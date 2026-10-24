@@ -26,6 +26,25 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - ~~**/admin/alertas-smart**~~ (2026-10-23, decisão do dono): apagada com `/api/alertas/smart`; o endereço leva ao Início.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
+## Plataformas de delivery, parte 3: iFood (2026-10-24)
+
+Plano `docs/superpowers/plans/2026-10-24-ifood.md`. O código está pronto; a loja só conecta depois da homologação.
+
+### Abertos
+
+- **Homologação no iFood (dono):** seguir `docs/ifood-homologacao.md` (app de produção distribuído, variáveis
+  `IFOOD_CLIENT_ID`, `IFOOD_CLIENT_SECRET`, `IFOOD_APP_MODE=distributed`, `IFOOD_POLLING=on` no Easypanel, Deploy).
+- **Depois de aprovada, trocar os textos que dizem "ainda não há conexão com o iFood":** `components/marketing/faq-section.tsx`,
+  `components/marketing/features-showcase.tsx`, `lib/marketing/segments.ts` (delivery), `lib/ai/knowledge/delivery.ts`, os
+  artigos `site-de-delivery` e `ligar-ifood` de `lib/help/seed-articles.ts` (o texto antigo vai para LEGACY_DEFAULT_HASHES)
+  e o manual.
+- **Disputa (HSD):** o id e o prazo são lidos de `metadata.disputeId` / `metadata.expiresAt` sem a documentação do iFood à
+  mão; conferir no teste real (Tarefa 10) e corrigir o mapeamento se vier diferente.
+- **Despacho sem "pronto":** quando a cozinha pula o Pronto, o Gastrux manda só o "despachado"; o iFood pode recusar (fica
+  registrado no pedido).
+- **Status mudado à mão** em Pedidos de delivery também vai para o iFood (Em preparo, Pronto, Em entrega); se a cozinha
+  depois marcar o mesmo passo, o iFood pode recusar a repetição (só fica registrado).
+
 ## Plataformas de delivery, parte 1: API de pedidos (2026-10-24)
 
 Spec `docs/superpowers/specs/2026-10-23-delivery-plataformas-design.md`, plano `docs/superpowers/plans/2026-10-23-api-de-pedidos.md`,

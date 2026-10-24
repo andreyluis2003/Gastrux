@@ -117,6 +117,16 @@ describe('iFood connection', () => {
     expect(row).toMatchObject({ isActive: false, storeId: null, oauthAccessToken: null, oauthRefreshToken: null });
   });
 
+  it('before the homologation (no credentials) the screen says so and start answers 409', async () => {
+    delete process.env.IFOOD_CLIENT_ID;
+    as(b.owner);
+    const r = await POST(req('POST', { action: 'start' }));
+    expect(r.status).toBe(409);
+    expect((await r.json()).error).toMatch(/homologação/);
+    expect((await (await GET()).json()).configured).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
   it('test mode: start answers 409; the link needs Gastrux staff', async () => {
     process.env.IFOOD_APP_MODE = 'centralized';
     as(a.owner);

@@ -26,7 +26,11 @@ async function assertBusiness(restaurantId: string) {
   }
 }
 
+/** The app's iFood credentials are set (they come with the homologation; before it the screen says so) */
+const configured = () => !!(process.env.IFOOD_CLIENT_ID && process.env.IFOOD_CLIENT_SECRET);
+
 function assertDistributed() {
+  if (!configured()) throw new IfoodConnectError('A conexão com o iFood ainda está em homologação no iFood', 409);
   if (ifoodMode() === 'centralized') throw new IfoodConnectError('Modo de teste: o administrador liga a loja', 409);
 }
 
@@ -64,6 +68,7 @@ export async function ifoodState(restaurantId: string) {
   const connected = !!row?.storeId;
   return {
     mode: ifoodMode(),
+    configured: configured(),
     available: isTierFeatureEnabled(await restaurantTier(restaurantId), 'deliveryPlatforms'),
     connected,
     merchant: connected ? { id: row!.storeId!, name: row!.storeName ?? '' } : null,

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 
 interface State {
   mode: 'centralized' | 'distributed';
+  configured: boolean;
   available: boolean;
   connected: boolean;
   merchant: { id: string; name: string } | null;
@@ -128,11 +129,18 @@ export default function IfoodPage() {
         </Card>
       )}
 
-      {state?.available && !state.connected && state.mode === 'centralized' && (
+      {state && !state.configured && !state.connected && (
+        <Card className="p-4 text-sm">
+          A conexão com o iFood está pronta no Gastrux e em homologação no iFood. Quando o iFood aprovar, você conecta a sua
+          loja por esta tela. Enquanto isso, os pedidos do iFood continuam no Gestor de Pedidos do iFood.
+        </Card>
+      )}
+
+      {state?.configured && state.available && !state.connected && state.mode === 'centralized' && (
         <Card className="p-4 text-sm">Modo de teste: a equipe do Gastrux liga a loja de teste do iFood a este restaurante.</Card>
       )}
 
-      {state?.available && !state.connected && state.mode === 'distributed' && (
+      {state?.configured && state.available && !state.connected && state.mode === 'distributed' && (
         <Card className="p-4 space-y-3">
           <p className="text-sm font-medium">Conectar a loja do iFood</p>
           <ol className="list-decimal pl-5 text-sm space-y-1">

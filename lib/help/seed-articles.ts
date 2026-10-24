@@ -47,6 +47,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '4db86b302c0b9737add2a14c4225914ce18612d7bac5d735a9254c15e15b4377', // contagem-do-dia (before the kitchen cancel became a loss)
   '106327f7a20c2d0c5dc46cc8fe38dee3cc6cd4ed873b95f57477dfe030d09671', // contagem-do-dia (before the other segments' examples were counted)
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
+  'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -579,7 +580,43 @@ Com a conta do Mercado Pago do restaurante conectada, o cliente pode pagar pelo 
 
 ## Outros sistemas e aplicativos
 
-O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". Hoje o Gastrux ainda não recebe pedidos direto do iFood, da Keeta ou da 99Food.`,
+O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". A conexão direta com o iFood está em homologação no iFood (veja "Como ligo o iFood?"). Keeta e 99Food ainda não estão conectados.`,
+  },
+  {
+    categorySlug: 'integracao-delivery',
+    slug: 'ligar-ifood',
+    title: 'Como ligo o iFood?',
+    summary: 'Em Configurações > iFood (plano Business): os pedidos do iFood chegam em Pedidos de delivery e o status volta para o iFood.',
+    keywords: 'ifood, delivery, integração, portal do parceiro, gestor de pedidos, cancelamento, homologação',
+    order: 4,
+    content: `## Situação
+
+A conexão com o iFood está pronta no Gastrux e **em homologação no iFood**. Até o iFood aprovar, a tela **Configurações > iFood** mostra "em homologação" e os pedidos do iFood continuam no Gestor de Pedidos do iFood. É do plano **Business**.
+
+## Conectando a loja
+
+1. O dono ou o gerente abre **Configurações > iFood** e clica em **Conectar iFood**
+2. Abra o link que aparece e digite o código no **Portal do Parceiro** do iFood, com a conta da loja
+3. Cole no Gastrux o **código de autorização** que o Portal mostrar e clique em **Concluir**
+
+Se a conta tem mais de uma loja, o Gastrux pergunta qual é a deste restaurante. Uma loja do iFood fica ligada a um restaurante só.
+
+## Os pedidos
+
+Os pedidos chegam em **Vender > Pedidos de delivery** como "iFood #número" e vão para a cozinha quando são aceitos (sozinhos, com **Aceitar pedidos sozinho** ligado). O iFood cancela o pedido que ninguém aceita em 8 minutos. Em preparo, pronto e saiu para entrega (quando a entrega é da loja) voltam para o iFood.
+
+Para o Gastrux reconhecer cada item, use no iFood o mesmo **Código PDV** que o **Código do produto** do Cardápio digital. Item sem código é procurado pelo nome.
+
+## Recusar, cancelar e pedidos de cancelamento
+
+- **Recusar** um pedido novo ou **Cancelar** um aceito pede um motivo da lista do iFood. Cancelar um pedido aceito exige um gerente; a cozinha cancela quando o iFood confirma.
+- Quando o cliente pede para cancelar, o pedido mostra **Aceitar o cancelamento** ou **Manter o pedido**, com o prazo para responder.
+
+## Pausar e desconectar
+
+**Pausar** faz o iFood fechar a loja em alguns minutos; **Retomar** volta a receber. **Desconectar** desliga a loja do Gastrux. A tela mostra "Conectada", "Pausada", "Com erro" ou "Desconectada".
+
+Os pedidos do iFood entram no caixa e na DRE, na linha "Delivery: iFood".`,
   },
   {
     categorySlug: 'integracao-delivery',
