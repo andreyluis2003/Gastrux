@@ -65,12 +65,12 @@ uma plataforma pequena. É também o caminho interno por onde passam os pedidos 
 
 - **Tela Pedidos de delivery**: mostra só as plataformas que funcionam, com a origem de cada pedido, o estado da
   integração (ligada, com erro, desligada) e o último pedido recebido.
-- **Aceitar pedido (proposta)**: cada restaurante escolhe aceitar sozinho ou tocar o alarme e esperar o "Aceitar". O
+- **Aceitar pedido**: cada restaurante escolhe aceitar sozinho ou tocar o alarme e esperar o "Aceitar". O
   padrão é aceitar sozinho, porque as plataformas cancelam o pedido não aceito em poucos minutos.
 - **Cozinha, Caixa, DRE e contagem**: o pedido aceito vai para a cozinha e entra nas vendas como delivery, com a
   plataforma separada na DRE (para ver quanto vende cada uma). A comissão da plataforma entra como despesa quando a
   plataforma informar o valor.
-- **Cliente e cashback (proposta)**: pedidos da API própria criam o cliente pelo celular no CRM e ganham cashback, como
+- **Cliente e cashback**: pedidos da API própria criam o cliente pelo celular no CRM e ganham cashback, como
   o site de delivery. Pedidos do iFood, da Keeta e da 99Food não: o cliente é da plataforma, e o celular costuma vir
   mascarado.
 - **NFC-e**: segue a regra de hoje para pedidos de delivery (a plataforma pode emitir a nota em alguns casos;
@@ -100,8 +100,9 @@ uma plataforma pequena. É também o caminho interno por onde passam os pedidos 
 2. Parte 2 (Open Delivery), assim que a conta da Keeta ou da 99Food sair.
 3. Parte 3 (iFood), depois da homologação.
 
-## Para o dono decidir
+## Decisões do dono (2026-10-23: "vamos seguir suas recomendações")
 
-1. Em que plano entram as integrações? Proposta: a API própria no Pro e no Business; Keeta, 99Food e iFood no Business.
-2. O pedido é aceito sozinho por padrão, com a opção de exigir o "Aceitar"?
-3. Pedidos da API própria geram cliente no CRM e cashback, e os das plataformas não?
+1. Plano: a API própria no Pro e no Business; Keeta, 99Food e iFood só no Business (e no teste, que é Business).
+2. O pedido é aceito sozinho por padrão; o restaurante pode exigir o "Aceitar".
+3. Pedidos da API própria criam o cliente pelo celular no CRM e ganham cashback (como o site de delivery); os das
+   plataformas não.
