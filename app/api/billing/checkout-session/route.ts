@@ -8,7 +8,6 @@ import { remainingTrialDays } from '@/lib/billing/plan-access';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { findPayingSubscription } from '@/lib/billing/cancel';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
-import { applyEarnedOnStripe } from '@/lib/referrals/apply-stripe';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,12 +119,6 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'https://gastrux.com';
 
     const isSubscription = tierId !== 'starter';
-
-    // Free months earned by referring other restaurants while in trial (plan 2026-10-24 indicacao): a credit on the
-    // customer before the subscription starts, so Stripe takes it off the first invoice. Never blocks the checkout.
-    if (isSubscription) {
-      await applyEarnedOnStripe(member.restaurantId, stripeCustomerId).catch((e) => console.error('[referral] checkout credit failed:', e));
-    }
 
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,

@@ -729,7 +729,7 @@ Quem abre o link tem 60 dias para se cadastrar. Também dá para digitar o códi
 3. Sete dias depois, se ele continua assinando: **Mês ganho**, e você recebe um e-mail
 4. Na assinatura pelo cartão, o mês entra como crédito e é descontado da sua próxima mensalidade: **Mês usado**
 
-Se você ainda está no teste, o mês fica **guardado** e é descontado da sua primeira mensalidade. Na assinatura pelo Mercado Pago, o mês também fica guardado até o desconto automático nesse meio de pagamento ser liberado.
+Se você ainda está no teste, o mês fica **guardado** e é descontado da próxima mensalidade depois que você assinar. Na assinatura pelo Mercado Pago, o mês também fica guardado até o desconto automático nesse meio de pagamento ser liberado.
 
 ## Limites
 

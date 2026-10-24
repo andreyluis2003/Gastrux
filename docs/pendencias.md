@@ -40,6 +40,20 @@ Plano `docs/superpowers/plans/2026-10-24-indicacao.md`.
   mês grátis real.
 - **Cadastro pelo Google:** usa o cookie do link (lido no servidor); não tem teste automático (os eventos do NextAuth).
 - **Colunas antigas** `users.referral*` e a tabela `referral_history` continuam no banco, sem uso.
+- **Revisão final (24/10/2026), itens menores que ficaram:**
+  - M2: se a equipe cancelar uma indicação "Mês ganho" no exato momento em que a rotina dá o crédito no Stripe, o crédito
+    sai e a indicação fica Cancelada (o id do crédito vai só para o log).
+  - M3: o cookie `gx_ref` não é apagado depois do cadastro: num computador compartilhado, outra conta criada ali em até 60
+    dias também conta como indicada; apagar o código digitado não apaga o cookie que a tela gravou (vale para "Entrar com
+    Google").
+  - M4: `/api/referrals/lookup` não tem limite por IP (31^6 códigos possíveis; devolve só o nome do restaurante).
+  - M5: a mesma pessoa com outro e-mail e sem CNPJ não é detectada (a regra da spec é e-mail, CNPJ ou dono). Sugestão:
+    mostrar na Plataforma quando o cartão do indicado é o mesmo de quem indicou.
+  - M6: faltam testes de: quem indica pelo Mercado Pago ficar "guardado"; a ligação dos webhooks (a ordem das chamadas).
+  - M7: o limite de 12 por ano é conferido sem trava; duas rotinas ao mesmo tempo poderiam passar de 12 (a rotina roda uma
+    vez por dia).
+  - Uma primeira mensalidade do indicado coberta inteira por crédito (R$ 0,00 pago) não conta como primeira cobrança: a
+    indicação espera a próxima cobrança paga.
 
 ## Plataformas de delivery, parte 3: iFood (2026-10-24)
 

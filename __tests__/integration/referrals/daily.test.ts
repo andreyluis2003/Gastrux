@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 
 jest.mock('../../../lib/stripe-connect', () => ({
   stripe: {
-    customers: { createBalanceTransaction: jest.fn() },
+    customers: { createBalanceTransaction: jest.fn(), listBalanceTransactions: jest.fn() },
     charges: { list: jest.fn() },
   },
 }));
@@ -16,7 +16,6 @@ import { stripe } from '../../../lib/stripe-connect';
 import { getPayment } from '../../../lib/mercado-pago';
 import { sendTransactionalEmail } from '../../../lib/email/transactional';
 import { runReferralDaily } from '../../../lib/referrals/daily';
-import { applyEarnedOnStripe } from '../../../lib/referrals/apply-stripe';
 import { POST as dailyRoute } from '../../../app/api/referrals/daily/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -26,7 +25,7 @@ const users: string[] = [];
 const DAY = 86_400_000;
 const NOW = new Date('2026-11-20T15:00:00Z');
 
-async function restaurant(opts: { tier?: string; status?: string; stripe?: boolean; paying?: boolean; cnpj?: string; internal?: boolean; ownerId?: string } = {}) {
+async function restaurant(opts: { tier?: string; status?: string; stripe?: boolean; paying?: boolean; payTier?: string; cancelAtPeriodEnd?: boolean; cnpj?: string; internal?: boolean; ownerId?: string } = {}) {
   let ownerId = opts.ownerId;
   if (!ownerId) {
     const u = await prisma.user.create({ data: { email: `rfd-${seq++}-${tag}@gastrux.test`, name: 'Dona', password: 'x', role: 'OWNER', stripeCustomerId: opts.stripe ? `cus_${tag}_${seq++}` : null } });
@@ -40,14 +39,14 @@ async function restaurant(opts: { tier?: string; status?: string; stripe?: boole
     },
   });
   if (opts.paying) {
-    await prisma.subscription.create({ data: { userId: ownerId, restaurantId: r.id, tier: opts.tier ?? 'pro', gateway: 'STRIPE', gatewaySubscriptionId: `sub_${tag}_${seq++}`, amount: 149, status: 'active' } });
+    await prisma.subscription.create({ data: { userId: ownerId, restaurantId: r.id, tier: opts.payTier ?? opts.tier ?? 'pro', gateway: 'STRIPE', gatewaySubscriptionId: `sub_${tag}_${seq++}`, amount: 149, status: 'active', cancelAtPeriodEnd: !!opts.cancelAtPeriodEnd } });
   }
   return { rid: r.id, ownerId };
 }
 
 /** A referral whose referred restaurant paid `daysAgo` days before NOW */
 async function confirming(referrer, referredOpts = {}, daysAgo = 8, gateway = 'STRIPE') {
-  const referred = await restaurant({ stripe: true, ...referredOpts });
+  const referred = await restaurant({ stripe: true, paying: true, ...referredOpts });
   const row = await prisma.referral.create({
     data: { referrerRestaurantId: referrer.rid, referredRestaurantId: referred.rid, status: 'CONFIRMING', gateway, firstChargeRef: `in_${tag}_${seq++}`, firstChargeAt: new Date(NOW.getTime() - daysAgo * DAY) },
   });
@@ -59,6 +58,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   (stripe.charges.list as jest.Mock).mockResolvedValue({ data: [{ id: 'ch_1', amount_refunded: 0, refunded: false }] });
   (stripe.customers.createBalanceTransaction as jest.Mock).mockImplementation(async (_c, body, opts) => ({ id: `cbtxn_${opts.idempotencyKey}`, amount: body.amount }));
+  (stripe.customers.listBalanceTransactions as jest.Mock).mockResolvedValue({ data: [] });
   (getPayment as jest.Mock).mockResolvedValue({ id: 1, status: 'approved' });
 });
 afterAll(async () => {
@@ -99,7 +99,7 @@ it('before 7 days nothing moves', async () => {
 
 it('the referred restaurant cancelled: CANCELLED, no credit', async () => {
   const referrer = await restaurant({ stripe: true, paying: true });
-  const { row } = await confirming(referrer, { status: 'canceled' });
+  const { row } = await confirming(referrer, { status: 'canceled', paying: false });
   await runReferralDaily(NOW);
   expect(await reload(row.id)).toMatchObject({ status: 'CANCELLED' });
   expect(stripe.customers.createBalanceTransaction).not.toHaveBeenCalled();
@@ -144,15 +144,52 @@ it('the 13th month of the year is CANCELLED "limite do ano"', async () => {
   expect(await reload(row.id)).toMatchObject({ status: 'CANCELLED', cancelReason: 'limite do ano' });
 });
 
-it('a referrer still in trial keeps the month EARNED; the Stripe checkout applies it', async () => {
+it('a referrer still in trial keeps the month EARNED (no amount yet); once subscribed on Stripe the next run applies it (final review I2)', async () => {
   const referrer = await restaurant({ stripe: true, status: 'trialing' });
   const { row } = await confirming(referrer);
   await runReferralDaily(NOW);
-  expect((await reload(row.id)).status).toBe('EARNED');
+  expect(await reload(row.id)).toMatchObject({ status: 'EARNED', amountCents: null });
   expect(stripe.customers.createBalanceTransaction).not.toHaveBeenCalled();
-  const customer = (await prisma.user.findUnique({ where: { id: referrer.ownerId } })).stripeCustomerId;
-  expect(await applyEarnedOnStripe(referrer.rid, customer)).toBe(1);
-  expect((await reload(row.id)).status).toBe('APPLIED');
+  // only a subscription that exists counts: opening the checkout is not paying
+  await prisma.subscription.create({ data: { userId: referrer.ownerId, restaurantId: referrer.rid, tier: 'pro', gateway: 'STRIPE', gatewaySubscriptionId: `sub_${tag}_late`, amount: 149, status: 'trialing' } });
+  await runReferralDaily(NOW);
+  expect(await reload(row.id)).toMatchObject({ status: 'APPLIED', amountCents: 14900 });
+});
+
+it('a Stripe-paying referred restaurant that cancels on day 3 (cancel at period end) does not earn (final review I1)', async () => {
+  const referrer = await restaurant({ stripe: true, paying: true });
+  const { row } = await confirming(referrer, { cancelAtPeriodEnd: true });
+  await runReferralDaily(NOW);
+  expect((await reload(row.id)).status).toBe('CANCELLED');
+  expect(stripe.customers.createBalanceTransaction).not.toHaveBeenCalled();
+});
+
+it('the month is worth the plan actually billed, not the restaurant tier (final review I3)', async () => {
+  // still marked business from the trial, subscribed to Pro
+  const referrer = await restaurant({ stripe: true, paying: true, tier: 'business', payTier: 'pro' });
+  const { row } = await confirming(referrer);
+  await runReferralDaily(NOW);
+  expect(await reload(row.id)).toMatchObject({ status: 'APPLIED', amountCents: 14900 });
+  expect((stripe.customers.createBalanceTransaction as jest.Mock).mock.calls[0][1].amount).toBe(-14900);
+});
+
+it('a referrer whose plan had ended (starter) gets the month when subscribing again (final review I3)', async () => {
+  const referrer = await restaurant({ stripe: true, tier: 'starter', status: 'canceled' });
+  const { row } = await confirming(referrer);
+  await runReferralDaily(NOW);
+  expect((await reload(row.id)).status).toBe('EARNED');
+  await prisma.subscription.create({ data: { userId: referrer.ownerId, restaurantId: referrer.rid, tier: 'business', gateway: 'STRIPE', gatewaySubscriptionId: `sub_${tag}_back`, amount: 199, status: 'active' } });
+  await runReferralDaily(NOW);
+  expect(await reload(row.id)).toMatchObject({ status: 'APPLIED', amountCents: 19900 });
+});
+
+it('a credit Stripe already has for this referral is not created again (final review M1)', async () => {
+  const referrer = await restaurant({ stripe: true, paying: true });
+  const { row } = await confirming(referrer);
+  (stripe.customers.listBalanceTransactions as jest.Mock).mockResolvedValue({ data: [{ id: 'cbtxn_earlier', amount: -14900, metadata: { referralId: row.id } }] });
+  await runReferralDaily(NOW);
+  expect(stripe.customers.createBalanceTransaction).not.toHaveBeenCalled();
+  expect(await reload(row.id)).toMatchObject({ status: 'APPLIED', appliedRef: 'cbtxn_earlier' });
 });
 
 it('an internal referrer or referred: CANCELLED', async () => {

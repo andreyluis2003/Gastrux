@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe-connect';
 import { getPayment } from '@/lib/mercado-pago';
 import { sendTransactionalEmail } from '@/lib/email/transactional';
-import { brtYear, CONFIRM_DAYS, monthValueCents, YEARLY_CAP } from './rules';
+import { findPayingSubscription } from '@/lib/billing/cancel';
+import { brtYear, CONFIRM_DAYS, YEARLY_CAP } from './rules';
 import { escape, ownerOf } from './signup';
 import { applyEarnedOnStripe } from './apply-stripe';
 
@@ -13,7 +14,6 @@ import { applyEarnedOnStripe } from './apply-stripe';
  * 2. earned months are applied (Stripe credit; Mercado Pago in Task 6). An owner not subscribed keeps them EARNED.
  */
 const DAY_MS = 86_400_000;
-const PAYING = ['active', 'past_due'];
 
 type Due = Awaited<ReturnType<typeof dueReferrals>>[number];
 
@@ -21,8 +21,8 @@ function dueReferrals(now: Date) {
   return prisma.referral.findMany({
     where: { status: 'CONFIRMING', firstChargeAt: { lte: new Date(now.getTime() - CONFIRM_DAYS * DAY_MS) } },
     include: {
-      referrer: { select: { id: true, ownerId: true, isInternal: true, subscriptionTier: true } },
-      referred: { select: { id: true, ownerId: true, isInternal: true, subscriptionStatus: true, name: true } },
+      referrer: { select: { id: true, ownerId: true, isInternal: true } },
+      referred: { select: { id: true, ownerId: true, isInternal: true, name: true } },
     },
   });
 }
@@ -48,7 +48,8 @@ async function firstChargeRefunded(r: Due): Promise<boolean | undefined> {
 async function cancelReason(r: Due): Promise<string | null | undefined> {
   if (r.referred.ownerId === r.referrer.ownerId) return 'mesmo dono';
   if (r.referrer.isInternal || r.referred.isInternal) return 'conta interna';
-  if (!PAYING.includes(r.referred.subscriptionStatus ?? '')) return 'o indicado cancelou em até 7 dias';
+  // A subscription still renewing: a Stripe cancel only sets cancel-at-period-end and stays "active" (final review I1)
+  if (!(await findPayingSubscription(r.referred.ownerId))) return 'o indicado cancelou em até 7 dias';
   const refunded = await firstChargeRefunded(r);
   if (refunded === undefined) return undefined;
   return refunded ? 'primeira cobrança estornada' : null;
@@ -77,7 +78,7 @@ async function tellEarned(r: Due) {
     subject: 'Você ganhou 1 mês grátis no Gastrux',
     html: `<p>Olá${owner.name ? `, ${escape(owner.name)}` : ''}!</p>
 <p><strong>${escape(r.referred.name)}</strong>, que se cadastrou pelo seu link, já é assinante do Gastrux.</p>
-<p>Você ganhou <strong>1 mês grátis</strong> do seu plano. Na assinatura pelo cartão, ele é descontado da sua próxima mensalidade; se você ainda está no teste, fica guardado para a primeira. Acompanhe em Minha assinatura &gt; Indique e ganhe.</p>
+<p>Você ganhou <strong>1 mês grátis</strong> do seu plano. Na assinatura pelo cartão, ele é descontado da sua próxima mensalidade; se você ainda está no teste, fica guardado e é descontado da próxima mensalidade depois que você assinar. Acompanhe em Minha assinatura &gt; Indique e ganhe.</p>
 <p>Obrigado por indicar o Gastrux!</p>`,
   }).catch((e) => console.error('[referral] earned e-mail failed:', e?.message ?? e));
 }
@@ -98,7 +99,8 @@ export async function runReferralDaily(now = new Date()): Promise<{ confirmed: n
     }
     const moved = await prisma.referral.updateMany({
       where: { id: r.id, status: 'CONFIRMING' },
-      data: { status: 'EARNED', earnedAt: now, amountCents: monthValueCents(r.referrer.subscriptionTier ?? '') },
+      // The value is set when the month is applied, from the plan billed then (final review I3)
+      data: { status: 'EARNED', earnedAt: now },
     });
     if (moved.count) {
       result.confirmed++;
@@ -107,7 +109,7 @@ export async function runReferralDaily(now = new Date()): Promise<{ confirmed: n
   }
 
   const referrers = await prisma.referral.findMany({
-    where: { status: 'EARNED', amountCents: { gt: 0 } },
+    where: { status: 'EARNED' },
     distinct: ['referrerRestaurantId'],
     select: { referrerRestaurantId: true },
   });
