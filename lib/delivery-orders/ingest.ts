@@ -8,6 +8,7 @@ import { findCustomerByPhone } from '@/lib/cashback/service';
 import { sanitizeCustomerNote } from '@/lib/delivery-payments/order-input';
 import type { OrderApiInput } from './input';
 import { notifyOrderStatus } from './callback';
+import { isPlatformOrder, pushPlatformStatus } from './platform-sync';
 
 /**
  * One pipeline for incoming delivery orders (plan 2026-10-23 api-de-pedidos, Task 4): the Gastrux order API now, the
@@ -99,6 +100,10 @@ export async function ingestDeliveryOrder(args: {
   apiKeyId?: string;
   platform: DeliveryPlatform;
   input: OrderApiInput;
+  /** Ticket lines of the platform (iFood: card brand, coupons, pickup code...), after the pipeline's own */
+  extraNote?: string;
+  platformData?: object;
+  externalCustomerId?: string | null;
 }): Promise<{ externalOrder: ExternalOrder; kitchenOrderId: string | null; duplicate: boolean }> {
   const { restaurantId, integrationId, input } = args;
   const key = { restaurantId_externalOrderId: { restaurantId, externalOrderId: input.codigo } };
@@ -122,7 +127,8 @@ export async function ingestDeliveryOrder(args: {
           externalItemId: it.codigo, name: it.nome, quantity: it.quantidade, price: it.precoUnitario,
           specialInstructions: [...(it.adicionais ?? []).map((ad) => `+ ${ad.nome}`), sanitizeCustomerNote(it.observacao)].filter(Boolean).join(' · ') || undefined,
         }))),
-        specialInstructions: kitchenNote(input),
+        specialInstructions: [kitchenNote(input), args.extraNote].filter(Boolean).join('\n'),
+        platformData: args.platformData as any, externalCustomerId: args.externalCustomerId ?? undefined,
       },
     });
   } catch (e: any) {
@@ -150,7 +156,7 @@ export async function ingestDeliveryOrder(args: {
   return { externalOrder, kitchenOrderId: null, duplicate: false };
 }
 
-export async function acceptDeliveryOrder(restaurantId: string, externalOrderId: string, _by: { userId?: string }): Promise<{ kitchenOrderId: string | null }> {
+export async function acceptDeliveryOrder(restaurantId: string, externalOrderId: string, by: { userId?: string; fromPlatform?: boolean }): Promise<{ kitchenOrderId: string | null }> {
   const moved = await prisma.externalOrder.updateMany({ where: { id: externalOrderId, restaurantId, status: 'PENDING' }, data: { status: 'CONFIRMED' } });
   const order = await prisma.externalOrder.findFirst({ where: { id: externalOrderId, restaurantId }, select: { id: true, status: true } });
   if (!order) throw new DeliveryOrderError('Pedido não encontrado', 404);
@@ -161,14 +167,26 @@ export async function acceptDeliveryOrder(restaurantId: string, externalOrderId:
     kitchenOrderId = (await createOrderFromExternalOrder(order.id))?.id ?? (await kitchenOrderOf(order.id));
     if (kitchenOrderId) await noteSalesThresholds(restaurantId).catch(() => {});
   }
+  // The platform hears "confirmed" (iFood cancels an order not confirmed in 8 minutes), unless it told us
+  if (moved.count > 0 && !by.fromPlatform) await pushPlatformStatus(order.id, 'confirm');
   // The sender hears "aceito" (never waits on its address)
   if (moved.count > 0) void notifyOrderStatus(order.id);
   return { kitchenOrderId };
 }
 
-export async function rejectDeliveryOrder(member: RestaurantMember, externalOrderId: string, reason: unknown): Promise<void> {
+export async function rejectDeliveryOrder(member: RestaurantMember, externalOrderId: string, reason: unknown, cancelCode?: unknown): Promise<void> {
   const why = typeof reason === 'string' ? reason.trim() : '';
   if (why.length < 3 || why.length > 200) throw new DeliveryOrderError('Diga o motivo da recusa (de 3 a 200 letras)');
+  // iFood takes the refusal only with a reason of its own list (plan 2026-10-24 ifood)
+  const platform = await isPlatformOrder(externalOrderId);
+  const code = typeof cancelCode === 'string' ? cancelCode.trim() : '';
+  if (platform) {
+    if (!code) throw new DeliveryOrderError('Escolha o motivo do iFood');
+    const pending = await prisma.externalOrder.count({ where: { id: externalOrderId, restaurantId: member.restaurantId, status: 'PENDING' } });
+    if (pending && !(await pushPlatformStatus(externalOrderId, { cancel: { code, reason: why } }))) {
+      throw new DeliveryOrderError('O iFood não recebeu a recusa: tente de novo', 502);
+    }
+  }
   const moved = await prisma.externalOrder.updateMany({ where: { id: externalOrderId, restaurantId: member.restaurantId, status: 'PENDING' }, data: { status: 'CANCELLED' } });
   if (moved.count === 0) {
     const exists = await prisma.externalOrder.count({ where: { id: externalOrderId, restaurantId: member.restaurantId } });

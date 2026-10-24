@@ -165,6 +165,12 @@ export async function DELETE(
     if (outcome.kind === 'not-found') {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
+    if (outcome.kind === 'platform-cancel-required') {
+      return NextResponse.json(
+        { error: 'Cancele em Pedidos de delivery: o iFood pede o motivo', code: 'PLATFORM_CANCEL_REQUIRED' },
+        { status: 409 }
+      );
+    }
     if (outcome.kind === 'completed') {
       return NextResponse.json(
         { error: 'Um pedido concluído não pode ser cancelado', code: 'ORDER_ALREADY_COMPLETED' },

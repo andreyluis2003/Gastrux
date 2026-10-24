@@ -22,6 +22,8 @@ export interface CancelPayments {
 
 export type CancelOutcome =
   | { kind: 'not-found' }
+  /** An iFood order: cancelled only through Pedidos de delivery, with iFood's reason (plan 2026-10-24 ifood) */
+  | { kind: 'platform-cancel-required' }
   | { kind: 'already-cancelled'; order: any }
   | { kind: 'completed'; order: any }
   | { kind: 'cancelled'; order: any; loss: { recorded: boolean; ingredients: number; estimatedCost: number }; payments: CancelPayments };
@@ -39,8 +41,15 @@ export type CancelOutcome =
  */
 export async function cancelOrder(
   orderId: string,
-  opts: { restaurantId: string; userId?: string; reason?: string }
+  opts: { restaurantId: string; userId?: string; reason?: string; fromPlatform?: boolean }
 ): Promise<CancelOutcome> {
+  if (!opts.fromPlatform) {
+    const own = await prisma.order.findFirst({
+      where: { id: orderId, restaurantId: opts.restaurantId },
+      select: { externalOrder: { select: { status: true, integration: { select: { platform: true } } } } },
+    });
+    if (own?.externalOrder?.integration?.platform === 'ifood' && own.externalOrder.status !== 'CANCELLED') return { kind: 'platform-cancel-required' };
+  }
   const result = await prisma.$transaction(async (tx) => {
     // Scoped to the caller's restaurant: another restaurant's order is "not found", never cancelled.
     const order = await tx.order.findFirst({
@@ -118,7 +127,7 @@ export async function cancelOrder(
   }
 
   // An order of the Gastrux order API: the sender hears "cancelado" (plan 2026-10-23 api-de-pedidos)
-  if (result.kind === 'cancelled' && result.order?.externalOrderId) await followKitchen(result.order.externalOrderId, 'CANCELLED');
+  if (result.kind === 'cancelled' && result.order?.externalOrderId) await followKitchen(result.order.externalOrderId, 'CANCELLED', { fromPlatform: opts.fromPlatform });
   return result;
 }
 
