@@ -71,7 +71,7 @@ export const SEGMENTS: Segment[] = [
       'Pedidos anotados em papel que se perdem no pico',
     ],
     benefits: [
-      { icon: 'Smartphone', title: 'Pedidos externos por API', description: 'Outros sistemas podem enviar pedidos à Gastrux por webhook (exige configuração técnica).' },
+      { icon: 'Smartphone', title: 'API de Pedidos', description: 'Seu site, bot ou sistema manda pedidos direto para a Gastrux, com chave e documentação em português (Pro e Business).' },
       { icon: 'BarChart3', title: 'Margem por prato', description: 'CMV e margem de contribuição de cada item do cardápio.' },
       { icon: 'Package', title: 'Estoque Integrado', description: 'Pedidos feitos na Gastrux baixam o estoque pela ficha técnica.' },
       { icon: 'Clock', title: 'Tela da Cozinha', description: 'A tela da cozinha mostra os pedidos na ordem e há quanto tempo cada um espera.' },

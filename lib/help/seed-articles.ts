@@ -46,6 +46,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '5ff659663983995fad1368b4227d261d8d8682f1a98add0f5f381427c65e49e1', // contas-de-consumo (before the % of revenue only for a finished month)
   '4db86b302c0b9737add2a14c4225914ce18612d7bac5d735a9254c15e15b4377', // contagem-do-dia (before the kitchen cancel became a loss)
   '106327f7a20c2d0c5dc46cc8fe38dee3cc6cd4ed873b95f57477dfe030d09671', // contagem-do-dia (before the other segments' examples were counted)
+  '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -564,15 +565,48 @@ A nota pode sair automaticamente ao fechar a conta. Uma nota rejeitada gera avis
 
 Em **Clientes e marketing > Site de delivery** você configura o site do restaurante para pedidos de entrega e retirada, com o seu cardápio.
 
-Os pedidos chegam em **Vender > Pedidos de delivery**.
+No site, o cliente escolhe **Entregar** ou **Retirar no local** (sem endereço e sem taxa de entrega; a cozinha vê "RETIRADA NO LOCAL"). Mande o link do site pelo WhatsApp para o cliente pedir sozinho.
+
+Os pedidos chegam em **Vender > Pedidos de delivery**, com a origem de cada um (Cardápio digital ou API do Gastrux), e vão para a cozinha.
+
+## Aceitar pedidos sozinho
+
+Em **Vender > Pedidos de delivery**, o dono ou o gerente escolhe se os pedidos vão direto para a cozinha (**Aceitar pedidos sozinho**, o padrão) ou se cada um toca o alarme e espera o **Aceitar**. Quem recusa diz o motivo. Os pedidos do site vão sempre direto, porque o pagamento online precisa do pedido criado.
 
 ## Pagamento online
 
 Com a conta do Mercado Pago do restaurante conectada, o cliente pode pagar pelo site. Os pagamentos aparecem em **Caixa e pagamentos > Pagamentos online**.
 
-## iFood e outros aplicativos
+## Outros sistemas e aplicativos
 
-Hoje o Gastrux não recebe pedidos direto do iFood ou de outros aplicativos de entrega.`,
+O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". Hoje o Gastrux ainda não recebe pedidos direto do iFood, da Keeta ou da 99Food.`,
+  },
+  {
+    categorySlug: 'integracao-delivery',
+    slug: 'api-de-pedidos',
+    title: 'Como recebo pedidos de outros sistemas (API de pedidos)?',
+    summary: 'Crie uma chave em Configurações > API de pedidos e passe para quem faz o seu site, bot ou sistema.',
+    keywords: 'api, integração, webhook, chave, site próprio, bot, sistema, pedidos externos, desenvolvedor',
+    order: 3,
+    content: `## Para que serve
+
+Seu site próprio, um bot de WhatsApp ou outro sistema podem mandar pedidos de delivery direto para o Gastrux. O pedido aparece em **Vender > Pedidos de delivery**, vai para a cozinha e entra no caixa e na DRE (na linha "Delivery: API do Gastrux"). O cliente entra no CRM pelo celular e ganha cashback, se você usa. É dos planos **Pro** e **Business**.
+
+## Criando a chave
+
+1. Vá em **Configurações > API de pedidos** e dê um nome à chave, como "Site da loja"
+2. Toque em **Criar chave** e copie: ela aparece uma vez só
+3. Passe a chave para quem faz o sistema, com o link da página **/desenvolvedores** (gastrux.com/desenvolvedores), que explica como mandar o pedido
+
+Para o sistema saber quando o pedido foi aceito, ficou pronto ou saiu, cadastre o **endereço de aviso** na chave. Se a chave vazar, toque em **Revogar**: ela para de valer na hora.
+
+## Os produtos
+
+Para o Gastrux reconhecer cada item, coloque o **Código do produto** no Cardápio digital (ao criar ou editar o produto) e use o mesmo código no outro sistema. Item sem código é procurado pelo nome; o que não for reconhecido vai para a cozinha escrito no pedido e toca o sino.
+
+## Aceitar ou não
+
+Com **Aceitar pedidos sozinho** ligado (o padrão), o pedido vai direto para a cozinha. Desligado, cada pedido espera o **Aceitar** em Pedidos de delivery.`,
   },
   {
     categorySlug: 'integracao-delivery',

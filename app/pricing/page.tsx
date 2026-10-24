@@ -29,7 +29,7 @@ const FEATURES_COMPARISON = [
   { category: 'Produção', name: 'Planejamento de Produção' },
   { category: 'Analytics', name: 'Dashboard Analítico' },
   { category: 'Analytics', name: 'Relatórios Executivos' },
-  { category: 'Integrações', name: 'Pedidos externos por webhook (API)' },
+  { category: 'Integrações', name: 'API de pedidos (site, bot ou outro sistema)' },
   { category: 'Integrações', name: 'Multi-loja' },
   { category: 'Suporte', name: 'Suporte Email' },
   { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
@@ -59,10 +59,8 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Planejamento de Produção': true,
     'Dashboard Analítico': true,
     'Relatórios Executivos': ['business', 'enterprise'].includes(tierId),
-    'Pedidos externos por webhook (API)':
-      tier.limits.deliveryIntegrations > 0
-        ? (tier.limits.deliveryIntegrations === 999999 ? 'Ilimitado' : `${tier.limits.deliveryIntegrations} conexões`)
-        : false,
+    // Owner decision 2026-10-23: the Gastrux order API on Pro and Business (lib/tier-guard.ts orderApi)
+    'API de pedidos (site, bot ou outro sistema)': true,
     'Multi-loja':
       tier.limits.locations && tier.limits.locations > 0
         ? (tier.limits.locations === 999999 ? 'Ilimitado' : `${tier.limits.locations} lojas`)

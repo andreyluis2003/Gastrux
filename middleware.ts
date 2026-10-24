@@ -44,6 +44,7 @@ const PUBLIC_PATHS = [
   '/para',
   '/menu',
   '/delivery', // pedido e pagamento do cliente final, sem conta no Gastrux
+  '/desenvolvedores', // documentação da API de pedidos (plano 2026-10-23 api-de-pedidos)
 ];
 
 /** Brand files and app icons in public/ (2026-10-13: the new logo did not show to visitors) */

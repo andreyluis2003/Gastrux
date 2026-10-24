@@ -24,6 +24,7 @@ export const BASE_PRICING_TIERS = {
       'Cardápio digital com QR Code',
       'Estoque, fichas técnicas e CMV',
       'Contas a pagar',
+      'API de pedidos para o seu site ou sistema',
       'Clientes com anotações',
       'Etiquetas de manipulação',
       'Assistente com IA: 50 perguntas por mês',

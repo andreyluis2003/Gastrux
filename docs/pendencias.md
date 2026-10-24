@@ -26,6 +26,25 @@ Corrigida: /escalonamento (Escalonar receita, em Mais recursos).
 - ~~**/admin/alertas-smart**~~ (2026-10-23, decisão do dono): apagada com `/api/alertas/smart`; o endereço leva ao Início.
 - ~~E-mail do 3º dia~~: apagado em 2026-10-19 com a sequência antiga (ver "E-mails de onboarding").
 
+## Plataformas de delivery, parte 1: API de pedidos (2026-10-24)
+
+Spec `docs/superpowers/specs/2026-10-23-delivery-plataformas-design.md`, plano `docs/superpowers/plans/2026-10-23-api-de-pedidos.md`,
+migração `20261024120000_order_api`.
+
+### Abertos
+
+- **Pedidos do site ignoram o "Aceitar"**: com "Aceitar pedidos sozinho" desligado, os pedidos do cardápio digital
+  continuam indo direto para a cozinha, porque o pagamento online (Mercado Pago) se prende ao pedido da cozinha criado na
+  hora. Para valer também no site, o pagamento teria de esperar o aceite ou o pedido ficar parado na cozinha.
+- **Webhook antigo** `/api/external/orders/webhook` (formato com `x-platform`, testado no bad-day) continua, sem ninguém que o use,
+  até a parte 2 (Open Delivery) passar a usar `ingestDeliveryOrder`.
+- **Aviso de status sem nova tentativa**: se o sistema de origem não responder em 5 s, o aviso não é repetido (fica no
+  registro do pedido); a página `/desenvolvedores` diz para consultar o status. O envio real por https (`callbackTransport.send`)
+  não tem teste automatizado: os testes trocam o envio.
+- **Cancelar em Pedidos de delivery** um pedido já aceito é recusado: cancela-se pela tela da cozinha (exige gerente).
+- **Partes 2 e 3** (Keeta, 99Food e Rappi pelo Open Delivery; iFood pela Merchant API) esperam as contas de desenvolvedor
+  da Gastrux em cada plataforma, que só o dono pode criar.
+
 ## Telas fora do menu, segunda revisão (decisão do dono, 2026-10-23)
 
 - **No menu agora**: Cardápio e produtos > Adicionais (`/admin/modifiers`; quebrava com o erro #310 do React, hook depois

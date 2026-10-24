@@ -46,6 +46,14 @@ it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a p
   for (const fact of ['Nova conta', 'Parcelar', 'Repetir todo mês', 'gaveta', 'Desfazer pagamento', 'competência', 'CMV']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
 });
 
+it('the order API and the delivery article (plan 2026-10-23 api-de-pedidos)', () => {
+  const api = HELP_ARTICLES.find((x) => x.slug === 'api-de-pedidos');
+  expect(api?.categorySlug).toBe('integracao-delivery');
+  for (const fact of ['Configurações > API de pedidos', 'Aceitar pedidos sozinho', '/desenvolvedores', 'Código do produto', 'Pro', 'Revogar']) expect([fact, api?.content.includes(fact)]).toEqual([fact, true]);
+  const site = HELP_ARTICLES.find((x) => x.slug === 'site-de-delivery');
+  for (const fact of ['Retirar no local', 'Aceitar pedidos sozinho', 'API de pedidos']) expect([fact, site?.content.includes(fact)]).toEqual([fact, true]);
+});
+
 it('the Adicionais article (2026-10-23, the screen went into the menu)', () => {
   const a = HELP_ARTICLES.find((x) => x.slug === 'adicionais');
   expect(a?.categorySlug).toBe('cardapio-e-receitas');
