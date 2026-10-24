@@ -37,6 +37,19 @@ interface ExternalOrder {
   };
   /** The Gastrux order API key that sent it (plan 2026-10-23 api-de-pedidos) */
   apiKeyName?: string | null;
+  /** iFood (plan 2026-10-24 ifood): displayId is the number the customer sees; a dispute is a cancel request to answer */
+  platformData?: { displayId?: string } | null;
+  disputeId?: string | null;
+  disputeExpiresAt?: string | null;
+}
+
+/** The iFood reason picker: refusing a new order or cancelling an accepted one */
+interface ReasonPick {
+  order: ExternalOrder;
+  mode: 'reject' | 'cancel';
+  reasons: Array<{ cancelCodeId: string; description: string }> | null;
+  code: string;
+  text: string;
 }
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; icon: any }> = {
@@ -50,12 +63,15 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: str
   REJECTED: { label: 'Rejeitado', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: X },
 };
 
-// Only what works today (plan 2026-10-23 api-de-pedidos): the digital menu and the Gastrux order API. iFood, Keeta and
-// 99Food come with parts 2 and 3
+// Only what works today (plan 2026-10-23 api-de-pedidos; iFood plan 2026-10-24). Keeta and 99Food come with part 2
 const PLATFORM_CONFIG: Record<string, { label: string; color: string; logo: string }> = {
   delivery_site: { label: 'Cardápio digital', color: 'bg-orange-600', logo: '🛒' },
   gastrux_api: { label: 'API do Gastrux', color: 'bg-slate-700', logo: '🔗' },
+  ifood: { label: 'iFood', color: 'bg-red-600', logo: '🍔' },
 };
+
+const isIfood = (o: ExternalOrder) => o.integration.platform === 'ifood';
+const orderCode = (o: ExternalOrder) => (isIfood(o) && o.platformData?.displayId ? o.platformData.displayId : o.externalOrderId);
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'];
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -126,8 +142,46 @@ export default function DeliveryOrdersPage() {
     return () => clearInterval(interval);
   }, [autoRefresh, fetchOrders]);
 
+  const [reasonPick, setReasonPick] = useState<ReasonPick | null>(null);
+
+  const send = async (orderId: string, payload: Record<string, unknown>, done: string) => {
+    setUpdatingId(orderId);
+    try {
+      const res = await fetch(`/api/admin/integrations/orders/${orderId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(body.error || 'Não foi possível atualizar o pedido'); return false; }
+      toast.success(done);
+      fetchOrders(false);
+      return true;
+    } catch {
+      toast.error('Sem conexão: tente de novo');
+      return false;
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // iFood takes a refusal or a cancel only with one of its reasons (plan 2026-10-24 ifood)
+  const openReasons = async (order: ExternalOrder, mode: 'reject' | 'cancel') => {
+    setReasonPick({ order, mode, reasons: null, code: '', text: '' });
+    const res = await fetch(`/api/admin/integrations/orders/${order.id}/cancel-reasons`, { cache: 'no-store' });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { toast.error(body.error || 'O iFood não mandou os motivos'); setReasonPick(null); return; }
+    setReasonPick((p) => (p && p.order.id === order.id ? { ...p, reasons: body.reasons } : p));
+  };
+
+  const confirmReason = async () => {
+    if (!reasonPick) return;
+    const { order, mode, code, reasons } = reasonPick;
+    const text = reasonPick.text.trim() || reasons?.find((r) => r.cancelCodeId === code)?.description || '';
+    const ok = await send(order.id, { action: mode, cancelCode: code, reason: text }, mode === 'reject' ? 'Pedido recusado no iFood' : 'Cancelamento enviado ao iFood');
+    if (ok) setReasonPick(null);
+  };
+
   // Accept creates the kitchen order; reject needs a reason (plan 2026-10-23 api-de-pedidos)
   const act = async (orderId: string, action: 'accept' | 'reject') => {
+    const order = orders.find((o) => o.id === orderId);
+    if (action === 'reject' && order && isIfood(order)) { openReasons(order, 'reject'); return; }
     let reason: string | null = null;
     if (action === 'reject') {
       reason = window.prompt('Por que recusar este pedido? (o cliente ou o sistema de origem fica sabendo que foi cancelado)');
@@ -309,6 +363,7 @@ export default function DeliveryOrdersPage() {
             <option value="all">Todas Plataformas</option>
             <option value="delivery_site">🛒 Cardápio digital</option>
             <option value="gastrux_api">🔗 API do Gastrux</option>
+            <option value="ifood">🍔 iFood</option>
           </select>
         </div>
 
@@ -362,7 +417,7 @@ export default function DeliveryOrdersPage() {
                           </span>
                         </div>
                         <div className="mt-1.5 flex items-center gap-3">
-                          <span className="font-bold text-sm truncate max-w-[16rem]" title={order.externalOrderId}>#{order.externalOrderId}</span>
+                          <span className="font-bold text-sm truncate max-w-[16rem]" title={order.externalOrderId}>#{orderCode(order)}</span>
                           <span className="text-sm">{order.customerName}</span>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 truncate">
@@ -400,6 +455,24 @@ export default function DeliveryOrdersPage() {
                           <X className="h-4 w-4 mr-1" />
                           Recusar
                         </Button>
+                      </div>
+                    )}
+
+                    {/* iFood: the customer asked to cancel; the answer goes back to iFood */}
+                    {order.disputeId && (
+                      <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm space-y-2" onClick={(e) => e.stopPropagation()}>
+                        <p className="font-medium text-red-800 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" /> O cliente pediu para cancelar este pedido
+                          {order.disputeExpiresAt ? ` (responda até ${new Date(order.disputeExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` : ''}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="destructive" disabled={isUpdating} onClick={() => send(order.id, { action: 'dispute-accept' }, 'Cancelamento aceito: o iFood cancela o pedido')}>
+                            Aceitar o cancelamento
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => send(order.id, { action: 'dispute-reject' }, 'Pedido mantido')}>
+                            Manter o pedido
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -472,7 +545,7 @@ export default function DeliveryOrdersPage() {
                           size="sm"
                           variant="destructive"
                           disabled={isUpdating}
-                          onClick={() => updateStatus(order.id, 'CANCELLED')}
+                          onClick={() => (isIfood(order) ? openReasons(order, 'cancel') : updateStatus(order.id, 'CANCELLED'))}
                           className="w-full"
                         >
                           <X className="h-4 w-4 mr-1" />
@@ -487,6 +560,47 @@ export default function DeliveryOrdersPage() {
           </div>
         )}
       </div>
+
+      {reasonPick && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setReasonPick(null)}>
+          <Card className="w-full max-w-md p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <p className="font-medium">
+              {reasonPick.mode === 'reject' ? 'Recusar' : 'Cancelar'} o pedido iFood #{orderCode(reasonPick.order)}
+            </p>
+            {reasonPick.reasons === null ? (
+              <p className="text-sm text-muted-foreground">Buscando os motivos do iFood…</p>
+            ) : (
+              <>
+                <label className="text-sm font-medium block">Motivo (lista do iFood)</label>
+                <select
+                  value={reasonPick.code}
+                  onChange={(e) => setReasonPick({ ...reasonPick, code: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
+                >
+                  <option value="">Escolha…</option>
+                  {reasonPick.reasons.map((r) => <option key={r.cancelCodeId} value={r.cancelCodeId}>{r.description}</option>)}
+                </select>
+                <input
+                  value={reasonPick.text}
+                  maxLength={200}
+                  placeholder="Detalhe (opcional)"
+                  onChange={(e) => setReasonPick({ ...reasonPick, text: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
+                />
+                {reasonPick.mode === 'cancel' && (
+                  <p className="text-xs text-muted-foreground">A cozinha cancela o pedido quando o iFood confirmar o cancelamento.</p>
+                )}
+              </>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button size="sm" variant="outline" onClick={() => setReasonPick(null)}>Voltar</Button>
+              <Button size="sm" variant="destructive" disabled={!reasonPick.code || updatingId === reasonPick.order.id} onClick={confirmReason}>
+                {reasonPick.mode === 'reject' ? 'Recusar no iFood' : 'Cancelar no iFood'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

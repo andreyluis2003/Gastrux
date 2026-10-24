@@ -20,7 +20,7 @@ interface DREData {
     receitaBruta: number;
     receitaDineIn: number;
     receitaDelivery: number;
-    receitaDeliveryPorOrigem?: { site: number; gastrux_api: number };
+    receitaDeliveryPorOrigem?: { site: number; gastrux_api: number; ifood?: number };
     taxaServico?: number;
     receitaCaixa: number;
     deducoes: { impostos: number; descontos: number; cashback?: number; total: number };
@@ -258,10 +258,11 @@ export default function DREPage() {
                 <DRELine label="Vendas Salão (mesas e balcão)" value={d.receitaDineIn} indent sub />
                 {(d.taxaServico ?? 0) > 0 && <DRELine label="Taxa de serviço (incluída)" value={d.taxaServico ?? 0} indent sub />}
                 <DRELine label="Vendas Delivery" value={d.receitaDelivery} indent sub />
-                {d.receitaDeliveryPorOrigem && d.receitaDeliveryPorOrigem.gastrux_api > 0 && (
+                {d.receitaDeliveryPorOrigem && (d.receitaDeliveryPorOrigem.gastrux_api > 0 || (d.receitaDeliveryPorOrigem.ifood ?? 0) > 0) && (
                   <>
                     <DRELine label="Delivery: cardápio digital" value={d.receitaDeliveryPorOrigem.site} indent sub />
                     <DRELine label="Delivery: API do Gastrux" value={d.receitaDeliveryPorOrigem.gastrux_api} indent sub />
+                    {(d.receitaDeliveryPorOrigem.ifood ?? 0) > 0 && <DRELine label="Delivery: iFood" value={d.receitaDeliveryPorOrigem.ifood ?? 0} indent sub />}
                   </>
                 )}
                 {d.receitaCaixa > 0 && <DRELine label="Receita Caixa" value={d.receitaCaixa} indent sub />}

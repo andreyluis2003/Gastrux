@@ -34,9 +34,9 @@ describe('delivery by origin', () => {
     const from = new Date(Date.now() - 3600e3), to = new Date(Date.now() + 3600e3);
     const s = await salesInRange(rid, from, to);
     expect(s.deliveryCents).toBe(7700);
-    expect(s.deliveryByOrigin).toEqual({ site: 3000, gastrux_api: 4700 });
+    expect(s.deliveryByOrigin).toEqual({ site: 3000, gastrux_api: 4700, ifood: 0 });
     const today = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
     const dre = await computeDre(rid, today, today);
-    expect(dre.dre.receitaDeliveryPorOrigem).toEqual({ site: 30, gastrux_api: 47 });
+    expect(dre.dre.receitaDeliveryPorOrigem).toEqual({ site: 30, gastrux_api: 47, ifood: 0 });
   });
 });

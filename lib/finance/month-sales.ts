@@ -11,8 +11,8 @@ export interface PeriodSales {
   salaoCents: number;
   /** Kitchen orders without a comanda: site delivery and delivery integrations */
   deliveryCents: number;
-  /** Delivery by origin (plan 2026-10-23 api-de-pedidos): the Gastrux order API, and the rest (site, older orders) */
-  deliveryByOrigin: { site: number; gastrux_api: number };
+  /** Delivery by origin (plan 2026-10-23 api-de-pedidos; iFood plan 2026-10-24): the Gastrux order API, iFood, and the rest (site, older orders) */
+  deliveryByOrigin: { site: number; gastrux_api: number; ifood: number };
   /** Service charge of the bills closed in the period (already inside salaoCents) */
   serviceCents: number;
   deliveryDiscountCents: number;
@@ -31,7 +31,7 @@ const cents = (v: unknown) => Math.round(Number(v ?? 0) * 100);
  */
 export async function salesInRange(restaurantId: string, from: Date, to: Date): Promise<PeriodSales> {
   const kitchenDelivery = { restaurantId, orderSessionId: null, status: { not: 'CANCELLED' as const }, createdAt: { gte: from, lt: to } };
-  const [entries, online, orders, service, apiOrders] = await Promise.all([
+  const [entries, online, orders, service, apiOrders, ifoodOrders] = await Promise.all([
     prisma.cashSessionEntry.findMany({
       where: { restaurantId, orderSessionId: { not: null }, createdAt: { gte: from, lt: to } },
       select: { type: true, method: true, amountCents: true, direction: true, orderSessionId: true },
@@ -53,6 +53,10 @@ export async function salesInRange(restaurantId: string, from: Date, to: Date): 
       where: { ...kitchenDelivery, externalOrder: { integration: { platform: 'gastrux_api' } } },
       _sum: { total: true },
     }),
+    prisma.order.aggregate({
+      where: { ...kitchenDelivery, externalOrder: { integration: { platform: 'ifood' } } },
+      _sum: { total: true },
+    }),
   ]);
   const split = splitTableOnline(online as any);
   const summary = salesSummary(entries as any, split.perBill);
@@ -66,7 +70,11 @@ export async function salesInRange(restaurantId: string, from: Date, to: Date): 
     totalCents: summary.totalCents + deliveryCents,
     salaoCents: summary.totalCents,
     deliveryCents,
-    deliveryByOrigin: { site: deliveryCents - cents(apiOrders._sum.total), gastrux_api: cents(apiOrders._sum.total) },
+    deliveryByOrigin: {
+      site: deliveryCents - cents(apiOrders._sum.total) - cents(ifoodOrders._sum.total),
+      gastrux_api: cents(apiOrders._sum.total),
+      ifood: cents(ifoodOrders._sum.total),
+    },
     serviceCents: service._sum.serviceChargeCents ?? 0,
     deliveryDiscountCents: cents(orders._sum.discount),
     deliveryTaxesCents: cents(orders._sum.taxes),

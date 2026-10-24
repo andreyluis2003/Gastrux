@@ -31,7 +31,11 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   const receitaDineIn = sales.salaoCents / 100 + cashback;
   const receitaDelivery = sales.deliveryCents / 100;
   // By origin (plan 2026-10-23 api-de-pedidos): what came through the Gastrux order API, and the site and the rest
-  const receitaDeliveryPorOrigem = { site: sales.deliveryByOrigin.site / 100, gastrux_api: sales.deliveryByOrigin.gastrux_api / 100 };
+  const receitaDeliveryPorOrigem = {
+    site: sales.deliveryByOrigin.site / 100,
+    gastrux_api: sales.deliveryByOrigin.gastrux_api / 100,
+    ifood: sales.deliveryByOrigin.ifood / 100,
+  };
   const taxaServico = sales.serviceCents / 100;
 
   // 2. DEDUÇÕES - taxes and discounts of the delivery orders (comanda discounts are already net)

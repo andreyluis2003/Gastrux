@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
-import { confirmOrder, dispatchOrder, readyToPickup, requestCancellation, startPreparation } from '@/lib/ifood/client';
+import { acceptDispute, cancellationReasons, confirmOrder, dispatchOrder, readyToPickup, rejectDispute, requestCancellation, startPreparation } from '@/lib/ifood/client';
 import { DeliveryOrderError } from './ingest';
 
 /**
@@ -70,4 +70,43 @@ export async function cancelPlatformOrder(member: RestaurantMember, externalOrde
   const ok = await pushPlatformStatus(ext.id, { cancel: { code, reason: reason || 'Cancelado pelo restaurante' } });
   if (!ok) throw new DeliveryOrderError('O iFood não recebeu o cancelamento: tente de novo', 502);
   await recordAudit(member, { action: 'UPDATE', entityType: 'ExternalOrder', entityId: ext.id, changes: { cancelRequested: code, reason } });
+}
+
+async function ownIfoodOrder(member: RestaurantMember, externalOrderId: string) {
+  const ext = await prisma.externalOrder.findFirst({
+    where: { id: externalOrderId, restaurantId: member.restaurantId },
+    select: { id: true, externalOrderId: true, disputeId: true, disputeExpiresAt: true, integration: { select: { id: true, platform: true } } },
+  });
+  if (!ext) throw new DeliveryOrderError('Pedido não encontrado', 404);
+  if (ext.integration.platform !== 'ifood') throw new DeliveryOrderError('Este pedido não é do iFood', 400);
+  return ext;
+}
+
+/** The reasons iFood accepts to refuse or cancel this order (Pedidos de delivery asks one) */
+export async function ifoodCancelReasons(member: RestaurantMember, externalOrderId: string) {
+  const ext = await ownIfoodOrder(member, externalOrderId);
+  try {
+    return await cancellationReasons({ id: ext.integration.id }, ext.externalOrderId);
+  } catch (e: any) {
+    throw new DeliveryOrderError(`O iFood não mandou os motivos: ${String(e?.message ?? e).slice(0, 200)}`, 502);
+  }
+}
+
+/**
+ * The restaurant answers a customer's cancellation request (iFood handshake dispute). Accepting lets iFood cancel the
+ * order (its CAN event cancels the kitchen order); rejecting keeps it going.
+ */
+export async function answerDispute(member: RestaurantMember, externalOrderId: string, answer: 'accept' | 'reject'): Promise<void> {
+  const ext = await ownIfoodOrder(member, externalOrderId);
+  if (!ext.disputeId) throw new DeliveryOrderError('Este pedido não tem pedido de cancelamento aberto', 409);
+  if (ext.disputeExpiresAt && ext.disputeExpiresAt.getTime() <= Date.now()) {
+    throw new DeliveryOrderError('O prazo para responder acabou: o iFood já decidiu este pedido', 409);
+  }
+  try {
+    await (answer === 'accept' ? acceptDispute : rejectDispute)({ id: ext.integration.id }, ext.disputeId);
+  } catch (e: any) {
+    throw new DeliveryOrderError(`O iFood não recebeu a resposta: ${String(e?.message ?? e).slice(0, 200)}`, 502);
+  }
+  await prisma.externalOrder.update({ where: { id: ext.id }, data: { disputeId: null, disputeExpiresAt: null } });
+  await recordAudit(member, { action: 'UPDATE', entityType: 'ExternalOrder', entityId: ext.id, changes: { dispute: answer, disputeId: ext.disputeId } });
 }
