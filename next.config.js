@@ -8,6 +8,8 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../'),
+    // instrumentation.ts starts the iFood polling loop (plan 2026-10-24 ifood)
+    instrumentationHook: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
