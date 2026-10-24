@@ -8,6 +8,7 @@ import { queuePaymentForRetry } from '@/lib/dunning-flow';
 import { createInvoice } from '@/lib/billing/invoice-service';
 import { upsertSubscriptionFromGatewayEvent, NormalizedSubscriptionStatus } from '@/lib/billing/subscription-sync';
 import { isChargedInvoice, stripeInvoiceSubscriptionId, stripeSubscriptionPeriod } from '@/lib/billing/stripe-period';
+import { noteFirstStripeInvoice } from '@/lib/referrals/charges';
 import {
   alertPaymentSucceeded,
   alertPaymentFailed,
@@ -268,6 +269,9 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventId: string) {
   // The R$ 0,00 invoice Stripe issues when a free trial starts is not a payment: no invoice in Gastrux and
   // no "active" status over the trial (production 2026-10-10 listed "Assinatura Starter R$ 0,00")
   if (!isChargedInvoice(invoice)) return;
+
+  // A referred restaurant's first payment starts the referrer's free month (plan 2026-10-24 indicacao)
+  await noteFirstStripeInvoice(invoice);
 
   await prisma.user.update({
     where: { id: user.id },

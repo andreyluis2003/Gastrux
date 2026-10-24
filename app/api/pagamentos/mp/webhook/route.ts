@@ -17,6 +17,7 @@ import { logPaymentEvent, PaymentEventType } from '@/lib/payment-logger';
 import { captureException, addBreadcrumb } from '@/lib/sentry';
 import { createPaymentAlert } from '@/lib/payment-alert-service';
 import { syncRestaurantPayment } from '@/lib/mercadopago-connect/payment-sync';
+import { noteFirstCharge } from '@/lib/referrals/charges';
 
 export const dynamic = 'force-dynamic';
 
@@ -430,6 +431,13 @@ async function handleSubscriptionRecurringCharge(
     console.log(`[MP Webhook] Recurring charge for Subscription ${subscriptionId} not approved (${mappedStatus}), skipping invoice`);
     return;
   }
+
+  // A referred restaurant's first payment starts the referrer's free month (plan 2026-10-24 indicacao)
+  await noteFirstCharge(subscription.userId, {
+    gateway: 'MERCADO_PAGO',
+    ref: String(mpPayment.id),
+    at: mpPayment.date_approved ? new Date(mpPayment.date_approved) : new Date(),
+  });
 
   const mpPaymentIdStr = String(mpPayment.id);
   const currentPeriodStart = mpPayment.date_approved ? new Date(mpPayment.date_approved) : new Date();
