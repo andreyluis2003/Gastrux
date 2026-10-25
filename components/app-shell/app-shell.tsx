@@ -5,13 +5,15 @@ import Link from 'next/link';
 import { GastruxLogo } from '@/components/brand/logo';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ChevronDown, CreditCard, LifeBuoy, Lightbulb, LogOut, Menu, UserCog, X } from 'lucide-react';
+import { ChevronDown, CreditCard, LifeBuoy, Lightbulb, LogOut, Menu, PlayCircle, UserCog, X } from 'lucide-react';
 import { NotificationCenter } from '@/components/notification-center';
 import { openFeedback } from '@/components/feedback/feedback-widget';
 import { PlanBanner } from '@/components/billing/plan-banner';
 import { signOutSafely } from '@/lib/offline/sign-out';
 import { activeHref, navFor, shellMode, type NavGroup } from '@/lib/navigation/app-nav';
 import { cn } from '@/lib/utils';
+import { TutorialModal } from '@/components/tutorials/tutorial-modal';
+import { tutorialForPath, type Tutorial } from '@/lib/tutorials/catalog';
 
 /**
  * The one menu of the app (lib/navigation/app-nav.ts says what is in it and where it shows).
@@ -25,6 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const mode = shellMode(pathname);
   const [open, setOpen] = useState(false);
   const isDesktop = useIsDesktop();
+  const [video, setVideo] = useState<Tutorial | null>(null);
 
   // Close the drawer when the page changes
   useEffect(() => setOpen(false), [pathname]);
@@ -40,6 +43,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // The bell polls: mount it once, in the pinned menu on a computer, in the top bar otherwise
   const bellInMenu = sidebar && isDesktop === true;
   const bellInTopBar = isDesktop !== null && !bellInMenu;
+  // The tutorial video of this screen, when there is one (spec 2026-10-25 tutoriais-em-video)
+  const screenVideo = tutorialForPath(pathname, user?.role);
 
   return (
     <>
@@ -60,6 +65,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/dashboard" className="flex items-center min-w-0 flex-1 -ml-1" aria-label="Gastrux, início">
           <GastruxLogo className="h-9" />
         </Link>
+        {screenVideo && (
+          <button
+            onClick={() => setVideo(screenVideo)}
+            className="p-2 rounded-lg text-brand-green hover:bg-slate-100 dark:hover:bg-slate-800"
+            aria-label="Vídeo desta tela"
+            title="Vídeo desta tela"
+          >
+            <PlayCircle className="h-6 w-6" />
+          </button>
+        )}
         {bellInTopBar && <NotificationCenter />}
       </header>
 
@@ -93,12 +108,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          {screenVideo && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                setVideo(screenVideo);
+              }}
+              className="w-full mb-2 flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-brand-light/15 text-white hover:bg-brand-light/25"
+            >
+              <PlayCircle className="h-4 w-4" /> Vídeo desta tela
+            </button>
+          )}
           {groups.map((g) => (
             <NavSection key={g.id} group={g} active={active} />
           ))}
         </nav>
 
         <div className="p-3 border-t border-white/10 space-y-1 shrink-0">
+          <Link href="/tutoriais" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10">
+            <PlayCircle className="h-4 w-4" /> Vídeos tutoriais
+          </Link>
           {/* The public help center (app/ajuda), in a new tab so the work on screen stays open */}
           <a
             href="/ajuda"
@@ -135,6 +164,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className={cn('pt-14', sidebar && 'md:pt-0 md:pl-64')}>{children}</div>
+      <TutorialModal tutorial={video} onClose={() => setVideo(null)} />
     </>
   );
 }
