@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle, Clock, Printer, Zap } from 'lucide-react';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
 import { cn } from '@/lib/utils';
+import { kdsPriorityLabel, kdsStatusLabel } from '@/lib/kds/status-label';
 
 interface OrderItem {
   id: string;
@@ -141,12 +142,12 @@ export function KDSOrderCard({
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-lg">{order.orderNumber}</h3>
             <Badge className={getStatusColor(order.status)}>
-              {order.status}
+              {kdsStatusLabel(order.status)}
             </Badge>
             {order.priority !== 'NORMAL' && (
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Zap className="w-3 h-3" />
-                {order.priority}
+                {kdsPriorityLabel(order.priority)}
               </Badge>
             )}
           </div>
@@ -156,7 +157,7 @@ export function KDSOrderCard({
           <p className="font-semibold text-lg">{formatTime(elapsed)}</p>
           {order.estimatedPrepTime && (
             <p className="text-sm text-gray-600">
-              Est: {order.estimatedPrepTime}min
+              Previsto: {order.estimatedPrepTime} min
             </p>
           )}
         </div>

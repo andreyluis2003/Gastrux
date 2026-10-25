@@ -165,7 +165,7 @@ export function KDSDisplay({ stationId }: KDSDisplayProps) {
     <div className="space-y-6">
       {/* Connection Status */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Kitchen Display System</h1>
+        <h1 className="text-3xl font-bold">Pedidos na cozinha</h1>
         <label className="flex items-center gap-2 text-sm" title="Para imprimir sem a janela de confirmação, abra o Chrome da cozinha com --kiosk-printing">
           <input type="checkbox" checked={autoPrint} onChange={(e) => toggleAutoPrint(e.target.checked)} />
           Imprimir pedidos novos automaticamente
