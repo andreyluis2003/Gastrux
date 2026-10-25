@@ -6,14 +6,16 @@ import { prisma } from '@/lib/prisma';
  * restaurant sends its first order), and a concurrent writer that took the same number is retried.
  */
 
-/** Next free "KDS-####" number: ignores orders numbered in any other format. */
+/**
+ * Next free "KDS-####" number: one after the highest number in use (not after the newest order: with two
+ * servers' clocks apart the newest order can hold a lower number, and every retry took the same one).
+ * Ignores orders numbered in any other format.
+ */
 export async function nextKdsOrderNumber(): Promise<string> {
-  const last = await prisma.order.findFirst({
-    where: { orderNumber: { startsWith: 'KDS-' } },
-    orderBy: { createdAt: 'desc' },
-    select: { orderNumber: true },
-  });
-  const current = last ? parseInt(last.orderNumber.slice(4), 10) : 0;
+  const [row] = await prisma.$queryRaw<{ max: number | null }[]>`
+    SELECT MAX(CAST(SUBSTRING("orderNumber" FROM 5) AS INTEGER)) AS max
+    FROM "orders" WHERE "orderNumber" ~ '^KDS-[0-9]{1,9}$'`;
+  const current = Number(row?.max ?? 0);
   return `KDS-${String((Number.isFinite(current) ? current : 0) + 1).padStart(4, '0')}`;
 }
 
