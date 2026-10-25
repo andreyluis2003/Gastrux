@@ -93,6 +93,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip video/audio: the browser streams them with Range requests (206), which the cache can't store
+  if (request.destination === 'video' || request.destination === 'audio' || request.headers.has('range') || url.pathname.startsWith('/videos/')) {
+    return;
+  }
+
   // Determine cache strategy based on URL
   if (isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirstStrategy(request));

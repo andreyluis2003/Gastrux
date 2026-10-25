@@ -48,8 +48,11 @@ const PUBLIC_PATHS = [
   '/desenvolvedores', // documentação da API de pedidos (plano 2026-10-23 api-de-pedidos)
 ];
 
-/** Brand files and app icons in public/ (2026-10-13: the new logo did not show to visitors) */
-const PUBLIC_ASSET = /^\/(brand\/[\w.-]+\.(svg|png)|favicon\.svg|icon-[\w-]+\.png|og-image\.png|screenshot-[\w-]+\.png)$/;
+/**
+ * Brand files, app icons and the home page video in public/ (2026-10-13: the new logo did not show
+ * to visitors; 2026-10-25: the same for the video)
+ */
+const PUBLIC_ASSET = /^\/(brand\/[\w.-]+\.(svg|png)|videos\/[\w-]+\.(mp4|jpg)|favicon\.svg|icon-[\w-]+\.png|og-image\.png|screenshot-[\w-]+\.png)$/;
 
 function isPublicPage(pathname: string): boolean {
   if (PUBLIC_ASSET.test(pathname)) return true;

@@ -17,6 +17,7 @@ import { TrustSection } from '@/components/marketing/trust-section';
 import { FAQSection } from '@/components/marketing/faq-section';
 import { SegmentsSection } from '@/components/marketing/segments-section';
 import { WhyGastrux } from '@/components/marketing/why-gastrux';
+import { HeroVideo } from '@/components/marketing/hero-video';
 import { ClarityScript } from '@/components/analytics/clarity-script';
 
 const heroBenefits = [
@@ -164,6 +165,8 @@ function HomePageContent() {
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Sem cartão • Sem contrato • Se não gostar, volta pro caderno
           </p>
+
+          <HeroVideo />
 
           {/* Product facts - right under the fold, before the visitor scrolls past */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 pt-8 border-t border-slate-200 dark:border-slate-700">
