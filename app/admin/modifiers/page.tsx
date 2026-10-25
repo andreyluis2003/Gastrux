@@ -251,7 +251,7 @@ export default function ModifiersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="priceAdjustment">Ajuste de Preco</Label>
+              <Label htmlFor="priceAdjustment">Ajuste de Preço</Label>
               <Input
                 id="priceAdjustment"
                 type="number"

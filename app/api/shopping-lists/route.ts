@@ -93,13 +93,20 @@ export async function POST(req: NextRequest) {
         priority: any;
       }[] = [];
 
+      // Below the minimum but with no supplier linked: a list item needs one (price and receiving), so they
+      // are named in the answer instead of being skipped in silence (2026-10-25)
+      const withoutSupplier: string[] = [];
+
       for (const stock of stocks) {
         const ingredient = stock.ingredient;
         if (!ingredient.active) continue;
 
         const minStock = ingredient.minimumStock ?? 0;
         if (stock.currentQuantity >= minStock) continue;
-        if (ingredient.suppliers.length === 0) continue;
+        if (ingredient.suppliers.length === 0) {
+          withoutSupplier.push(ingredient.name);
+          continue;
+        }
 
         const supplier = ingredient.suppliers[0];
         const neededQty = Math.max(minStock * 2 - stock.currentQuantity, 1);
@@ -122,10 +129,10 @@ export async function POST(req: NextRequest) {
       }
 
       if (itemsToCreate.length === 0) {
-        return NextResponse.json(
-          { error: 'Nenhum ingrediente abaixo do estoque mínimo encontrado' },
-          { status: 400 }
-        );
+        const error = withoutSupplier.length
+          ? `Abaixo do estoque mínimo, mas sem fornecedor ligado: ${withoutSupplier.join(', ')}. Ligue um fornecedor ao insumo (Estoque e compras > Fornecedores) ou use Lista Vazia.`
+          : 'Nenhum ingrediente abaixo do estoque mínimo encontrado';
+        return NextResponse.json({ error }, { status: 400 });
       }
 
       const totalCost = itemsToCreate.reduce(
