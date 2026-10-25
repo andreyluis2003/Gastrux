@@ -84,3 +84,13 @@ describe('tutorial videos catalog', () => {
     expect(tutorialBySlug('nao-existe')).toBeNull();
   });
 });
+
+describe('when a video counts as watched', () => {
+  it('counts from 90% of the duration, never before the metadata loads', () => {
+    const { watchedAt } = require('@/lib/tutorials/catalog');
+    expect(watchedAt(89, 100)).toBe(false);
+    expect(watchedAt(90, 100)).toBe(true);
+    expect(watchedAt(5, NaN)).toBe(false);
+    expect(watchedAt(0, 0)).toBe(false);
+  });
+});

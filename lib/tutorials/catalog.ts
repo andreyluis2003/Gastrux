@@ -139,3 +139,8 @@ export function nextTutorial(slug: string, role: string | null | undefined): Tut
   const rest = all.slice(i + 1).filter((x) => x.essentialOrder === undefined);
   return rest[0] ?? null;
 }
+
+/** A video counts as watched from 90% of its length (the player also counts the end) */
+export function watchedAt(currentTime: number, duration: number): boolean {
+  return Number.isFinite(duration) && duration > 0 && currentTime / duration >= 0.9;
+}
