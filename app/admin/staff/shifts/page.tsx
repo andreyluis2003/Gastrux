@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { Calendar, Clock, Plus, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { weekRange } from '@/lib/staff/week-range';
 
 interface Shift {
   id: string;
@@ -38,16 +39,7 @@ export default function ShiftsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ staffMemberId: '', shiftDate: '', startTime: '08:00', endTime: '18:00', shiftType: 'NORMAL', notes: '' });
 
-  const getWeekRange = (offset: number) => {
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(start.getDate() - start.getDay() + 1 + offset * 7);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return { start, end };
-  };
+  const getWeekRange = (offset: number) => weekRange(new Date(), offset);
 
   const fetchData = async () => {
     setLoading(true);
