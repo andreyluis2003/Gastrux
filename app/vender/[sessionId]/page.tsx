@@ -146,7 +146,8 @@ export default function ComandaRapidaPage() {
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        {/* min-w-0: a grid item does not shrink below its content, and the category tabs row is wider than a phone (video screenshots 2026-10-24) */}
+        <div className="lg:col-span-2 min-w-0">
           <MenuPanel groups={c.groups} disabled={c.isClosed} onTap={c.quickAdd} onDetails={(entry) => setSheet({ entry })} />
         </div>
         <div className="hidden lg:block">
