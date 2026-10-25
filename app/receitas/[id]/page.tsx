@@ -18,7 +18,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { FadeIn } from '@/components/ui/animate';
 import { GlassCard } from '@/components/ui/glass-card';
-import { formatBRL, formatPercent } from '@/lib/formatters';
+import { formatBRL, formatPercent, formatQuantity } from '@/lib/formatters';
 import { recipeCost } from '@/lib/recipes/cost';
 import { convertUnits } from '@/lib/utils';
 import { RecipeFiscalCard } from '@/components/fiscal/recipe-fiscal-card';
@@ -496,7 +496,7 @@ export default function ReceitaDetailPage() {
                           )}
                         </td>
                         <td className="py-3 text-right font-medium">
-                          {ri.quantity} {ri.unit}
+                          {formatQuantity(ri.quantity, ri.unit)}
                         </td>
                         <td className="py-3 text-right">
                           {formatBRL(ri.ingredient.referenceCost)}
@@ -506,7 +506,7 @@ export default function ReceitaDetailPage() {
                         </td>
                         <td className="py-3 text-center">
                           <Badge variant={stockQty > 0 ? 'default' : 'destructive'}>
-                            {stockQty} {ri.ingredient.standardUnit}
+                            {formatQuantity(stockQty, ri.ingredient.standardUnit)}
                           </Badge>
                         </td>
                       </tr>

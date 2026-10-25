@@ -60,7 +60,7 @@ export function formatQuantity(value: number | string | null | undefined | unkno
   if (value === null || value === undefined) return '0';
   const formatted = new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 3, // grams of a kilo: 0,003 kg
   }).format(toSafeNumber(value));
   return unit ? `${formatted} ${unit}` : formatted;
 }
