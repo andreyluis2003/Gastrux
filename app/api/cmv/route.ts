@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { salesInRange } from '@/lib/finance/month-sales';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,8 @@ export async function GET(req: NextRequest) {
 
     for (const m of movements) {
       const cost = m.quantity * (m.ingredient.referenceCost || 0);
+      // Sales, manual withdrawals and losses are written with a negative quantity: as a cost they count by size
+      const out = Math.abs(cost);
       const key = m.ingredientId;
       if (!byIngredient[key]) byIngredient[key] = { name: m.ingredient.name, purchases: 0, consumption: 0, losses: 0 };
 
@@ -60,14 +63,14 @@ export async function GET(req: NextRequest) {
         purchases += cost;
         byIngredient[key].purchases += cost;
       } else if (m.movementType === 'LOSS') {
-        losses += cost;
-        byIngredient[key].losses += cost;
+        losses += out;
+        byIngredient[key].losses += out;
       } else if (m.movementType === 'ADJUSTMENT') {
         unidentifiedLosses -= cost;
         byIngredient[key].losses -= cost;
       } else {
-        consumption += cost;
-        byIngredient[key].consumption += cost;
+        consumption += out;
+        byIngredient[key].consumption += out;
       }
     }
 
@@ -75,25 +78,20 @@ export async function GET(req: NextRequest) {
     let prevConsumption = 0;
     for (const m of prevMovements) {
       const cost = m.quantity * (m.ingredient.referenceCost || 0);
+      // Sales, manual withdrawals and losses are written with a negative quantity: as a cost they count by size
+      const out = Math.abs(cost);
       if (m.movementType === 'ENTRY') prevPurchases += cost;
       else if (m.movementType === 'ADJUSTMENT') prevConsumption -= cost;
-      else if (m.movementType !== 'LOSS') prevConsumption += cost;
+      else if (m.movementType !== 'LOSS') prevConsumption += out;
     }
 
     const cmv = consumption + losses + unidentifiedLosses;
     const prevCmv = prevConsumption;
     const cmvChange = prevCmv > 0 ? ((cmv - prevCmv) / prevCmv) * 100 : 0;
 
-    // Get total recipe revenue estimate (from production plans)
-    const plans = await prisma.productionPlanItem.findMany({
-      where: { restaurantId, plan: { planDate: { gte: startDate } } },
-      include: { recipe: { select: { sellingPrice: true, costPerPortion: true, name: true } } },
-    });
-
-    let estimatedRevenue = 0;
-    for (const p of plans) {
-      if (p.recipe.sellingPrice) estimatedRevenue += p.quantity * p.recipe.sellingPrice;
-    }
+    // The period's sales, the Caixa and DRE criterion (it was the production plans: R$ 0,00 for a restaurant that
+    // sells without plans, found in the video screenshots 2026-10-24)
+    const estimatedRevenue = (await salesInRange(restaurantId, startDate, new Date())).totalCents / 100;
 
     const cmvPercent = estimatedRevenue > 0 ? (cmv / estimatedRevenue) * 100 : 0;
 
@@ -109,9 +107,11 @@ export async function GET(req: NextRequest) {
       const day = m.createdAt.toISOString().split('T')[0];
       if (!dailyData[day]) dailyData[day] = { date: day, purchases: 0, consumption: 0 };
       const cost = m.quantity * (m.ingredient.referenceCost || 0);
+      // Sales, manual withdrawals and losses are written with a negative quantity: as a cost they count by size
+      const out = Math.abs(cost);
       if (m.movementType === 'ENTRY') dailyData[day].purchases += cost;
       else if (m.movementType === 'ADJUSTMENT') dailyData[day].consumption -= cost;
-      else dailyData[day].consumption += cost;
+      else dailyData[day].consumption += out;
     }
 
     const dailyChart = Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date));

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { lineTotal } from '@/lib/comanda/line-total';
+import { salesInRange } from '@/lib/finance/month-sales';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
@@ -59,39 +59,18 @@ export async function POST(req: NextRequest) {
     let losses = 0;
     for (const m of movements) {
       const cost = m.quantity * (m.ingredient?.referenceCost || 0);
+      // Sales, manual withdrawals and losses are written with a negative quantity: as a cost they count by size
+      // (found in the video screenshots 2026-10-24: the CMV came out negative)
       if (m.movementType === 'ENTRY') purchases += cost;
-      else if (m.movementType === 'LOSS') losses += cost;
+      else if (m.movementType === 'LOSS') losses += Math.abs(cost);
       // Stock-count differences (signed: - shortage costs, + surplus gives back)
       else if (m.movementType === 'ADJUSTMENT') losses -= cost;
-      else consumption += cost;
+      else consumption += Math.abs(cost);
     }
     const totalCMV = consumption + losses;
 
-    // Revenue from order session items (actual sales) with fallback to production plans
-    const sessionItems = await prisma.orderSessionItem.findMany({
-      where: {
-        addedAt: { gte: startDate, lte: endDate },
-        session: { status: { not: 'CANCELLED' as any }, restaurantId },
-      },
-      select: { quantity: true, price: true, modifiers: { select: { priceAdjustment: true } } },
-    });
-    // Modifier surcharges are revenue too, applied to each unit (lib/comanda/line-total.ts).
-    let revenue = sessionItems.reduce(
-      (s, i) => s + lineTotal(i.price, i.quantity, i.modifiers.map((m) => m.priceAdjustment)),
-      0
-    );
-
-    if (revenue === 0) {
-      // Fallback: production × selling price
-      const plans = await prisma.productionPlanItem.findMany({
-        where: { plan: { planDate: { gte: startDate, lte: endDate }, restaurantId } },
-        include: { recipe: { select: { sellingPrice: true } } },
-      });
-      revenue = plans.reduce(
-        (s, p) => s + (p.recipe?.sellingPrice ? p.quantity * p.recipe.sellingPrice : 0),
-        0
-      );
-    }
+    // The period's sales, the Caixa and DRE criterion: comandas and delivery (session items left out the delivery)
+    const revenue = (await salesInRange(restaurantId, startDate, endDate)).totalCents / 100;
 
     const cmvPercent = revenue > 0 ? (totalCMV / revenue) * 100 : 0;
 
