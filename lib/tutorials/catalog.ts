@@ -1,4 +1,5 @@
 import { canSeeModule } from '@/lib/navigation/app-nav';
+import { PUBLISHED } from './published';
 
 /**
  * Tutorial videos (spec 2026-10-25 tutoriais-em-video): one per menu item, made in the gastrux-videos
@@ -20,16 +21,17 @@ export type Tutorial = {
   published: boolean;
 };
 
+/** A catalog entry; published (with steps and length) once its video is listed in published.ts */
 const t = (slug: string, title: string, group: string, routes: string[], summary: string, essentialOrder?: number): Tutorial => ({
   slug,
   title,
   group,
   routes,
   summary,
-  steps: [],
-  durationSec: 0,
+  steps: PUBLISHED[slug]?.steps ?? [],
+  durationSec: PUBLISHED[slug]?.durationSec ?? 0,
   essentialOrder,
-  published: false,
+  published: !!PUBLISHED[slug],
 });
 
 export const TUTORIALS: Tutorial[] = [

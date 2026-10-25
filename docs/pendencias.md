@@ -6,19 +6,14 @@ commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e 
 ## Vídeos tutoriais, a área no sistema (2026-10-25)
 
 Spec `docs/superpowers/specs/2026-10-25-tutoriais-em-video-design.md`, plano
-`docs/superpowers/plans/2026-10-25-tutoriais-em-video.md`. Em produção, mas invisível até o primeiro vídeo
-ser publicado (`published: true` em `lib/tutorials/catalog.ts`). Precisa de `npx prisma migrate deploy`
-(migração `20261025160000_tutorial_views`).
+`docs/superpowers/plans/2026-10-25-tutoriais-em-video.md`. Lote 1 publicado (os 9 da trilha "Comece por
+aqui", `lib/tutorials/published.ts`). Precisa de `npx prisma migrate deploy` (migração
+`20261025160000_tutorial_views`). Lotes 2 a 4 (os outros 37 vídeos) feitos com `gastrux-videos/tutoriais`.
 
-### Fazer junto com o commit que publica o lote 1
+### Fazer com os próximos lotes
 
-- Devolver o artigo de ajuda "videos-tutoriais" e o parágrafo da IA em `lib/ai/knowledge/implantacao.ts`
-  (estão no commit 9da29e8, revertido em a6054ff para não falar de uma área que ainda não aparece), com o teste
-  em `__tests__/unit/help-seed-articles.test.ts`.
-- A IA conhecer o catálogo (spec, item 6): indicar o vídeo de cada tela pelo nome.
 - `__tests__/integration/tutorials-progress.test.ts` espera 400 para `dre` porque ele não está publicado:
   antes de publicar `dre`, marcar `dre.published = false` no próprio teste.
-- Conferir no navegador o link "Vídeos tutoriais" do rodapé do menu aparecendo (só aparece com vídeo publicado).
 
 ### Menores deixados pela revisão final
 

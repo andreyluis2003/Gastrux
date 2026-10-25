@@ -14,9 +14,10 @@ import pagamentoMesa from './pagamento-mesa';
 import implantacao from './implantacao';
 import planos from './planos';
 import vender from './vender';
+import videos from './videos';
 
 /**
  * "Pergunte ao Gastrux" manual (spec 2026-10-16 ia-assistente §4.4). Fixed order (prompt cache).
  * Every feature change updates its area file here (memory rule feedback_gastrux-ai-knowledge).
  */
-export const KNOWLEDGE = [implantacao, vender, delivery, caixa, cashback, pagamentoMesa, cardapio, estoque, contagem, etiquetas, financeiro, contasConsumo, contasPagar, fiscal, planos, equipe].join('\n\n');
+export const KNOWLEDGE = [implantacao, videos, vender, delivery, caixa, cashback, pagamentoMesa, cardapio, estoque, contagem, etiquetas, financeiro, contasConsumo, contasPagar, fiscal, planos, equipe].join('\n\n');

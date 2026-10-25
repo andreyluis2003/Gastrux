@@ -113,3 +113,31 @@ describe('the video of each first step', () => {
     expect(tutorialForFirstStep('nfce')).toBeNull();
   });
 });
+
+describe('the published videos (lote 1, 2026-10-25)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const track = [
+    'conhecendo-o-painel', 'insumos', 'fichas-tecnicas', 'cardapio-digital', 'cadastro-de-mesas',
+    'caixa', 'mesas-e-balcao', 'cozinha-kds', 'equipe-e-acessos',
+  ];
+
+  it('publishes the whole "Comece por aqui" track, each with its written steps, length and files', () => {
+    for (const slug of track) {
+      const t = TUTORIALS.find((x) => x.slug === slug)!;
+      expect([slug, t.published]).toEqual([slug, true]);
+      expect(t.steps.length).toBeGreaterThan(2);
+      expect(t.durationSec).toBeGreaterThan(20);
+      for (const ext of ['mp4', 'jpg']) expect([slug, ext, fs.existsSync(path.join(process.cwd(), `public/videos/tutoriais/${slug}.${ext}`))]).toEqual([slug, ext, true]);
+    }
+  });
+
+  it('keeps every other video hidden until it is made', () => {
+    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual([...track].sort());
+  });
+
+  it('teaches the AI the name of each published video', () => {
+    const { KNOWLEDGE } = require('@/lib/ai/knowledge');
+    for (const t of TUTORIALS.filter((x) => x.published)) expect([t.title, KNOWLEDGE.includes(t.title)]).toEqual([t.title, true]);
+  });
+});
