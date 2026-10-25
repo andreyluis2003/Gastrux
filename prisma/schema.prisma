@@ -105,6 +105,7 @@ model User {
   aiQuestions         AiQuestion[]
   dailyCountEntries   DailyCountEntry[] @relation("DailyCountEntryUser")
   settledFoodLabels   FoodLabel[]       @relation("FoodLabelSettledBy")
+  tutorialViews       TutorialView[]
 
   @@index([role])
   @@index([active])
@@ -4865,4 +4866,16 @@ model Referral {
   @@index([referrerRestaurantId, status])
   @@index([status])
   @@map("referrals")
+}
+
+/// Tutorial videos a person watched (spec 2026-10-25 tutoriais-em-video); slug = lib/tutorials/catalog.ts
+model TutorialView {
+  id        String   @id @default(cuid())
+  userId    String
+  slug      String
+  watchedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@map("tutorial_views")
 }
