@@ -3,6 +3,35 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Vídeos tutoriais, a área no sistema (2026-10-25)
+
+Spec `docs/superpowers/specs/2026-10-25-tutoriais-em-video-design.md`, plano
+`docs/superpowers/plans/2026-10-25-tutoriais-em-video.md`. Em produção, mas invisível até o primeiro vídeo
+ser publicado (`published: true` em `lib/tutorials/catalog.ts`). Precisa de `npx prisma migrate deploy`
+(migração `20261025160000_tutorial_views`).
+
+### Fazer junto com o commit que publica o lote 1
+
+- Devolver o artigo de ajuda "videos-tutoriais" e o parágrafo da IA em `lib/ai/knowledge/implantacao.ts`
+  (estão no commit 9da29e8, revertido em a6054ff para não falar de uma área que ainda não aparece), com o teste
+  em `__tests__/unit/help-seed-articles.test.ts`.
+- A IA conhecer o catálogo (spec, item 6): indicar o vídeo de cada tela pelo nome.
+- `__tests__/integration/tutorials-progress.test.ts` espera 400 para `dre` porque ele não está publicado:
+  antes de publicar `dre`, marcar `dre.published = false` no próprio teste.
+- Conferir no navegador o link "Vídeos tutoriais" do rodapé do menu aparecendo (só aparece com vídeo publicado).
+
+### Menores deixados pela revisão final
+
+- `/tutoriais/[slug]` abre pelo endereço direto para quem não pode abrir a tela (o cozinheiro em
+  `/tutoriais/dre`); o "Abrir esta tela" leva a uma tela que ele não usa. Correção: `notFound()` quando o
+  vídeo não está em `tutorialsFor(role)` depois que a sessão carregou.
+- Enquanto a sessão carrega, o papel vazio conta como dono (`canSeeModule`): por um instante aparecem vídeos e o
+  "Vídeo desta tela" das telas do dono. Correção: não mostrar nada com `status === 'loading'`.
+- A janela do vídeo fica vazia durante a animação de fechar (o vídeo vira null antes). Guardar o último num ref.
+- POST de progresso de um usuário apagado dá erro 500 (chave estrangeira) em vez de 401.
+- `NEXT_PUBLIC_TUTORIAL_VIDEO_BASE` com barra no fim gera `//slug.mp4`: tirar a barra final.
+- No iPhone, o vídeo da janela pode não começar sozinho com som (Safari); os controles ficam na tela.
+
 ## Telas escondidas (decisão do dono, 2026-10-19)
 
 Apagadas (cada endereço antigo redireciona): /tutorial → /ajuda, /estoque-rapido → /estoque/entrada,
