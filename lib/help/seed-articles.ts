@@ -71,6 +71,25 @@ export const HELP_CATEGORIES = [
 export const HELP_ARTICLES = [
   {
     categorySlug: 'primeiros-passos',
+    slug: 'videos-tutoriais',
+    title: 'Onde estão os vídeos que ensinam a usar cada tela?',
+    summary: 'Em Vídeos tutoriais, no rodapé do menu, e no botão "Vídeo desta tela" de cada tela.',
+    keywords: 'vídeo, vídeos, tutorial, tutoriais, aprender, ensinar, passo a passo, treinamento, curso',
+    featured: true,
+    order: 0,
+    content: `## Vídeos tutoriais
+
+Cada tela do Gastrux tem um vídeo curto com o passo a passo. Você aprende no seu ritmo, sem precisar de ninguém ensinando.
+
+- **Vídeos tutoriais**, no rodapé do menu lateral: todos os vídeos, separados pelos mesmos grupos do menu, com busca por nome.
+- **Comece por aqui**: a trilha com os vídeos essenciais para começar, na ordem certa. O Gastrux marca os que você já assistiu.
+- **Vídeo desta tela**: no topo do menu (no celular, o ícone de play na barra de cima). Abre o vídeo da tela em que você está, sem sair dela.
+- **Ver vídeo**: no cartão "Primeiros passos" do Início, ao lado de cada etapa.
+
+Cada vídeo tem embaixo o passo a passo escrito e o botão **Abrir esta tela**. Cada pessoa da equipe vê só os vídeos das telas que pode abrir.`,
+  },
+  {
+    categorySlug: 'primeiros-passos',
     slug: 'como-criar-restaurante',
     title: 'Como configuro meu restaurante pela primeira vez?',
     summary: 'O cartão "Primeiros passos" do Início mostra o que falta, na ordem, até a primeira venda.',
