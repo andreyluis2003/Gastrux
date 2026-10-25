@@ -132,8 +132,22 @@ describe('the published videos (lote 1, 2026-10-25)', () => {
     }
   });
 
+  // Lote 2 (2026-10-25): Vender, Caixa e pagamentos, Cardápio e produtos, Estoque e compras
+  const lote2 = [
+    'pedidos-de-delivery', 'contagem-do-dia', 'pagamentos-online', 'contas-a-pagar', 'adicionais', 'qr-codes-das-mesas',
+    'estoque', 'contagem-de-estoque', 'compras', 'desperdicio', 'fornecedores', 'importar-nota-de-compra',
+  ];
+
+  it('publishes lote 2 with its steps, length and files', () => {
+    for (const slug of lote2) {
+      const t = TUTORIALS.find((x) => x.slug === slug)!;
+      expect([slug, t.published, t.steps.length > 2, t.durationSec > 15]).toEqual([slug, true, true, true]);
+      for (const ext of ['mp4', 'jpg']) expect([slug, ext, fs.existsSync(path.join(process.cwd(), `public/videos/tutoriais/${slug}.${ext}`))]).toEqual([slug, ext, true]);
+    }
+  });
+
   it('keeps every other video hidden until it is made', () => {
-    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual([...track].sort());
+    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual([...track, ...lote2].sort());
   });
 
   it('teaches the AI the name of each published video', () => {

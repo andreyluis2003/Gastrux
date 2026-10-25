@@ -15,6 +15,14 @@ aqui", `lib/tutorials/published.ts`). Precisa de `npx prisma migrate deploy` (mi
 - `__tests__/integration/tutorials-progress.test.ts` espera 400 para `dre` porque ele não está publicado:
   antes de publicar `dre`, marcar `dre.published = false` no próprio teste.
 
+### Achados ao gravar o lote 2 (2026-10-25)
+
+- Compras > Gerar Automaticamente só lista insumos com fornecedor ligado (o item da lista pega nome, preço e
+  recebimento pelo fornecedor). Agora a resposta diz quais estão abaixo do mínimo sem fornecedor (06605d1); o passo
+  seguinte seria incluir esses insumos na lista sem fornecedor (nome e custo pelo próprio insumo, e o recebimento
+  em `lib/stock/receive-shopping-list.ts` sem `supplier`).
+- O caminho no topo de Desperdício e de Contagem de estoque mostra "Início > Início > ..." (o primeiro Início se repete).
+
 ### Menores deixados pela revisão final
 
 - `/tutoriais/[slug]` abre pelo endereço direto para quem não pode abrir a tela (o cozinheiro em
