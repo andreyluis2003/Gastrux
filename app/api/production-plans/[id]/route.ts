@@ -9,6 +9,7 @@ import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { withoutCost } from '@/lib/production-plans/view';
 import { MANAGER_ROLES, getRestaurantMember, isManager, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { withLiveCost } from '@/lib/recipes/cost-map';
+import { planDay } from '@/lib/production-plans/plan-day';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,7 @@ export async function PUT(
     const { planDate, notes, status } = body;
 
     const updateData: any = {};
-    if (planDate !== undefined) updateData.planDate = new Date(planDate);
+    if (planDate !== undefined) updateData.planDate = planDay(planDate);
     if (notes !== undefined) updateData.notes = notes;
     if (status !== undefined) updateData.status = status;
 

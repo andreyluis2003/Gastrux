@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { withoutCost } from '@/lib/production-plans/view';
+import { planDay } from '@/lib/production-plans/plan-day';
 import { MANAGER_ROLES, getRestaurantMember, isManager, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 
 export const dynamic = 'force-dynamic';
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     const plan = await prisma.productionPlan.create({
       data: {
         restaurantId,
-        planDate: new Date(body.planDate),
+        planDate: planDay(body.planDate),
         notes: body.notes || '',
       },
     });
