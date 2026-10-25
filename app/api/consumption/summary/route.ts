@@ -80,12 +80,12 @@ export async function GET(request: NextRequest) {
 
     // Calculate aggregations
     const totalQuantity = movements.reduce(
-      (sum, m) => sum + m.quantity,
+      (sum, m) => sum + Math.abs(m.quantity),
       0
     );
 
     const totalCost = movements.reduce((sum, m) => {
-      const cost = (m.ingredient.referenceCost || 0) * m.quantity;
+      const cost = (m.ingredient.referenceCost || 0) * Math.abs(m.quantity);
       return sum + cost;
     }, 0);
 
@@ -121,8 +121,8 @@ export async function GET(request: NextRequest) {
       }
 
       const item = byIngredient[m.ingredientId];
-      item.totalQuantity += m.quantity;
-      item.totalCost += (m.ingredient.referenceCost || 0) * m.quantity;
+      item.totalQuantity += Math.abs(m.quantity);
+      item.totalCost += (m.ingredient.referenceCost || 0) * Math.abs(m.quantity);
       item.frequency += 1;
       item.averageDaily = item.totalQuantity / daysInPeriod;
     });

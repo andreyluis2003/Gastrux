@@ -100,15 +100,15 @@ export async function GET(request: NextRequest) {
     movements.forEach((m) => {
       const dateStr = m.createdAt.toISOString().split('T')[0];
       if (byDate[dateStr]) {
-        byDate[dateStr].totalQuantity += m.quantity;
+        byDate[dateStr].totalQuantity += Math.abs(m.quantity);
         byDate[dateStr].totalCost +=
-          (m.ingredient.referenceCost || 0) * m.quantity;
+          (m.ingredient.referenceCost || 0) * Math.abs(m.quantity);
         byDate[dateStr].movements += 1;
 
         if (!byDate[dateStr].ingredients[m.ingredient.name]) {
           byDate[dateStr].ingredients[m.ingredient.name] = 0;
         }
-        byDate[dateStr].ingredients[m.ingredient.name] += m.quantity;
+        byDate[dateStr].ingredients[m.ingredient.name] += Math.abs(m.quantity);
       }
     });
 

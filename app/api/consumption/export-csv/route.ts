@@ -71,12 +71,12 @@ export async function GET(request: NextRequest) {
     let csv = 'Data,Ingrediente,Categoria,Tipo,Quantidade,Unidade,Custo Unitario,Custo Total\n';
 
     movements.forEach((m: any) => {
-      const cost = (m.ingredient.referenceCost || 0) * m.quantity;
+      const cost = (m.ingredient.referenceCost || 0) * Math.abs(m.quantity);
       const date = m.createdAt.toLocaleDateString('pt-BR');
       const ingredient = m.ingredient.name;
       const category = m.ingredient.category?.name || 'Sem categoria';
       const movementType = m.movementType || 'DESCONHECIDO';
-      const qty = m.quantity.toFixed(2);
+      const qty = Math.abs(m.quantity).toFixed(2);
       const unit = m.ingredient.standardUnit || 'un';
       const unitCost = (m.ingredient.referenceCost || 0).toFixed(2);
       const totalCost = cost.toFixed(2);

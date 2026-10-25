@@ -86,17 +86,17 @@ export async function GET(request: NextRequest) {
           totalQuantity: 0,
           totalCost: 0,
           frequency: 0,
-          minQuantity: m.quantity,
-          maxQuantity: m.quantity,
+          minQuantity: Math.abs(m.quantity),
+          maxQuantity: Math.abs(m.quantity),
         };
       }
 
       const item = aggregated[m.ingredientId];
-      item.totalQuantity += m.quantity;
-      item.totalCost += (m.ingredient.referenceCost || 0) * m.quantity;
+      item.totalQuantity += Math.abs(m.quantity);
+      item.totalCost += (m.ingredient.referenceCost || 0) * Math.abs(m.quantity);
       item.frequency += 1;
-      item.minQuantity = Math.min(item.minQuantity, m.quantity);
-      item.maxQuantity = Math.max(item.maxQuantity, m.quantity);
+      item.minQuantity = Math.min(item.minQuantity, Math.abs(m.quantity));
+      item.maxQuantity = Math.max(item.maxQuantity, Math.abs(m.quantity));
     });
 
     const topIngredients = Object.values(aggregated)
