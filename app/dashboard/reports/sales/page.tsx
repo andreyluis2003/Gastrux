@@ -135,7 +135,7 @@ export default function SalesReportPage() {
             <h1 className="text-xl font-bold sm:text-3xl">Vendas</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Analise de vendas por periodo e categoria
+            Análise de vendas por período e categoria
           </p>
         </div>
         <Button
@@ -204,13 +204,13 @@ export default function SalesReportPage() {
             </Card>
             <Card className="p-4">
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Ticket Medio</p>
+                <p className="text-sm text-muted-foreground">Ticket médio</p>
                 <p className="text-2xl font-bold">{formatBRL(report.averageTicket)}</p>
               </div>
             </Card>
             <Card className="p-4">
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Periodo</p>
+                <p className="text-sm text-muted-foreground">Período</p>
                 <p className="text-lg font-bold truncate">{report.period}</p>
               </div>
             </Card>
