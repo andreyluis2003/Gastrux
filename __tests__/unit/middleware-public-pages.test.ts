@@ -31,11 +31,14 @@ describe('middleware: public pages without login', () => {
     // The home page video and its poster (2026-10-25: the video went to the sign-in page)
     '/videos/gastrux-em-1-minuto.mp4',
     '/videos/gastrux-em-1-minuto-capa.jpg',
+    // The tutorial videos (spec 2026-10-25 tutoriais-em-video)
+    '/videos/tutoriais/caixa.mp4',
+    '/videos/tutoriais/caixa.jpg',
   ])('%s opens for a visitor', async (path) => {
     expect(redirectsToSignIn(await visit(path))).toBe(false);
   });
 
-  it.each(['/dashboard', '/dashboard/pagamentos/conectar', '/deliveryx', '/videos/../dashboard', '/videos/x.mp4/dashboard'])(
+  it.each(['/dashboard', '/dashboard/pagamentos/conectar', '/deliveryx', '/videos/../dashboard', '/videos/x.mp4/dashboard', '/tutoriais', '/videos/tutoriais/../../dashboard'])(
     '%s still requires login',
     async (path) => {
       expect(redirectsToSignIn(await visit(path))).toBe(true);
