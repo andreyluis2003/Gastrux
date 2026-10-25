@@ -35,6 +35,11 @@ export function formatBRL(value: number | string | null | undefined | unknown): 
   }).format(toSafeNumber(value));
 }
 
+/** A percentage already in percent units (18.4 → "18,4%"), with a comma like the money */
+export function formatPercent(value: number | string | null | undefined | unknown, decimals = 1): string {
+  return `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(toSafeNumber(value))}%`;
+}
+
 export function formatDate(date: Date | null | undefined): string {
   if (!date) return '-';
   return new Intl.DateTimeFormat('pt-BR', {

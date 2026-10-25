@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
+import { formatPercent } from '@/lib/formatters';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -78,13 +79,13 @@ export async function POST(req: NextRequest) {
     let alertMessage: string | null = null;
     if (cmvPercent > 40) {
       alertLevel = 'CRITICAL';
-      alertMessage = `CMV em ${cmvPercent.toFixed(1)}% — muito acima do ideal (28-35%). Ação urgente: revisar fichas técnicas, auditar perdas e renegociar com fornecedores.`;
+      alertMessage = `CMV em ${formatPercent(cmvPercent, 1)} — muito acima do ideal (28-35%). Ação urgente: revisar fichas técnicas, auditar perdas e renegociar com fornecedores.`;
     } else if (cmvPercent > 35) {
       alertLevel = 'WARNING';
-      alertMessage = `CMV em ${cmvPercent.toFixed(1)}% — acima do range ideal. Monitorar perdas e revisar margens.`;
+      alertMessage = `CMV em ${formatPercent(cmvPercent, 1)} — acima do range ideal. Monitorar perdas e revisar margens.`;
     } else if (cmvPercent < 20 && revenue > 0) {
       alertLevel = 'WARNING';
-      alertMessage = `CMV em ${cmvPercent.toFixed(1)}% — muito baixo. Verificar se produção/vendas estão sendo registradas corretamente.`;
+      alertMessage = `CMV em ${formatPercent(cmvPercent, 1)} — muito baixo. Verificar se produção/vendas estão sendo registradas corretamente.`;
     }
 
     const snapshot = await (prisma as any).cMVSnapshot.create({

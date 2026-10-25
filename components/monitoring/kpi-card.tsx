@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 
 interface KPICardProps {
@@ -74,7 +75,7 @@ export function KPICard({
               isTrendPositive ? 'text-green-600' : 'text-red-600'
             }`}
           >
-            {isTrendPositive ? '+' : '-'}{trendAbs.toFixed(2)}%
+            {isTrendPositive ? '+' : '-'}{formatPercent(trendAbs, 2)}
           </span>
           <span className="text-xs opacity-60">vs. mês anterior</span>
         </div>

@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { formatPercent } from '@/lib/formatters';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
           type: 'CMV_DISPARITY',
           severity: diff > 10 ? 'critical' : 'warning',
           title: 'Disparidade de CMV entre unidades',
-          message: `${maxCmv.name} tem CMV de ${maxCmv.cmvPercent.toFixed(1)}% enquanto ${minCmv.name} está em ${minCmv.cmvPercent.toFixed(1)}% (diferença de ${diff.toFixed(1)}pp). Investigue custos e processos na unidade com maior CMV.`,
+          message: `${maxCmv.name} tem CMV de ${formatPercent(maxCmv.cmvPercent, 1)} enquanto ${minCmv.name} está em ${formatPercent(minCmv.cmvPercent, 1)} (diferença de ${formatPercent(diff, 1).replace('%', '')} pontos percentuais). Investigue custos e processos na unidade com maior CMV.`,
           locations: [maxCmv.name, minCmv.name],
         });
       }
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
           type: 'CMV_CRITICAL',
           severity: 'critical',
           title: `CMV crítico em ${c.name}`,
-          message: `${c.name} está com CMV de ${c.cmvPercent.toFixed(1)}% nos últimos 30 dias, acima de 40%. Confira os preços, as fichas técnicas e o custo dos insumos.`,
+          message: `${c.name} está com CMV de ${formatPercent(c.cmvPercent, 1)} nos últimos 30 dias, acima de 40%. Confira os preços, as fichas técnicas e o custo dos insumos.`,
           locations: [c.name],
         });
       }

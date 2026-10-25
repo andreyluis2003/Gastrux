@@ -18,7 +18,7 @@ import {
   BarChart3,
   TrendingUp,
 } from 'lucide-react';
-import { formatBRL, formatDate } from '@/lib/formatters';
+import { formatBRL, formatDate, formatPercent } from '@/lib/formatters';
 
 interface SalesReport {
   period: string;
@@ -252,7 +252,7 @@ export default function SalesReportPage() {
                   <div className="flex justify-between items-center">
                     <p className="font-semibold">{cat.category}</p>
                     <p className="text-sm font-semibold text-primary">
-                      {cat.percentage.toFixed(1)}%
+                      {formatPercent(cat.percentage, 1)}
                     </p>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">

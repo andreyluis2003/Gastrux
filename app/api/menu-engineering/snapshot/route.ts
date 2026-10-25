@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
+import { formatPercent } from '@/lib/formatters';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -16,10 +17,10 @@ function buildRecommendation(cls: string, foodCostPercent: number, margin: numbe
       return 'Manter destaque no cardápio. Monitorar consistência da margem.';
     case 'HORSE':
       return foodCostPercent > 40
-        ? `Food cost alto (${foodCostPercent.toFixed(1)}%). Revisar porção ou aumentar preço.`
+        ? `Food cost alto (${formatPercent(foodCostPercent, 1)}). Revisar porção ou aumentar preço.`
         : 'Testar aumento suave de preço (5-8%) ou melhorar ficha técnica.';
     case 'PUZZLE':
-      return `Margem ${margin.toFixed(1)}% boa, mas pouco pedido. Destacar no cardápio ou promover.`;
+      return `Margem ${formatPercent(margin, 1)} boa, mas pouco pedido. Destacar no cardápio ou promover.`;
     case 'DOG':
       return 'Considerar remoção ou reformulação completa do prato.';
     default:

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/ui/back-button';
@@ -157,7 +158,7 @@ export default function DeliveryAnalyticsPage() {
                     <div key={p.platform} className="p-3 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <Badge className={meta.color}>{meta.label}</Badge>
-                        <span className="text-sm text-gray-500">{share.toFixed(1)}% da receita</span>
+                        <span className="text-sm text-gray-500">{formatPercent(share, 1)} da receita</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-sm">
                         <div>

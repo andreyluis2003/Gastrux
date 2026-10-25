@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { Truck, DollarSign, TrendingUp, TrendingDown, Users, Loader2, Package, ArrowUpDown } from 'lucide-react';
-import { formatBRL } from '@/lib/formatters';
+import { formatBRL, formatPercent } from '@/lib/formatters';
 
 interface SupplierDashboard {
   totalSuppliers: number;
@@ -141,7 +141,7 @@ export default function FornecedoresPainelPage() {
                       <span className="font-bold">{formatBRL(t.newPrice)}</span>
                       <span className={`flex items-center text-xs font-medium ${t.changePercent > 0 ? 'text-red-600' : 'text-green-600'}`}>
                         {t.changePercent > 0 ? <TrendingUp className="h-3 w-3 mr-0.5" /> : <TrendingDown className="h-3 w-3 mr-0.5" />}
-                        {t.changePercent > 0 ? '+' : ''}{t.changePercent.toFixed(1)}%
+                        {t.changePercent > 0 ? '+' : ''}{formatPercent(t.changePercent, 1)}
                       </span>
                     </div>
                   </div>

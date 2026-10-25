@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { TrendingUp, TrendingDown, Users, ShoppingCart, AlertTriangle } from 'lucide-react';
-import { formatBRL } from '@/lib/formatters';
+import { formatBRL, formatPercent } from '@/lib/formatters';
 
 interface KPICard {
   label: string;
@@ -60,7 +60,7 @@ export function DashboardKPIs({ kpis }: DashboardKPIsProps) {
     },
     {
       label: 'Margem de Lucro',
-      value: `${kpis.profitMargin.toFixed(1)}%`,
+      value: `${formatPercent(kpis.profitMargin, 1)}`,
       format: 'number',
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'bg-cyan-50 border-cyan-200',

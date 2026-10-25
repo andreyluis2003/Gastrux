@@ -10,7 +10,7 @@ import {
   Percent, BarChart3, ArrowUpRight, ArrowDownRight, Minus as MinusIcon, CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatBRL } from '@/lib/formatters';
+import { formatBRL, formatPercent } from '@/lib/formatters';
 
 type PeriodType = 'month' | 'quarter' | 'year' | 'custom';
 
@@ -130,7 +130,7 @@ export default function DREPage() {
 
   function MarginBadge({ value }: { value: number }) {
     const color = value > 0 ? 'text-green-700 bg-green-50' : value < 0 ? 'text-red-700 bg-red-50' : 'text-gray-700 bg-gray-50';
-    return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>{value.toFixed(1)}%</span>;
+    return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>{formatPercent(value, 1)}</span>;
   }
 
   function TrendIcon({ value }: { value: number }) {

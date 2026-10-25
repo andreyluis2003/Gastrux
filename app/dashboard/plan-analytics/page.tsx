@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -188,7 +189,7 @@ export default function PlanAnalyticsPage() {
               <div>
                 <p className="text-sm text-slate-400">Taxa de Conversão</p>
                 <p className="mt-2 text-3xl font-bold text-white">
-                  {data.metrics.conversionRate.toFixed(1)}%
+                  {formatPercent(data.metrics.conversionRate, 1)}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-400" />
@@ -326,7 +327,7 @@ export default function PlanAnalyticsPage() {
                       {source.source}
                     </span>
                     <span className="text-white font-semibold">
-                      {source.count} ({source.percentage.toFixed(1)}%)
+                      {source.count} ({formatPercent(source.percentage, 1)})
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-700">

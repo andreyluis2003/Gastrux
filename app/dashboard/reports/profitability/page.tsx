@@ -18,7 +18,7 @@ import {
   TrendingUp,
   AlertCircle,
 } from 'lucide-react';
-import { formatBRL } from '@/lib/formatters';
+import { formatBRL, formatPercent } from '@/lib/formatters';
 
 interface DishProfitability {
   id: string;
@@ -206,7 +206,7 @@ export default function ProfitabilityPage() {
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Margem média</p>
                 <p className="text-2xl font-bold text-primary">
-                  {report.averageMargin.toFixed(1)}%
+                  {formatPercent(report.averageMargin, 1)}
                 </p>
               </div>
             </Card>
@@ -233,7 +233,7 @@ export default function ProfitabilityPage() {
                   <div className="flex-1">
                     <p className="font-semibold">{dish.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Margem: {dish.marginPercentage.toFixed(1)}%
+                      Margem: {formatPercent(dish.marginPercentage, 1)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -264,7 +264,7 @@ export default function ProfitabilityPage() {
                     <div className="flex-1">
                       <p className="font-semibold">{dish.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        Margem: {dish.marginPercentage.toFixed(1)}%
+                        Margem: {formatPercent(dish.marginPercentage, 1)}
                       </p>
                     </div>
                     <div className="text-right">
@@ -294,7 +294,7 @@ export default function ProfitabilityPage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Margem</p>
-                    <p className="font-semibold">{dish.noCost ? 'sem custo' : `${dish.marginPercentage.toFixed(1)}%`}</p>
+                    <p className="font-semibold">{dish.noCost ? 'sem custo' : `${formatPercent(dish.marginPercentage, 1)}`}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Vendas</p>

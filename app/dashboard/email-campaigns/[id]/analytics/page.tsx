@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -183,13 +184,13 @@ export default function CampaignAnalyticsPage() {
                   <div className="hidden sm:block">
                     <p className="text-xs text-gray-600">Taxa Abertura</p>
                     <p className="font-semibold text-blue-600">
-                      {segment.openRate.toFixed(1)}%
+                      {formatPercent(segment.openRate, 1)}
                     </p>
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-xs text-gray-600">Taxa Clique</p>
                     <p className="font-semibold text-green-600">
-                      {segment.clickRate.toFixed(1)}%
+                      {formatPercent(segment.clickRate, 1)}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -253,19 +254,19 @@ export default function CampaignAnalyticsPage() {
                               <div>
                                 <p className="text-gray-600">Abertura</p>
                                 <p className="font-semibold text-blue-600">
-                                  {variant.openRate.toFixed(1)}%
+                                  {formatPercent(variant.openRate, 1)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-600">Clique</p>
                                 <p className="font-semibold text-green-600">
-                                  {variant.clickRate.toFixed(1)}%
+                                  {formatPercent(variant.clickRate, 1)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-600">Conversão</p>
                                 <p className="font-semibold text-purple-600">
-                                  {variant.conversionRate.toFixed(1)}%
+                                  {formatPercent(variant.conversionRate, 1)}
                                 </p>
                               </div>
                             </div>

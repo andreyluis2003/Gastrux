@@ -18,7 +18,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { FadeIn } from '@/components/ui/animate';
 import { GlassCard } from '@/components/ui/glass-card';
-import { formatBRL } from '@/lib/formatters';
+import { formatBRL, formatPercent } from '@/lib/formatters';
 import { recipeCost } from '@/lib/recipes/cost';
 import { convertUnits } from '@/lib/utils';
 import { RecipeFiscalCard } from '@/components/fiscal/recipe-fiscal-card';
@@ -419,7 +419,7 @@ export default function ReceitaDetailPage() {
                 const suggestedPrice = displayCostPerPortion / 0.30; // Target 30% food cost
                 return (
                   <div>
-                    <p className={`text-2xl font-bold ${color}`}>{fc.toFixed(1)}%</p>
+                    <p className={`text-2xl font-bold ${color}`}>{formatPercent(fc, 1)}</p>
                     <p className={`text-xs ${color}`}>{label}</p>
                     {fc > 35 && (
                       <p className="text-xs text-muted-foreground mt-1">

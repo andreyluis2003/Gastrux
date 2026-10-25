@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { useSession } from 'next-auth/react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -271,7 +272,7 @@ export default function MultiLocationPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">CMV Médio</p>
-                  <p className="text-lg font-bold">{(consolidated.avgCmv || 0).toFixed(1)}%</p>
+                  <p className="text-lg font-bold">{formatPercent((consolidated.avgCmv || 0), 1)}</p>
                 </div>
               </div>
             </Card>
@@ -349,7 +350,7 @@ export default function MultiLocationPage() {
                         <div>
                           <span className="text-muted-foreground">CMV</span>
                           <p className={`font-bold text-sm ${loc.metrics.cmvPercent > 35 ? 'text-red-600' : loc.metrics.cmvPercent > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
-                            {loc.metrics.cmvPercent.toFixed(1)}%
+                            {formatPercent(loc.metrics.cmvPercent, 1)}
                           </p>
                         </div>
                         <div>

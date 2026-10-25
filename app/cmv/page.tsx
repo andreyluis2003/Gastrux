@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BackButton } from '@/components/ui/back-button';
@@ -185,7 +186,7 @@ export default function CMVPage() {
                   {data.cmvChange !== 0 && (
                     <div className={`flex items-center gap-1 mt-2 text-sm ${data.cmvChange > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                       {data.cmvChange > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                      <span>{Math.abs(data.cmvChange).toFixed(1)}% vs período anterior</span>
+                      <span>{formatPercent(Math.abs(data.cmvChange), 1)} vs período anterior</span>
                     </div>
                   )}
                 </div>
@@ -196,7 +197,7 @@ export default function CMVPage() {
                       <div className={`px-6 py-4 rounded-xl ${status.bg}`}>
                         <p className="text-sm text-muted-foreground">CMV %</p>
                         <p className={`text-3xl font-bold ${status.color}`}>
-                          {data.cmvPercent > 0 ? `${data.cmvPercent.toFixed(1)}%` : 'N/A'}
+                          {data.cmvPercent > 0 ? `${formatPercent(data.cmvPercent, 1)}` : 'N/A'}
                         </p>
                         <p className={`text-xs font-medium mt-1 ${status.color}`}>{status.label}</p>
                         <p className="text-xs text-muted-foreground mt-1">Ideal: {data.idealRange.min}-{data.idealRange.max}%</p>
@@ -276,14 +277,14 @@ export default function CMVPage() {
                         <div
                           key={h.id}
                           className="flex-1 flex flex-col items-center justify-end group relative"
-                          title={`${fmtDate(h.periodEnd)}: ${h.cmvPercent.toFixed(1)}%`}
+                          title={`${fmtDate(h.periodEnd)}: ${formatPercent(h.cmvPercent, 1)}`}
                         >
                           <div
                             className={`w-full ${color} rounded-t transition-all hover:opacity-80`}
                             style={{ height: `${Math.max(heightPct, 2)}%` }}
                           />
                           <div className="absolute bottom-full mb-1 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">
-                            {fmtDate(h.periodEnd)}: {h.cmvPercent.toFixed(1)}%
+                            {fmtDate(h.periodEnd)}: {formatPercent(h.cmvPercent, 1)}
                           </div>
                         </div>
                       );

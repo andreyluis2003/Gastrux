@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -254,7 +255,7 @@ export default function PlatformDashboardPage() {
           />
           <MetricCard
             label="Churn bruto"
-            value={`${metrics.subscriptions.grossChurnPct.toFixed(2)}%`}
+            value={`${formatPercent(metrics.subscriptions.grossChurnPct, 2)}`}
             hint="Últimos 30 dias"
             accent={metrics.subscriptions.grossChurnPct > 5 ? 'rose' : 'amber'}
           />

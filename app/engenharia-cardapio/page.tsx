@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BackButton } from '@/components/ui/back-button';
@@ -242,7 +243,7 @@ export default function EngenhariaCardapioPage() {
                               <div className="text-center">
                                 <p className="text-xs text-muted-foreground">Food Cost</p>
                                 <p className={`font-bold text-xs sm:text-sm ${recipe.foodCostPercent > 35 ? 'text-red-600' : recipe.foodCostPercent > 28 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                  {recipe.sellingPrice ? `${recipe.foodCostPercent.toFixed(1)}%` : '—'}
+                                  {recipe.sellingPrice ? `${formatPercent(recipe.foodCostPercent, 1)}` : '—'}
                                 </p>
                               </div>
                               <div className="text-center">
@@ -278,7 +279,7 @@ export default function EngenhariaCardapioPage() {
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <p className="font-semibold text-sm">{recipe.name}</p>
                               <div className="flex gap-3 text-xs text-muted-foreground shrink-0">
-                                <span>Margem: <strong className={recipe.profitMargin > 60 ? 'text-emerald-600' : recipe.profitMargin > 40 ? 'text-blue-600' : 'text-red-600'}>{recipe.profitMargin.toFixed(1)}%</strong></span>
+                                <span>Margem: <strong className={recipe.profitMargin > 60 ? 'text-emerald-600' : recipe.profitMargin > 40 ? 'text-blue-600' : 'text-red-600'}>{formatPercent(recipe.profitMargin, 1)}</strong></span>
                                 <span>Vendas: <strong>{recipe.qtySold}</strong></span>
                               </div>
                             </div>

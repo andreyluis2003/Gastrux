@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatPercent } from '@/lib/formatters';
 import { getPerformanceMonitor, PerformanceStats } from '@/lib/performance-monitor';
 import { GlassCard } from './ui/glass-card';
 import { FadeIn, ScaleIn } from './ui/animate';
@@ -47,7 +48,7 @@ export function PerformanceDashboard() {
             <div className="flex justify-between">
               <span className="text-slate-600 dark:text-slate-400">Taxa de erro:</span>
               <span className={cn('font-medium', health.errorRate > 5 ? 'text-red-600' : 'text-green-600')}>
-                {health.errorRate.toFixed(1)}%
+                {formatPercent(health.errorRate, 1)}
               </span>
             </div>
             <div className="flex justify-between">
