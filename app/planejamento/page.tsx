@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatBRL } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
@@ -87,7 +88,7 @@ export default function PlanejamentoPage() {
                     <p className="text-xs text-slate-500 mt-1">Status: {STATUS_LABEL[plan.status] ?? plan.status}</p>
                   </div>
                   <div className="text-right">
-                    {plan.totalCost != null && <p className="text-lg font-semibold">R$ {plan.totalCost.toFixed(2)}</p>}
+                    {plan.totalCost != null && <p className="text-lg font-semibold">{formatBRL(plan.totalCost)}</p>}
                   </div>
                 </div>
               </Card>

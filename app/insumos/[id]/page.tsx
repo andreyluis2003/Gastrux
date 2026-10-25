@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatBRL } from '@/lib/formatters';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -241,12 +242,12 @@ export default function IngredientDetailPage() {
               <div className="space-y-4">
                 <div>
                   <h3 className="mb-1 text-sm font-semibold text-slate-600">Custo de Referência</h3>
-                  <p className="text-2xl font-bold">R$ {ingredient.referenceCost.toFixed(2)}</p>
+                  <p className="text-2xl font-bold">{formatBRL(ingredient.referenceCost)}</p>
                 </div>
                 {ingredient.priceTrends && ingredient.priceTrends.length > 0 && (
                   <div className="border-t pt-4">
                     <h3 className="mb-1 text-sm font-semibold text-slate-600">Preço Médio</h3>
-                    <p className="text-2xl font-bold">R$ {avgPrice.toFixed(2)}</p>
+                    <p className="text-2xl font-bold">{formatBRL(avgPrice)}</p>
                   </div>
                 )}
               </div>
@@ -272,7 +273,7 @@ export default function IngredientDetailPage() {
                           <p className="text-xs text-slate-500">Cód: {supplier.supplierCode}</p>
                         )}
                         <p className="mt-1 text-sm font-semibold text-emerald-600">
-                          R$ {supplier.unitPrice.toFixed(2)}
+                          {formatBRL(supplier.unitPrice)}
                         </p>
                       </div>
                     ))}
@@ -317,7 +318,7 @@ export default function IngredientDetailPage() {
                         {formatDate(new Date(trend.recordedDate))}
                       </td>
                       <td className="py-2 text-right font-semibold">
-                        R$ {trend.price.toFixed(2)}
+                        {formatBRL(trend.price)}
                       </td>
                       <td className="py-2 text-right text-slate-600">
                         {trend.quantity ? `${trend.quantity} ${ingredient.standardUnit}` : '—'}

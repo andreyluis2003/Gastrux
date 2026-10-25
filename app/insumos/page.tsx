@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatBRL } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
@@ -196,7 +197,7 @@ export default function InsumosPage() {
                 </div>
                 <p className="text-sm text-slate-600">{ingredient.description || '-'}</p>
                 <p className="mt-2 text-xs text-slate-500">
-                  {ingredient.standardUnit} • R$ {ingredient.referenceCost?.toFixed(2) || '0,00'}
+                  {ingredient.standardUnit} • {formatBRL(ingredient.referenceCost)}
                 </p>
               </Card>
             </Link>

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { formatBRL } from '@/lib/formatters';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { ShoppingBag, Plus, Minus, X, Check, Search, ChefHat, QrCode, Loader2 } from 'lucide-react';
@@ -309,7 +310,7 @@ export default function PublicMenuPage() {
                   {cartCount}
                 </span>
               )}
-              <span className="hidden sm:inline">R$ {cartTotal.toFixed(2)}</span>
+              <span className="hidden sm:inline">{formatBRL(cartTotal)}</span>
             </Button>
             </div>
           </div>
@@ -407,7 +408,7 @@ export default function PublicMenuPage() {
                       )}
                       <div className="flex items-center justify-between mt-2">
                         <span className="font-bold text-amber-700">
-                          R$ {Number(item.price).toFixed(2)}
+                          {formatBRL(Number(item.price))}
                         </span>
                         {inCart ? (
                           <div
@@ -478,7 +479,7 @@ export default function PublicMenuPage() {
                       )}
                       {combo.comboPrice > 0 && (
                         <p className="font-bold text-amber-700 text-sm mt-1">
-                          R$ {Number(combo.comboPrice).toFixed(2)}
+                          {formatBRL(Number(combo.comboPrice))}
                         </p>
                       )}
                     </div>
@@ -501,7 +502,7 @@ export default function PublicMenuPage() {
               <ShoppingBag className="w-5 h-5" />
               Ver carrinho ({cartCount})
             </span>
-            <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
+            <span className="font-bold">{formatBRL(cartTotal)}</span>
           </Button>
         </div>
       )}
@@ -545,7 +546,7 @@ export default function PublicMenuPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm">{item.name}</h3>
-                    <p className="text-xs text-gray-500">R$ {item.price.toFixed(2)} cada</p>
+                    <p className="text-xs text-gray-500">{formatBRL(item.price)} cada</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Button
                         size="sm"
@@ -572,7 +573,7 @@ export default function PublicMenuPage() {
                     </div>
                   </div>
                   <div className="text-sm font-bold shrink-0">
-                    R$ {(item.price * item.quantity).toFixed(2)}
+                    {formatBRL((item.price * item.quantity))}
                   </div>
                 </div>
               ))}
@@ -594,7 +595,7 @@ export default function PublicMenuPage() {
             <div className="border-t p-4 space-y-3 bg-white">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Total</span>
-                <span className="text-xl font-bold">R$ {cartTotal.toFixed(2)}</span>
+                <span className="text-xl font-bold">{formatBRL(cartTotal)}</span>
               </div>
               <Button
                 onClick={submitOrder}

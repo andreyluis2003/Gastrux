@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatBRL } from '@/lib/formatters';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -356,7 +357,7 @@ export default function ProductionPlanDetailPage() {
                   {item.estimatedCost != null && (
                     <div className="flex justify-between">
                       <span className="text-sm text-slate-600">Custo estimado:</span>
-                      <span className="font-medium">R$ {item.estimatedCost.toFixed(2)}</span>
+                      <span className="font-medium">{formatBRL(item.estimatedCost)}</span>
                     </div>
                   )}
                 </div>
@@ -372,7 +373,7 @@ export default function ProductionPlanDetailPage() {
           {plan.canManage && (
             <div className="flex justify-between text-lg">
               <span className="font-semibold">Custo Total:</span>
-              <span className="font-bold text-emerald-600">R$ {totalCost.toFixed(2)}</span>
+              <span className="font-bold text-emerald-600">{formatBRL(totalCost)}</span>
             </div>
           )}
           <div className="flex justify-between text-sm text-slate-600">

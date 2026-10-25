@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatBRL } from '@/lib/formatters';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -301,7 +302,7 @@ export default function SupplierDetailPage() {
                       {ing.ingredient.name}
                     </span>
                     <span className="text-sm text-slate-600 dark:text-slate-400">
-                      R$ {ing.unitPrice.toFixed(2)}
+                      {formatBRL(ing.unitPrice)}
                     </span>
                   </div>
                 ))}
