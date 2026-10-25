@@ -104,7 +104,7 @@ Demais (por grupo do menu):
   (/admin/integrations/api), varias-lojas (/admin/multi-location), uso-da-ia (/admin/settings/ia)
 - **Fica de fora por enquanto:** iFood (ainda em homologação; entra quando liberar).
 
-Total: 45 vídeos.
+Total: 46 vídeos (9 da trilha + 37).
 
 ## Entregas em lotes
 

@@ -39,7 +39,7 @@
 **Interfaces:**
 - Produces:
   - `type Tutorial = { slug: string; title: string; group: string; routes: string[]; summary: string; steps: string[]; durationSec: number; essentialOrder?: number; published: boolean }`
-  - `TUTORIALS: Tutorial[]` — all 45 entries of the spec list (slug, title, group = nav group id from `NAV_GROUPS`, routes); `published: false` for all until videos exist; `steps`/`summary`/`durationSec` filled when a video is published (until then `steps: []`, `summary` one line, `durationSec: 0`).
+  - `TUTORIALS: Tutorial[]` — all 46 entries of the spec list (slug, title, group = nav group id from `NAV_GROUPS`, routes); `published: false` for all until videos exist; `steps`/`summary`/`durationSec` filled when a video is published (until then `steps: []`, `summary` one line, `durationSec: 0`).
   - `tutorialVideoUrl(slug: string): string`, `tutorialPosterUrl(slug: string): string`
   - `tutorialsFor(role: string | null | undefined): Tutorial[]` — published + visible for the role, catalog order
   - `essentialTrack(role): Tutorial[]` — of `tutorialsFor(role)`, those with `essentialOrder`, sorted by it
