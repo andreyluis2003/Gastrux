@@ -13,7 +13,7 @@ import { signOutSafely } from '@/lib/offline/sign-out';
 import { activeHref, navFor, shellMode, type NavGroup } from '@/lib/navigation/app-nav';
 import { cn } from '@/lib/utils';
 import { TutorialModal } from '@/components/tutorials/tutorial-modal';
-import { tutorialForPath, type Tutorial } from '@/lib/tutorials/catalog';
+import { tutorialForPath, tutorialsFor, type Tutorial } from '@/lib/tutorials/catalog';
 
 /**
  * The one menu of the app (lib/navigation/app-nav.ts says what is in it and where it shows).
@@ -45,6 +45,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const bellInTopBar = isDesktop !== null && !bellInMenu;
   // The tutorial video of this screen, when there is one (spec 2026-10-25 tutoriais-em-video)
   const screenVideo = tutorialForPath(pathname, user?.role);
+  // The videos area only shows once this person has a published video
+  const hasVideos = tutorialsFor(user?.role).length > 0;
 
   return (
     <>
@@ -125,9 +127,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-3 border-t border-white/10 space-y-1 shrink-0">
-          <Link href="/tutoriais" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10">
-            <PlayCircle className="h-4 w-4" /> Vídeos tutoriais
-          </Link>
+          {hasVideos && (
+            <Link href="/tutoriais" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-brand-light/90 hover:bg-white/10">
+              <PlayCircle className="h-4 w-4" /> Vídeos tutoriais
+            </Link>
+          )}
           {/* The public help center (app/ajuda), in a new tab so the work on screen stays open */}
           <a
             href="/ajuda"
@@ -164,7 +168,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className={cn('pt-14', sidebar && 'md:pt-0 md:pl-64')}>{children}</div>
-      <TutorialModal tutorial={video} onClose={() => setVideo(null)} />
+      {video && <TutorialModal tutorial={video} onClose={() => setVideo(null)} />}
     </>
   );
 }

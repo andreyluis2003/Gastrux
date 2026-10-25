@@ -5,11 +5,8 @@ import { useState } from 'react';
 import { CheckCircle2, Circle, PlayCircle, ShoppingBag, Sparkles } from 'lucide-react';
 import type { FirstStep } from '@/lib/onboarding/first-steps';
 import { TutorialModal } from '@/components/tutorials/tutorial-modal';
-import { tutorialForPath, type Tutorial } from '@/lib/tutorials/catalog';
+import { tutorialForFirstStep, type Tutorial } from '@/lib/tutorials/catalog';
 import { Dismissible } from './dismissible';
-
-/** The tutorial video of a step's screen (the steps are for who manages the restaurant) */
-const stepVideo = (href: string) => tutorialForPath(href.split(/[?#]/)[0], 'OWNER');
 
 /**
  * The way to sell from the home (usability walkthrough 2026-10-12): a "Vender" button for everyone and,
@@ -67,10 +64,10 @@ export function FirstSteps({ steps, canSell = true }: { steps: FirstStep[] | nul
                     <Sparkles className="h-3.5 w-3.5" /> Fazer com a IA
                   </button>
                 )}
-                {!s.done && stepVideo(s.href) && (
+                {!s.done && tutorialForFirstStep(s.key) && (
                   <button
                     type="button"
-                    onClick={() => setVideo(stepVideo(s.href))}
+                    onClick={() => setVideo(tutorialForFirstStep(s.key))}
                     className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-primary hover:bg-slate-50"
                   >
                     <PlayCircle className="h-3.5 w-3.5" /> Ver vídeo
@@ -82,7 +79,7 @@ export function FirstSteps({ steps, canSell = true }: { steps: FirstStep[] | nul
         </section>
         </Dismissible>
       )}
-      <TutorialModal tutorial={video} onClose={() => setVideo(null)} />
+      {video && <TutorialModal tutorial={video} onClose={() => setVideo(null)} />}
     </div>
   );
 }

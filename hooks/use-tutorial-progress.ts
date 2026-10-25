@@ -2,8 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-/** The tutorial videos this person watched (spec 2026-10-25 tutoriais-em-video); marking is optimistic */
-export function useTutorialProgress(): { watched: Set<string>; markWatched: (slug: string) => void; loading: boolean } {
+/** Records that this person watched a tutorial video (spec 2026-10-25 tutoriais-em-video); fire and forget */
+export function markTutorialWatched(slug: string): void {
+  void fetch('/api/tutorials/progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).catch(() => undefined);
+}
+
+/** The videos this person watched, for the list page only (the other screens just record) */
+export function useWatchedTutorials(): { watched: Set<string>; markWatched: (slug: string) => void; loading: boolean } {
   const [watched, setWatched] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
@@ -21,11 +30,7 @@ export function useTutorialProgress(): { watched: Set<string>; markWatched: (slu
 
   const markWatched = useCallback((slug: string) => {
     setWatched((prev) => (prev.has(slug) ? prev : new Set(prev).add(slug)));
-    void fetch('/api/tutorials/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    }).catch(() => undefined);
+    markTutorialWatched(slug);
   }, []);
 
   return { watched, markWatched, loading };

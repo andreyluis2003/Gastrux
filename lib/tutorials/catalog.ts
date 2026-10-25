@@ -144,3 +144,19 @@ export function nextTutorial(slug: string, role: string | null | undefined): Tut
 export function watchedAt(currentTime: number, duration: number): boolean {
   return Number.isFinite(duration) && duration > 0 && currentTime / duration >= 0.9;
 }
+
+/** The video of each "Primeiros passos" step (lib/onboarding/first-steps.ts), by step: "Abrir o caixa" opens /vender */
+const FIRST_STEP_VIDEO: Record<string, string> = {
+  caixa: 'caixa',
+  venda: 'mesas-e-balcao',
+  cardapio: 'cardapio-digital',
+  mesas: 'cadastro-de-mesas',
+  equipe: 'equipe-e-acessos',
+  endereco: 'configuracoes-do-restaurante',
+  nfce: 'nfce',
+};
+
+export function tutorialForFirstStep(key: string): Tutorial | null {
+  const slug = FIRST_STEP_VIDEO[key];
+  return slug ? tutorialBySlug(slug) : null;
+}

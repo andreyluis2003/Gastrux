@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { CheckCircle2, PlayCircle, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useTutorialProgress } from '@/hooks/use-tutorial-progress';
+import { useWatchedTutorials } from '@/hooks/use-tutorial-progress';
 import { NAV_GROUPS } from '@/lib/navigation/app-nav';
 import { essentialTrack, tutorialPosterUrl, tutorialsFor, type Tutorial } from '@/lib/tutorials/catalog';
 
@@ -16,7 +16,7 @@ const minutes = (sec: number) => (sec > 0 ? `${Math.floor(sec / 60)}:${String(se
 export default function TutoriaisPage() {
   const { data: session } = useSession() || ({} as ReturnType<typeof useSession>);
   const role = (session?.user as { role?: string } | undefined)?.role;
-  const { watched } = useTutorialProgress();
+  const { watched } = useWatchedTutorials();
   const [query, setQuery] = useState('');
 
   const all = useMemo(() => tutorialsFor(role), [role]);

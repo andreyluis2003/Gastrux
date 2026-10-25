@@ -6,14 +6,13 @@ import { useSession } from 'next-auth/react';
 import { ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TutorialPlayer } from '@/components/tutorials/tutorial-player';
-import { useTutorialProgress } from '@/hooks/use-tutorial-progress';
+import { markTutorialWatched } from '@/hooks/use-tutorial-progress';
 import { nextTutorial, tutorialBySlug } from '@/lib/tutorials/catalog';
 
 /** One tutorial video with its written step by step (spec 2026-10-25 tutoriais-em-video) */
 export default function TutorialPage({ params }: { params: { slug: string } }) {
   const { data: session } = useSession() || ({} as ReturnType<typeof useSession>);
   const role = (session?.user as { role?: string } | undefined)?.role;
-  const { markWatched } = useTutorialProgress();
 
   const tutorial = tutorialBySlug(params.slug);
   if (!tutorial) notFound();
@@ -29,7 +28,7 @@ export default function TutorialPage({ params }: { params: { slug: string } }) {
         <p className="text-sm text-muted-foreground mt-1">{tutorial.summary}</p>
       </div>
 
-      <TutorialPlayer tutorial={tutorial} onWatched={() => markWatched(tutorial.slug)} />
+      <TutorialPlayer tutorial={tutorial} onWatched={() => markTutorialWatched(tutorial.slug)} />
 
       <div className="flex flex-wrap gap-3">
         <Button asChild>

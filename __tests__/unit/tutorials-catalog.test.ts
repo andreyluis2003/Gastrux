@@ -94,3 +94,22 @@ describe('when a video counts as watched', () => {
     expect(watchedAt(0, 0)).toBe(false);
   });
 });
+
+describe('the video of each first step', () => {
+  const published = new Map(TUTORIALS.map((t) => [t.slug, t.published]));
+  beforeAll(() => TUTORIALS.forEach((t) => (t.published = true)));
+  afterAll(() => TUTORIALS.forEach((t) => (t.published = published.get(t.slug)!)));
+
+  it('goes by the step, not by the screen it opens ("Abrir o caixa" opens /vender)', () => {
+    const { tutorialForFirstStep } = require('@/lib/tutorials/catalog');
+    expect(tutorialForFirstStep('caixa')?.slug).toBe('caixa');
+    expect(tutorialForFirstStep('venda')?.slug).toBe('mesas-e-balcao');
+    expect(tutorialForFirstStep('cardapio')?.slug).toBe('cardapio-digital');
+    expect(tutorialForFirstStep('mesas')?.slug).toBe('cadastro-de-mesas');
+    expect(tutorialForFirstStep('equipe')?.slug).toBe('equipe-e-acessos');
+    expect(tutorialForFirstStep('endereco')?.slug).toBe('configuracoes-do-restaurante');
+    expect(tutorialForFirstStep('nfce')?.slug).toBe('nfce');
+    TUTORIALS.find((t) => t.slug === 'nfce')!.published = false;
+    expect(tutorialForFirstStep('nfce')).toBeNull();
+  });
+});
