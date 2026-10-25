@@ -146,8 +146,19 @@ describe('the published videos (lote 1, 2026-10-25)', () => {
     }
   });
 
+  // Lote 3 (2026-10-25): Fiscal e Relatórios (dre stays out until it is made)
+  const lote3 = ['nfce', 'notas-emitidas', 'cmv', 'consumo-de-insumos', 'vendas', 'lucratividade', 'financeiro', 'relatorio-executivo'];
+
+  it('publishes lote 3 with its steps, length and files', () => {
+    for (const slug of lote3) {
+      const t = TUTORIALS.find((x) => x.slug === slug)!;
+      expect([slug, t.published, t.steps.length > 2, t.durationSec > 15]).toEqual([slug, true, true, true]);
+      for (const ext of ['mp4', 'jpg']) expect([slug, ext, fs.existsSync(path.join(process.cwd(), `public/videos/tutoriais/${slug}.${ext}`))]).toEqual([slug, ext, true]);
+    }
+  });
+
   it('keeps every other video hidden until it is made', () => {
-    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual([...track, ...lote2].sort());
+    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual([...track, ...lote2, ...lote3].sort());
   });
 
   it('teaches the AI the name of each published video', () => {

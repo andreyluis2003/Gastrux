@@ -207,4 +207,80 @@ export const PUBLISHED: Record<string, { durationSec: number; steps: string[] }>
       "Os que ele não reconhecer ficam pendentes, para você cadastrar ou ligar à mão.",
     ],
   },
+  'nfce': {
+    durationSec: 40,
+    steps: [
+      "Em Notas fiscais você configura a emissão da NFC-e, a nota do consumidor, direto pelo Gastrux.",
+      "A Visão Geral mostra quantas notas foram emitidas, autorizadas, pendentes e rejeitadas.",
+      "Para começar, abra Configuração e preencha os dados da empresa: CNPJ, inscrição estadual e regime tributário.",
+      "Escolha o provedor fiscal e informe a chave de acesso e a senha do certificado digital A1.",
+      "A tributação padrão dos produtos é preenchida pelo seu contador. Com tudo pronto, a nota pode sair sozinha a cada venda.",
+    ],
+  },
+  'notas-emitidas': {
+    durationSec: 25,
+    steps: [
+      "Em Notas emitidas fica o histórico de todas as notas fiscais do restaurante.",
+      "Para achar uma nota, busque pelo número, pela chave ou pelo cliente.",
+      "E filtre pela situação, como autorizada, rejeitada ou cancelada, e pelo tipo de nota.",
+      "Para ajustar a emissão, use o botão Configuração.",
+    ],
+  },
+  'cmv': {
+    durationSec: 33,
+    steps: [
+      "O CMV mostra quanto do que você vendeu virou custo de mercadoria, no período escolhido.",
+      "O percentual é comparado com a faixa ideal, de vinte e oito a trinta e cinco por cento.",
+      "Logo abaixo ficam as compras, o consumo, as perdas e a receita do período.",
+      "Em Top Insumos por Custo você vê quais ingredientes mais pesam no custo.",
+      "Mude o período no seletor de cima, e use Salvar snapshot para guardar a foto do mês.",
+    ],
+  },
+  'consumo-de-insumos': {
+    durationSec: 27,
+    steps: [
+      "Em Consumo de insumos você vê o que saiu do estoque no período: pelas vendas, pelas saídas manuais e pelas perdas.",
+      "Escolha os tipos de movimentação e os insumos que quer analisar, e clique em Aplicar Filtros.",
+      "Os gráficos mostram a tendência do consumo e quanto ele custou.",
+      "E dá para baixar tudo em Exportar CSV, para abrir na planilha.",
+    ],
+  },
+  'vendas': {
+    durationSec: 26,
+    steps: [
+      "Em Vendas você vê o total vendido, o número de vendas e o ticket médio do período.",
+      "Escolha as datas e clique em Aplicar Filtro.",
+      "Top Pratos mostra os itens que mais venderam.",
+      "E Vendas por Categoria mostra o peso de cada parte do cardápio.",
+      "Para levar os números para a planilha, use Baixar planilha.",
+    ],
+  },
+  'lucratividade': {
+    durationSec: 28,
+    steps: [
+      "Lucratividade mostra a margem de contribuição: a receita de cada item menos o custo da ficha técnica.",
+      "Itens sem ficha técnica ficam fora da margem, e o Gastrux avisa quantos são.",
+      "Em Pratos Mais Lucrativos aparecem os que mais deixam dinheiro no caixa.",
+      "E em Todos os Pratos, a margem de cada um, em percentual e em reais.",
+    ],
+  },
+  'financeiro': {
+    durationSec: 37,
+    steps: [
+      "O Financeiro junta os números do Caixa e da DRE: a receita, o resultado, a margem e o ticket médio dos últimos trinta dias.",
+      "Na previsão do mês, o Gastrux calcula como o mês fecha se o ritmo continuar.",
+      "Mais abaixo, as formas de pagamento dos últimos trinta dias.",
+      "Os atalhos levam para a DRE, as contas a pagar, as contas de consumo e os relatórios.",
+      "Em Contas de consumo, lance a luz, a água e o gás do mês. Elas entram na DRE pelo mês de referência.",
+    ],
+  },
+  'relatorio-executivo': {
+    durationSec: 27,
+    steps: [
+      "Em Relatório executivo você gera relatórios prontos em PDF, para analisar ou apresentar.",
+      "Escolha o tipo: CMV, engenharia de cardápio, desperdício, ou o relatório completo.",
+      "Clique em Abrir relatório. Ele abre numa nova aba.",
+      "Lá, toque em Imprimir e escolha Salvar como PDF para guardar o arquivo.",
+    ],
+  },
 };

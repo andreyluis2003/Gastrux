@@ -68,7 +68,7 @@ export const TUTORIALS: Tutorial[] = [
   // Relatórios
   t('cmv', 'CMV', 'relatorios', ['/cmv'], 'Quanto do que você vende vira custo.'),
   t('consumo-de-insumos', 'Consumo de insumos', 'relatorios', ['/consumo-analise'], 'O que saiu do estoque em cada período.'),
-  t('vendas', 'Relatório de vendas', 'relatorios', ['/dashboard/reports/sales'], 'Vendas por dia, produto e forma de pagamento.'),
+  t('vendas', 'Relatório de vendas', 'relatorios', ['/dashboard/reports/sales'], 'Total vendido, ticket médio, pratos e categorias do período.'),
   t('lucratividade', 'Lucratividade', 'relatorios', ['/dashboard/reports/profitability'], 'Quais produtos dão mais lucro.'),
   t('financeiro', 'Financeiro', 'relatorios', ['/dashboard/financeiro', '/dashboard/financeiro/contas'], 'Entradas, saídas e contas de consumo.'),
   t('relatorio-executivo', 'Relatório executivo (PDF)', 'relatorios', ['/relatorios'], 'O resumo do mês num PDF.'),
