@@ -255,7 +255,7 @@ const pt = {
   'billing.features': 'Recursos incluídos',
   'billing.manage': 'Gerenciar assinatura',
   'billing.upgrade': 'Quer mais recursos?',
-  'billing.upgradeDesc': 'Upgrade para um plano superior para desbloquear mais features',
+  'billing.upgradeDesc': 'Mude para um plano maior para liberar mais recursos.',
   'billing.viewPlans': 'Ver planos',
   'billing.status.active': 'Ativo',
   'billing.status.pastDue': 'Pagamento em atraso',

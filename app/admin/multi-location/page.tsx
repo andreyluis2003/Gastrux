@@ -168,7 +168,7 @@ export default function MultiLocationPage() {
               <Building2 className="w-7 h-7 text-violet-500" />
               Várias lojas
             </h1>
-            <p className="text-sm text-muted-foreground">{consolidated.totalLocations || 0} unidade(s) • Visão consolidada</p>
+            <p className="text-sm text-muted-foreground">{consolidated.totalLocations === 1 ? '1 unidade' : `${consolidated.totalLocations || 0} unidades`} • Visão consolidada</p>
           </div>
         </div>
         <Button onClick={() => setShowForm(!showForm)} className="gap-2">

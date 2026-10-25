@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { Save, Building2, Clock, MapPin, Globe, Loader2 } from 'lucide-react';
+import { timezoneLabel } from '@/lib/settings/timezone-label';
 
 const DAYS = [
   { key: 'seg', label: 'Segunda' },
@@ -247,7 +248,7 @@ export default function SettingsPage() {
           <div>
             <Label htmlFor="timezone">Fuso horário</Label>
             <select id="timezone" value={form.timezone} onChange={e => updateField('timezone', e.target.value)} className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm bg-white">
-              {timezones.map(tz => <option key={tz} value={tz}>{tz.replace('America/', '')}</option>)}
+              {timezones.map(tz => <option key={tz} value={tz}>{timezoneLabel(tz)}</option>)}
             </select>
           </div>
         </div>

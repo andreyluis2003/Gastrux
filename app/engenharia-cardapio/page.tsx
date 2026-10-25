@@ -112,7 +112,9 @@ export default function EngenhariaCardapioPage() {
       {/* Items sold without a ficha técnica have no cost to analyse (2026-10-12) */}
       {data?.withoutFicha?.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          {data.withoutFicha.length === 1 ? '1 item sem ficha técnica fica' : `${data.withoutFicha.length} itens sem ficha técnica ficam`} fora desta análise, porque não têm custo:{' '}
+          {data.withoutFicha.length === 1
+            ? '1 item sem ficha técnica fica fora desta análise, porque não tem custo'
+            : `${data.withoutFicha.length} itens sem ficha técnica ficam fora desta análise, porque não têm custo`}:{' '}
           {data.withoutFicha.slice(0, 5).join(', ')}{data.withoutFicha.length > 5 ? '...' : ''}.{' '}
           <a href="/receitas" className="font-medium underline">Adicione os ingredientes em Fichas técnicas</a>.
         </div>

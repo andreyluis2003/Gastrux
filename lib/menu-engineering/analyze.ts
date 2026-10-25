@@ -4,16 +4,18 @@ import { lineTotal } from '@/lib/comanda/line-total';
 import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { withLiveCost } from '@/lib/recipes/cost-map';
 
-function buildRecommendation(cls: string, foodCostPercent: number, margin: number): string {
+const pct = (v: number) => `${v.toFixed(1).replace(".", ",")}%`;
+
+export function buildRecommendation(cls: string, foodCostPercent: number, margin: number): string {
   switch (cls) {
     case 'STAR':
       return 'Manter destaque no cardápio. Monitorar consistência da margem. Considerar combos que potencializem pedidos adicionais.';
     case 'HORSE':
       return foodCostPercent > 40
-        ? `Food cost alto (${foodCostPercent.toFixed(1)}%). Reavaliar porção, substituir ingredientes caros ou aumentar preço 5-10%.`
+        ? `Food cost alto (${pct(foodCostPercent)}). Reavaliar porção, substituir ingredientes caros ou aumentar preço 5-10%.`
         : 'Prato popular com margem baixa. Testar aumento suave de preço (5-8%) ou redesenhar ficha técnica para melhorar margem.';
     case 'PUZZLE':
-      return `Boa margem (${margin.toFixed(1)}%), mas pouco pedido. Destacar no cardápio, criar promoção cruzada com STARs ou reposicionar como sugestão do chef.`;
+      return `Boa margem (${pct(margin)}), mas pouco pedido. Destacar no cardápio, criar promoção junto com as Estrelas ou reposicionar como sugestão do chef.`;
     case 'DOG':
       return 'Baixa popularidade e baixa margem. Considerar remoção do cardápio, reformulação completa ou substituição por item de maior potencial.';
     default:
