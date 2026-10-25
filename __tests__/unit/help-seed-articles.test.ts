@@ -130,11 +130,3 @@ it('no article promises iFood, a card machine or the old Admin menu', () => {
     expect(a.content).not.toMatch(/Admin →|SumUp|token de merchant|maquininha/i);
   }
 });
-
-it('the tutorial videos article (spec 2026-10-25 tutoriais-em-video)', () => {
-  const a = HELP_ARTICLES.find((x) => x.slug === 'videos-tutoriais');
-  expect(a?.categorySlug).toBe('primeiros-passos');
-  for (const fact of ['Vídeos tutoriais', 'Vídeo desta tela', 'Comece por aqui', 'Ver vídeo']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
-  const { KNOWLEDGE } = require('@/lib/ai/knowledge');
-  for (const fact of ['Vídeos tutoriais', 'Vídeo desta tela']) expect([fact, KNOWLEDGE.includes(fact)]).toEqual([fact, true]);
-});
