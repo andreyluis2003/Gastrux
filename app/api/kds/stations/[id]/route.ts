@@ -8,6 +8,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { MANAGER_ROLES, requireRestaurantRole, type RestaurantRole } from '@/lib/auth/restaurant-role';
+
+const STATION_ROLES: RestaurantRole[] = [...MANAGER_ROLES, 'ADMIN'];
 
 export const dynamic = 'force-dynamic';
 
@@ -54,12 +57,11 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'OWNER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Owner and manager of THIS restaurant (2026-10-26: was the owner only, by the global role)
+    const auth = await requireRestaurantRole(STATION_ROLES, 'Configurar as estações da cozinha é do dono e do gerente');
+    if (!auth.ok) return auth.response;
 
-    const restaurantId = await getCurrentRestaurantId();
+    const restaurantId = auth.member.restaurantId;
     if (!restaurantId) return NextResponse.json({ error: 'Station not found' }, { status: 404 });
 
     const owned = await prisma.kitchenStation.findFirst({
@@ -98,12 +100,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'OWNER') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Owner and manager of THIS restaurant (2026-10-26: was the owner only, by the global role)
+    const auth = await requireRestaurantRole(STATION_ROLES, 'Configurar as estações da cozinha é do dono e do gerente');
+    if (!auth.ok) return auth.response;
 
-    const restaurantId = await getCurrentRestaurantId();
+    const restaurantId = auth.member.restaurantId;
     if (!restaurantId) return NextResponse.json({ error: 'Station not found' }, { status: 404 });
 
     const owned = await prisma.kitchenStation.findFirst({

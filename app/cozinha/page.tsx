@@ -21,7 +21,9 @@ export default function KDSPage() {
   const [newStationName, setNewStationName] = useState('');
   const [newStationColor, setNewStationColor] = useState('#3b82f6');
   const [showStations, setShowStations] = useState(false);
-  const canConfigure = (session?.user as any)?.role === 'OWNER';
+  // Owner and manager (2026-10-26); an empty role counts as the owner, as in the menu
+  const role = (session?.user as any)?.role;
+  const canConfigure = !role || ['OWNER', 'MANAGER', 'ADMIN'].includes(role);
 
   // Check authentication
   useEffect(() => {
@@ -117,7 +119,7 @@ export default function KDSPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold">Cozinha</h1>
-        {/* Creating and deleting stations is the owner's (same rule as /api/kds/stations) */}
+        {/* Creating and deleting stations is the owner's and the manager's (same rule as /api/kds/stations) */}
         {canConfigure && (
           <Button variant="outline" onClick={() => setShowStations((s) => !s)} className="gap-2 self-start">
             <Settings className="w-4 h-4" /> {showStations ? 'Fechar estações' : 'Configurar estações'}

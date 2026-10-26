@@ -46,6 +46,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '5ff659663983995fad1368b4227d261d8d8682f1a98add0f5f381427c65e49e1', // contas-de-consumo (before the % of revenue only for a finished month)
   '4db86b302c0b9737add2a14c4225914ce18612d7bac5d735a9254c15e15b4377', // contagem-do-dia (before the kitchen cancel became a loss)
   '106327f7a20c2d0c5dc46cc8fe38dee3cc6cd4ed873b95f57477dfe030d09671', // contagem-do-dia (before the other segments' examples were counted)
+  'ed3677b9cc501137431a6328018b7f8f15809b1491a9cb96faca3acabbd7b036', // usar-kds (before the manager configured the stations)
   'e5edebb211040df1eca5636d345d0cf33afb86603c0b874cd2f1e2e224e0b9db', // contagem-do-dia (before combos counted as their parts)
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
   'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
@@ -409,7 +410,7 @@ O ícone de impressora imprime o ticket da cozinha. Um item riscado com "CANCELA
 
 ## Estações
 
-As abas **Todos Pedidos** e **Por Estação** mudam a visão. Quantas estações você pode ter depende do plano: Pro 2, Business 5, Enterprise ilimitadas. Só o dono configura as estações.
+As abas **Todos Pedidos** e **Por Estação** mudam a visão. Quantas estações você pode ter depende do plano: Pro 2, Business 5, Enterprise ilimitadas. O dono e o gerente configuram as estações, no botão **Configurar estações** da tela da Cozinha.
 
 > **Dica**: crie uma estação por praça real da cozinha (grelha, fritura, bebidas), não por categoria do cardápio.`,
   },
