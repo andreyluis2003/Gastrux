@@ -8,6 +8,7 @@ import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { withLiveCost } from '@/lib/recipes/cost-map';
+import { lineUnits } from '@/lib/comanda/weight';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,14 +74,15 @@ export async function POST(req: NextRequest) {
         addedAt: { gte: startDate, lte: endDate },
         session: { status: { not: 'CANCELLED' as any }, restaurantId },
       },
-      select: { recipeId: true, quantity: true, price: true },
+      select: { recipeId: true, quantity: true, weightGrams: true, price: true },
     });
 
     const salesByRecipe: Record<string, { qty: number; revenue: number }> = {};
     for (const item of sessionItems) {
       if (!item.recipeId || !analysed.has(item.recipeId)) continue;
       if (!salesByRecipe[item.recipeId]) salesByRecipe[item.recipeId] = { qty: 0, revenue: 0 };
-      salesByRecipe[item.recipeId].qty += item.quantity;
+      // kg for a line sold by weight: its ficha (and so its cost) is per kg
+      salesByRecipe[item.recipeId].qty += lineUnits(item);
       salesByRecipe[item.recipeId].revenue += item.quantity * Number(item.price);
     }
 
@@ -125,7 +127,8 @@ export async function POST(req: NextRequest) {
           periodStart: startDate,
           periodEnd: endDate,
           periodDays: period,
-          quantitySold: item.qtySold,
+          // Whole units in the snapshot (kg of an item sold by weight rounded)
+          quantitySold: Math.round(item.qtySold),
           revenue: item.revenue,
           cost: item.cost,
           contribution: item.contribution,

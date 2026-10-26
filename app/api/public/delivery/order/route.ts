@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     // Items without a ficha técnica get their ficha simples first (2026-10-12)
     await ensureMenuItemRecipes(prisma, restaurantId, menuItemIds.filter((id: unknown) => typeof id === 'string'), { onSaleOnly: true });
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds }, restaurantId, active: true, available: true },
+      where: { id: { in: menuItemIds }, restaurantId, active: true, available: true, soldByWeight: false },
       include: { images: { take: 1 } },
     });
 

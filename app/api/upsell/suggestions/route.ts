@@ -51,6 +51,7 @@ export async function GET(req: NextRequest) {
         restaurantId: currentItem.restaurantId,
         active: true,
         available: true,
+        soldByWeight: false,
         price: { lte: currentItem.price },
       },
       include: { category: true, images: { take: 1, where: { isPublic: true } } },
@@ -66,6 +67,7 @@ export async function GET(req: NextRequest) {
         restaurantId: currentItem.restaurantId,
         active: true,
         available: true,
+        soldByWeight: false,
         price: { gt: currentItem.price },
       },
       include: { category: true, images: { take: 1, where: { isPublic: true } } },
@@ -80,7 +82,7 @@ export async function GET(req: NextRequest) {
     // First: paired items from order history
     if (pairedRecipeIds.length > 0) {
       const pairedMenuItems = await prisma.menuItem.findMany({
-        where: { recipeId: { in: pairedRecipeIds }, restaurantId: currentItem.restaurantId, active: true, available: true },
+        where: { recipeId: { in: pairedRecipeIds }, restaurantId: currentItem.restaurantId, active: true, available: true, soldByWeight: false },
         include: { category: true, images: { take: 1, where: { isPublic: true } } },
       });
       for (const item of pairedMenuItems) {

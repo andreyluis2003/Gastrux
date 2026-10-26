@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { lineUnits } from '@/lib/comanda/weight';
 import { creditSale, recordPurchase } from '@/lib/cashback/service';
 import { followKitchen } from '@/lib/delivery-orders/follow-kitchen';
 
@@ -86,13 +87,13 @@ async function deductOrderStock(tx: any, restaurantId: string, orderId: string) 
   const items = await tx.orderItem.findMany({
     // An item withdrawn from the comanda was not made (its loss, if any, was recorded then: lib/kds/withdraw-line.ts)
     where: { orderId, status: { not: 'CANCELLED' } },
-    select: { quantity: true, recipe: { select: { restaurantId: true, ingredients: { select: { ingredientId: true, quantity: true } } } } },
+    select: { quantity: true, weightGrams: true, recipe: { select: { restaurantId: true, ingredients: { select: { ingredientId: true, quantity: true } } } } },
   });
   const totals = new Map<string, number>();
   for (const item of items) {
     if (!item.recipe || item.recipe.restaurantId !== restaurantId) continue;
     for (const ri of item.recipe.ingredients) {
-      totals.set(ri.ingredientId, (totals.get(ri.ingredientId) ?? 0) + Number(ri.quantity) * Number(item.quantity));
+      totals.set(ri.ingredientId, (totals.get(ri.ingredientId) ?? 0) + Number(ri.quantity) * lineUnits(item));
     }
   }
   const order = await tx.order.findUnique({ where: { id: orderId }, select: { orderNumber: true } });

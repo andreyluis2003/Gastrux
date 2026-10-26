@@ -1,11 +1,15 @@
 import { prisma } from '@/lib/prisma';
+import { lineUnits } from '@/lib/comanda/weight';
 
 export interface ItemSales {
   recipeId: string;
   name: string;
   category: string;
+  /** Units, or kg for an item sold by weight */
   quantity: number;
   revenue: number;
+  /** Sold by weight (spec 2026-10-25 venda-por-peso): quantity is the kg sold */
+  byWeight?: boolean;
 }
 
 /**
@@ -17,7 +21,7 @@ export async function itemSalesInRange(restaurantId: string, from: Date, to: Dat
   const [lines, kitchen] = await Promise.all([
     prisma.orderSessionItem.findMany({
       where: { addedAt: { gte: from, lt: to }, session: { restaurantId, status: { not: 'CANCELLED' } } },
-      select: { recipeId: true, quantity: true, price: true, recipe: { select: { name: true } } },
+      select: { recipeId: true, quantity: true, weightGrams: true, price: true, recipe: { select: { name: true } } },
     }),
     prisma.orderItem.findMany({
       where: {
@@ -29,13 +33,14 @@ export async function itemSalesInRange(restaurantId: string, from: Date, to: Dat
     }),
   ]);
   const byRecipe = new Map<string, ItemSales>();
-  const add = (recipeId: string, name: string, quantity: number, revenue: number) => {
+  const add = (recipeId: string, name: string, quantity: number, revenue: number, byWeight = false) => {
     const it = byRecipe.get(recipeId) ?? { recipeId, name, category: 'Sem categoria', quantity: 0, revenue: 0 };
     it.quantity += quantity;
     it.revenue += revenue;
+    if (byWeight) it.byWeight = true;
     byRecipe.set(recipeId, it);
   };
-  for (const l of lines) add(l.recipeId, l.recipe.name, l.quantity, Number(l.price) * l.quantity);
+  for (const l of lines) add(l.recipeId, l.recipe.name, lineUnits(l), Number(l.price) * l.quantity, !!l.weightGrams);
   for (const k of kitchen) add(k.recipeId, k.recipe.name, k.quantity, Number(k.recipe.sellingPrice ?? 0) * k.quantity);
   if (byRecipe.size) {
     const menu = await prisma.menuItem.findMany({
@@ -48,6 +53,9 @@ export async function itemSalesInRange(restaurantId: string, from: Date, to: Dat
       if (it && it.category === 'Sem categoria' && m.category?.name) it.category = m.category.name;
     }
   }
-  for (const it of byRecipe.values()) it.revenue = Math.round(it.revenue * 100) / 100;
+  for (const it of byRecipe.values()) {
+    it.revenue = Math.round(it.revenue * 100) / 100;
+    it.quantity = Math.round(it.quantity * 1000) / 1000;
+  }
   return [...byRecipe.values()].sort((a, b) => b.revenue - a.revenue);
 }

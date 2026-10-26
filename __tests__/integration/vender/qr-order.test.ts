@@ -51,6 +51,15 @@ describe('QR-code order on a table', () => {
     expect(res.status).toBe(400);
   });
 
+  it('refuses a product sold by weight: the customer has no scale (spec 2026-10-25 venda-por-peso)', async () => {
+    const cat = await prisma.menuCategory.findFirst({ where: { restaurantId: rid } });
+    // With its ficha, so only the weight refuses it
+    const recipe = await prisma.recipe.create({ data: { restaurantId: rid, code: `PAO${tag}`, name: `Pão ${tag}`, baseYield: 1, yieldUnit: 'kg', portionUnit: 'kg', sellingPrice: 18.9 } });
+    const bread = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: `Pão ${tag}`, price: 18.9, position: 6, soldByWeight: true, recipeId: recipe.id } });
+    const res = await order([{ menuItemId: bread.id, quantity: 1 }]);
+    expect(res.status).toBe(400);
+  });
+
   it('a QR order takes a drink without a ficha técnica (2026-10-12)', async () => {
     const cat = await prisma.menuCategory.findFirst({ where: { restaurantId: rid } });
     const soda = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: cat.id, name: `Refri ${tag}`, price: 6, position: 5 } });

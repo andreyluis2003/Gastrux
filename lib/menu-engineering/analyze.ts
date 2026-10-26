@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { prisma } from '@/lib/prisma';
+import { lineUnits } from '@/lib/comanda/weight';
 import { lineTotal } from '@/lib/comanda/line-total';
 import { OWN_RECIPE_WHERE } from '@/lib/cardapio/product-recipe';
 import { withLiveCost } from '@/lib/recipes/cost-map';
@@ -58,14 +59,15 @@ export async function analyzeMenu(restaurantId: string, period: number) {
         restaurantId,
       },
     },
-    select: { recipeId: true, quantity: true, price: true, modifiers: { select: { priceAdjustment: true } } },
+    select: { recipeId: true, quantity: true, weightGrams: true, price: true, modifiers: { select: { priceAdjustment: true } } },
   });
 
   const salesByRecipe: Record<string, { qty: number; revenue: number }> = {};
   for (const item of sessionItems) {
     if (!item.recipeId || !analysed.has(item.recipeId)) continue;
     if (!salesByRecipe[item.recipeId]) salesByRecipe[item.recipeId] = { qty: 0, revenue: 0 };
-    salesByRecipe[item.recipeId].qty += item.quantity;
+    // kg for a line sold by weight: its ficha (and so its cost) is per kg
+    salesByRecipe[item.recipeId].qty += lineUnits(item);
     // Modifier surcharges are revenue too, applied to each unit (lib/comanda/line-total.ts).
     salesByRecipe[item.recipeId].revenue += lineTotal(item.price, item.quantity, item.modifiers.map((m) => m.priceAdjustment));
   }

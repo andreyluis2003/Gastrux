@@ -36,7 +36,7 @@ export async function GET(
       where: { active: true, restaurantId: table.restaurant.id },
       include: {
         items: {
-          where: { active: true, available: true, displayOnQR: true },
+          where: { active: true, available: true, displayOnQR: true, soldByWeight: false },
           include: {
             images: { where: { isPublic: true }, take: 1 },
           },

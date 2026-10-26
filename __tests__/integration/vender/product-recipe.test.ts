@@ -191,3 +191,31 @@ describe('ficha simples', () => {
     } finally { spy.mockRestore(); }
   });
 });
+
+describe('a product sold by weight on the menu (spec 2026-10-25 venda-por-peso)', () => {
+  let ownerId, rid, cat;
+  beforeAll(async () => {
+    ownerId = (await prisma.user.create({ data: { email: `prk-${tag}@gastrux.test`, name: 'Ana', password: 'x', role: 'OWNER' } })).id;
+    rid = (await prisma.restaurant.create({ data: { name: `PRK ${tag}`, ownerId, status: 'ACTIVE' } })).id;
+    await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: ownerId, role: 'OWNER', permissions: ['ALL'], acceptedAt: new Date() } });
+    await prisma.user.update({ where: { id: ownerId }, data: { currentRestaurantId: rid } });
+    cat = await prisma.menuCategory.create({ data: { restaurantId: rid, name: 'Padaria', position: 0, active: true } });
+    (getServerSession as jest.Mock).mockResolvedValue({ user: { id: ownerId, email: `prk-${tag}@gastrux.test` } });
+    (getCurrentRestaurantId as jest.Mock).mockResolvedValue(rid);
+  });
+  afterAll(async () => {
+    try { await prisma.restaurant.delete({ where: { id: rid } }); } catch {}
+    try { await prisma.user.delete({ where: { id: ownerId } }); } catch {}
+  });
+  const json = (method, body) => new Request('http://x/api/cardapio/itens', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) as any;
+
+  it('is created and changed through the menu API, with a ficha simples in kg', async () => {
+    const res = await createRoute(json('POST', { categoryId: cat.id, name: `Pão ${tag}`, price: 18.9, soldByWeight: true }));
+    expect(res.status).toBe(201);
+    const { id } = await res.json();
+    const created = await prisma.menuItem.findUnique({ where: { id }, include: { recipe: true } });
+    expect([created.soldByWeight, created.recipe.yieldUnit, created.recipe.portionUnit]).toEqual([true, 'kg', 'kg']);
+    expect((await updateRoute(json('PUT', { soldByWeight: false }), { params: { id } })).status).toBe(200);
+    expect((await prisma.menuItem.findUnique({ where: { id } })).soldByWeight).toBe(false);
+  });
+});

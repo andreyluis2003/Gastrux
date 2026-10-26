@@ -72,6 +72,7 @@ async function sendUnlocked(restaurantId: string, sessionId: string): Promise<Re
           create: newItems.map((sessionItem) => ({
             recipeId: sessionItem.recipeId,
             quantity: sessionItem.quantity,
+            weightGrams: sessionItem.weightGrams,
             specialInstructions: sessionItem.specialInstructions,
             status: 'PENDING',
             modifiers: {

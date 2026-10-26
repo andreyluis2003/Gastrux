@@ -68,6 +68,11 @@ async function handlePUT(
     if (closedComanda(line)) return NextResponse.json(CLOSED_ANSWER, { status: 409 });
 
     const { quantity, quantityDelta, specialInstructions, modifierIds, reason } = await request.json();
+    // A weighing is one line of quantity 1 (spec 2026-10-25 venda-por-peso): a wrong weight is removed
+    // and weighed again; only the undo of the add (-1) and the note change it
+    if (line.weightGrams && ((quantityDelta !== undefined && quantityDelta !== -1) || (quantity !== undefined && quantity !== 1) || modifierIds !== undefined)) {
+      return NextResponse.json({ error: 'Item por peso: para mudar o peso, remova e lance de novo' }, { status: 409 });
+    }
     const onlyMore = modifierIds === undefined && specialInstructions === undefined
       && (quantityDelta !== undefined ? quantityDelta > 0 : quantity !== undefined && quantity > line.quantity);
     if (!onlyMore && (await hasPayments(params.id, member.restaurantId))) return NextResponse.json(PAID_ANSWER, { status: 409 });

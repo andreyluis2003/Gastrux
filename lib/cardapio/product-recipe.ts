@@ -18,7 +18,7 @@ type Db = Prisma.TransactionClient | typeof prisma;
 export async function createProductRecipe(
   tx: Prisma.TransactionClient,
   restaurantId: string,
-  item: { name: string; description: string | null; price: Prisma.Decimal | number },
+  item: { name: string; description: string | null; price: Prisma.Decimal | number; soldByWeight?: boolean },
 ) {
   // A free code: a taken one would abort the whole sale transaction (Postgres allows no retry after an error)
   let code = '';
@@ -34,9 +34,10 @@ export async function createProductRecipe(
       name: item.name,
       description: item.description,
       baseYield: 1,
-      yieldUnit: 'un',
+      // A product sold by weight: its ficha describes 1 kg (spec 2026-10-25 venda-por-peso)
+      yieldUnit: item.soldByWeight ? 'kg' : 'un',
       portionSize: 1,
-      portionUnit: 'un',
+      portionUnit: item.soldByWeight ? 'kg' : 'un',
       sellingPrice: Number(item.price) || 0,
     },
     select: { id: true },
@@ -63,7 +64,7 @@ export async function ensureMenuItemRecipes(
 
   const run = async (tx: Prisma.TransactionClient) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'menu-item-recipe:' + restaurantId}))`;
-    const missing = await tx.menuItem.findMany({ where, select: { id: true, name: true, description: true, price: true } });
+    const missing = await tx.menuItem.findMany({ where, select: { id: true, name: true, description: true, price: true, soldByWeight: true } });
     for (const mi of missing) {
       const recipe = await createProductRecipe(tx, restaurantId, mi);
       await tx.menuItem.update({ where: { id: mi.id }, data: { recipeId: recipe.id } });

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { lineUnits } from '@/lib/comanda/weight';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 const EPS = 1e-9;
@@ -7,7 +8,7 @@ const EPS = 1e-9;
 /**
  * A closed comanda takes its ingredients out of stock (2026-10-13: stock only left when the kitchen screen
  * marked an order COMPLETED, so a counter sale, a drink or a restaurant without the kitchen screen never
- * moved stock). Reconciled, so it can run at every close: target = ficha quantity × units of the current
+ * moved stock). Reconciled, so it can run at every close: target = ficha quantity × units (kg for a line by weight) of the current
  * lines; already taken = the kitchen's movements for this comanda's orders (ORDER) and this comanda's own
  * earlier settlements (ORDER_SESSION). The difference leaves stock; a reopened bill that lost lines gets
  * back only what an earlier settlement took (what the kitchen made is a loss, lib/kds-cancel-order.ts).
@@ -21,7 +22,7 @@ export async function settleSessionStock(db: Db, restaurantId: string, sessionId
       where: { id: sessionId, restaurantId },
       select: {
         status: true, tableNumber: true, customerName: true,
-        items: { select: { quantity: true, recipe: { select: { restaurantId: true, ingredients: { select: { ingredientId: true, quantity: true } } } } } },
+        items: { select: { quantity: true, weightGrams: true, recipe: { select: { restaurantId: true, ingredients: { select: { ingredientId: true, quantity: true } } } } } },
       },
     });
     if (!session || (session.status !== 'CLOSED' && session.status !== 'CANCELLED')) return { moved: 0 };
@@ -31,7 +32,7 @@ export async function settleSessionStock(db: Db, restaurantId: string, sessionId
     for (const line of cancelled ? [] : session.items) {
       if (!line.recipe || line.recipe.restaurantId !== restaurantId) continue;
       for (const ri of line.recipe.ingredients) {
-        target.set(ri.ingredientId, (target.get(ri.ingredientId) ?? 0) + Number(ri.quantity) * Number(line.quantity));
+        target.set(ri.ingredientId, (target.get(ri.ingredientId) ?? 0) + Number(ri.quantity) * lineUnits(line));
       }
     }
 

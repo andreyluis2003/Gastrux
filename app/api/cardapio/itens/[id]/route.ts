@@ -100,6 +100,7 @@ export async function PUT(
         ...(available !== undefined && { available }),
         ...(position !== undefined && { position }),
         ...(displayOnQR !== undefined && { displayOnQR }),
+        ...(typeof body.soldByWeight === 'boolean' && { soldByWeight: body.soldByWeight }),
         ...(displayOnWeb !== undefined && { displayOnWeb }),
         ...(recipeId !== undefined && { recipeId: recipeId || null }),
         ...(categoryId !== undefined && { categoryId }),

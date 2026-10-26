@@ -1772,6 +1772,8 @@ model OrderItem {
   orderId             String
   recipeId            String
   quantity            Int                 @default(1)
+  /// Copied from a comanda line sold by weight (spec 2026-10-25 venda-por-peso)
+  weightGrams         Int?
   specialInstructions String?
   status              OrderItemStatus     @default(PENDING)
   stationId           String?
@@ -1901,6 +1903,9 @@ model OrderSessionItem {
   recipeId            String
   quantity            Int                        @default(1)
   price               Decimal                    @default(0)
+  /// A line sold by weight (spec 2026-10-25 venda-por-peso): quantity stays 1 and price is the whole line
+  weightGrams         Int?
+  pricePerKg          Decimal?
   specialInstructions String?
   addedAt             DateTime                   @default(now())
   /// When the kitchen got this line (null = new, "a enviar"); moves with the line (spec 2026-10-07, 7)
@@ -2059,6 +2064,8 @@ model MenuItem {
   displayOnWeb Boolean         @default(true)
   /// Product code other systems send in the Gastrux order API (unique per restaurant)
   code         String?
+  /// Sold by weight (spec 2026-10-25 venda-por-peso): price is per kg and its ficha describes 1 kg
+  soldByWeight Boolean         @default(false)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   images       MenuItemImage[]

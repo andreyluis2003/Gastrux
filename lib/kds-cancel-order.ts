@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { prisma } from './prisma';
+import { lineUnits } from './comanda/weight';
 import { getMpClientForRestaurant } from './mercadopago-connect/connection-service';
 import { cancelConnectPayment } from './mercadopago-connect/payments';
 import { createPaymentAlert } from './payment-alert-service';
@@ -180,7 +181,7 @@ export async function recordKitchenLoss(
   for (const item of opts.items) {
     for (const ri of item.recipe?.ingredients ?? []) {
       const entry = used.get(ri.ingredientId) ?? { quantity: 0, ingredient: ri.ingredient };
-      entry.quantity += ri.quantity * item.quantity;
+      entry.quantity += ri.quantity * lineUnits(item);
       used.set(ri.ingredientId, entry);
     }
   }

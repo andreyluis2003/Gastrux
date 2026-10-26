@@ -37,7 +37,7 @@ export async function GET(
         name: true,
         emoji: true,
         items: {
-          where: { active: true, available: true, displayOnWeb: true },
+          where: { active: true, available: true, displayOnWeb: true, soldByWeight: false },
           select: {
             id: true,
             name: true,

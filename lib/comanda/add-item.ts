@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
+import { MAX_WEIGHT_GRAMS, weightLineCents } from '@/lib/comanda/weight';
 
 /**
  * Adds one line to a comanda. The price always comes from the restaurant's menu (menu item price,
@@ -16,6 +17,8 @@ export interface AddItemInput {
   quantity?: number;
   specialInstructions?: string | null;
   modifierIds?: string[];
+  /** A product sold by weight: the weighed grams (spec 2026-10-25 venda-por-peso) */
+  weightGrams?: number | null;
 }
 
 export class AddItemError extends Error {
@@ -43,6 +46,7 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
 
   let recipeId = input.recipeId || null;
   let price: number | null = null;
+  let byWeight: { weightGrams: number; pricePerKg: number } | null = null;
 
   if (input.menuItemId) {
     // A menu item without a ficha técnica sells too: it gets its ficha simples here (lib/cardapio/product-recipe.ts)
@@ -54,6 +58,20 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
     if (!menuItem) throw new AddItemError('Menu item not found', 404);
     recipeId = menuItem.recipeId || menuItem.recipe?.id || null;
     price = Number(menuItem.price) || 0;
+    if (menuItem.soldByWeight) {
+      // The price on the menu is per kg; the line costs the weighed part of it, quantity 1
+      const grams = input.weightGrams;
+      if (typeof grams !== 'number' || !Number.isInteger(grams) || grams < 1 || grams > MAX_WEIGHT_GRAMS) {
+        throw new AddItemError(`${menuItem.name} é vendido por peso: informe o peso (de 1 g a 50 kg)`, 400);
+      }
+      if (quantity !== 1) throw new AddItemError('Item por peso: lance uma pesagem por vez', 400);
+      if ((input.modifierIds ?? []).length) throw new AddItemError('Item por peso não leva adicionais', 400);
+      byWeight = { weightGrams: grams, pricePerKg: price };
+      price = weightLineCents(price, grams) / 100;
+    }
+  }
+  if (!byWeight && input.weightGrams != null) {
+    throw new AddItemError('Este item é vendido por unidade, não por peso', 400);
   }
 
   if (!recipeId) {
@@ -75,6 +93,7 @@ export async function addComandaItem(db: Db, restaurantId: string, sessionId: st
       recipeId,
       quantity,
       price: new Prisma.Decimal(price),
+      ...(byWeight ? { weightGrams: byWeight.weightGrams, pricePerKg: new Prisma.Decimal(byWeight.pricePerKg) } : {}),
       specialInstructions: input.specialInstructions || null,
       modifiers: {
         create: modifiers.map((m) => ({ modifierId: m.id, priceAdjustment: m.priceAdjustment })),
@@ -127,8 +146,9 @@ export async function addOrMergeComandaItem(restaurantId: string, sessionId: str
     if (plain && input.menuItemId) {
       // Linked first, so the second tap on a soda merges like any item
       await ensureMenuItemRecipes(tx, restaurantId, [input.menuItemId]);
-      const menuItem = await tx.menuItem.findFirst({ where: { id: input.menuItemId, restaurantId }, select: { recipeId: true, price: true } });
-      if (menuItem?.recipeId) {
+      const menuItem = await tx.menuItem.findFirst({ where: { id: input.menuItemId, restaurantId }, select: { recipeId: true, price: true, soldByWeight: true } });
+      // Each weighing is its own line
+      if (menuItem?.recipeId && !menuItem.soldByWeight) {
         const target = await tx.orderSessionItem.findFirst({
           where: {
             sessionId,

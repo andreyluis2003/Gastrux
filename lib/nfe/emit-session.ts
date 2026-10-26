@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
-import { lineTotalCents, toCents } from '@/lib/comanda/line-total';
+import { nfceQuantityFields } from '@/lib/nfe/session-line';
 import { apportionDiscount } from '@/lib/cashback/rules';
 import { createDocumentWithNextNumber, findReusableRejected } from '@/lib/nfe/numbering';
 import { resolveItemsFiscalData } from '@/lib/nfe/fiscal-data';
@@ -86,15 +86,10 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
   }
 
   const lines = orderSession.items.map((item, idx) => {
-    const adjustments = item.modifiers.map((m) => m.priceAdjustment);
-    const unitCents = toCents(item.price) + adjustments.reduce<number>((sum, adj) => sum + toCents(adj), 0);
-    const totalCents = lineTotalCents(item.price, item.quantity, adjustments);
     return {
       description: item.recipe?.name || 'Produto',
-      quantity: item.quantity,
-      unit: 'UN',
-      unitPrice: unitCents / 100,
-      totalPrice: totalCents / 100,
+      // UN, or KG for a line sold by weight (lib/nfe/session-line.ts)
+      ...nfceQuantityFields(item),
       ncm: fiscal.items[idx].ncm,
       cfop: fiscal.items[idx].cfop,
       recipeId: item.recipeId,

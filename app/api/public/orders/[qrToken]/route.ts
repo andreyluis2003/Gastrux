@@ -82,7 +82,7 @@ export async function POST(
     await ensureMenuItemRecipes(prisma, table.restaurantId, menuItemIds.filter((id: unknown) => typeof id === 'string'), { onSaleOnly: true });
     const menuItems = await prisma.menuItem.findMany({
       // Only this table's restaurant: a QR order took any restaurant's item, price and recipe (2026-10-07)
-      where: { id: { in: menuItemIds }, restaurantId: table.restaurantId, active: true, available: true },
+      where: { id: { in: menuItemIds }, restaurantId: table.restaurantId, active: true, available: true, soldByWeight: false },
     });
 
     const menuItemMap = new Map(menuItems.map((m) => [m.id, m]));

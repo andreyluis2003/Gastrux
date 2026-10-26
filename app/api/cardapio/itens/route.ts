@@ -97,6 +97,8 @@ export async function POST(req: NextRequest) {
           position: position || 0,
           restaurantId,
           code: code.code ?? null,
+          // Sold by weight: the price is per kg (spec 2026-10-25 venda-por-peso)
+          soldByWeight: body.soldByWeight === true,
         },
         select: { id: true },
       });

@@ -248,7 +248,7 @@ async function handleGreeting(ctx: BotContext) {
 
 async function handleShowCategories(ctx: BotContext) {
   const categories = await prisma.menuCategory.findMany({
-    where: { active: true, items: { some: { active: true, available: true } } },
+    where: { active: true, items: { some: { active: true, available: true, soldByWeight: false } } },
     orderBy: { position: 'asc' },
     take: 10,
   });
@@ -285,7 +285,7 @@ async function handleShowCategories(ctx: BotContext) {
 
 async function handleShowCategoryItems(ctx: BotContext, categoryId: string) {
   const items = await prisma.menuItem.findMany({
-    where: { categoryId, active: true, available: true },
+    where: { categoryId, active: true, available: true, soldByWeight: false },
     orderBy: { position: 'asc' },
     take: 10,
     include: { category: true },
@@ -326,7 +326,7 @@ async function handleShowCategoryItems(ctx: BotContext, categoryId: string) {
 
 async function handleAddItem(ctx: BotContext, menuItemId: string) {
   const item = await prisma.menuItem.findFirst({
-    where: { id: menuItemId, active: true, available: true },
+    where: { id: menuItemId, active: true, available: true, soldByWeight: false },
   });
   if (!item) {
     return safeSendText(ctx, 'Item não encontrado. Digite *menu* para ver o cardápio novamente.');
