@@ -3,6 +3,23 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Venda por peso, padaria fase 2 (2026-10-25)
+
+Spec `docs/superpowers/specs/2026-10-25-venda-por-peso-design.md`. Ficou de fora, de propósito:
+
+- **Balança ligada ao computador** (serial/USB, protocolo Toledo/Filizola): hoje o peso é digitado no campo Peso.
+- **Etiqueta da balança com código de barras** (EAN-13 que começa com 2, com o código do produto e o preço ou o
+  peso embutidos), lida pelo leitor no caixa: precisa de um campo "código da balança" no produto e de um leitor
+  no Vender e na Venda balcão.
+- **Pedidos de plataformas** (iFood, API de pedidos) com produto por peso: chegam como unidade, como antes. O QR
+  Code, o site de delivery e o robô do WhatsApp não oferecem produto por peso.
+- **Contagem do dia** por peso: a contagem conta unidades, então o pão francês do modelo de padaria (agora por
+  kg) saiu da contagem. Uma padaria que quiser contar a fornada em unidades usa um produto por unidade.
+- A **foto de comprovante da balança** e o **self-service por kg** (restaurante a quilo, com tara do prato) não
+  foram feitos: o self-service pede tara e é outro fluxo.
+- O **Planejamento de produção** e o **Escalonar receita** de um produto por peso falam em "porções"; para ele, uma
+  porção é 1 kg (a ficha descreve 1 kg). O texto da tela não diz isso.
+
 ## Vídeos tutoriais, a área no sistema (2026-10-25)
 
 Spec `docs/superpowers/specs/2026-10-25-tutoriais-em-video-design.md`, plano
