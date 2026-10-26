@@ -89,38 +89,6 @@ export async function GET(
       }))
       .filter((c: any) => c.items.length > 0);
 
-    // Sprint 2: Fetch active combos for this restaurant
-    let combos: any[] = [];
-    try {
-      const comboInsights = await prisma.aIInsight.findMany({
-        where: {
-          restaurantId: table.restaurant.id,
-          type: 'COMBO_SUGGESTION' as any,
-          pinned: true,
-          dismissed: false,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          summary: true,
-          content: true,
-          dataSnapshot: true,
-        },
-      });
-      combos = comboInsights.map((c: any) => ({
-        id: c.id,
-        name: c.title,
-        description: c.summary,
-        items: c.dataSnapshot?.items || [],
-        discountPercent: c.dataSnapshot?.discountPercent || 0,
-        comboPrice: c.dataSnapshot?.comboPrice || 0,
-      }));
-    } catch (e) {
-      // COMBO_SUGGESTION may not exist yet - silent fail
-    }
-
     return NextResponse.json({
       table: {
         id: table.id,
@@ -134,7 +102,6 @@ export async function GET(
         acceptsOnlinePayment: await tablePaymentEnabled(table.restaurant.id),
       },
       categories: enrichedCategories,
-      combos,
     }, {
       headers: { 'Cache-Control': 'public, max-age=60' },
     });

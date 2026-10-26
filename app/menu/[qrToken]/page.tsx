@@ -30,20 +30,6 @@ interface MenuItem {
   badge?: MenuBadge | null;
 }
 
-interface ComboItem {
-  name: string;
-  price: number;
-}
-
-interface Combo {
-  id: string;
-  name: string;
-  description: string;
-  items: ComboItem[];
-  discountPercent: number;
-  comboPrice: number;
-}
-
 interface MenuCategory {
   id: string;
   name: string;
@@ -64,7 +50,6 @@ interface MenuData {
   table: { id: string; number: number; section: { name: string } };
   restaurant: { id: string; name: string; acceptsOnlinePayment?: boolean };
   categories: MenuCategory[];
-  combos?: Combo[];
 }
 
 export default function PublicMenuPage() {
@@ -448,47 +433,6 @@ export default function PublicMenuPage() {
           </div>
         ))}
 
-        {/* Sprint 2: Combos Section */}
-        {menu?.combos && menu.combos.length > 0 && (
-          <div className="scroll-mt-48">
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-              🎁 Combos Especiais
-            </h2>
-            <div className="space-y-3">
-              {menu.combos.map((combo) => (
-                <Card key={combo.id} className="p-4 border-2 border-dashed border-amber-300 bg-amber-50/50">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-sm text-amber-900">{combo.name}</h3>
-                      <p className="text-xs text-amber-700 mt-0.5">{combo.description}</p>
-                      {combo.items.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {combo.items.map((ci, i) => (
-                            <span key={i} className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                              {ci.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      {combo.discountPercent > 0 && (
-                        <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">
-                          -{combo.discountPercent}%
-                        </span>
-                      )}
-                      {combo.comboPrice > 0 && (
-                        <p className="font-bold text-amber-700 text-sm mt-1">
-                          {formatBRL(Number(combo.comboPrice))}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Fixed cart button (mobile) */}

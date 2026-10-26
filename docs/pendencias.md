@@ -3,6 +3,23 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Revisão da lanchonete (2026-10-26)
+
+Spec `docs/superpowers/specs/2026-10-26-lanchonete-revisao-design.md`. Entrou: "Na contagem do dia, conta como"
+(combo e cento contam como os itens da contagem), modelo de lanchonete novo, QR sem os "Combos Especiais" antigos.
+
+### Abertos
+
+- Combo com escolha (suco OU refri, sabor do salgado): hoje é um combo por opção. Seria um item com grupos de
+  escolha que baixam o estoque do que foi escolhido.
+- Ficha do combo montada a partir das fichas dos itens: hoje o dono soma os insumos à mão, e mudar a ficha da
+  coxinha não muda a do combo.
+- "Conta como" só aparece em Editar a ficha, não em Nova ficha nem no Cardápio digital (onde o combo costuma ser
+  criado, com ficha simples): o dono cria o item e depois edita a ficha.
+- Uma peça que sai da contagem (desmarcada) continua ligada ao combo e some do vendido; ao salvar o combo de novo,
+  o servidor recusa até tirá-la ("Escolha só itens marcados para a contagem do dia").
+- Os vídeos e a página /para/lanchonete não mostram combos; regravar se o dono quiser.
+
 ## Encomendas, padaria fase 3 (2026-10-26)
 
 Spec `docs/superpowers/specs/2026-10-26-encomendas-design.md`. Ficou de fora, de propósito:

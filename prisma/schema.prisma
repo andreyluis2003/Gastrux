@@ -367,6 +367,9 @@ model Recipe {
   dailyCount        Boolean           @default(false)
   dailyCountEntries DailyCountEntry[]
   dailyCountLines   DailyCountLine[]
+  /// A combo that counts as other counted items in the daily count (spec 2026-10-26 lanchonete)
+  countParts        RecipeCountPart[] @relation("RecipeCountParts")
+  countedIn         RecipeCountPart[] @relation("RecipeCountedIn")
 
   @@unique([restaurantId, code])
   @@index([restaurantId])
@@ -4541,6 +4544,21 @@ model DailyCountEntry {
   @@index([countId])
   @@index([restaurantId])
   @@map("daily_count_entries")
+}
+
+/// "Na contagem do dia, conta como" (spec 2026-10-26 lanchonete): each sale of recipeId counts as quantity × partRecipeId
+model RecipeCountPart {
+  id           String @id @default(cuid())
+  restaurantId String
+  recipeId     String
+  partRecipeId String
+  quantity     Int
+  recipe       Recipe @relation("RecipeCountParts", fields: [recipeId], references: [id], onDelete: Cascade)
+  part         Recipe @relation("RecipeCountedIn", fields: [partRecipeId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, partRecipeId])
+  @@index([restaurantId, partRecipeId])
+  @@map("recipe_count_parts")
 }
 
 /// The close, frozen per item: later cancellations never change it

@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { shelfLifeFromBody } from '@/lib/labels/rules';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
+import { parseCountParts, saveCountParts } from '@/lib/daily-count/count-parts';
+import { DailyCountError } from '@/lib/daily-count/compute';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +38,7 @@ export async function GET(
             },
           },
         },
+        countParts: { select: { partRecipeId: true, quantity: true, part: { select: { name: true } } }, orderBy: { part: { name: 'asc' } } },
       },
     });
 
@@ -46,7 +49,9 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(recipe, {
+    // "Na contagem do dia, conta como" (spec 2026-10-26 lanchonete)
+    const countParts = recipe.countParts.map((p) => ({ recipeId: p.partRecipeId, name: p.part.name, quantity: p.quantity }));
+    return NextResponse.json({ ...recipe, countParts }, {
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     });
   } catch (error) {
@@ -78,8 +83,10 @@ export async function PUT(
     const body = await req.json();
     // Shelf life per storage for food labels (spec 2026-10-09 etiquetas, 4.1): only what was sent
     let shelfLife;
+    let countParts;
     try {
       shelfLife = shelfLifeFromBody(body);
+      countParts = parseCountParts(body.countParts);
     } catch (e: any) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
@@ -92,20 +99,24 @@ export async function PUT(
       );
     }
 
-    const recipe = await prisma.recipe.update({
-      where: { id: params.id },
-      data: {
-        ...shelfLife,
-        ...(typeof body.dailyCount === 'boolean' ? { dailyCount: body.dailyCount } : {}),
-        name: body.name,
-        description: body.description,
-        baseYield: body.baseYield,
-        yieldUnit: body.yieldUnit,
-        portionSize: body.portionSize,
-        portionUnit: body.portionUnit,
-        prepTimeMinutes: body.prepTimeMinutes,
-        yieldLossFactor: body.yieldLossFactor,
-      },
+    const recipe = await prisma.$transaction(async (tx) => {
+      const updated = await tx.recipe.update({
+        where: { id: params.id },
+        data: {
+          ...shelfLife,
+          ...(typeof body.dailyCount === 'boolean' ? { dailyCount: body.dailyCount } : {}),
+          name: body.name,
+          description: body.description,
+          baseYield: body.baseYield,
+          yieldUnit: body.yieldUnit,
+          portionSize: body.portionSize,
+          portionUnit: body.portionUnit,
+          prepTimeMinutes: body.prepTimeMinutes,
+          yieldLossFactor: body.yieldLossFactor,
+        },
+      });
+      await saveCountParts(tx, restaurantId, updated.id, updated.dailyCount, countParts);
+      return updated;
     });
 
     await prisma.auditLog.create({
@@ -120,6 +131,7 @@ export async function PUT(
 
     return NextResponse.json(recipe);
   } catch (error) {
+    if (error instanceof DailyCountError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('Error updating recipe:', error);
     return NextResponse.json(
       { error: 'Erro ao atualizar receita' },

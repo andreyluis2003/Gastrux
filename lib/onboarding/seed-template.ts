@@ -70,6 +70,9 @@ export async function seedStarterTemplate(restaurantId: string, businessType: st
       });
       recipeId[r.key] = row.id;
     }
+    // Combos that count as the salgado they carry (spec 2026-10-26 lanchonete)
+    const parts = template.recipes.flatMap((r) => (r.countsAs ?? []).map((p) => ({ restaurantId, recipeId: recipeId[r.key], partRecipeId: recipeId[p.recipe], quantity: p.qty })));
+    if (parts.length) await tx.recipeCountPart.createMany({ data: parts });
 
     const menuCategoryId: Record<string, string> = {};
     for (const [position, c] of template.menuCategories.entries()) {

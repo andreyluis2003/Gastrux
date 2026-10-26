@@ -30,6 +30,8 @@ export interface TemplateRecipe {
   dailyCount?: boolean;
   /** Sold by weight: price per kg and the items describe 1 kg (spec 2026-10-25 venda-por-peso) */
   soldByWeight?: boolean;
+  /** "Na contagem do dia, conta como" (spec 2026-10-26 lanchonete): counted recipes of the template it carries */
+  countsAs?: Array<{ recipe: string; qty: number }>;
 }
 
 export interface TemplateResaleItem {
@@ -173,38 +175,66 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     ],
     resale: DRINKS,
   },
+  // Revisão da lanchonete (spec 2026-10-26): salgados contados no dia, combos que contam como o salgado que
+  // levam, o cento para festas (Encomendas) e o refrigerante com insumo próprio (o combo baixa o mesmo estoque)
   {
     slug: 'lanchonete',
     label: 'Lanchonete',
-    menuCategories: [{ name: 'Lanches', emoji: '🥪' }, { name: 'Salgados', emoji: '🥟' }, { name: 'Bebidas', emoji: '🥤' }],
+    menuCategories: [{ name: 'Lanches', emoji: '🥪' }, { name: 'Salgados', emoji: '🥟' }, { name: 'Combos', emoji: '🍱' }, { name: 'Para festas', emoji: '🎉' }, { name: 'Bebidas', emoji: '🥤' }],
     ingredients: [
       { key: 'PFR', name: 'Pão francês', category: 'Outros', unit: 'un', cost: 0.8 },
       { key: 'PFO', name: 'Pão de forma', category: 'Outros', unit: 'un', cost: 0.5 },
+      { key: 'PHB', name: 'Pão de hambúrguer', category: 'Outros', unit: 'un', cost: 1.2 },
+      { key: 'HAM', name: 'Hambúrguer bovino 90 g', category: 'Carnes', unit: 'un', cost: 2.5 },
       { key: 'PRE', name: 'Presunto', category: 'Carnes', unit: 'kg', cost: 30 },
       { key: 'MUS', name: 'Muçarela', category: 'Laticínios', unit: 'kg', cost: 38 },
       { key: 'OVO', name: 'Ovo', category: 'Outros', unit: 'un', cost: 0.9 },
       { key: 'MAN', name: 'Manteiga', category: 'Laticínios', unit: 'kg', cost: 45 },
+      { key: 'ALF', name: 'Alface', category: 'Vegetais', unit: 'un', cost: 5 },
+      { key: 'TOM', name: 'Tomate', category: 'Vegetais', unit: 'kg', cost: 7.5 },
       { key: 'COX', name: 'Coxinha congelada', category: 'Outros', unit: 'un', cost: 2.2 },
+      { key: 'KIB', name: 'Kibe congelado', category: 'Outros', unit: 'un', cost: 1.9 },
+      { key: 'ESF', name: 'Esfiha de carne congelada', category: 'Outros', unit: 'un', cost: 1.6 },
+      { key: 'SGM', name: 'Salgadinho de festa congelado', category: 'Outros', unit: 'un', cost: 0.3 },
       { key: 'OLE', name: 'Óleo para fritura', category: 'Outros', unit: 'l', cost: 7 },
       { key: 'LAR', name: 'Laranja', category: 'Vegetais', unit: 'kg', cost: 4 },
       { key: 'CAF', name: 'Café em pó', category: 'Bebidas', unit: 'kg', cost: 45 },
       { key: 'LEI', name: 'Leite', category: 'Laticínios', unit: 'l', cost: 5.5 },
+      { key: 'REF', name: 'Refrigerante lata', category: 'Bebidas', unit: 'un', cost: 2.6 },
     ],
     recipes: [
       { key: 'MIS', name: 'Misto quente', description: 'Pão de forma, presunto e muçarela na chapa', menuCategory: 'Lanches', price: 12, prepMinutes: 5,
         items: [{ ingredient: 'PFO', qty: 2, unit: 'un' }, { ingredient: 'PRE', qty: 0.04, unit: 'kg' }, { ingredient: 'MUS', qty: 0.04, unit: 'kg' }, { ingredient: 'MAN', qty: 0.01, unit: 'kg' }] },
+      { key: 'BAU', name: 'Bauru', description: 'Pão francês, presunto, muçarela e tomate', menuCategory: 'Lanches', price: 14, prepMinutes: 6,
+        items: [{ ingredient: 'PFR', qty: 1, unit: 'un' }, { ingredient: 'PRE', qty: 0.04, unit: 'kg' }, { ingredient: 'MUS', qty: 0.04, unit: 'kg' }, { ingredient: 'TOM', qty: 0.03, unit: 'kg' }] },
+      { key: 'XSA', name: 'X-salada', description: 'Hambúrguer, muçarela, alface e tomate', menuCategory: 'Lanches', price: 18, prepMinutes: 8,
+        items: [{ ingredient: 'PHB', qty: 1, unit: 'un' }, { ingredient: 'HAM', qty: 1, unit: 'un' }, { ingredient: 'MUS', qty: 0.03, unit: 'kg' }, { ingredient: 'ALF', qty: 0.05, unit: 'un' }, { ingredient: 'TOM', qty: 0.03, unit: 'kg' }] },
       { key: 'PAN', name: 'Pão na chapa', description: 'Pão francês com manteiga', menuCategory: 'Lanches', price: 6, prepMinutes: 3,
         items: [{ ingredient: 'PFR', qty: 1, unit: 'un' }, { ingredient: 'MAN', qty: 0.015, unit: 'kg' }] },
       { key: 'OVO', name: 'Pão com ovo e queijo', description: 'Pão francês, ovo e muçarela', menuCategory: 'Lanches', price: 11, prepMinutes: 5,
         items: [{ ingredient: 'PFR', qty: 1, unit: 'un' }, { ingredient: 'OVO', qty: 1, unit: 'un' }, { ingredient: 'MUS', qty: 0.03, unit: 'kg' }, { ingredient: 'MAN', qty: 0.005, unit: 'kg' }] },
-      { key: 'COX', name: 'Coxinha', description: 'Frita na hora', menuCategory: 'Salgados', price: 8, prepMinutes: 6, dailyCount: true,
+      { key: 'COX', name: 'Coxinha', description: 'Frita na hora, a unidade', menuCategory: 'Salgados', price: 8, prepMinutes: 6, dailyCount: true,
         items: [{ ingredient: 'COX', qty: 1, unit: 'un' }, { ingredient: 'OLE', qty: 0.02, unit: 'l' }] },
+      { key: 'KIB', name: 'Kibe', description: 'Frito na hora, a unidade', menuCategory: 'Salgados', price: 7, prepMinutes: 6, dailyCount: true,
+        items: [{ ingredient: 'KIB', qty: 1, unit: 'un' }, { ingredient: 'OLE', qty: 0.02, unit: 'l' }] },
+      { key: 'ESF', name: 'Esfiha de carne', description: 'Assada, a unidade', menuCategory: 'Salgados', price: 6, prepMinutes: 15, dailyCount: true,
+        items: [{ ingredient: 'ESF', qty: 1, unit: 'un' }] },
+      { key: 'CMS', name: 'Combo misto + suco', description: 'Misto quente e suco de laranja de 300 ml', menuCategory: 'Combos', price: 18, prepMinutes: 6,
+        items: [{ ingredient: 'PFO', qty: 2, unit: 'un' }, { ingredient: 'PRE', qty: 0.04, unit: 'kg' }, { ingredient: 'MUS', qty: 0.04, unit: 'kg' }, { ingredient: 'MAN', qty: 0.01, unit: 'kg' }, { ingredient: 'LAR', qty: 0.6, unit: 'kg' }] },
+      { key: 'CXR', name: 'Combo coxinha + refri', description: 'Coxinha e refrigerante lata', menuCategory: 'Combos', price: 13, prepMinutes: 6, countsAs: [{ recipe: 'COX', qty: 1 }],
+        items: [{ ingredient: 'COX', qty: 1, unit: 'un' }, { ingredient: 'OLE', qty: 0.02, unit: 'l' }, { ingredient: 'REF', qty: 1, unit: 'un' }] },
+      { key: 'CAM', name: 'Combo café da manhã', description: 'Pão na chapa e café com leite', menuCategory: 'Combos', price: 10, prepMinutes: 4,
+        items: [{ ingredient: 'PFR', qty: 1, unit: 'un' }, { ingredient: 'MAN', qty: 0.015, unit: 'kg' }, { ingredient: 'CAF', qty: 0.01, unit: 'kg' }, { ingredient: 'LEI', qty: 0.15, unit: 'l' }] },
+      { key: 'CEN', name: 'Cento de salgadinhos', description: '100 salgadinhos de festa fritos, sortidos. Peça com antecedência', menuCategory: 'Para festas', price: 99, prepMinutes: 60,
+        items: [{ ingredient: 'SGM', qty: 100, unit: 'un' }, { ingredient: 'OLE', qty: 1, unit: 'l' }] },
       { key: 'SUC', name: 'Suco de laranja', description: '300 ml, feito na hora', menuCategory: 'Bebidas', price: 9, prepMinutes: 3,
         items: [{ ingredient: 'LAR', qty: 0.6, unit: 'kg' }] },
       { key: 'CAF', name: 'Café com leite', description: 'Xícara grande', menuCategory: 'Bebidas', price: 6, prepMinutes: 2,
         items: [{ ingredient: 'CAF', qty: 0.01, unit: 'kg' }, { ingredient: 'LEI', qty: 0.15, unit: 'l' }] },
+      { key: 'REF', name: 'Refrigerante lata', description: '350 ml', menuCategory: 'Bebidas', price: 6, prepMinutes: 0,
+        items: [{ ingredient: 'REF', qty: 1, unit: 'un' }] },
     ],
-    resale: DRINKS,
+    resale: [{ name: 'Água mineral', description: '500 ml', menuCategory: 'Bebidas', price: 4 }],
   },
   {
     slug: 'doceria',

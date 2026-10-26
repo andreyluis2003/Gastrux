@@ -2,7 +2,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { MANAGER_ROLES, recordAudit, type RestaurantMember, type RestaurantRole } from '@/lib/auth/restaurant-role';
 import { buildRows, entryTotals, lossReason, parseQuantity, DailyCountError, type CountRow, type EntryKind } from './compute';
-import { soldByRecipe } from './sold';
+import { soldForCount } from './sold';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -33,6 +33,12 @@ export async function recordKitchenCountLoss(
   items: { recipeId: string; quantity: number }[],
   opts: { userId?: string | null; reason?: string | null } = {},
 ) {
+  // A combo cancelled is a loss of the counted items it counts as (spec 2026-10-26 lanchonete)
+  const parts = await tx.recipeCountPart.findMany({ where: { restaurantId, recipeId: { in: items.map((i) => i.recipeId) } }, select: { recipeId: true, partRecipeId: true, quantity: true } });
+  items = items.flatMap((i) => {
+    const own = parts.filter((p) => p.recipeId === i.recipeId);
+    return own.length ? own.map((p) => ({ recipeId: p.partRecipeId, quantity: i.quantity * p.quantity })) : [i];
+  });
   const ids = [...new Set(items.map((i) => i.recipeId))];
   if (!ids.length) return;
   const counted = new Set((await tx.recipe.findMany({ where: { id: { in: ids }, restaurantId, dailyCount: true }, select: { id: true } })).map((r) => r.id));
@@ -62,7 +68,7 @@ export async function nightItems(db: Db, restaurantId: string, countId: string):
 export async function nightRows(db: Db, restaurantId: string, night: { id: string; openedAt: Date }, to: Date): Promise<CountRow[]> {
   const items = await nightItems(db, restaurantId, night.id);
   const entries = await db.dailyCountEntry.findMany({ where: { countId: night.id, restaurantId }, select: { recipeId: true, kind: true, quantity: true } });
-  const sold = await soldByRecipe(db, restaurantId, items.map((i) => i.recipeId), night.openedAt, to);
+  const sold = await soldForCount(db, restaurantId, items.map((i) => i.recipeId), night.openedAt, to);
   return buildRows(items, entryTotals(entries as any), sold);
 }
 

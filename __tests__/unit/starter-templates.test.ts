@@ -26,7 +26,7 @@ describe('starter templates ("Comece com", lib/onboarding/starter-templates.ts)'
   // is sold is counted; what is made to order is not
   it('the other segments count what they prepare in advance', () => {
     const counted = (slug: string) => templateFor(slug).recipes.filter((r) => r.dailyCount).map((r) => r.key).sort();
-    expect(counted('lanchonete')).toEqual(['COX']);
+    expect(counted('lanchonete')).toEqual(['COX', 'ESF', 'KIB']);
     expect(counted('marmitaria')).toEqual(['CMO', 'FRG', 'LIN', 'MAC']);
     expect(counted('doceria')).toEqual(['BOL', 'BRI', 'MOR', 'MOU']);
     // Padaria and cafeteria (owner, 2026-10-23): the fornada and what goes in the display case are counted
@@ -46,8 +46,30 @@ describe('starter templates ("Comece com", lib/onboarding/starter-templates.ts)'
     for (const slug of ['restaurantes', 'cafeteria', 'lanchonete', 'espetaria']) expect([slug, byWeight(slug)]).toEqual([slug, []]);
   });
 
+  // Revisão da lanchonete (spec 2026-10-26): combos, salgados de festa, refrigerante com estoque
+  it('the lanchonete has combos and a cento for parties; the combo with coxinha counts as a coxinha', () => {
+    const t = templateFor('lanchonete');
+    expect(t.menuCategories.map((c) => c.name)).toEqual(['Lanches', 'Salgados', 'Combos', 'Para festas', 'Bebidas']);
+    expect(t.recipes.filter((r) => r.menuCategory === 'Combos').length).toBeGreaterThanOrEqual(3);
+    expect(t.recipes.find((r) => r.key === 'CXR')!.countsAs).toEqual([{ recipe: 'COX', qty: 1 }]);
+    expect(t.recipes.filter((r) => r.menuCategory === 'Para festas').map((r) => r.key)).toEqual(['CEN']);
+    // The can has its own insumo: the combo and the can sold alone take from the same stock
+    expect(t.resale.map((s) => s.name)).not.toContain('Refrigerante lata');
+    expect(t.recipes.find((r) => r.name === 'Refrigerante lata')!.items).toEqual([{ ingredient: 'REF', qty: 1, unit: 'un' }]);
+  });
+
   for (const t of STARTER_TEMPLATES) {
     describe(t.slug, () => {
+      it('"conta como" points at counted recipes of the template, never from a counted one or at itself', () => {
+        for (const r of t.recipes.filter((x) => x.countsAs?.length)) {
+          expect([r.key, !!r.dailyCount]).toEqual([r.key, false]);
+          for (const p of r.countsAs!) {
+            const part = t.recipes.find((x) => x.key === p.recipe);
+            expect([r.key, p.recipe, !!part?.dailyCount, p.recipe !== r.key, Number.isInteger(p.qty) && p.qty >= 1]).toEqual([r.key, p.recipe, true, true, true]);
+          }
+        }
+      });
+
       it('ingredient and recipe codes are unique, categories exist', () => {
         const ing = t.ingredients.map((i) => i.key);
         expect(new Set(ing).size).toBe(ing.length);

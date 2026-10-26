@@ -208,7 +208,7 @@ export const SEGMENTS: Segment[] = [
     metaTitle: 'Sistema para Lanchonete | Gastrux',
     metaDescription: 'Sistema para lanchonetes. Controle salgados, sucos, sanduíches, caixa e delivery de forma simples.',
     heroHeadline: 'Gestão simples e rápida para lanchonetes',
-    heroDescription: 'Controle salgados, sucos, sanduíches naturais e caixa em um sistema leve, feito para o dia a dia corrido da lanchonete.',
+    heroDescription: 'Controle salgados, sucos, lanches, combos e caixa em um sistema leve, feito para o dia a dia corrido da lanchonete.',
     painPoints: [
       'Alto volume de itens baratos dificulta o controle',
       'Margem apertada em salgados e sucos',
@@ -218,9 +218,9 @@ export const SEGMENTS: Segment[] = [
     benefits: [
       { icon: 'Zap', title: 'PDV Rápido', description: 'Venda de balcão em poucos toques, com o celular do cliente para o cashback.' },
       { icon: 'Calculator', title: 'Custo por Item', description: 'Saiba a margem de cada salgado, suco e sanduíche.' },
-      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Quantos salgados você fritou, vendeu e perdeu: no fim do dia, o Gastrux mostra quanto deveria sobrar.' },
+      { icon: 'ClipboardList', title: 'Contagem do Dia', description: 'Quantos salgados você fritou, vendeu (sozinhos ou no combo) e perdeu: no fim do dia, o Gastrux mostra quanto deveria sobrar.' },
       { icon: 'Wallet', title: 'Controle de Caixa', description: 'Abertura, sangria, fechamento e conferência de caixa.' },
-      { icon: 'Smartphone', title: 'Pedidos WhatsApp', description: 'Receba pedidos pelo WhatsApp e integre com a produção.' },
+      { icon: 'Calendar', title: 'Encomendas de festa', description: 'Anote o cento de salgados com data de retirada e sinal; a venda fecha quando o cliente busca.' },
       { icon: 'Receipt', title: 'NFC-e Automática', description: 'A nota do consumidor sai ao fechar a conta, com o certificado digital e os dados do contador.' },
     ],
     cta: {

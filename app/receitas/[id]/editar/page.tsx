@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DailyCountField } from '@/components/recipes/daily-count-field';
+import { CountPartsField, type CountPart } from '@/components/recipes/count-parts-field';
 import { ShelfLifeFields, shelfLifeToForm } from '@/components/labels/shelf-life-fields';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +30,7 @@ export default function EditarReceitaPage() {
     shelfLifeChilledDays: '3',
     shelfLifeFrozenDays: '30',
     dailyCount: false,
+    countParts: [] as CountPart[],
     yieldUnit: 'un',
     portionSize: 1,
     portionUnit: 'un',
@@ -57,6 +59,7 @@ export default function EditarReceitaPage() {
         yieldLossFactor: recipe.yieldLossFactor,
         ...shelfLifeToForm(recipe),
         dailyCount: !!recipe.dailyCount,
+        countParts: (recipe.countParts ?? []).map((p: CountPart) => ({ recipeId: p.recipeId, quantity: p.quantity })),
       });
     } catch (error) {
       toast.error('Erro ao carregar receita');
@@ -74,14 +77,18 @@ export default function EditarReceitaPage() {
       const res = await fetch(`/api/recipes/${params.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        // A counted item counts as itself: its "conta como" goes away
+        body: JSON.stringify({ ...formData, countParts: formData.dailyCount ? [] : formData.countParts }),
       });
 
-      if (!res.ok) throw new Error('Erro ao atualizar receita');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Erro ao atualizar receita');
+      }
       toast.success('Receita atualizada com sucesso');
       router.push(`/receitas/${params.id}`);
-    } catch (error) {
-      toast.error('Erro ao atualizar receita');
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao atualizar receita');
     } finally {
       setIsSaving(false);
     }
@@ -212,6 +219,9 @@ export default function EditarReceitaPage() {
           </div>
 
           <DailyCountField checked={!!formData.dailyCount} onChange={(v) => setFormData({ ...formData, dailyCount: v })} />
+          {!formData.dailyCount && (
+            <CountPartsField recipeId={String(params.id)} value={formData.countParts} onChange={(v) => setFormData({ ...formData, countParts: v })} />
+          )}
 
           <ShelfLifeFields value={formData} onChange={(next) => setFormData({ ...formData, ...next })} />
 

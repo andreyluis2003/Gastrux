@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { combosCountingAs } from './count-parts';
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -38,5 +39,21 @@ export async function soldByRecipe(db: Db, restaurantId: string, recipeIds: stri
   ]);
   const out: Record<string, number> = {};
   for (const r of [...lines, ...kitchen]) if (r._sum.quantity) out[r.recipeId] = (out[r.recipeId] ?? 0) + r._sum.quantity;
+  return out;
+}
+
+/**
+ * Sold for the daily count: each counted recipe's own sales plus the sales of the recipes that count as it
+ * (combos, a cento: spec 2026-10-26 lanchonete) times their quantity.
+ */
+export async function soldForCount(db: Db, restaurantId: string, recipeIds: string[], from: Date, to: Date): Promise<Record<string, number>> {
+  const combos = await combosCountingAs(db, restaurantId, recipeIds);
+  const sold = await soldByRecipe(db, restaurantId, [...new Set([...recipeIds, ...combos.keys()])], from, to);
+  const out: Record<string, number> = {};
+  for (const id of recipeIds) if (sold[id]) out[id] = sold[id];
+  for (const [comboId, parts] of combos) {
+    const n = sold[comboId] ?? 0;
+    if (n) for (const p of parts) out[p.partRecipeId] = (out[p.partRecipeId] ?? 0) + n * p.quantity;
+  }
   return out;
 }
