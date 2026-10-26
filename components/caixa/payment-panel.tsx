@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { brl } from './money';
-import { panelState, type PanelPayment } from './panel-state';
+import { addRemaining, panelState, type PanelPayment } from './panel-state';
 
 export { panelState };
 export type { PanelPayment };
@@ -16,10 +16,7 @@ const QUICK: Array<{ method: PanelPayment['method']; label: string }> = [
 /** Payment of a sale (spec §8.3): quick method buttons, several methods, change from cash. */
 export function PaymentPanel({ totalCents, payments, onChange, disabled }: { totalCents: number; payments: PanelPayment[]; onChange: (p: PanelPayment[]) => void; disabled?: boolean }) {
   const state = panelState(totalCents, payments);
-  const fill = (method: PanelPayment['method']) => {
-    const rest = state.remainingCents || (payments.length ? 0 : totalCents);
-    onChange([...payments, { method, amount: (rest / 100).toFixed(2).replace('.', ',') }]);
-  };
+  const fill = (method: PanelPayment['method']) => onChange(addRemaining(totalCents, payments, method));
   return (
     <div className="space-y-3">
       <p className="text-2xl font-bold text-center">{brl(totalCents)}</p>

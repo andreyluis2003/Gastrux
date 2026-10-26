@@ -330,6 +330,35 @@ Conte o que tem em cada forma de pagamento. Depois da contagem, o Gastrux mostra
 O histórico de todos os turnos fica em **Caixa e pagamentos > Histórico de caixas** (dono e gerente).`,
   },
   {
+    categorySlug: 'pdv-e-caixa',
+    slug: 'atalhos-balcao',
+    title: 'Quais são os atalhos de teclado da Venda balcão?',
+    summary: 'Com um teclado, dá para vender no balcão sem tirar a mão: buscar, adicionar, escolher o pagamento e finalizar.',
+    keywords: 'atalho, teclado, balcão, venda rápida, F2, enter, finalizar, caixa, pdv',
+    order: 4,
+    content: `## Os atalhos
+
+| Tecla | O que faz |
+| --- | --- |
+| **F2** | Vai para a busca de itens |
+| **↑ ↓** | Na busca, escolhem o item (ele fica destacado em verde) |
+| **Enter** | Na busca, adiciona o item destacado (produto por peso abre o Pesar) |
+| **Esc** | Sai da busca |
+| **1, 2, 3, 4** | Pagamento em Dinheiro, PIX, Crédito ou Débito, com o valor que falta |
+| **Ctrl + Enter** | Finaliza a venda |
+
+Os números só valem fora de um campo de texto: digitando o CPF ou o celular, eles vão para o campo.
+
+## Uma venda inteira pelo teclado
+
+1. **F2**, digite "cox" e **Enter**: uma coxinha entra na venda. Repita para os outros itens.
+2. **Esc** para sair da busca.
+3. **1** para receber em dinheiro (o valor do total já vem preenchido; mude para calcular o troco).
+4. **Ctrl + Enter** para finalizar.
+
+A lista dos atalhos aparece em cima da busca, em telas de computador.`,
+  },
+  {
     categorySlug: 'integracao-delivery',
     slug: 'acerto-entregador',
     title: 'Como faço o acerto com o entregador?',

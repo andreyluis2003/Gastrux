@@ -29,6 +29,17 @@ export function panelState(totalCents: number, payments: PanelPayment[]) {
   };
 }
 
+/**
+ * A payment method button (or its key at the counter): the first method takes the whole total, the next one what is
+ * still missing. Already paid: nothing changes (the same array comes back).
+ */
+export function addRemaining(totalCents: number, payments: PanelPayment[], method: PanelPayment['method']): PanelPayment[] {
+  const state = panelState(totalCents, payments);
+  if (payments.length && state.remainingCents === 0) return payments;
+  const rest = payments.length ? state.remainingCents : totalCents;
+  return [...payments, { method, amount: (rest / 100).toFixed(2).replace('.', ',') }];
+}
+
 /** "1.234,50" -> "1234.50", the amount format the API reads. */
 export const toApiAmount = (amount: string) => (amount.includes(',') ? amount.replace(/\./g, '').replace(',', '.') : amount.trim());
 

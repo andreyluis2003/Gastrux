@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Minus, Plus, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
 import { PaymentPanel, panelState, type PanelPayment } from '@/components/caixa/payment-panel';
-import { finishHint, toApiAmount } from '@/components/caixa/panel-state';
+import { addRemaining, finishHint, toApiAmount } from '@/components/caixa/panel-state';
+import { COUNTER_KEYS_LEGEND, counterKeyAction } from '@/lib/vender/counter-keys';
 import { OpenShiftCard } from '@/components/caixa/open-shift-card';
 import { brl } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
@@ -59,6 +60,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   const shift = useDeviceShift();
   const [toKitchen, setToKitchen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Keyboard (atalhos no balcão, 2026-10-26): the highlighted search result, Enter adds it
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [highlight, setHighlight] = useState(0);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
     fetch('/api/cardapio/itens')
@@ -79,6 +84,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   const visible = menu.filter((m) => m.available !== false && m.name?.toLowerCase().includes(search.toLowerCase()));
   const change = (id: string, delta: number) =>
     setCart((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
+  const picked = visible[Math.min(highlight, Math.max(0, visible.length - 1))];
+  useEffect(() => {
+    if (searchFocused) document.querySelector('[data-counter-picked="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [highlight, searchFocused]);
 
   const finish = async () => {
     if (itemCount === 0) {
@@ -153,6 +162,41 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
     }
   };
 
+  // The latest state for the key handler, which is registered once
+  const keyState = useRef({ visible, picked, total, payments, itemCount });
+  keyState.current = { visible, picked, total, payments, itemCount };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const inField = !!t && (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable);
+      // A dialog over the sale (Pesar, a confirm) keeps its own keys
+      if (t?.closest?.('[role="dialog"]')) return;
+      const action = counterKeyAction({ key: e.key, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, inField, inSearch: t === searchRef.current });
+      if (!action) return;
+      e.preventDefault();
+      const s = keyState.current;
+      if (action === 'focusSearch') { searchRef.current?.focus(); searchRef.current?.select(); return; }
+      if (action === 'next') { setHighlight((h) => Math.min(h + 1, Math.max(0, s.visible.length - 1))); return; }
+      if (action === 'prev') { setHighlight((h) => Math.max(0, h - 1)); return; }
+      if (action === 'leaveSearch') { setSearch(''); searchRef.current?.blur(); return; }
+      if (action === 'pick') {
+        if (!s.picked) return;
+        if (s.picked.soldByWeight) setWeighing(s.picked);
+        else { change(s.picked.id, 1); toast.success(`+1 ${s.picked.name}`, { duration: 1200 }); }
+        setSearch('');
+        return;
+      }
+      if (action === 'finish') { if (!saving) finishRef.current(); return; }
+      if (action.startsWith('pay:') && s.itemCount > 0) {
+        setPayments(addRemaining(Math.round(s.total * 100), s.payments, action.slice(4) as PanelPayment['method']));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [saving]);
+
   return (
     <Card className="p-6 mb-8 bg-white shadow-lg">
       <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
@@ -161,10 +205,20 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       {!online && (
         <p className="text-sm text-amber-700 mb-3">Sem internet: a venda fica guardada neste aparelho e é enviada quando a conexão voltar.</p>
       )}
-      <Input placeholder="Buscar item..." value={search} onChange={(e) => setSearch(e.target.value)} className="mb-3" />
+      <p className="hidden md:block text-xs text-slate-500 mb-2">{COUNTER_KEYS_LEGEND}</p>
+      <Input
+        ref={searchRef}
+        placeholder="Buscar item... (F2)"
+        aria-label="Buscar item"
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); setHighlight(0); }}
+        onFocus={() => setSearchFocused(true)}
+        onBlur={() => setSearchFocused(false)}
+        className="mb-3"
+      />
       <div className="grid sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto mb-4">
         {visible.map((entry) => (
-          <div key={entry.id} className="flex items-center justify-between gap-2 border rounded-md p-2">
+          <div key={entry.id} data-counter-picked={searchFocused && entry === picked ? 'true' : undefined} className={`flex items-center justify-between gap-2 border rounded-md p-2 ${searchFocused && entry === picked ? 'ring-2 ring-green-600 bg-green-50' : ''}`}>
             <div>
               <div className="font-semibold text-sm">{entry.name}</div>
               <div className="text-xs text-green-700">{brl(Math.round(priceOf(entry) * 100))}{entry.soldByWeight ? '/kg' : ''}</div>
