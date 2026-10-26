@@ -48,11 +48,10 @@ aqui", `lib/tutorials/published.ts`). Precisa de `npx prisma migrate deploy` (mi
 
 ### Achados ao gravar o lote 2 (2026-10-25)
 
-- Compras > Gerar Automaticamente só lista insumos com fornecedor ligado (o item da lista pega nome, preço e
-  recebimento pelo fornecedor). Agora a resposta diz quais estão abaixo do mínimo sem fornecedor (06605d1); o passo
-  seguinte seria incluir esses insumos na lista sem fornecedor (nome e custo pelo próprio insumo, e o recebimento
-  em `lib/stock/receive-shopping-list.ts` sem `supplier`).
-- O caminho no topo de Desperdício e de Contagem de estoque mostra "Início > Início > ..." (o primeiro Início se repete).
+- Feito em 2026-10-26: Compras > Gerar Automaticamente inclui os insumos sem fornecedor (custo de referência do
+  insumo, mostrados pelo nome, recebidos no estoque) e o caminho "Início > Início" saiu de Desperdício, Contagem de
+  estoque, CMV e Engenharia de cardápio. Os vídeos tutoriais dessas quatro telas ainda mostram o "Início" repetido
+  no topo (gravados antes da correção); regravar é opcional.
 
 ### Menores deixados pela revisão final
 

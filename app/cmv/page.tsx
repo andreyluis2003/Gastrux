@@ -114,7 +114,7 @@ export default function CMVPage() {
 
   return (
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
-      <Breadcrumb items={[{ label: 'Início', href: '/dashboard' }, { label: 'CMV' }]} />
+      <Breadcrumb items={[{ label: 'CMV' }]} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <BackButton href="/dashboard" label="Voltar" />

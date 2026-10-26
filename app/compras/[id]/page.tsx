@@ -42,6 +42,8 @@ interface ShoppingListItem {
   priority: string;
   checked: boolean;
   notes: string | null;
+  /** An insumo without a supplier (automatic list, 2026-10-26): the API sends the insumo here */
+  ingredient?: ShoppingListItem['supplier']['ingredient'] | null;
   supplier: {
     id: string;
     supplierName: string;
@@ -532,7 +534,7 @@ export default function ShoppingListDetailPage() {
             <div className="divide-y dark:divide-slate-700">
               {list.items.map((item) => {
                 const prio = priorityConfig[item.priority] || priorityConfig.MEDIUM;
-                const ingredient = item.supplier?.ingredient;
+                const ingredient = item.supplier?.ingredient ?? item.ingredient ?? undefined;
                 return (
                   <div
                     key={item.id}
@@ -567,7 +569,7 @@ export default function ShoppingListDetailPage() {
                             </p>
                             <p className="text-xs text-slate-500 break-words">
                               {ingredient?.code ? `${ingredient.code} • ` : ''}
-                              Fornecedor: {item.supplier?.supplierName || (item.notes?.startsWith('Item não cadastrado:') ? '(não cadastrado)' : '—')}
+                              Fornecedor: {item.supplier?.supplierName || (item.notes?.startsWith('Item não cadastrado:') ? '(não cadastrado)' : 'sem fornecedor ligado')}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -590,7 +592,7 @@ export default function ShoppingListDetailPage() {
                             <strong>{item.quantity}</strong> {item.unit}
                           </span>
                           <span className="text-slate-600 dark:text-slate-400">
-                            Unit: {formatBRL(item.supplier?.unitPrice || 0)}
+                            Unit: {formatBRL(item.supplier?.unitPrice ?? (item.quantity > 0 ? item.estimatedCost / item.quantity : 0))}
                           </span>
                           <span className="font-semibold text-emerald-700 dark:text-emerald-400">
                             {formatBRL(item.estimatedCost)}

@@ -78,7 +78,7 @@ export default function EngenhariaCardapioPage() {
 
   return (
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
-      <Breadcrumb items={[{ label: 'Início', href: '/dashboard' }, { label: 'Engenharia de cardápio' }]} />
+      <Breadcrumb items={[{ label: 'Engenharia de cardápio' }]} />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <BackButton href="/dashboard" label="Voltar" />

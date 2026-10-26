@@ -54,7 +54,16 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(list);
+    // An item of an insumo without a supplier (automatic list, 2026-10-26) is shown by the insumo itself
+    const loose = [...new Set(list.items.filter((i) => !i.supplier && i.ingredientId).map((i) => i.ingredientId as string))];
+    const ingredients = loose.length
+      ? await prisma.ingredient.findMany({ where: { id: { in: loose }, restaurantId }, include: { category: true, currentStock: true } })
+      : [];
+    const byId = new Map(ingredients.map((g) => [g.id, g]));
+    return NextResponse.json({
+      ...list,
+      items: list.items.map((i) => (!i.supplier && i.ingredientId ? { ...i, ingredient: byId.get(i.ingredientId) ?? null } : i)),
+    });
   } catch (error) {
     console.error('Error fetching shopping list:', error);
     return NextResponse.json(

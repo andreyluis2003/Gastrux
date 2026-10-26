@@ -86,16 +86,12 @@ export async function POST(req: NextRequest) {
       const itemsToCreate: {
         restaurantId: string;
         ingredientId: string;
-        supplierId: string;
+        supplierId: string | null;
         quantity: number;
         unit: any;
         estimatedCost: number;
         priority: any;
       }[] = [];
-
-      // Below the minimum but with no supplier linked: a list item needs one (price and receiving), so they
-      // are named in the answer instead of being skipped in silence (2026-10-25)
-      const withoutSupplier: string[] = [];
 
       for (const stock of stocks) {
         const ingredient = stock.ingredient;
@@ -103,12 +99,10 @@ export async function POST(req: NextRequest) {
 
         const minStock = ingredient.minimumStock ?? 0;
         if (stock.currentQuantity >= minStock) continue;
-        if (ingredient.suppliers.length === 0) {
-          withoutSupplier.push(ingredient.name);
-          continue;
-        }
-
-        const supplier = ingredient.suppliers[0];
+        // Without a supplier linked it goes in all the same, at the insumo's reference cost (2026-10-26: it was
+        // left out, and the list missed what Estoque showed as Crítico); it is received by the insumo
+        const supplier = ingredient.suppliers[0] ?? null;
+        const unitPrice = supplier ? supplier.unitPrice : ingredient.referenceCost ?? 0;
         const neededQty = Math.max(minStock * 2 - stock.currentQuantity, 1);
         const priority =
           stock.currentQuantity <= 0
@@ -120,19 +114,16 @@ export async function POST(req: NextRequest) {
         itemsToCreate.push({
           restaurantId,
           ingredientId: ingredient.id,
-          supplierId: supplier.id,
+          supplierId: supplier?.id ?? null,
           quantity: parseFloat(neededQty.toFixed(2)),
           unit: ingredient.standardUnit,
-          estimatedCost: parseFloat((neededQty * supplier.unitPrice).toFixed(2)),
+          estimatedCost: parseFloat((neededQty * unitPrice).toFixed(2)),
           priority: priority,
         });
       }
 
       if (itemsToCreate.length === 0) {
-        const error = withoutSupplier.length
-          ? `Abaixo do estoque mínimo, mas sem fornecedor ligado: ${withoutSupplier.join(', ')}. Ligue um fornecedor ao insumo (Estoque e compras > Fornecedores) ou use Lista Vazia.`
-          : 'Nenhum ingrediente abaixo do estoque mínimo encontrado';
-        return NextResponse.json({ error }, { status: 400 });
+        return NextResponse.json({ error: 'Nenhum ingrediente abaixo do estoque mínimo encontrado' }, { status: 400 });
       }
 
       const totalCost = itemsToCreate.reduce(
