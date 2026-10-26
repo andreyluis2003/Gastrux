@@ -1521,6 +1521,11 @@ model ExternalOrder {
   /// A customer's cancellation request waiting for the restaurant's answer (iFood handshake dispute)
   disputeId             String?
   disputeExpiresAt      DateTime?
+  /// Who took it out (spec 2026-10-26 acerto com o entregador): a name typed at "Saiu para entrega"
+  driverName            String?
+  /// The driver settlement that brought its money to the drawer; null = not settled
+  settlementId          String?
+  settlement            DeliverySettlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   deliveryLogs          DeliveryLog[]
@@ -1532,6 +1537,7 @@ model ExternalOrder {
   @@index([restaurantId])
   @@index([status])
   @@index([orderReceivedAt])
+  @@index([restaurantId, settlementId])
   @@map("external_orders")
 }
 
@@ -1972,11 +1978,36 @@ model CashSession {
   cashRegister      CashRegister       @relation(fields: [cashRegisterId], references: [id])
   entries           CashSessionEntry[]
   onlinePayments    Payment[]          @relation("CashSessionOnlinePayments")
+  deliverySettlements DeliverySettlement[]
 
   @@index([restaurantId])
   @@index([cashRegisterId])
   @@index([openedAt])
   @@map("cash_sessions")
+}
+
+/// Acerto com o entregador (spec 2026-10-26): the money of the orders paid at the door, brought to a shift
+model DeliverySettlement {
+  id                String          @id @default(cuid())
+  restaurantId      String
+  cashSessionId     String
+  driverName        String?
+  orderCount        Int
+  expectedCashCents Int
+  receivedCashCents Int
+  creditCents       Int             @default(0)
+  debitCents        Int             @default(0)
+  otherCents        Int             @default(0)
+  driverPayCents    Int             @default(0)
+  reason            String?
+  createdById       String
+  createdAt         DateTime        @default(now())
+  cashSession       CashSession     @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  orders            ExternalOrder[]
+
+  @@index([restaurantId, createdAt])
+  @@index([cashSessionId])
+  @@map("delivery_settlements")
 }
 
 /// One ledger line of a shift: a sale payment, change, sangria, suprimento, despesa, estorno or ajuste.
@@ -1998,6 +2029,8 @@ model CashSessionEntry {
 
   /// The bill this drawer expense paid (spec 2026-10-18 contas a pagar): the DRE counts the bill, not this entry
   payableId String?
+  /// The driver settlement this line belongs to (spec 2026-10-26 acerto com o entregador)
+  deliverySettlementId String?
 
   @@index([cashSessionId])
   @@index([payableId])

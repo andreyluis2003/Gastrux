@@ -9,6 +9,7 @@ import { pickRegister, readRemembered, remember, type RegisterOption } from '@/l
 import { OpenShiftCard } from '@/components/caixa/open-shift-card';
 import { EntryDialog } from '@/components/caixa/entry-dialog';
 import { CloseShiftDialog } from '@/components/caixa/close-shift-dialog';
+import { DriverSettlementDialog } from '@/components/caixa/driver-settlement-dialog';
 import { brl } from '@/components/caixa/money';
 import { CASH_METHODS, METHOD_KEY, METHOD_LABEL } from '@/lib/caixa/payment-methods';
 import { ENTRY_TYPE_LABEL } from '@/lib/caixa/labels';
@@ -25,6 +26,7 @@ export default function CaixaPage() {
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<null | 'WITHDRAWAL' | 'SUPPLY' | 'EXPENSE'>(null);
   const [closing, setClosing] = useState(false);
+  const [settling, setSettling] = useState(false);
   const [role, setRole] = useState<string>('CASHIER');
 
   const loadView = useCallback(async (reg: RegisterOption) => {
@@ -82,10 +84,11 @@ export default function CaixaPage() {
           )}
           <Card className="p-4">
             <p className="text-sm text-gray-600">{view.register.name} · aberto por {view.openedByName ?? '-'} às {time(view.session.openedAt)}</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-3">
               <Button size="lg" variant="outline" onClick={() => setDialog('WITHDRAWAL')}>Sangria</Button>
               <Button size="lg" variant="outline" onClick={() => setDialog('SUPPLY')}>Suprimento</Button>
               {isManager && <Button size="lg" variant="outline" onClick={() => setDialog('EXPENSE')}>Despesa</Button>}
+              <Button size="lg" variant="outline" onClick={() => setSettling(true)}>Acerto do entregador</Button>
               <Button size="lg" className="bg-red-600 hover:bg-red-700" onClick={() => setClosing(true)}>Fechar caixa</Button>
             </div>
           </Card>
@@ -127,6 +130,7 @@ export default function CaixaPage() {
             )}
           </Card>
 
+          {settling && <DriverSettlementDialog sessionId={view.session.id} isManager={isManager} onClose={() => setSettling(false)} onDone={() => loadView(register)} />}
           {dialog && <EntryDialog sessionId={view.session.id} type={dialog} open onClose={() => setDialog(null)} onDone={() => loadView(register)} />}
           {closing && <CloseShiftDialog sessionId={view.session.id} registerName={view.register.name} onClose={() => setClosing(false)} onClosed={() => loadView(register)} />}
         </>

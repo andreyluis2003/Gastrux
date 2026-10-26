@@ -19,6 +19,8 @@ type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'PICKED_UP'
 interface ExternalOrder {
   id: string;
   externalOrderId: string;
+  /** Who took it out (spec 2026-10-26 acerto com o entregador) */
+  driverName?: string | null;
   status: OrderStatus;
   totalAmount: number;
   deliveryFee: number;
@@ -143,6 +145,8 @@ export default function DeliveryOrdersPage() {
   }, [autoRefresh, fetchOrders]);
 
   const [reasonPick, setReasonPick] = useState<ReasonPick | null>(null);
+  // "Saiu para entrega": who takes it, for the driver settlement in the Caixa (spec 2026-10-26)
+  const [dispatch, setDispatch] = useState<{ order: ExternalOrder; driver: string } | null>(null);
 
   const send = async (orderId: string, payload: Record<string, unknown>, done: string) => {
     setUpdatingId(orderId);
@@ -212,16 +216,17 @@ export default function DeliveryOrdersPage() {
     toast.success(value ? 'Os pedidos vão direto para a cozinha' : 'Cada pedido espera o "Aceitar"');
   };
 
-  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const updateStatus = async (orderId: string, newStatus: OrderStatus, driverName?: string) => {
     setUpdatingId(orderId);
     try {
       const res = await fetch(`/api/admin/integrations/orders/${orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(driverName === undefined ? { status: newStatus } : { status: newStatus, driverName }),
       });
       if (!res.ok) { const body = await res.json().catch(() => ({})); toast.error(body.error || 'Erro ao atualizar pedido'); return; }
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      const driver = driverName === undefined ? {} : { driverName: driverName.trim() || null };
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, ...driver } : o));
       toast.success(`Pedido atualizado para: ${STATUS_CONFIG[newStatus].label}`);
     } catch {
       toast.error('Erro ao atualizar pedido');
@@ -525,6 +530,7 @@ export default function DeliveryOrdersPage() {
                         <span>Subtotal: <strong>{formatBRL(order.totalAmount - order.deliveryFee)}</strong></span>
                         {order.deliveryFee > 0 && <span>Entrega: <strong>{formatBRL(order.deliveryFee)}</strong></span>}
                         {order.platformFee > 0 && <span>Taxa plataforma: <strong>{formatBRL(order.platformFee)}</strong></span>}
+                        {order.driverName && <span>Entregador: <strong>{order.driverName}</strong></span>}
                       </div>
 
                       {/* Status Actions */}
@@ -532,7 +538,7 @@ export default function DeliveryOrdersPage() {
                         <Button
                           size="sm"
                           disabled={isUpdating}
-                          onClick={() => updateStatus(order.id, nextStatus)}
+                          onClick={() => (nextStatus === 'PICKED_UP' ? setDispatch({ order, driver: order.driverName ?? '' }) : updateStatus(order.id, nextStatus))}
                           className="w-full"
                         >
                           <ArrowRight className="h-4 w-4 mr-1" />
@@ -560,6 +566,38 @@ export default function DeliveryOrdersPage() {
           </div>
         )}
       </div>
+
+      {dispatch && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setDispatch(null)}>
+          <Card role="dialog" aria-label="Saiu para entrega" className="w-full max-w-sm p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-semibold">Saiu para entrega</h2>
+            <label htmlFor="driver-name" className="text-sm text-muted-foreground block">Quem vai levar? (opcional: serve para o acerto no Caixa)</label>
+            <input
+              id="driver-name"
+              list="driver-names"
+              autoFocus
+              maxLength={60}
+              value={dispatch.driver}
+              onChange={(e) => setDispatch({ ...dispatch, driver: e.target.value })}
+              placeholder="Nome do entregador"
+              className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
+            />
+            <datalist id="driver-names">
+              {[...new Set(orders.map((o) => o.driverName).filter(Boolean))].map((n) => <option key={n as string} value={n as string} />)}
+            </datalist>
+            <div className="flex gap-2 justify-end">
+              <Button size="sm" variant="outline" onClick={() => setDispatch(null)}>Voltar</Button>
+              <Button
+                size="sm"
+                disabled={updatingId === dispatch.order.id}
+                onClick={async () => { const d = dispatch; setDispatch(null); await updateStatus(d.order.id, 'PICKED_UP', d.driver); }}
+              >
+                Saiu para entrega
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {reasonPick && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setReasonPick(null)}>

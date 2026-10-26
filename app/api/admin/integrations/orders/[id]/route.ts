@@ -7,6 +7,7 @@ import { notifyOrderStatus } from '@/lib/delivery-orders/callback';
 import { answerDispute, cancelPlatformOrder, isPlatformOrder, pushPlatformStatus } from '@/lib/delivery-orders/platform-sync';
 import { DELIVERY_ROLES } from '@/lib/delivery-orders/roles';
 import { canMoveExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
+import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireRestaurantRole([...DELIVERY_ROLES], DENIED);
   if (!auth.ok) return auth.response;
-  const { status } = await request.json().catch(() => ({}));
+  const { status, driverName } = await request.json().catch(() => ({}));
   if (!status || !Object.values(ExternalOrderStatus).includes(status)) return NextResponse.json({ error: 'Status inválido' }, { status: 400 });
   const order = await prisma.externalOrder.findFirst({ where: { id: params.id, restaurantId: auth.member.restaurantId } });
   if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
@@ -83,7 +84,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const kitchen = await prisma.order.findUnique({ where: { id: order.internalOrderId }, select: { status: true } });
     if (kitchen && kitchen.status !== 'CANCELLED') return NextResponse.json({ error: 'Este pedido já está na cozinha: cancele pela tela da cozinha (exige um gerente)' }, { status: 409 });
   }
-  const moved = await prisma.externalOrder.updateMany({ where: { id: order.id, status: order.status }, data: { status } });
+  // "Saiu para entrega" takes who took it, for the driver settlement in the Caixa (spec 2026-10-26)
+  const driver = status === 'PICKED_UP' && driverName !== undefined ? { driverName: normalizeDriverName(driverName) } : {};
+  const moved = await prisma.externalOrder.updateMany({ where: { id: order.id, status: order.status }, data: { status, ...driver } });
   if (moved.count === 0) return NextResponse.json({ error: 'O pedido mudou enquanto era atualizado. Atualize a tela.' }, { status: 409 });
   await prisma.deliveryLog.create({
     data: { externalOrderId: order.id, eventType: 'STATUS_CHANGED', previousStatus: order.status, newStatus: status, message: 'Status mudado em Pedidos de delivery', eventTimestamp: new Date() },

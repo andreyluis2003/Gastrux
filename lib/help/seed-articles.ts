@@ -329,6 +329,34 @@ Conte o que tem em cada forma de pagamento. Depois da contagem, o Gastrux mostra
 O histórico de todos os turnos fica em **Caixa e pagamentos > Histórico de caixas** (dono e gerente).`,
   },
   {
+    categorySlug: 'integracao-delivery',
+    slug: 'acerto-entregador',
+    title: 'Como faço o acerto com o entregador?',
+    summary: 'O dinheiro e o cartão dos pedidos pagos na entrega entram no caixa pelo botão Acerto do entregador.',
+    keywords: 'entregador, motoboy, acerto, delivery, pago na entrega, dinheiro, troco, cartão na entrega, taxa de entrega',
+    order: 3,
+    content: `## Para que serve
+
+Num pedido de delivery pago na entrega (dinheiro, ou cartão e vale passados pelo entregador), a venda já conta no faturamento, mas o dinheiro só chega à gaveta quando o entregador volta. O acerto põe esse dinheiro no caixa e mostra se ficou faltando algo.
+
+## Quem levou cada pedido
+
+Em **Vender > Pedidos de delivery**, ao avançar o pedido para **Em Entrega**, o Gastrux pergunta quem vai levar. Escreva o nome do entregador (os nomes já usados aparecem como sugestão). É opcional: pedidos sem nome ficam em "Sem nome" no acerto.
+
+## Fazendo o acerto
+
+1. Com o caixa aberto, toque em **Acerto do entregador** (Caixa e pagamentos > Caixa).
+2. Escolha o entregador. Aparecem os pedidos pagos na entrega que já saíram e ainda não foram acertados, com o total em dinheiro, cartão e vale.
+3. Desmarque o pedido que ele ainda não trouxe, se for o caso.
+4. Digite o dinheiro que ele entregou. Se não bater, o Gastrux mostra quanto falta ou sobra e pede o motivo.
+5. Se você paga o entregador na hora, informe o valor em **Pagar ao entregador**: sai da gaveta como despesa "Entregador". O caixa paga até a soma das taxas de entrega; acima disso, só o gerente.
+6. Toque em **Lançar acerto**.
+
+O dinheiro entra no esperado da gaveta, o cartão no esperado do crédito e do débito, e a diferença fica como ajuste, com o motivo. A venda não conta de novo: ela já está no faturamento desde o pedido.
+
+> **Dica**: o troco que o entregador leva sai e volta para a gaveta, então não precisa lançar. Faça os acertos antes de fechar o caixa.`,
+  },
+  {
     categorySlug: 'comanda-e-kds',
     slug: 'usar-kds',
     title: 'Como uso a tela da cozinha (KDS)?',

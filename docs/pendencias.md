@@ -3,6 +3,16 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Acerto com o entregador (2026-10-26)
+
+Spec `docs/superpowers/specs/2026-10-26-acerto-entregador-design.md`. Ficou de fora, de propósito:
+
+- Cadastro de entregadores (hoje é um nome digitado), taxa fixa por entrega e relatório do mês por entregador.
+- O nome do entregador só é pedido em Pedidos de delivery; a cozinha (KDS) não pergunta quando ela marca a saída.
+- Acerto desfeito: não há "desfazer". Errou? Um gerente lança um ajuste no caixa; os pedidos continuam acertados.
+- Pedidos do iFood entregues pelo iFood não são pagos na entrega para a loja; os de entrega própria pagos na porta
+  entram no acerto se o iFood informar o pagamento como na entrega (não testado sem as credenciais do iFood).
+
 ## Revisão da lanchonete (2026-10-26)
 
 Spec `docs/superpowers/specs/2026-10-26-lanchonete-revisao-design.md`. Entrou: "Na contagem do dia, conta como"
