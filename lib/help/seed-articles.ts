@@ -49,6 +49,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   'e5edebb211040df1eca5636d345d0cf33afb86603c0b874cd2f1e2e224e0b9db', // contagem-do-dia (before combos counted as their parts)
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
   'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
+  'a8bbe2c80766c08e1febbca29251bc627b1131b95280b2f266715da13e4cbaf9', // site-de-delivery (before the board view)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -625,6 +626,8 @@ Os pedidos chegam em **Vender > Pedidos de delivery**, com a origem de cada um (
 ## Aceitar pedidos sozinho
 
 Em **Vender > Pedidos de delivery**, o dono ou o gerente escolhe se os pedidos vão direto para a cozinha (**Aceitar pedidos sozinho**, o padrão) ou se cada um toca o alarme e espera o **Aceitar**. Quem recusa diz o motivo. Os pedidos do site vão sempre direto, porque o pagamento online precisa do pedido criado.
+
+O botão **Lista | Quadro** muda a forma de ver. No **Quadro**, os pedidos ativos ficam em quatro colunas (Novos, Em preparo, Prontos, Em entrega), o mais antigo em cima, com um botão para passar à etapa seguinte e a forma de pagamento (pago online ou o que o entregador cobra na entrega). O aparelho lembra a sua escolha. Cancelar um pedido aceito continua na Lista.
 
 ## Pagamento online
 

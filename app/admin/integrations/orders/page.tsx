@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/formatters';
+import { boardColumns, paymentHint } from '@/lib/delivery-orders/board';
 import {
   RefreshCw, Check, X, ChefHat, Bike, Package, Clock,
   Bell, BellOff, Filter, AlertCircle, Search, Volume2, VolumeX,
@@ -96,6 +97,15 @@ export default function DeliveryOrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [autoAccept, setAutoAccept] = useState<boolean | null>(null);
   const [canChangeSettings, setCanChangeSettings] = useState(false);
+  // Lista or Quadro (por etapa), remembered on this device (2026-10-26)
+  const [view, setView] = useState<'list' | 'board'>('list');
+  useEffect(() => {
+    try { if (localStorage.getItem('gx-delivery-view') === 'board') setView('board'); } catch {}
+  }, []);
+  const chooseView = (v: 'list' | 'board') => {
+    setView(v);
+    try { localStorage.setItem('gx-delivery-view', v); } catch {}
+  };
   const prevOrderCountRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -346,7 +356,11 @@ export default function DeliveryOrdersPage() {
               className="w-full pl-9 pr-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
             />
           </div>
-          <select
+          <div className="inline-flex rounded-md border bg-white dark:bg-gray-800 p-0.5 self-start" role="group" aria-label="Ver como">
+            <button type="button" className={`px-3 py-1.5 text-sm rounded ${view === 'list' ? 'bg-gray-900 text-white' : ''}`} aria-pressed={view === 'list'} onClick={() => chooseView('list')}>Lista</button>
+            <button type="button" className={`px-3 py-1.5 text-sm rounded ${view === 'board' ? 'bg-gray-900 text-white' : ''}`} aria-pressed={view === 'board'} onClick={() => chooseView('board')}>Quadro</button>
+          </div>
+          {view === 'list' && <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
             className="px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
@@ -359,7 +373,7 @@ export default function DeliveryOrdersPage() {
             <option value="READY">Prontos</option>
             <option value="DELIVERED">Entregues</option>
             <option value="CANCELLED">Cancelados</option>
-          </select>
+          </select>}
           <select
             value={platformFilter}
             onChange={(e) => setPlatformFilter(e.target.value)}
@@ -372,8 +386,64 @@ export default function DeliveryOrdersPage() {
           </select>
         </div>
 
-        {/* Orders List */}
-        {loading ? (
+        {/* Board: the active orders by stage, the one waiting longest on top */}
+        {view === 'board' && !loading ? (
+          <div className="flex gap-3 overflow-x-auto pb-2 snap-x lg:grid lg:grid-cols-4 lg:overflow-visible">
+            {boardColumns(orders.filter(o => {
+              if (platformFilter !== 'all' && o.integration.platform !== platformFilter) return false;
+              if (!searchQuery) return true;
+              const q = searchQuery.toLowerCase();
+              return o.customerName.toLowerCase().includes(q) || o.externalOrderId.toLowerCase().includes(q) || o.deliveryAddress.toLowerCase().includes(q);
+            })).map((col) => (
+              <section key={col.key} aria-label={col.label} className="snap-start shrink-0 w-[80vw] sm:w-72 lg:w-auto rounded-lg bg-gray-100 dark:bg-gray-800 p-2 space-y-2">
+                <h2 className="text-sm font-semibold px-1 flex items-center justify-between">
+                  {col.label} <span className="text-xs font-normal text-muted-foreground">{col.orders.length}</span>
+                </h2>
+                {col.orders.length === 0 && <p className="text-xs text-muted-foreground px-1 py-4 text-center">Nada aqui</p>}
+                {col.orders.map((order) => {
+                  const platCfg = PLATFORM_CONFIG[order.integration.platform] || { label: order.integration.platform, color: 'bg-gray-500', logo: '⚪' };
+                  const nextStatus = NEXT_STATUS[order.status];
+                  const isUpdating = updatingId === order.id;
+                  const items = parseItems(order.items);
+                  const pay = paymentHint(order);
+                  return (
+                    <Card key={order.id} className={`p-3 space-y-1.5 ${order.status === 'PENDING' ? 'ring-2 ring-amber-400' : ''}`}>
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span title={platCfg.label}>{platCfg.logo} <span className="font-bold text-sm">#{orderCode(order)}</span></span>
+                        <span className="text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />{timeSince(order.orderReceivedAt)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate">{order.customerName}</span>
+                        <span className="font-semibold shrink-0">{formatBRL(order.totalAmount)}</span>
+                      </div>
+                      {items.length > 0 && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{items.map((i: any) => `${i.quantity || 1}x ${i.name || i.productName || 'Item'}`).join(', ')}</p>
+                      )}
+                      {(pay || order.driverName) && (
+                        <p className="text-xs">{pay}{pay && order.driverName ? ' · ' : ''}{order.driverName ? `Entregador: ${order.driverName}` : ''}</p>
+                      )}
+                      {order.status === 'PENDING' ? (
+                        <div className="flex gap-2 pt-1">
+                          <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700 text-white" disabled={isUpdating} onClick={() => act(order.id, 'accept')}>Aceitar</Button>
+                          <Button size="sm" variant="outline" className="text-red-600" disabled={isUpdating} onClick={() => act(order.id, 'reject')}>Recusar</Button>
+                        </div>
+                      ) : nextStatus ? (
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          disabled={isUpdating}
+                          onClick={() => (nextStatus === 'PICKED_UP' ? setDispatch({ order, driver: order.driverName ?? '' }) : updateStatus(order.id, nextStatus))}
+                        >
+                          <ArrowRight className="h-4 w-4 mr-1" /> {STATUS_CONFIG[nextStatus].label}
+                        </Button>
+                      ) : null}
+                    </Card>
+                  );
+                })}
+              </section>
+            ))}
+          </div>
+        ) : loading ? (
           <div className="space-y-3">
             {[1,2,3].map(i => <Card key={i} className="h-32 animate-pulse bg-gray-100" />)}
           </div>
