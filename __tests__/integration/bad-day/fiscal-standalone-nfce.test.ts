@@ -92,13 +92,25 @@ describe('stand-alone NFC-e on /admin/fiscal', () => {
     const { status, body } = await post({ items: [item()], paymentMethod: 'pix', customerCPF: '123.456.789-09' });
 
     expect(status).toBe(201);
-    expect(body).toMatchObject({ success: true, status: 'authorized' });
+    expect(body).toMatchObject({ success: true, status: 'authorized', simulated: false });
     expect(fakeProvider.emitNFCe).toHaveBeenCalledTimes(1);
     expect(sent()).toMatchObject({ documentType: 'NFCe', number: 1, totalAmount: 25, paymentMethod: 'pix', customerCPF: '12345678909' });
     expect(sent().items[0]).toMatchObject({ ncm: '21069090', cfop: '5102', icmsOrigin: '0', icmsCST: '102', quantity: 2, unitPrice: 12.5, totalPrice: 25 });
     const [doc] = await docsOfA();
     expect(doc).toMatchObject({ status: 'authorized', accessKey: `35${'1'.repeat(41)}1`, documentNumber: 1 });
     expect(Number(doc.totalAmount)).toBe(25);
+  });
+
+  // The fiscal setup's test note must not read as a real authorization when no SEFAZ was reached (2026-10-26)
+  it('says when the note was simulated (no Focus token, or a test environment that does not send)', async () => {
+    const previous = fakeProvider.name;
+    fakeProvider.name = 'mock';
+    try {
+      const { body } = await post({ items: [item()], paymentMethod: 'pix' });
+      expect(body.simulated).toBe(true);
+    } finally {
+      fakeProvider.name = previous;
+    }
   });
 
   it("uses the chosen product's own fiscal data (substitution-tax beer with CEST)", async () => {

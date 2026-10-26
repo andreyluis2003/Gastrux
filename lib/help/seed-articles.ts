@@ -48,6 +48,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '106327f7a20c2d0c5dc46cc8fe38dee3cc6cd4ed873b95f57477dfe030d09671', // contagem-do-dia (before the other segments' examples were counted)
   'ed3677b9cc501137431a6328018b7f8f15809b1491a9cb96faca3acabbd7b036', // usar-kds (before the manager configured the stations)
   '4be5ca9ff2c9575980af870e31c71b954ff41a7ea99c6ee97456d03cbe8d9cae', // abrir-fechar-caixa (before the change warning)
+  '048d36a041b3486a0c788c3d36b8c745665f41b16aa780765d7bd5ba5f81dbd0', // configurar-nfce (before the guided setup)
   'e5edebb211040df1eca5636d345d0cf33afb86603c0b874cd2f1e2e224e0b9db', // contagem-do-dia (before combos counted as their parts)
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
   'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
@@ -631,9 +632,17 @@ Todo dia às 7h, o sino avisa o dono e o gerente quando há etiquetas vencidas o
 - token da Focus NFe
 - dados fiscais de cada produto (NCM, CFOP, CSOSN), definidos pelo seu contador
 
-## Onde configurar
+## Passo a passo
 
-Abra **Fiscal > Notas fiscais (NFC-e)** (dono e gerente). As notas emitidas ficam em **Fiscal > Notas emitidas**. A NFC-e está em todos os planos.
+Abra **Fiscal > Notas fiscais (NFC-e)**, aba **Configuração** (dono e gerente). São 5 etapas, e cada uma salva quando você avança; dá para parar e voltar depois:
+
+1. **O que ter em mãos**: a lista acima, para marcar.
+2. **Empresa**: CNPJ, inscrição estadual, razão social, UF e regime. Hoje o Gastrux emite no **Simples Nacional**.
+3. **Emissor (Focus NFe)**: o token da sua empresa na Focus e o ambiente. Comece em **Teste** (token de homologação); quando der certo, troque para **Produção** com o token de produção. O certificado A1 e o CSC ficam cadastrados na Focus, não no Gastrux.
+4. **Tributação (contador)**: NCM, CFOP, origem, CSOSN e CST de PIS/COFINS padrão. Tem um texto pronto para copiar e mandar ao contador, e a lista dos produtos que ainda não sairiam na nota.
+5. **Revisar e testar**: o que falta em cada etapa, a emissão automática ao fechar a venda e o botão **Emitir nota de teste** (R$ 1,00 em homologação).
+
+A **Visão geral** mostra em que etapa a configuração parou, com o botão **Continuar**. As notas emitidas ficam em **Fiscal > Notas emitidas**. A NFC-e está em todos os planos.
 
 ## No dia a dia
 

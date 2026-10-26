@@ -223,6 +223,13 @@ describe('fiscal data per product (launch plan item 3)', () => {
       expect([saved.defaultNcm, saved.defaultCsosn, saved.pisCofinsCst]).toEqual(['21069090', '103', '49']);
     });
 
+    // The cleanup removed the letter D instead of the non-digits (2026-10-26): " 4.9 " came out as " 4.9 ", refused
+    it('saves the PIS/COFINS code typed with spaces or dots as its digits', async () => {
+      const res = await patchFiscalConfig(req('http://localhost/api/admin/fiscal/config', 'PATCH', { pisCofinsCst: ' 4.9 ' }));
+      expect(res.status).toBe(200);
+      expect((await prisma.nFeConfig.findUnique({ where: { id: config.id } })).pisCofinsCst).toBe('49');
+    });
+
     it('refuses an invalid default', async () => {
       const res = await patchFiscalConfig(req('http://localhost/api/admin/fiscal/config', 'PATCH', { defaultCfop: '6102' }));
       expect(res.status).toBe(400);

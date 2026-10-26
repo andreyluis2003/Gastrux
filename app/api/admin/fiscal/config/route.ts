@@ -59,7 +59,7 @@ function fiscalDefaultsFrom(body: any): { data: Record<string, string | null>; p
   const data: Record<string, string | null> = {};
   sent.forEach((k) => (data[k] = normalized[keys[k]]));
   if (body.pisCofinsCst !== undefined) {
-    const cst = String(body.pisCofinsCst ?? '').replace(/D/g, '');
+    const cst = String(body.pisCofinsCst ?? '').replace(/\D/g, '');
     if (cst && cst.length !== 2) problems.push('CST de PIS/COFINS deve ter 2 dígitos');
     data.pisCofinsCst = cst || null;
   }

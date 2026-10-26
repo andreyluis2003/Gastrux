@@ -12,19 +12,14 @@ import { toast } from 'sonner';
 
 type TabType = 'dashboard' | 'config' | 'documents' | 'logs';
 
-const UF_LIST = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
-import { ORIGIN_LABELS, SUPPORTED_CSOSN } from '@/lib/nfe/fiscal-data';
+import { FiscalSetupWizard } from '@/components/fiscal/setup-wizard';
+import { FISCAL_STEPS, fiscalSetupProgress } from '@/lib/nfe/setup-steps';
 import { noteLabel, noteStatusLabel } from '@/lib/nfe/access-key';
 
 const CRT_OPTIONS = [
   { value: '1', label: '1 - Simples Nacional' },
   { value: '2', label: '2 - Simples Nacional (excesso)' },
   { value: '3', label: '3 - Regime Normal (Lucro Presumido/Real)' },
-];
-const NFE_PROVIDERS = [
-  { value: 'focusnfe', label: 'Focus NFe', desc: 'Mais popular no Brasil' },
-  { value: 'nfeio', label: 'NFe.io', desc: 'API moderna' },
-  { value: 'taxgroup', label: 'TaxGroup', desc: 'Enterprise' },
 ];
 
 const EMPTY_ISSUE_FORM = { documentType: 'NFCe', paymentMethod: 'dinheiro', items: [{ description: '', quantity: 1, unitPrice: 0 }] };
@@ -52,9 +47,7 @@ export default function FiscalPage() {
   const [docs, setDocs] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [issuing, setIssuing] = useState(false);
-  const [form, setForm] = useState<any>({});
   // Products that could not go on a note today (lib/nfe/fiscal-data.ts)
   const [fiscalPending, setFiscalPending] = useState<any>(null);
   const [showIssueForm, setShowIssueForm] = useState(false);
@@ -65,7 +58,6 @@ export default function FiscalPage() {
       const res = await fetch('/api/admin/fiscal/config');
       const data = await res.json();
       setConfig(data.config);
-      if (data.config) setForm(data.config);
     } catch { toast.error('Erro ao carregar config fiscal'); }
   }, []);
 
@@ -96,24 +88,6 @@ export default function FiscalPage() {
     Promise.all([fetchConfig(), fetchDocs(), fetchLogs(), fetchFiscalPending()]).finally(() => setLoading(false));
   }, [fetchConfig, fetchDocs, fetchLogs, fetchFiscalPending]);
 
-  const handleSaveConfig = async () => {
-    setSaving(true);
-    try {
-      const method = config ? 'PATCH' : 'POST';
-      const res = await fetch('/api/admin/fiscal/config', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      const data = await res.json();
-      setConfig(data.config);
-      toast.success('Configuração fiscal salva!');
-      fetchFiscalPending();
-    } catch (err: any) { toast.error(err.message || 'Erro ao salvar'); }
-    finally { setSaving(false); }
-  };
-
   const handleIssue = async () => {
     setIssuing(true);
     try {
@@ -127,7 +101,8 @@ export default function FiscalPage() {
       if (!res.ok) throw new Error(data.error || 'Erro ao emitir');
       // The note was created: say what the SEFAZ (through the provider) actually answered
       const label = data.document ? noteLabel(data.document) : 'NFC-e';
-      if (data.status === 'authorized') toast.success(`${label} autorizada`);
+      if (data.simulated) toast.warning(`${label} simulada: não foi enviada para a SEFAZ (ambiente de teste deste servidor)`);
+      else if (data.status === 'authorized') toast.success(`${label} autorizada`);
       else if (data.status === 'processing' || data.status === 'submitted') toast.warning(`${label} enviada, aguardando a SEFAZ. Confira o status na lista.`);
       else toast.error(`${label} ${data.status === 'denied' ? 'denegada' : 'rejeitada'}: ${data.rejectionReason || 'veja o motivo na lista'}`);
       setShowIssueForm(false);
@@ -165,7 +140,7 @@ export default function FiscalPage() {
                 <Receipt className="w-8 h-8 text-indigo-600" />
                 Notas fiscais (NFC-e)
               </h1>
-              <p className="text-gray-500 mt-1">Emissão de NFC-e / NF-e via Focus NFe, NFe.io ou TaxGroup</p>
+              <p className="text-gray-500 mt-1">Emissão de NFC-e pela Focus NFe</p>
             </div>
             <div className="flex gap-2">
               {config?.active && (
@@ -223,15 +198,32 @@ export default function FiscalPage() {
                         <p className="text-sm text-gray-500">
                           {config ? (
                             <>
-                              {config.nfeProvider === 'focusnfe' ? 'Focus NFe' : config.nfeProvider === 'nfeio' ? 'NFe.io' : 'TaxGroup'}
-                              {' • '}{config.environment === 'sandbox' ? 'Sandbox (Teste)' : 'Produção'}
+                              Focus NFe
+                              {' • '}{config.environment === 'sandbox' ? 'Teste (homologação)' : 'Produção'}
                               {' • CNPJ: '}{config.cnpj ? formatCNPJ(config.cnpj) : 'Não informado'}
                             </>
-                          ) : 'Configure o CNPJ e a API Key do provider fiscal'}
+                          ) : 'Siga o passo a passo em Configuração'}
                         </p>
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Where the guided setup stopped */}
+                  {(() => {
+                    const p = fiscalSetupProgress(config);
+                    if (p.ready) return null;
+                    return (
+                      <Card className="shadow-sm border-indigo-200">
+                        <CardContent className="pt-4 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold">Configuração fiscal: etapa {p.resumeAt + 1} de {FISCAL_STEPS.length}, {FISCAL_STEPS[p.resumeAt].title}</p>
+                            <p className="text-sm text-gray-500">{[...p.missing.empresa, ...p.missing.emissor, ...p.missing.tributacao].length ? `Falta: ${[...p.missing.empresa, ...p.missing.emissor, ...p.missing.tributacao].join(', ')}` : 'Comece pela lista do que ter em mãos.'}</p>
+                          </div>
+                          <Button onClick={() => setTab('config')}>Continuar</Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
 
                   {/* KPIs */}
                   <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -279,178 +271,20 @@ export default function FiscalPage() {
                     </Card>
                   )}
 
-                  {!config && (
-                    <Card className="shadow-sm">
-                      <CardContent className="py-12 text-center">
-                        <Shield className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-700 mb-2">Configure o Compliance Fiscal</h3>
-                        <p className="text-gray-500 mb-4 max-w-md mx-auto">
-                          Cadastre os dados fiscais do seu restaurante para emitir NFC-e e NF-e automaticamente.
-                        </p>
-                        <Button onClick={() => setTab('config')}><Settings className="w-4 h-4 mr-1" /> Configurar Agora</Button>
-                      </CardContent>
-                    </Card>
-                  )}
                 </div>
               )}
 
-              {/* Config Tab */}
+              {/* Config Tab: the guided setup (configuração fiscal guiada, 2026-10-26) */}
               {tab === 'config' && (
                 <Card className="shadow-sm">
-                  <CardHeader><CardTitle className="text-base">Configuração Fiscal</CardTitle></CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Company */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><Building2 className="w-4 h-4" /> Dados da Empresa</h3>
-                      <div className="grid sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">CNPJ *</label>
-                          <input className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="00.000.000/0000-00" value={form.cnpj || ''} onChange={e => setForm({ ...form, cnpj: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Inscrição Estadual</label>
-                          <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.stateRegistration || ''} onChange={e => setForm({ ...form, stateRegistration: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Razão Social</label>
-                          <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.companyName || ''} onChange={e => setForm({ ...form, companyName: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Nome Fantasia</label>
-                          <input className="w-full border rounded-lg px-3 py-2 text-sm" value={form.tradeName || ''} onChange={e => setForm({ ...form, tradeName: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">UF</label>
-                          <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.uf || 'SP'} onChange={e => setForm({ ...form, uf: e.target.value })}>
-                            {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">CRT (Regime Tributário)</label>
-                          <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.crt || '1'} onChange={e => setForm({ ...form, crt: e.target.value })}>
-                            {CRT_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Provider */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><Shield className="w-4 h-4" /> Provider Fiscal</h3>
-                      <div className="grid sm:grid-cols-3 gap-3 mb-4">
-                        {NFE_PROVIDERS.map(p => (
-                          <button
-                            key={p.value}
-                            onClick={() => setForm({ ...form, nfeProvider: p.value })}
-                            className={`border rounded-lg p-4 text-left transition-all ${
-                              form.nfeProvider === p.value ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/20' : 'hover:border-gray-300'
-                            }`}
-                          >
-                            <p className="font-medium text-sm">{p.label}</p>
-                            <p className="text-xs text-gray-500">{p.desc}</p>
-                          </button>
-                        ))}
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">API Key *</label>
-                          <input className="w-full border rounded-lg px-3 py-2 text-sm" type="password" placeholder="Chave de API do provider" value={form.nfeApiKey || ''} onChange={e => setForm({ ...form, nfeApiKey: e.target.value })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Senha do Certificado Digital (A1)</label>
-                          <input className="w-full border rounded-lg px-3 py-2 text-sm" type="password" placeholder="Senha do .pfx" value={form.certificatePassword || ''} onChange={e => setForm({ ...form, certificatePassword: e.target.value })} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Settings */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><Hash className="w-4 h-4" /> Numeração e Comportamento</h3>
-                      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Série NFC-e</label>
-                          <input type="number" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.seriesNFCe || 1} onChange={e => setForm({ ...form, seriesNFCe: parseInt(e.target.value) || 1 })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Série NF-e</label>
-                          <input type="number" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.seriesNFe || 1} onChange={e => setForm({ ...form, seriesNFe: parseInt(e.target.value) || 1 })} />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 mb-1 block">Ambiente</label>
-                          <select className="w-full border rounded-lg px-3 py-2 text-sm" value={form.environment || 'sandbox'} onChange={e => setForm({ ...form, environment: e.target.value })}>
-                            <option value="sandbox">Sandbox (Teste)</option>
-                            <option value="production">Produção</option>
-                          </select>
-                        </div>
-                        <div className="flex items-end">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="rounded" checked={form.autoIssueOnSale ?? true} onChange={e => setForm({ ...form, autoIssueOnSale: e.target.checked })} />
-                            <span className="text-sm">Emitir automaticamente nas vendas</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Default taxation (set by the accountant) for products without their own data */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2"><FileCheck className="w-4 h-4" /> Tributação padrão dos produtos</h3>
-                      <p className="text-xs text-gray-500 mb-3">
-                        Preenchida pelo contador. Vale para os produtos sem dados fiscais próprios (cadastre os próprios na tela de cada receita).
-                        Sem estes dados a NFC-e não é emitida: o sistema não inventa NCM nem tributação. Suporte atual: Simples Nacional.
-                      </p>
-                      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                        <div>
-                          <label htmlFor="fiscal-default-ncm" className="text-xs font-medium text-gray-600 mb-1 block">NCM padrão</label>
-                          <input id="fiscal-default-ncm" inputMode="numeric" placeholder="8 dígitos" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultNcm || ''} onChange={e => setForm({ ...form, defaultNcm: e.target.value })} />
-                        </div>
-                        <div>
-                          <label htmlFor="fiscal-default-cfop" className="text-xs font-medium text-gray-600 mb-1 block">CFOP padrão</label>
-                          <input id="fiscal-default-cfop" inputMode="numeric" placeholder="ex.: 5102" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultCfop || ''} onChange={e => setForm({ ...form, defaultCfop: e.target.value })} />
-                        </div>
-                        <div>
-                          <label htmlFor="fiscal-default-origin" className="text-xs font-medium text-gray-600 mb-1 block">Origem padrão</label>
-                          <select id="fiscal-default-origin" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultOrigin || ''} onChange={e => setForm({ ...form, defaultOrigin: e.target.value })}>
-                            <option value="">—</option>
-                            {Object.entries(ORIGIN_LABELS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor="fiscal-default-csosn" className="text-xs font-medium text-gray-600 mb-1 block">CSOSN padrão</label>
-                          <select id="fiscal-default-csosn" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.defaultCsosn || ''} onChange={e => setForm({ ...form, defaultCsosn: e.target.value })}>
-                            <option value="">—</option>
-                            {SUPPORTED_CSOSN.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor="fiscal-pis-cofins" className="text-xs font-medium text-gray-600 mb-1 block">CST PIS/COFINS</label>
-                          <input id="fiscal-pis-cofins" inputMode="numeric" placeholder="2 dígitos" className="w-full border rounded-lg px-3 py-2 text-sm" value={form.pisCofinsCst || ''} onChange={e => setForm({ ...form, pisCofinsCst: e.target.value })} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {fiscalPending && (fiscalPending.blockedReason || fiscalPending.pending?.length > 0) && (
-                      <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2">
-                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-                          {fiscalPending.blockedReason
-                            ? fiscalPending.blockedReason
-                            : `${fiscalPending.pending.length} de ${fiscalPending.total} produtos não sairiam na NFC-e hoje (dados fiscais incompletos):`}
-                        </p>
-                        {!fiscalPending.blockedReason && (
-                          <ul className="text-sm flex flex-wrap gap-2">
-                            {fiscalPending.pending.slice(0, 40).map((p: any) => (
-                              <li key={p.id}><a className="underline" href={`/receitas/${p.id}`}>{p.name}</a></li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <Button onClick={handleSaveConfig} disabled={saving}>
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
-                        {config ? 'Atualizar' : 'Salvar Configuração'}
-                      </Button>
-                    </div>
+                  <CardHeader><CardTitle className="text-base">Configuração fiscal</CardTitle></CardHeader>
+                  <CardContent>
+                    <FiscalSetupWizard
+                      config={config}
+                      pending={fiscalPending}
+                      onSaved={(c) => { setConfig(c); fetchFiscalPending(); }}
+                      onIssued={() => { fetchDocs(); fetchLogs(); }}
+                    />
                   </CardContent>
                 </Card>
               )}

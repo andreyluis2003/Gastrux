@@ -194,6 +194,8 @@ export async function emitStandaloneNFCe(input: StandaloneInput): Promise<Standa
       success: result.ok,
       status: updated.status,
       rejectionReason: result.rejectionReason,
+      // No SEFAZ was reached (no Focus token, or a test environment without NFE_FORCE_REAL): the fiscal setup says so
+      simulated: provider.name === 'mock',
       document: updated,
     },
   };
