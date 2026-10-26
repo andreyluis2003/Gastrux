@@ -6,6 +6,7 @@ Menu: Caixa e pagamentos > Caixa. Histórico em Caixa e pagamentos > Histórico 
 - Despesa: dinheiro que sai da gaveta para pagar algo (compras, entregador, outros). Entra como despesa na DRE.
 - Sangria: dinheiro retirado da gaveta para guardar (cofre, banco). Não é despesa, não entra na DRE.
 - Suprimento: dinheiro colocado na gaveta.
+- Troco maior que o dinheiro que deveria haver na gaveta antes da venda (ex.: nota de R$ 100 logo após abrir com pouco troco): a venda é registrada e aparece um aviso para conferir o troco e, se faltar, lançar um suprimento. O aviso não mostra o valor esperado da gaveta (o caixa fecha às cegas).
 - Fechar caixa: conte o que tem em cada forma; o Gastrux mostra o esperado e a diferença. Diferenças grandes geram aviso para o dono e o gerente, e pedem um motivo.
 - Pagamentos feitos pelo celular na mesa (PIX ou cartão online) aparecem como "Recebido online": contam nas vendas do turno, mas não entram na gaveta.
 - Acerto do entregador (botão no Caixa, turno aberto): para delivery pago na entrega. Escolha o entregador (o nome é dado em Pedidos de delivery ao marcar "Em Entrega"; sem nome fica "Sem nome"), confira os pedidos que saíram e não foram acertados, digite o dinheiro que ele trouxe e, se quiser, o pagamento dele (despesa "Entregador"; o caixa paga até a soma das taxas de entrega, acima disso só gerente). Dinheiro, cartão e vale entram no esperado do turno; diferença vira ajuste com motivo obrigatório. Não conta como venda de novo (o pedido já é faturamento). O troco que o entregador leva não precisa ser lançado.

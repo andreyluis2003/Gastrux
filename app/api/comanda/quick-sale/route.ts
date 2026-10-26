@@ -74,6 +74,7 @@ async function handlePOST(request: Request) {
   if (read.legacy) console.warn('[caixa] legacy one-method counter sale body', { restaurantId: member.restaurantId, clientId });
   let target: SaleTarget | null = null;
   let changeCents = 0;
+  let changeWarning: string | null = null;
   let primaryMethod: string | undefined;
 
   try {
@@ -93,7 +94,7 @@ async function handlePOST(request: Request) {
       const payments = read.legacy ? [{ method: read.payments[0].method, amount: (total / 100).toFixed(2) }] : read.payments;
       const settled = settlePayments(total, payments);
       if (target) {
-        await recordSaleEntries(tx, { restaurantId: member.restaurantId, target, orderSessionId: clientId, settled, createdById: member.userId });
+        ({ changeWarning } = await recordSaleEntries(tx, { restaurantId: member.restaurantId, target, orderSessionId: clientId, settled, createdById: member.userId }));
       }
       changeCents = settled.changeCents;
       primaryMethod = toNfcePaymentMethod(settled.primaryMethod);
@@ -137,7 +138,7 @@ async function handlePOST(request: Request) {
 
   // The plan counts sales per month and only warns (owner decision 2026-10-09)
   await noteSalesThresholds(member.restaurantId);
-  return NextResponse.json({ session, kitchen, nfce, changeCents, cashbackEarnedCents }, { status: 201 });
+  return NextResponse.json({ session, kitchen, nfce, changeCents, changeWarning, cashbackEarnedCents }, { status: 201 });
 }
 
 // Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)

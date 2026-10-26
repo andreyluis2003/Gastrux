@@ -51,6 +51,20 @@ describe('counter sale records its payments in the shift', () => {
     await prisma.cashSession.deleteMany({ where: { restaurantId: A.restaurantId } });
   });
 
+  // Spec rule 12: change above the cash expected in the drawer is allowed, with a warning (2026-10-26)
+  it('warns when the change is more than the drawer should have before the sale; never says how much it had', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: '10,00' });
+    const big = await sale({ clientId: `bal-${crypto.randomUUID()}`, items: [item()], cashSessionId: session.id, payments: [{ method: 'dinheiro', amount: 100 }] });
+    expect(big.status).toBe(201);
+    const body = await big.json();
+    expect(body.changeCents).toBe(7000);
+    expect(body.changeWarning).toMatch(/troco de R\$\s70,00 é maior que o dinheiro/i);
+    expect(body.changeWarning).not.toMatch(/10,00/);
+    // Now the drawer should have 10 + 30 = 40: a change of 20 is fine
+    const ok = await sale({ clientId: `bal-${crypto.randomUUID()}`, items: [item()], cashSessionId: session.id, payments: [{ method: 'dinheiro', amount: 50 }] });
+    expect((await ok.json()).changeWarning ?? null).toBeNull();
+  });
+
   it('records the cash handed over and the change', async () => {
     const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
     const clientId = `bal-${crypto.randomUUID()}`;

@@ -47,6 +47,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '4db86b302c0b9737add2a14c4225914ce18612d7bac5d735a9254c15e15b4377', // contagem-do-dia (before the kitchen cancel became a loss)
   '106327f7a20c2d0c5dc46cc8fe38dee3cc6cd4ed873b95f57477dfe030d09671', // contagem-do-dia (before the other segments' examples were counted)
   'ed3677b9cc501137431a6328018b7f8f15809b1491a9cb96faca3acabbd7b036', // usar-kds (before the manager configured the stations)
+  '4be5ca9ff2c9575980af870e31c71b954ff41a7ea99c6ee97456d03cbe8d9cae', // abrir-fechar-caixa (before the change warning)
   'e5edebb211040df1eca5636d345d0cf33afb86603c0b874cd2f1e2e224e0b9db', // contagem-do-dia (before combos counted as their parts)
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
   'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
@@ -323,6 +324,8 @@ As vendas pagas entram sozinhas, por forma de pagamento (Dinheiro, PIX, Crédito
 - **Despesa**: dinheiro que sai da gaveta para pagar algo; entra como despesa na DRE
 - **Sangria**: dinheiro retirado para guardar (cofre, banco); não é despesa
 - **Suprimento**: dinheiro colocado na gaveta
+
+Se o troco de uma venda for maior que o dinheiro que deveria haver na gaveta antes dela (por exemplo, uma nota de R$ 100 logo depois de abrir o caixa com pouco troco), a venda é registrada e o Gastrux avisa: confira o troco e, se faltar dinheiro, lance um suprimento.
 
 ## Fechando
 

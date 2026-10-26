@@ -260,7 +260,7 @@ export async function recordBillPayment(
     const due = Number.isInteger(input.dueCents) && (input.dueCents as number) > 0 ? Math.min(input.dueCents as number, bill.remainingCents) : bill.remainingCents;
     const settled = settlePartial(due, input.payments);
     const target = await resolveSaleShift(tx, { restaurantId: member.restaurantId, cashSessionId: input.cashSessionId, replay: false, legacy: false });
-    await recordSaleEntries(tx, { restaurantId: member.restaurantId, target: target!, orderSessionId: sessionId, settled, createdById: member.userId });
+    const { changeWarning } = await recordSaleEntries(tx, { restaurantId: member.restaurantId, target: target!, orderSessionId: sessionId, settled, createdById: member.userId });
     // The staff took a payment: the table's "pagar com o garçom" was answered (spec 2026-10-10 §5.3)
     await tx.orderSession.update({ where: { id: sessionId }, data: { payAtWaiterRequestedAt: null } });
     const paidNow = settled.paidCents - settled.changeCents;
@@ -277,7 +277,7 @@ export async function recordBillPayment(
     }
     // Cashback and CRM purchase of the identified customer (spec 2026-10-23 §7.1)
     const cashbackEarnedCents = closed ? await onBillClosed(tx, member.restaurantId, sessionId) : 0;
-    return { closed, changeCents: settled.changeCents, customerName: bill.customerName, cashbackEarnedCents };
+    return { closed, changeCents: settled.changeCents, changeWarning, customerName: bill.customerName, cashbackEarnedCents };
   });
 
   let nfce: unknown = null;
@@ -285,7 +285,7 @@ export async function recordBillPayment(
     nfce = await emitClosedBill(member, sessionId, input.customerCPF, result.customerName);
   }
   const bill = (await loadBill(prisma, member.restaurantId, sessionId))!;
-  return { bill, changeCents: result.changeCents, closed: result.closed, nfce, cashbackEarnedCents: result.cashbackEarnedCents };
+  return { bill, changeCents: result.changeCents, changeWarning: result.changeWarning, closed: result.closed, nfce, cashbackEarnedCents: result.cashbackEarnedCents };
 }
 
 /**

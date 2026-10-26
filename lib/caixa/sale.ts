@@ -1,10 +1,12 @@
 import type { Prisma } from '@prisma/client';
 import { lineTotalCents } from '@/lib/comanda/line-total';
 import { CASH_METHODS } from './payment-methods';
-import { CashRuleError, type PaymentInput, type SettledPayment } from './rules';
+import { CashRuleError, expectedByMethod, type EntryLike, type PaymentInput, type SettledPayment } from './rules';
 import { ensureDefaultRegister, recalcClosedSession } from './sessions';
 
 /** Sales paid on the spot enter the cash shift (spec §6). Every function runs inside the caller's transaction. */
+
+const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // 422, not 409: the device outbox retries 409 forever ("still running"), and this refusal is final
 const REQUIRED = () => new CashRuleError('Abra o caixa para receber', 422, 'CASH_SESSION_REQUIRED');
@@ -65,6 +67,16 @@ export async function recordSaleEntries(
 ) {
   const { restaurantId, target, orderSessionId, settled, createdById } = input;
   const base = { restaurantId, cashSessionId: target.cashSessionId, orderSessionId, createdById, afterClose: target.late };
+  // Spec rule 12: change above the cash the drawer should have before this sale is allowed, with a warning. It
+  // never says how much the drawer should have (a cashier closes blind)
+  let changeWarning: string | null = null;
+  if (settled.changeCents > 0 && !target.late) {
+    const shift = await tx.cashSession.findUnique({ where: { id: target.cashSessionId }, select: { openingFloatCents: true, entries: { select: { type: true, method: true, amountCents: true, direction: true } } } });
+    const cash = shift ? expectedByMethod(shift.openingFloatCents, shift.entries as EntryLike[]).CASH : 0;
+    if (settled.changeCents > cash) {
+      changeWarning = `O troco de ${brl(settled.changeCents)} é maior que o dinheiro que deveria haver na gaveta antes desta venda. Confira o troco; se faltar dinheiro, lance um suprimento.`;
+    }
+  }
   const rows: Prisma.CashSessionEntryCreateManyInput[] = CASH_METHODS
     .filter((m) => settled.receipts[m] > 0)
     .map((m) => ({ ...base, type: 'RECEIPT', method: m, amountCents: settled.receipts[m] }));
@@ -74,6 +86,7 @@ export async function recordSaleEntries(
     await tx.cashSession.update({ where: { id: target.cashSessionId }, data: { lateEntries: { increment: 1 } } });
     await recalcClosedSession(tx, target.cashSessionId);
   }
+  return { changeWarning };
 }
 
 /** Every payment given back by a reopening or a cancellation starts with one of these (bill and merge read them). */

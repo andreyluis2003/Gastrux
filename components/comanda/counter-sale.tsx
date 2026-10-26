@@ -149,6 +149,8 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         if (data.nfce?.message) {
           (data.nfce.nfce?.status === 'authorized' ? toast.success : toast.warning)(data.nfce.message);
         }
+        // Last, so it sits on top of the stack of notices
+        if (data.changeWarning) toast.warning(data.changeWarning, { duration: 20000 });
       }
       setCart({});
       setWeighed([]);

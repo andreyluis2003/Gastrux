@@ -121,6 +121,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       } else {
         toast.success(`Recebido. Falta ${brl(out.bill.remainingCents)}`);
       }
+      // Last, so it sits on top of the stack of notices
+      if (out.changeWarning) toast.warning(out.changeWarning, { duration: 20000 });
     } catch {
       // No answer (the connection dropped): the payment may have gone through. Show the bill as the
       // server has it before anyone charges again; the same tap resends the same key, recorded once

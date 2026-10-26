@@ -125,6 +125,7 @@ async function handlePUT(
     let saleTarget: SaleTarget | null = null;
     let primaryMethod: string | undefined;
     let changeCents = 0;
+    let changeWarning: string | null = null;
     let updated;
     try {
       updated = await prisma.$transaction(async (tx) => {
@@ -162,7 +163,7 @@ async function handlePUT(
           if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
           // The sale takes its ingredients out of stock, kitchen screen or not (lib/stock/session-stock.ts)
           await settleSessionStock(tx, restaurantId, params.id);
-          if (saleTarget) await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId });
+          if (saleTarget) ({ changeWarning } = await recordSaleEntries(tx, { restaurantId, target: saleTarget, orderSessionId: params.id, settled, createdById: member!.userId }));
           await onBillClosed(tx, restaurantId, params.id);
           primaryMethod = toNfcePaymentMethod(settled.primaryMethod);
           changeCents = settled.changeCents;
@@ -237,7 +238,7 @@ async function handlePUT(
         paymentMethod: primaryMethod,
         onlyIfEnabled: true,
       });
-      return NextResponse.json({ ...updated, changeCents, nfce });
+      return NextResponse.json({ ...updated, changeCents, changeWarning, nfce });
     }
 
     return NextResponse.json(updated);
