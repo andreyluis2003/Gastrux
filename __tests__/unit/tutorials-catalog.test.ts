@@ -157,8 +157,26 @@ describe('the published videos (lote 1, 2026-10-25)', () => {
     }
   });
 
-  it('keeps every other video hidden until it is made', () => {
-    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual([...track, ...lote2, ...lote3].sort());
+  // Lote 4 (2026-10-26): Clientes e marketing, Mais recursos (with the DRE) and Configurações
+  const lote4 = [
+    'clientes-crm', 'cashback', 'campanhas', 'site-de-delivery',
+    'planejamento-de-producao', 'escalonar-receita', 'etiquetas-e-validades', 'engenharia-de-cardapio', 'dre', 'turnos', 'comissoes',
+    'configuracoes-do-restaurante', 'minha-assinatura', 'whatsapp', 'api-de-pedidos', 'varias-lojas', 'uso-da-ia',
+  ];
+
+  it('publishes lote 4 with its steps, length and files', () => {
+    for (const slug of lote4) {
+      const t = TUTORIALS.find((x) => x.slug === slug)!;
+      expect([slug, t.published, t.steps.length > 2, t.durationSec > 15]).toEqual([slug, true, true, true]);
+      for (const ext of ['mp4', 'jpg']) expect([slug, ext, fs.existsSync(path.join(process.cwd(), `public/videos/tutoriais/${slug}.${ext}`))]).toEqual([slug, ext, true]);
+    }
+  });
+
+  it('publishes the whole catalog, every video once', () => {
+    const all = [...track, ...lote2, ...lote3, ...lote4];
+    expect(new Set(all).size).toBe(all.length);
+    expect(TUTORIALS.filter((t) => t.published).map((t) => t.slug).sort()).toEqual(all.sort());
+    expect(TUTORIALS.map((t) => t.slug).sort()).toEqual(all.sort());
   });
 
   it('teaches the AI the name of each published video', () => {

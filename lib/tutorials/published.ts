@@ -283,4 +283,156 @@ export const PUBLISHED: Record<string, { durationSec: number; steps: string[] }>
       "Lá, toque em Imprimir e escolha Salvar como PDF para guardar o arquivo.",
     ],
   },
+  'clientes-crm': {
+    durationSec: 31,
+    steps: [
+      "Em Clientes você vê quem compra no restaurante, quanto já gastou e quantas vezes comprou.",
+      "O cliente entra aqui sozinho quando o caixa digita o celular dele ao fechar a conta, ou quando ele pede pelo site de delivery.",
+      "Cada um ganha um segmento pelas compras dos últimos noventa dias: VIP, Regular, Ocasional ou Inativo.",
+      "Busque pelo nome ou pelo celular, ou cadastre à mão em Novo Cliente.",
+    ],
+  },
+  'cashback': {
+    durationSec: 29,
+    steps: [
+      "Com o cashback, o cliente ganha um crédito em reais a cada compra e usa como desconto na próxima.",
+      "Ligue o cashback e escolha o percentual de cada compra.",
+      "Defina a validade do crédito em meses e o valor mínimo para usar. Depois, clique em Salvar.",
+      "No caixa, basta digitar o celular do cliente ao fechar a conta. Aqui você acompanha o crédito dado, o usado e o que vai vencer.",
+    ],
+  },
+  'campanhas': {
+    durationSec: 27,
+    steps: [
+      "Em Campanhas você manda mensagens para listas de clientes pelo WhatsApp.",
+      "Primeiro, ligue o provedor de mensagens, como Meta, Take Blip ou Zenvia.",
+      "Depois, cadastre os modelos de mensagem. O WhatsApp só deixa enviar modelos aprovados.",
+      "Com isso pronto, clique em Nova Campanha, escolha o modelo e a lista, e envie na hora ou agende.",
+    ],
+  },
+  'site-de-delivery': {
+    durationSec: 31,
+    steps: [
+      "O site de delivery é a sua loja própria: o cliente vê o cardápio, monta o pedido e paga, sem comissão.",
+      "Copie o link e mande no WhatsApp, no Instagram e nas redes sociais.",
+      "Os pedidos aparecem sozinhos em Pedidos de delivery.",
+      "Aqui também ficam prontas as mensagens do WhatsApp Business, para ele responder sozinho com o link do cardápio.",
+      "E, no fim, você escolhe as formas de pagamento aceitas na entrega.",
+    ],
+  },
+  'planejamento-de-producao': {
+    durationSec: 27,
+    steps: [
+      "No Planejamento de produção você decide quanto preparar de cada receita para o dia.",
+      "Clique em Novo Plano, escolha a data e clique em Criar Plano.",
+      "Abra o plano e, em Inserir Item, adicione cada receita com a quantidade a produzir.",
+      "A equipe da cozinha acompanha o plano, do rascunho até a produção concluída.",
+    ],
+  },
+  'escalonar-receita': {
+    durationSec: 22,
+    steps: [
+      "Escalonar receita mostra quanto separar de cada insumo para produzir uma quantidade.",
+      "Escolha a ficha técnica.",
+      "Diga quantas porções quer fazer, e clique em Escalonar.",
+      "Pronto: a lista mostra a quantidade de cada insumo para essa produção.",
+    ],
+  },
+  'etiquetas-e-validades': {
+    durationSec: 26,
+    steps: [
+      "Em Etiquetas você imprime a etiqueta de cada preparo ou insumo aberto, com a data de validade.",
+      "Busque o item e toque nele.",
+      "Escolha onde ele vai ficar guardado: a validade é calculada sozinha. Depois, clique em Imprimir.",
+      "Em Validades você vê o que vence hoje e amanhã, para usar antes ou descartar.",
+    ],
+  },
+  'engenharia-de-cardapio': {
+    durationSec: 30,
+    steps: [
+      "A engenharia de cardápio cruza o quanto cada prato vende com o quanto ele dá de margem.",
+      "Estrela vende muito e dá lucro. Cavalo de Batalha vende muito, com margem baixa. Enigma dá lucro, mas vende pouco. E Abacaxi vai mal nas duas coisas.",
+      "Em Recomendações, o Gastrux diz o que fazer com cada prato.",
+      "Pratos sem ficha técnica ficam de fora, porque não têm custo.",
+    ],
+  },
+  'dre': {
+    durationSec: 33,
+    steps: [
+      "A DRE mostra o resultado do mês: do que entrou com as vendas até o que sobrou de lucro.",
+      "Escolha a visão mensal, trimestral, anual ou um período seu, e use as setas para trocar o mês.",
+      "Ela começa pela receita, separando salão e delivery, tira os impostos e os descontos, e o CMV.",
+      "Depois vêm as despesas: folha, contas a pagar, contas de consumo e taxas de pagamento. No fim, o resultado líquido.",
+    ],
+  },
+  'turnos': {
+    durationSec: 24,
+    steps: [
+      "Em Turnos você monta a escala da semana: quem trabalha em cada dia.",
+      "Cada linha é uma pessoa da equipe, e cada coluna é um dia.",
+      "Clique em Turno para lançar o dia, a entrada e a saída.",
+      "Assim todo mundo sabe a escala da semana, e você vê quem estava em cada dia.",
+    ],
+  },
+  'comissoes': {
+    durationSec: 30,
+    steps: [
+      "Em Comissões você vê quanto cada pessoa ganhou sobre as contas fechadas que ela abriu. A taxa de serviço não entra.",
+      "Escolha se o pagamento é semanal, quinzenal ou mensal.",
+      "A tabela mostra a regra, as contas, as vendas e a comissão de cada um. A regra é definida em Equipe e acessos.",
+      "Quando o período terminar, clique em Fechar período para guardar o fechamento.",
+    ],
+  },
+  'configuracoes-do-restaurante': {
+    durationSec: 27,
+    steps: [
+      "Em Configurações ficam os dados do restaurante: nome, CNPJ, contato e endereço.",
+      "A taxa de serviço é sugerida na conta das mesas. O cliente pode recusar, e zero desliga.",
+      "Escolha também o tamanho da etiqueta da sua impressora térmica.",
+      "Preencha o horário de funcionamento de cada dia e clique em Salvar alterações.",
+    ],
+  },
+  'minha-assinatura': {
+    durationSec: 23,
+    steps: [
+      "Em Minha assinatura você vê o seu plano, o preço e o que está incluído.",
+      "Para trocar o cartão ou o plano, clique em Gerenciar assinatura.",
+      "Em Indique e ganhe, mande o seu link para outros restaurantes. Cada um que assinar vale um mês grátis para você.",
+    ],
+  },
+  'whatsapp': {
+    durationSec: 26,
+    steps: [
+      "Aqui você liga o WhatsApp do restaurante para receber pedidos pelo robô.",
+      "Copie os dados da sua conta do WhatsApp Business no painel da Meta e cole aqui.",
+      "Depois, informe na Meta o endereço do webhook mostrado nesta tela.",
+      "Ajuste as mensagens do robô, salve, e envie uma mensagem de teste para o seu número.",
+    ],
+  },
+  'api-de-pedidos': {
+    durationSec: 29,
+    steps: [
+      "A API de pedidos deixa o seu site, um robô de WhatsApp ou outro sistema mandar pedidos de delivery direto para o Gastrux.",
+      "Dê um nome para a chave, como Site da loja, e clique em Criar chave.",
+      "Passe a chave para quem cuida do sistema, junto com a página para desenvolvedores.",
+      "Os pedidos que chegarem aparecem em Vender, Pedidos de delivery.",
+    ],
+  },
+  'varias-lojas': {
+    durationSec: 31,
+    steps: [
+      "Em Várias lojas você acompanha todas as unidades juntas: faturamento, vendas, ticket médio e CMV.",
+      "O ranking mostra qual unidade vai melhor no período.",
+      "Em Alertas Cruzados aparecem os avisos de todas as lojas num lugar só.",
+      "Para abrir uma nova loja, clique em Nova Unidade. E use Sincronizar Fichas para levar as fichas técnicas de uma loja para outra.",
+    ],
+  },
+  'uso-da-ia': {
+    durationSec: 21,
+    steps: [
+      "Em Uso da IA você vê quantas perguntas foram feitas ao Pergunte ao Gastrux neste mês.",
+      "Cada plano tem um limite de perguntas por mês, e aqui aparece quanto ainda sobra.",
+      "Abaixo fica a lista das perguntas, com quem perguntou e quando.",
+    ],
+  },
 };

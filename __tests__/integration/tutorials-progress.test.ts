@@ -47,7 +47,15 @@ describe('tutorial progress', () => {
   it('rejects a video that is not in the catalog (or not published) and writes nothing', async () => {
     as(ana);
     expect((await post('nao-existe')).status).toBe(400);
-    expect((await post('dre')).status).toBe(400);
+    // Every video is published since lote 4: hide one here to check the unpublished case
+    const dre = TUTORIALS.find((t) => t.slug === 'dre')!;
+    const was = dre.published;
+    dre.published = false;
+    try {
+      expect((await post('dre')).status).toBe(400);
+    } finally {
+      dre.published = was;
+    }
     expect((await post(42)).status).toBe(400);
     expect(await prisma.tutorialView.count({ where: { userId: ana.id } })).toBe(0);
   });
