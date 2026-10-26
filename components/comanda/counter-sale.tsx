@@ -13,6 +13,8 @@ import { finishHint, toApiAmount } from '@/components/caixa/panel-state';
 import { OpenShiftCard } from '@/components/caixa/open-shift-card';
 import { brl } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
+import { WeightSheet } from '@/components/vender/weight-sheet';
+import { kgLabel, weightLineCents } from '@/lib/comanda/weight';
 
 /** The "Venda registrada" notices, one per sale (each keeps its own "Imprimir cupom"); a comanda screen
  *  dismisses them all (they stayed over the next comanda, 2026-10-12) */
@@ -30,6 +32,8 @@ interface MenuEntry {
   sellingPrice?: number;
   recipe?: { id: string; sellingPrice: number | string } | null;
   available?: boolean;
+  /** Price per kg; each weighing is its own line (spec 2026-10-25 venda-por-peso) */
+  soldByWeight?: boolean;
 }
 
 /**
@@ -42,6 +46,9 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   const { send, online } = useOutbox();
   const [menu, setMenu] = useState<MenuEntry[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
+  // Products sold by weight: one line per weighing
+  const [weighed, setWeighed] = useState<Array<{ key: string; entry: MenuEntry; grams: number }>>([]);
+  const [weighing, setWeighing] = useState<MenuEntry | null>(null);
   const [search, setSearch] = useState('');
   const [cpf, setCpf] = useState('');
   // The customer for the cashback and the CRM (spec 2026-10-23 §7.2): earns, never uses; a new phone needs the name
@@ -65,14 +72,16 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
     () => menu.filter((m) => cart[m.id] > 0).map((m) => ({ entry: m, quantity: cart[m.id] })),
     [menu, cart]
   );
-  const total = lines.reduce((sum, l) => sum + Math.round(priceOf(l.entry) * 100) * l.quantity, 0) / 100;
+  const total = (lines.reduce((sum, l) => sum + Math.round(priceOf(l.entry) * 100) * l.quantity, 0)
+    + weighed.reduce((sum, w) => sum + weightLineCents(priceOf(w.entry), w.grams), 0)) / 100;
+  const itemCount = lines.length + weighed.length;
   const hint = finishHint(Math.round(total * 100), payments);
   const visible = menu.filter((m) => m.available !== false && m.name?.toLowerCase().includes(search.toLowerCase()));
   const change = (id: string, delta: number) =>
     setCart((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
 
   const finish = async () => {
-    if (lines.length === 0) {
+    if (itemCount === 0) {
       toast.error('Adicione itens à venda');
       return;
     }
@@ -95,7 +104,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         queueable: true,
         body: {
           clientId,
-          items: lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
+          items: [
+            ...lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
+            ...weighed.map((w) => ({ menuItemId: w.entry.id, weightGrams: w.grams })),
+          ],
           customerCPF: cpf.replace(/\D/g, '') || undefined,
           customerPhone: phone.trim() || undefined,
           customerName: customerName.trim() || undefined,
@@ -130,6 +142,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         }
       }
       setCart({});
+      setWeighed([]);
       setCpf('');
       setPhone('');
       setCustomerName('');
@@ -154,8 +167,13 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           <div key={entry.id} className="flex items-center justify-between gap-2 border rounded-md p-2">
             <div>
               <div className="font-semibold text-sm">{entry.name}</div>
-              <div className="text-xs text-green-700">{brl(Math.round(priceOf(entry) * 100))}</div>
+              <div className="text-xs text-green-700">{brl(Math.round(priceOf(entry) * 100))}{entry.soldByWeight ? '/kg' : ''}</div>
             </div>
+            {entry.soldByWeight ? (
+              <Button size="sm" variant="outline" aria-label={`Pesar ${entry.name}`} onClick={() => setWeighing(entry)}>
+                Pesar
+              </Button>
+            ) : (
             <div className="flex items-center gap-1">
               <Button size="icon" variant="outline" aria-label={`Menos ${entry.name}`} onClick={() => change(entry.id, -1)}>
                 <Minus className="w-4 h-4" />
@@ -165,9 +183,31 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
+            )}
           </div>
         ))}
       </div>
+      {weighed.length > 0 && (
+        <ul className="mb-4 space-y-1">
+          {weighed.map((w) => (
+            <li key={w.key} className="flex items-center justify-between gap-2 text-sm border rounded-md p-2 bg-amber-50">
+              <span>{kgLabel(w.grams)} {w.entry.name}</span>
+              <span className="flex items-center gap-2">
+                {brl(weightLineCents(priceOf(w.entry), w.grams))}
+                <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setWeighed((prev) => prev.filter((x) => x.key !== w.key))}>Remover</Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {weighing && (
+        <WeightSheet
+          name={weighing.name}
+          pricePerKg={priceOf(weighing)}
+          onAdd={async (grams) => { setWeighed((prev) => [...prev, { key: crypto.randomUUID(), entry: weighing, grams }]); return true; }}
+          onClose={() => setWeighing(null)}
+        />
+      )}
       <div className="grid sm:grid-cols-2 gap-3 items-end">
         <div>
           <label htmlFor="counter-cpf" className="text-sm font-semibold block mb-1">CPF na nota?</label>
@@ -196,16 +236,16 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
             <OpenShiftCard registerId={shift.register.id} registerName={shift.register.name} onOpened={() => shift.refresh()} />
           </div>
         ) : (
-          lines.length > 0 && <PaymentPanel totalCents={Math.round(total * 100)} payments={payments} onChange={setPayments} disabled={saving} />
+          itemCount > 0 && <PaymentPanel totalCents={Math.round(total * 100)} payments={payments} onChange={setPayments} disabled={saving} />
         )}
       </div>
       {/* Why the button is still grey (2026-10-12: it stayed disabled with no reason on screen) */}
-      {lines.length > 0 && shift.shiftId && hint && (
+      {itemCount > 0 && shift.shiftId && hint && (
         <p className="text-sm text-amber-700 mt-3 text-right">{hint}</p>
       )}
       <div className="flex items-center justify-between mt-4">
         <span className="text-2xl font-bold text-green-700">{brl(Math.round(total * 100))}</span>
-        <Button onClick={finish} disabled={saving || lines.length === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
+        <Button onClick={finish} disabled={saving || itemCount === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
           {saving ? 'Registrando...' : 'Finalizar venda'}
         </Button>
       </div>

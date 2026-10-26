@@ -67,7 +67,7 @@ describe('public table bill and pay', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ status: 'OPEN', sessionId: s.id, label: 'Mesa 3', subtotalCents: 5000, totalCents: body.subtotalCents + body.serviceCents, paidCents: 0 });
-    expect(body.items).toEqual([{ name: `Burger ${tag}`, quantity: 2, totalCents: 5000 }]);
+    expect(body.items).toEqual([{ name: `Burger ${tag}`, quantity: 2, weightGrams: null, totalCents: 5000 }]);
     expect(JSON.stringify(body)).not.toMatch(/Segredo|userId|restaurantId|cashSession/);
   });
 

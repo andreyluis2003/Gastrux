@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { KitchenTicket } from '@/lib/print/tickets';
 import { printWhenReady } from '@/lib/print/print-frame';
+import { quantityLabel } from '@/lib/comanda/weight';
 import '../../print.css';
 
 /** Kitchen ticket ("comanda de produção") in 80 mm, printed by the browser. */
@@ -53,7 +54,7 @@ export default function KitchenTicketPage() {
         {ticket.lines.map((line, i) => (
           <div key={i} style={{ marginBottom: '2mm' }}>
             <div className="big">
-              {line.quantity}x {line.name}
+              {quantityLabel(line)} {line.name}
             </div>
             {line.modifiers.map((m, j) => (
               <div key={j}>&nbsp;&nbsp;* {m}</div>

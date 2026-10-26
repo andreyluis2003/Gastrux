@@ -11,8 +11,10 @@ import type { LineDetails, Modifier } from '@/components/vender/use-comanda';
  * The item sheet (spec 2026-10-07, 4.2): quantity, modifiers, note. For a line the kitchen already
  * has, only the details and "Remover com motivo".
  */
-export function ItemSheet({ title, modifiers, initial, sent, saveLabel, onSave, onRemove, onClose }: {
+export function ItemSheet({ title, modifiers, initial, sent, saveLabel, onSave, onRemove, onClose, byWeight = false }: {
   title: string;
+  /** A weighed line: no quantity (a wrong weight is removed and weighed again), only the note */
+  byWeight?: boolean;
   modifiers: Modifier[];
   initial: LineDetails;
   sent: boolean;
@@ -45,11 +47,15 @@ export function ItemSheet({ title, modifiers, initial, sent, saveLabel, onSave, 
           <p className="text-sm text-slate-600">A cozinha já recebeu este item. Para tirar da conta, use “Remover com motivo”.</p>
         ) : (
           <>
+            {byWeight ? (
+              <p className="text-sm text-slate-600">Peso errado? Remova e lance de novo com o peso certo.</p>
+            ) : (
             <div className="flex items-center gap-4">
               <Button variant="outline" size="icon" aria-label="Menos" onClick={() => setD((x) => ({ ...x, quantity: Math.max(1, x.quantity - 1) }))}><Minus className="h-4 w-4" /></Button>
               <span className="text-2xl font-bold w-10 text-center">{d.quantity}</span>
               <Button variant="outline" size="icon" aria-label="Mais" onClick={() => setD((x) => ({ ...x, quantity: x.quantity + 1 }))}><Plus className="h-4 w-4" /></Button>
             </div>
+            )}
 
             {Object.entries(byCategory).map(([cat, mods]) => (
               <div key={cat}>

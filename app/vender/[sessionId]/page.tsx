@@ -9,6 +9,8 @@ import { brl } from '@/components/caixa/money';
 import { useComanda, type ComandaLine } from '@/components/vender/use-comanda';
 import { MenuPanel } from '@/components/vender/menu-panel';
 import { ItemSheet } from '@/components/vender/item-sheet';
+import { WeightSheet } from '@/components/vender/weight-sheet';
+import { kgLabel } from '@/lib/comanda/weight';
 import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
 import { MesaActions } from '@/components/vender/mesa-actions';
@@ -148,7 +150,8 @@ export default function ComandaRapidaPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* min-w-0: a grid item does not shrink below its content, and the category tabs row is wider than a phone (video screenshots 2026-10-24) */}
         <div className="lg:col-span-2 min-w-0">
-          <MenuPanel groups={c.groups} disabled={c.isClosed} onTap={c.quickAdd} onDetails={(entry) => setSheet({ entry })} />
+          {/* A product sold by weight always asks the weight first (spec 2026-10-25 venda-por-peso) */}
+          <MenuPanel groups={c.groups} disabled={c.isClosed} onTap={(entry) => (entry.soldByWeight ? setSheet({ entry }) : c.quickAdd(entry))} onDetails={(entry) => setSheet({ entry })} />
         </div>
         <div className="hidden lg:block">
           <div className="sticky top-4 rounded-xl border bg-white p-4">{panel}</div>
@@ -172,7 +175,15 @@ export default function ComandaRapidaPage() {
         </div>
       )}
 
-      {sheet?.entry && (
+      {sheet?.entry?.soldByWeight && (
+        <WeightSheet
+          name={sheet.entry.name}
+          pricePerKg={sheet.entry.price}
+          onAdd={(grams) => c.addWeighed(sheet.entry!, grams)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet?.entry && !sheet.entry.soldByWeight && (
         <ItemSheet
           title={sheet.entry.name}
           modifiers={c.modifiers}
@@ -185,8 +196,9 @@ export default function ComandaRapidaPage() {
       )}
       {sheetLine && (
         <ItemSheet
-          title={sheetLine.recipe.name}
-          modifiers={c.modifiers}
+          title={sheetLine.weightGrams ? `${sheetLine.recipe.name} (${kgLabel(sheetLine.weightGrams)})` : sheetLine.recipe.name}
+          modifiers={sheetLine.weightGrams ? [] : c.modifiers}
+          byWeight={!!sheetLine.weightGrams}
           initial={{
             quantity: sheetLine.quantity,
             modifierIds: (sheetLine.modifiers ?? []).map((m) => m.modifierId).filter((x): x is string => !!x),

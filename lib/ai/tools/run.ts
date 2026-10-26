@@ -50,7 +50,11 @@ export async function runTool(member: RestaurantMember, name: string, input: unk
         const p = parsePeriod(input);
         const items = (await itemSalesInRange(rid, p.from, p.to)).sort((a, b) => b.quantity - a.quantity).slice(0, 30);
         return { ok: true, data: { periodo: `${p.startDate} a ${p.endDate}`,
-          itens: items.map((i) => (manager ? { item: i.name, quantidade: i.quantity, receita: i.revenue } : { item: i.name, quantidade: i.quantity })) } };
+          itens: items.map((i) => {
+            // Sold by weight: the quantity is kg (spec 2026-10-25 venda-por-peso)
+            const quantidade = i.byWeight ? `${i.quantity} kg` : i.quantity;
+            return manager ? { item: i.name, quantidade, receita: i.revenue } : { item: i.name, quantidade };
+          }) } };
       }
       case 'caixa_turno': {
         const open = await prisma.cashSession.findMany({ where: { restaurantId: rid, status: 'OPEN' }, select: { id: true } });

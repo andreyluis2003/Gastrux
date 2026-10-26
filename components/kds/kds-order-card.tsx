@@ -8,10 +8,13 @@ import { AlertCircle, CheckCircle, Clock, Printer, Zap } from 'lucide-react';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
 import { cn } from '@/lib/utils';
 import { kdsPriorityLabel, kdsStatusLabel } from '@/lib/kds/status-label';
+import { quantityLabel } from '@/lib/comanda/weight';
 
 interface OrderItem {
   id: string;
   quantity: number;
+  /** A line sold by weight (spec 2026-10-25 venda-por-peso) */
+  weightGrams?: number | null;
   specialInstructions?: string;
   status: string;
   recipe: {
@@ -190,7 +193,7 @@ export function KDSOrderCard({
               {ItemStatus(item.status)}
               <div className="flex-1">
                 <p className={`font-medium ${item.status === 'CANCELLED' ? 'line-through text-gray-400' : ''}`}>
-                  {item.quantity}x {item.recipe.name}
+                  {quantityLabel(item)} {item.recipe.name}
                 </p>
                 {/* Withdrawn from the comanda after it was sent (2026-10-12): the cook must not make it */}
                 {item.status === 'CANCELLED' && <p className="text-xs font-bold text-red-600">CANCELADO: não fazer</p>}

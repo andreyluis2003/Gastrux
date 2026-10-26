@@ -28,6 +28,8 @@ export interface TemplateRecipe {
   items: Array<{ ingredient: string; qty: number; unit: TemplateUnit }>;
   /** Counted in the daily count (contagem de espetos); seeded into Recipe.dailyCount */
   dailyCount?: boolean;
+  /** Sold by weight: price per kg and the items describe 1 kg (spec 2026-10-25 venda-por-peso) */
+  soldByWeight?: boolean;
 }
 
 export interface TemplateResaleItem {
@@ -367,8 +369,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     ],
     resale: [{ name: 'Cerveja long neck', description: '355 ml', menuCategory: 'Bebidas', price: 12 }, ...DRINKS],
   },
-  // Padaria and cafeteria (owner, 2026-10-23). The bread is made in the house (flour, yeast), sold by the unit: sale
-  // by weight (kg) is a later phase. What goes out in a fornada or into the display case is in the daily count.
+  // Padaria and cafeteria (owner, 2026-10-23). The bread is made in the house (flour, yeast) and the pão francês is
+  // sold by kg (venda por peso, 2026-10-25). What goes into the display case by the unit is in the daily count.
   {
     slug: 'padaria',
     label: 'Padaria',
@@ -388,8 +390,8 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
       { key: 'CAF', name: 'Café em pó', category: 'Bebidas', unit: 'kg', cost: 45 },
     ],
     recipes: [
-      { key: 'PFR', name: 'Pão francês', description: 'Saído do forno, a unidade', menuCategory: 'Pães', price: 0.9, prepMinutes: 180, dailyCount: true,
-        items: [{ ingredient: 'FTR', qty: 0.03, unit: 'kg' }, { ingredient: 'FER', qty: 0.001, unit: 'kg' }, { ingredient: 'SAL', qty: 0.0006, unit: 'kg' }, { ingredient: 'ACU', qty: 0.0005, unit: 'kg' }] },
+      { key: 'PFR', name: 'Pão francês', description: 'Saído do forno, por kg', menuCategory: 'Pães', price: 18.9, prepMinutes: 180, soldByWeight: true,
+        items: [{ ingredient: 'FTR', qty: 0.6, unit: 'kg' }, { ingredient: 'FER', qty: 0.02, unit: 'kg' }, { ingredient: 'SAL', qty: 0.012, unit: 'kg' }, { ingredient: 'ACU', qty: 0.01, unit: 'kg' }] },
       { key: 'PNC', name: 'Pão na chapa', description: 'Pão francês com manteiga', menuCategory: 'Lanches', price: 6, prepMinutes: 3,
         items: [{ ingredient: 'FTR', qty: 0.03, unit: 'kg' }, { ingredient: 'FER', qty: 0.001, unit: 'kg' }, { ingredient: 'MAN', qty: 0.015, unit: 'kg' }] },
       { key: 'MIS', name: 'Misto quente', description: 'Pão francês, presunto e muçarela na chapa', menuCategory: 'Lanches', price: 12, prepMinutes: 5,

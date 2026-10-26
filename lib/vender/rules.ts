@@ -10,6 +10,8 @@ export interface MenuEntry {
   recipeId: string | null;
   recipe?: { id: string } | null;
   available?: boolean;
+  /** Price per kg; the cashier types the weight (spec 2026-10-25 venda-por-peso) */
+  soldByWeight?: boolean;
   category?: { id: string; name: string; position: number; emoji?: string | null } | null;
 }
 

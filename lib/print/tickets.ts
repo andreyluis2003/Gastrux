@@ -15,7 +15,7 @@ export interface KitchenTicket {
   kind: 'Mesa' | 'Balcão' | 'Delivery' | 'Pedido';
   where: string | null;
   createdAt: string;
-  lines: Array<{ quantity: number; name: string; modifiers: string[]; notes: string | null }>;
+  lines: Array<{ quantity: number; weightGrams?: number | null; name: string; modifiers: string[]; notes: string | null }>;
   notes: string | null;
   deliveryAddress: string | null;
 }
@@ -63,6 +63,7 @@ export async function buildKitchenTicket(restaurantId: string, orderId: string):
     createdAt: order.createdAt.toISOString(),
     lines: order.items.map((item) => ({
       quantity: item.quantity,
+      weightGrams: item.weightGrams,
       name: item.recipe?.name ?? 'Item',
       modifiers: item.modifiers.map((m) => m.modifier?.name).filter((n): n is string => !!n),
       notes: item.specialInstructions ?? null,
@@ -77,7 +78,8 @@ export interface Receipt {
   title: string;
   closedAt: string | null;
   status: string;
-  lines: Array<{ quantity: number; name: string; unitPrice: number; total: number; modifiers: Array<{ name: string; price: number }> }>;
+  /** unitPrice is the price per kg on a line sold by weight (weightGrams set) */
+  lines: Array<{ quantity: number; weightGrams?: number | null; name: string; unitPrice: number; total: number; modifiers: Array<{ name: string; price: number }> }>;
   total: number;
   /** Service charge, outside the NFC-e (spec 2026-10-07, 4.5) */
   serviceCharge: number;
@@ -132,8 +134,9 @@ export async function buildReceipt(restaurantId: string, sessionId: string): Pro
     const totalCents = lineTotalCents(item.price, item.quantity, adjustments);
     return {
       quantity: item.quantity,
+      weightGrams: item.weightGrams,
       name: item.recipe?.name ?? 'Item',
-      unitPrice: Number(item.price),
+      unitPrice: item.weightGrams ? Number(item.pricePerKg ?? 0) : Number(item.price),
       total: totalCents / 100,
       modifiers: item.modifiers.map((m) => ({ name: m.modifier?.name ?? 'Adicional', price: Number(m.priceAdjustment) })),
     };

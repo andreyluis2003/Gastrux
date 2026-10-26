@@ -97,7 +97,7 @@ describe('printing phase 1: kitchen ticket and customer receipt', () => {
       expect(res.status).toBe(200);
       expect(ticket.kind).toBe('Mesa');
       expect(ticket.where).toBe('7');
-      expect(ticket.lines).toEqual([{ quantity: 2, name: `X-Burger ${tag}`, modifiers: [`Queijo extra sem cebola ${tag}`], notes: 'bem passado' }]);
+      expect(ticket.lines).toEqual([{ quantity: 2, weightGrams: null, name: `X-Burger ${tag}`, modifiers: [`Queijo extra sem cebola ${tag}`], notes: 'bem passado' }]);
       expect(ticket.notes).toBe('Cliente com pressa');
     });
 

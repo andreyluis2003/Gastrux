@@ -13,6 +13,7 @@ import { brl, reaisToCents } from '@/components/caixa/money';
 import { useDeviceShift } from '@/lib/caixa/use-device-shift';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
+import { quantityLabel } from '@/lib/comanda/weight';
 import { nextEqualShare, serviceRow, shareForItems, splitEqually } from '@/lib/comanda/bill';
 import { noteLabel } from '@/lib/nfe/access-key';
 import type { Bill } from '@/lib/comanda/bill-service';
@@ -188,9 +189,9 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
             {mode === 'items' && !closed ? (
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={picked.includes(i.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, i.id] : p.filter((x) => x !== i.id)))} />
-                {i.quantity}x {i.name}
+                {quantityLabel(i)} {i.name}
               </label>
-            ) : <span>{i.quantity}x {i.name}</span>}
+            ) : <span>{quantityLabel(i)} {i.name}</span>}
             <span>{brl(i.totalCents)}</span>
           </li>
         ))}

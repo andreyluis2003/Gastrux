@@ -19,6 +19,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { formatBRL, formatDate, formatPercent } from '@/lib/formatters';
+import { kgLabel } from '@/lib/comanda/weight';
 
 interface SalesReport {
   period: string;
@@ -27,8 +28,10 @@ interface SalesReport {
   averageTicket: number;
   topDishes: Array<{
     name: string;
+    /** kg when sold by weight */
     quantity: number;
     revenue: number;
+    byWeight?: boolean;
   }>;
   byCategory: Array<{
     category: string;
@@ -100,7 +103,7 @@ export default function SalesReportPage() {
         ['Ticket médio (R$)', money(report.averageTicket)],
         [],
         ['Item', 'Quantidade', 'Receita (R$)'],
-        ...report.topDishes.map((d) => [d.name, String(d.quantity), money(d.revenue)]),
+        ...report.topDishes.map((d) => [d.name, d.byWeight ? kgLabel(Math.round(d.quantity * 1000)) : String(d.quantity), money(d.revenue)]),
         [],
         ['Categoria', 'Vendas (R$)', '%'],
         ...report.byCategory.map((c) => [c.category, money(c.sales), c.percentage.toFixed(1).replace('.', ',')]),
@@ -230,7 +233,7 @@ export default function SalesReportPage() {
                   <div className="flex-1">
                     <p className="font-semibold">{dish.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {dish.quantity} vendas
+                      {dish.byWeight ? kgLabel(Math.round(dish.quantity * 1000)) : `${dish.quantity} vendas`}
                     </p>
                   </div>
                   <p className="font-semibold text-primary">

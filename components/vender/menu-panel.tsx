@@ -75,7 +75,7 @@ export function MenuPanel({ groups, disabled, onTap, onDetails }: {
                   className="w-full min-h-[72px] rounded-xl border bg-white p-3 pr-9 text-left active:bg-primary/5 disabled:opacity-50 select-none"
                 >
                   <div className="font-semibold text-sm leading-tight line-clamp-2">{entry.name}</div>
-                  <div className="text-sm text-emerald-700 mt-1">{brl(toCents(entry.price))}</div>
+                  <div className="text-sm text-emerald-700 mt-1">{brl(toCents(entry.price))}{entry.soldByWeight ? '/kg' : ''}</div>
                 </button>
                 <button
                   aria-label={`Detalhes de ${entry.name}`}

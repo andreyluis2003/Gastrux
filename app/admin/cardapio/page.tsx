@@ -38,6 +38,8 @@ interface MenuItem {
   available: boolean;
   active: boolean;
   displayOnQR: boolean;
+  /** Sold by weight: the price is per kg (spec 2026-10-25 venda-por-peso) */
+  soldByWeight?: boolean;
   categoryId: string;
   images: { id: string; imageUrl: string }[];
 }
@@ -66,6 +68,7 @@ export default function AdminCardapioPage() {
     price: '',
     recipeId: '',
     code: '',
+    soldByWeight: false,
   });
 
   useEffect(() => {
@@ -148,6 +151,7 @@ export default function AdminCardapioPage() {
           price: newItem.price,
           recipeId: newItem.recipeId || null,
           code: newItem.code || null,
+          soldByWeight: newItem.soldByWeight,
           position: 0,
         }),
       });
@@ -157,7 +161,7 @@ export default function AdminCardapioPage() {
         return;
       }
       toast.success('Item criado');
-      setNewItem({ name: '', description: '', price: '', recipeId: '', code: '' });
+      setNewItem({ name: '', description: '', price: '', recipeId: '', code: '', soldByWeight: false });
       setShowNewItem(null);
       fetchCategories();
     } catch (err) {
@@ -178,6 +182,7 @@ export default function AdminCardapioPage() {
           recipeId: editingItem.recipeId,
           available: editingItem.available,
           displayOnQR: editingItem.displayOnQR,
+          soldByWeight: !!editingItem.soldByWeight,
           categoryId: editingItem.categoryId,
           code: editingItem.code || null,
         }),
@@ -339,11 +344,19 @@ export default function AdminCardapioPage() {
                     <Input
                       type="number"
                       step="0.01"
-                      placeholder="Preço (R$) *"
+                      placeholder={newItem.soldByWeight ? 'Preço por kg (R$) *' : 'Preço (R$) *'}
                       value={newItem.price}
                       onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
                     />
                   </div>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newItem.soldByWeight}
+                      onChange={(e) => setNewItem({ ...newItem, soldByWeight: e.target.checked })}
+                    />
+                    Vendido por peso (preço por kg; o caixa digita o peso)
+                  </label>
                   <Input
                     placeholder="Descrição (opcional)"
                     value={newItem.description}
@@ -416,7 +429,7 @@ export default function AdminCardapioPage() {
                         )}
                         <div className="flex items-center gap-2 mt-1 text-xs">
                           <span className="font-bold text-amber-700">
-                            {brl(Math.round(Number(item.price) * 100))}
+                            {brl(Math.round(Number(item.price) * 100))}{item.soldByWeight ? '/kg' : ''}
                           </span>
                           {!item.displayOnQR && (
                             <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
@@ -490,7 +503,7 @@ export default function AdminCardapioPage() {
               />
             </div>
             <div>
-              <Label>Preço (R$) *</Label>
+              <Label>{editingItem.soldByWeight ? 'Preço por kg (R$) *' : 'Preço (R$) *'}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -545,7 +558,20 @@ export default function AdminCardapioPage() {
                 />
                 Mostrar no QR
               </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!editingItem.soldByWeight}
+                  onChange={(e) => setEditingItem({ ...editingItem, soldByWeight: e.target.checked })}
+                />
+                Vendido por peso
+              </label>
             </div>
+            {editingItem.soldByWeight && (
+              <p className="text-xs text-gray-500">
+                O preço é por kg e a ficha técnica descreve 1 kg. No caixa, digite o peso (ex.: 0,350). Não aparece no QR, no site de delivery nem no WhatsApp: o cliente não tem como pesar.
+              </p>
+            )}
             <div className="flex gap-2">
               <Button onClick={handleUpdateItem} className="flex-1">
                 Salvar

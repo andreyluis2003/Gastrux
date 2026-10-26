@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       totalSales,
       totalOrders,
       averageTicket: totalOrders > 0 ? totalSales / totalOrders : 0,
-      topDishes: items.map((i) => ({ name: i.name, quantity: i.quantity, revenue: i.revenue })),
+      topDishes: items.map((i) => ({ name: i.name, quantity: i.quantity, revenue: i.revenue, ...(i.byWeight ? { byWeight: true } : {}) })),
       byCategory: [...byCategory.values()].sort((a, b) => b.sales - a.sales),
     });
   } catch (error) {

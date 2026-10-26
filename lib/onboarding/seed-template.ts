@@ -57,9 +57,9 @@ export async function seedStarterTemplate(restaurantId: string, businessType: st
           name: r.name,
           description: r.description,
           baseYield: 1,
-          yieldUnit: 'un',
+          yieldUnit: r.soldByWeight ? 'kg' : 'un',
           portionSize: 1,
-          portionUnit: 'un',
+          portionUnit: r.soldByWeight ? 'kg' : 'un',
           prepTimeMinutes: r.prepMinutes,
           sellingPrice: r.price,
           dailyCount: r.dailyCount === true,
@@ -81,7 +81,7 @@ export async function seedStarterTemplate(restaurantId: string, businessType: st
       data: [
         ...template.recipes.map((r) => ({
           restaurantId, categoryId: menuCategoryId[r.menuCategory], name: r.name, description: r.description,
-          price: r.price, recipeId: recipeId[r.key], position: next(r.menuCategory),
+          price: r.price, recipeId: recipeId[r.key], position: next(r.menuCategory), soldByWeight: r.soldByWeight === true,
         })),
         ...template.resale.map((s) => ({
           restaurantId, categoryId: menuCategoryId[s.menuCategory], name: s.name, description: s.description,

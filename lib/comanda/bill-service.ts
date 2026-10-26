@@ -27,7 +27,8 @@ export interface Bill {
   sessionId: string;
   status: string;
   label: string;
-  items: Array<{ id: string; name: string; quantity: number; totalCents: number }>;
+  /** weightGrams: a line sold by weight (spec 2026-10-25 venda-por-peso) */
+  items: Array<{ id: string; name: string; quantity: number; weightGrams: number | null; totalCents: number }>;
   percent: number;
   applies: boolean;
   waived: boolean;
@@ -58,7 +59,7 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
       table: { select: { number: true } },
       restaurant: { select: { serviceChargePercent: true } },
       items: {
-        select: { id: true, quantity: true, price: true, recipe: { select: { name: true } }, modifiers: { select: { priceAdjustment: true } } },
+        select: { id: true, quantity: true, weightGrams: true, price: true, recipe: { select: { name: true } }, modifiers: { select: { priceAdjustment: true } } },
         orderBy: { addedAt: 'asc' },
       },
     },
@@ -83,6 +84,7 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
     id: i.id,
     name: i.recipe?.name ?? 'Item',
     quantity: i.quantity,
+    weightGrams: i.weightGrams,
     totalCents: lineTotalCents(i.price, i.quantity, i.modifiers.map((m) => m.priceAdjustment)),
   }));
   const subtotalCents = items.reduce((sum, i) => sum + i.totalCents, 0);

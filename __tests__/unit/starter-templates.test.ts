@@ -30,9 +30,20 @@ describe('starter templates ("Comece com", lib/onboarding/starter-templates.ts)'
     expect(counted('marmitaria')).toEqual(['CMO', 'FRG', 'LIN', 'MAC']);
     expect(counted('doceria')).toEqual(['BOL', 'BRI', 'MOR', 'MOU']);
     // Padaria and cafeteria (owner, 2026-10-23): the fornada and what goes in the display case are counted
-    expect(counted('padaria')).toEqual(['BOL', 'COX', 'PFR', 'SON']);
+    // The pão francês is sold by kg since 2026-10-25 (venda por peso): the count is of units, so it is out
+    expect(counted('padaria')).toEqual(['BOL', 'COX', 'SON']);
     expect(counted('cafeteria')).toEqual(['BOL', 'PQJ']);
     for (const slug of ['restaurantes', 'pizzaria', 'hamburgueria', 'japones', 'acai', 'bar']) expect([slug, counted(slug)]).toEqual([slug, []]);
+  });
+
+  it('the padaria sells its pão francês by kg, with a ficha of 1 kg (spec 2026-10-25 venda-por-peso)', () => {
+    const byWeight = (slug: string) => templateFor(slug).recipes.filter((r) => r.soldByWeight).map((r) => r.key);
+    expect(byWeight('padaria')).toEqual(['PFR']);
+    const pfr = templateFor('padaria').recipes.find((r) => r.key === 'PFR')!;
+    expect(pfr.price).toBe(18.9);
+    // About 0.6 kg of flour per kg of bread
+    expect(pfr.items.find((i) => i.ingredient === 'FTR')!.qty).toBeCloseTo(0.6);
+    for (const slug of ['restaurantes', 'cafeteria', 'lanchonete', 'espetaria']) expect([slug, byWeight(slug)]).toEqual([slug, []]);
   });
 
   for (const t of STARTER_TEMPLATES) {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { lineTotalCents } from '@/lib/comanda/line-total';
+import { kgLabel, weightLineCents } from '@/lib/comanda/weight';
 import { entryRecipeId, groupByCategory, isUnsent, unsentCount, type MenuEntry } from '@/lib/vender/rules';
 
 export interface ComandaLine {
@@ -15,6 +16,8 @@ export interface ComandaLine {
   pending?: boolean;
   quantity: number;
   price: string | number;
+  /** A line sold by weight (spec 2026-10-25 venda-por-peso): quantity 1, price is the whole line */
+  weightGrams?: number | null;
   specialInstructions?: string | null;
   recipe: { name: string };
   modifiers?: Array<{ modifierId?: string; priceAdjustment: string | number; modifier?: { name: string } }>;
@@ -100,6 +103,7 @@ export function useComanda(sessionId: string) {
       pending: true,
       quantity: Number((e.display as any)?.quantity ?? 1),
       price: Number((e.display as any)?.unitPrice ?? 0),
+      weightGrams: (e.display as any)?.weightGrams ?? null,
       recipe: { name: String((e.display as any)?.name ?? 'Item') },
       modifiers: ((e.display as any)?.modifiers ?? []) as ComandaLine['modifiers'],
       specialInstructions: ((e.display as any)?.notes as string) || null,
@@ -149,6 +153,21 @@ export function useComanda(sessionId: string) {
     });
   }
 
+  /** A product sold by weight: one weighing, one line; the server prices it from the price per kg */
+  async function addWeighed(entry: MenuEntry, grams: number): Promise<boolean> {
+    if (isClosed) return false;
+    const res = await mutate(
+      'POST',
+      `/api/comanda/sessions/${sessionId}/items`,
+      { menuItemId: entry.id, recipeId: entryRecipeId(entry), weightGrams: grams },
+      `${kgLabel(grams)} ${entry.name}`,
+      { name: entry.name, recipeId: entryRecipeId(entry), quantity: 1, unitPrice: weightLineCents(entry.price, grams) / 100, weightGrams: grams, notes: '', modifiers: [] },
+    );
+    if (res && !res.ok) { toast.error(await errorOf(res, 'Erro ao lançar')); return false; }
+    await refresh();
+    return true;
+  }
+
   async function addWithDetails(entry: MenuEntry, d: LineDetails): Promise<boolean> {
     const res = await postLine(entry, d);
     if (res && !res.ok) { toast.error(await errorOf(res, 'Erro ao lançar')); return false; }
@@ -160,7 +179,10 @@ export function useComanda(sessionId: string) {
     const res = await mutate(
       'PUT',
       `/api/comanda/sessions/${sessionId}/items/${line.id}`,
-      { quantity: d.quantity, modifierIds: d.modifierIds, specialInstructions: d.notes.trim() || null },
+      // A weighed line changes only its note (the server refuses a quantity or modifiers on it)
+      line.weightGrams
+        ? { specialInstructions: d.notes.trim() || null }
+        : { quantity: d.quantity, modifierIds: d.modifierIds, specialInstructions: d.notes.trim() || null },
       `Alterar ${line.recipe.name}`,
     );
     if (res && !res.ok) { toast.error(await errorOf(res, 'Erro ao salvar')); return false; }
@@ -196,5 +218,5 @@ export function useComanda(sessionId: string) {
     return true;
   }
 
-  return { session, menu, groups, modifiers, loading, staleSince, online, lines, isClosed, totalCents, newCount, quickAdd, addWithDetails, saveLine, removeLine, sendToKitchen, refresh, mutate };
+  return { session, menu, groups, modifiers, loading, staleSince, online, lines, isClosed, totalCents, newCount, quickAdd, addWeighed, addWithDetails, saveLine, removeLine, sendToKitchen, refresh, mutate };
 }

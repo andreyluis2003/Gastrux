@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { brl } from '@/components/caixa/money';
 import { lineTotalCents } from '@/lib/comanda/line-total';
 import { isUnsent } from '@/lib/vender/rules';
+import { quantityLabel } from '@/lib/comanda/weight';
 import type { ComandaLine } from '@/components/vender/use-comanda';
 
 /** The comanda list with total, "Enviar para cozinha (N)" and "Conta" (spec 2026-10-07, 4.2) */
@@ -32,7 +33,7 @@ export function ComandaPanel({ lines, totalCents, newCount, isClosed, onLine, on
                   className={`w-full text-left rounded-lg p-3 border ${fresh ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}
                 >
                   <div className="flex justify-between gap-2">
-                    <span className="font-semibold text-sm">{l.quantity}x {l.recipe.name}</span>
+                    <span className="font-semibold text-sm">{quantityLabel(l)} {l.recipe.name}</span>
                     <span className="text-sm">{brl(lineTotalCents(l.price, l.quantity, (l.modifiers ?? []).map((m) => m.priceAdjustment)))}</span>
                   </div>
                   {(l.modifiers ?? []).map((m, i) => <div key={i} className="text-xs text-slate-500">+ {m.modifier?.name ?? 'Adicional'}</div>)}

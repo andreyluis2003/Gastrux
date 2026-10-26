@@ -5,7 +5,7 @@ export interface PublicOpenBill {
   status: 'OPEN';
   sessionId: string;
   label: string;
-  items: Array<{ name: string; quantity: number; totalCents: number }>;
+  items: Array<{ name: string; quantity: number; weightGrams?: number | null; totalCents: number }>;
   subtotalCents: number;
   serviceCents: number;
   servicePercent: number;
@@ -24,7 +24,7 @@ export function toPublicBill(bill: Bill, names: Map<string, string> = new Map())
     status: 'OPEN',
     sessionId: bill.sessionId,
     label: bill.label,
-    items: bill.items.map((i) => ({ name: names.get(i.id) ?? i.name, quantity: i.quantity, totalCents: i.totalCents })),
+    items: bill.items.map((i) => ({ name: names.get(i.id) ?? i.name, quantity: i.quantity, weightGrams: i.weightGrams, totalCents: i.totalCents })),
     subtotalCents: bill.subtotalCents,
     serviceCents: bill.serviceCents,
     servicePercent: bill.percent,

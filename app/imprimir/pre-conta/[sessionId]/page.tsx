@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { printWhenReady } from '@/lib/print/print-frame';
 import { splitEqually } from '@/lib/comanda/bill';
+import { quantityLabel } from '@/lib/comanda/weight';
 import type { Bill } from '@/lib/comanda/bill-service';
 import '../../print.css';
 
@@ -41,7 +42,7 @@ export default function PreBillPage() {
         <div className="center muted">Pré-conta · {new Date().toLocaleString('pt-BR')}</div>
         <hr />
         {bill.items.map((i) => (
-          <div key={i.id} className="row"><span>{i.quantity} x {i.name}</span><span>{money(i.totalCents)}</span></div>
+          <div key={i.id} className="row"><span>{quantityLabel(i)} {i.name}</span><span>{money(i.totalCents)}</span></div>
         ))}
         <hr />
         <div className="row"><span>Subtotal</span><span>{money(bill.subtotalCents)}</span></div>

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import type { Receipt } from '@/lib/print/tickets';
 import { printWhenReady } from '@/lib/print/print-frame';
+import { kgLabel } from '@/lib/comanda/weight';
 import '../../print.css';
 
 const PAYMENT: Record<string, string> = {
@@ -89,7 +90,7 @@ export default function ReceiptPage() {
             <div>{line.name}</div>
             <div className="row">
               <span>
-                {line.quantity} x {money(line.unitPrice)}
+                {line.weightGrams ? `${kgLabel(line.weightGrams)} x ${money(line.unitPrice)}/kg` : <>{line.quantity} x {money(line.unitPrice)}</>}
               </span>
               <span>{money(line.total)}</span>
             </div>

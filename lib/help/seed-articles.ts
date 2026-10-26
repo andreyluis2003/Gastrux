@@ -638,6 +638,38 @@ Para o Gastrux reconhecer cada item, use no iFood o mesmo **Código PDV** que o 
 Os pedidos do iFood entram no caixa e na DRE, na linha "Delivery: iFood".`,
   },
   {
+    categorySlug: 'cardapio-e-receitas',
+    slug: 'venda-por-peso',
+    title: 'Como vendo por peso (pão, frios, doces por kg)?',
+    summary: 'Marque "Vendido por peso" no produto, com o preço por kg. No caixa, digite o peso que a balança mostra.',
+    keywords: 'peso, kg, quilo, balança, padaria, pão francês, frios, self-service, gramas, por quilo',
+    order: 5,
+    content: `## Cadastrando o produto
+
+Em **Cardápio e produtos > Cardápio digital**, crie ou edite o produto e marque **Vendido por peso**. O preço passa a ser **por kg**: no cardápio do caixa aparece "R$ 18,90/kg".
+
+Se o produto tem ficha técnica, ela descreve **1 kg** do produto (por exemplo, quanto de farinha vai em 1 kg de pão). O estoque baixa pelo peso vendido: 350 g tiram 35% da ficha.
+
+## Vendendo
+
+1. No **Vender** (comanda ou balcão), toque no produto. Na **Venda balcão**, toque em **Pesar**
+2. Digite o peso que a balança mostra: **0,350** (em kg) ou **350 g**
+3. Confira o valor que aparece e toque em **Lançar**
+
+Cada pesagem vira uma linha da conta, como "0,350 kg Pão francês". Pesou errado? Toque na linha, **Remover**, e lance de novo com o peso certo.
+
+## Na nota e nos relatórios
+
+- Na **NFC-e** o item sai em **KG**, com o peso e o preço por kg
+- O cupom, a conta e a cozinha mostram o peso
+- Em **Relatórios > Vendas**, o produto aparece com o total de kg vendidos
+
+## O que ainda não tem
+
+- **Balança ligada ao computador** e leitura da **etiqueta da balança** com código de barras: por enquanto o peso é digitado
+- Produto por peso **não aparece** no QR Code da mesa, no site de delivery nem no WhatsApp, porque o cliente não tem como pesar sozinho`,
+  },
+  {
     categorySlug: 'integracao-delivery',
     slug: 'api-de-pedidos',
     title: 'Como recebo pedidos de outros sistemas (API de pedidos)?',

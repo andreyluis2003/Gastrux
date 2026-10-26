@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { isValidPayerKey, MAX_PEOPLE, parseReaisCents, reais, shareCents, type ShareMode } from '@/lib/comanda/table-share';
 import type { PublicTableBill, PublicOpenBill } from '@/lib/comanda/public-bill';
 import { statusPollUrl } from '@/lib/delivery-payments/return-params';
+import { quantityLabel } from '@/lib/comanda/weight';
 
 const KEY_STORAGE = 'gastrux-payer-key';
 /** The comanda a phone was paying when it left for the card checkout (per table) */
@@ -258,7 +259,7 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
 
       <ul className="divide-y text-sm">
         {open.items.map((i, n) => (
-          <li key={n} className="flex justify-between py-1.5"><span>{i.quantity}x {i.name}</span><span>{reais(i.totalCents)}</span></li>
+          <li key={n} className="flex justify-between py-1.5"><span>{quantityLabel(i)} {i.name}</span><span>{reais(i.totalCents)}</span></li>
         ))}
       </ul>
       <div className="text-sm space-y-1 border-t pt-2">
