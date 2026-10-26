@@ -10,10 +10,10 @@ Spec `docs/superpowers/specs/2026-10-25-tutoriais-em-video-design.md`, plano
 aqui", `lib/tutorials/published.ts`). Precisa de `npx prisma migrate deploy` (migração
 `20261025160000_tutorial_views`). Lotes 2 a 4 (os outros 37 vídeos) feitos com `gastrux-videos/tutoriais`.
 
-### Fazer com os próximos lotes
+### Lotes
 
-- `__tests__/integration/tutorials-progress.test.ts` espera 400 para `dre` porque ele não está publicado:
-  antes de publicar `dre`, marcar `dre.published = false` no próprio teste.
+- Feito em 2026-10-26: os 46 vídeos do catálogo estão publicados (o teste de progresso esconde a DRE dentro dele
+  para conferir o caso de vídeo não publicado).
 
 ### Achados ao gravar o lote 2 (2026-10-25)
 
