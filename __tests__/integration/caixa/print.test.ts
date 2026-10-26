@@ -58,4 +58,32 @@ describe('cash register receipts', () => {
     expect((await entryTicket(req(), { params: { id: entry.id } })).status).toBe(404);
     expect((await closeTicket(req(), { params: { id: session.id } })).status).toBe(404);
   });
+
+  // A cashier sees the report of the shift he closed (it prints on close), never another one's (2026-10-26)
+  it('a cashier opens only the closing report of a shift he closed', async () => {
+    const mk = async (n) => {
+      const u = await prisma.user.create({ data: { email: `pr-${n}-${Date.now()}@x.test`, name: n, password: 'x', role: 'CASHIER', active: true, currentRestaurantId: A.restaurantId } });
+      await prisma.restaurantUser.create({ data: { restaurantId: A.restaurantId, userId: u.id, role: 'CASHIER', isActive: true } });
+      return u.id;
+    };
+    const ana = await mk('Ana'); const bia = await mk('Bia');
+    try {
+      const anaMember = { userId: ana, restaurantId: A.restaurantId, role: 'CASHIER' };
+      const { session } = await openSession(anaMember, { cashRegisterId: reg.id, openingFloat: 50 });
+      await closeSession(anaMember, session.id, { counted: { dinheiro: 50 } });
+      as(ana, A.restaurantId);
+      expect((await closeTicket(req(), { params: { id: session.id } })).status).toBe(200);
+      as(bia, A.restaurantId);
+      expect((await closeTicket(req(), { params: { id: session.id } })).status).toBe(403);
+      as(A.ownerId, A.restaurantId);
+      expect((await closeTicket(req(), { params: { id: session.id } })).status).toBe(200);
+    } finally {
+      await prisma.restaurantUser.deleteMany({ where: { userId: { in: [ana, bia] } } });
+      await prisma.cashSessionEntry.deleteMany({ where: { restaurantId: A.restaurantId } });
+      await prisma.cashSession.deleteMany({ where: { restaurantId: A.restaurantId } });
+      await prisma.auditLog.deleteMany({ where: { userId: { in: [ana, bia] } } });
+      await prisma.notification.deleteMany({ where: { restaurantId: A.restaurantId } });
+      await prisma.user.deleteMany({ where: { id: { in: [ana, bia] } } });
+    }
+  });
 });
