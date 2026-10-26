@@ -20,7 +20,8 @@ export async function soldByRecipe(db: Db, restaurantId: string, recipeIds: stri
       where: {
         ...recipeFilter,
         addedAt: { gte: from, lt: to },
-        session: { restaurantId, status: { not: 'CANCELLED' } },
+        // An encomenda is sold at the pickup (spec 2026-10-26)
+        session: { restaurantId, status: { notIn: ['CANCELLED', 'ENCOMENDA'] } },
       },
       _sum: { quantity: true },
     }),

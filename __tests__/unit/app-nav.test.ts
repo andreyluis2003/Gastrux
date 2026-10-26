@@ -43,7 +43,7 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
   });
 
   it('a cashier sees only what the counter uses', () => {
-    expect(hrefs(navFor('CASHIER', false))).toEqual(['/dashboard', '/vender', '/admin/integrations/orders', '/contagem-do-dia', '/caixa']);
+    expect(hrefs(navFor('CASHIER', false))).toEqual(['/dashboard', '/vender', '/encomendas', '/admin/integrations/orders', '/contagem-do-dia', '/caixa']);
   });
 
   it('the daily count is in Vender for every role that taps it', () => {

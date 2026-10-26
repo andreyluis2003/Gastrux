@@ -1877,6 +1877,8 @@ model OrderSession {
   customer               Customer?             @relation("OrderSessionCustomer", fields: [customerId], references: [id])
   /// Cashback used as a discount on this bill (lib/cashback/service.ts)
   cashbackUsedCents      Int                   @default(0)
+  /// When the customer picks up an encomenda (status ENCOMENDA, spec 2026-10-26 encomendas)
+  pickupAt               DateTime?
   onlinePayments         Payment[]             @relation("OrderSessionOnlinePayments")
   /// Every kitchen order of this comanda (orderId above keeps only the latest)
   kitchenOrders          Order[]               @relation("OrderComanda")
@@ -1894,6 +1896,7 @@ model OrderSession {
   @@index([tableId])
   @@index([userId])
   @@index([createdAt])
+  @@index([restaurantId, status, pickupAt])
   @@map("order_sessions")
 }
 
@@ -3913,6 +3916,8 @@ enum OrderSessionStatus {
   READY
   CLOSED
   CANCELLED
+  /// An order for later (spec 2026-10-26 encomendas): off the salão until the customer picks it up
+  ENCOMENDA
 }
 
 enum OrderType {

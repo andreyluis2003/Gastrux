@@ -638,6 +638,44 @@ Para o Gastrux reconhecer cada item, use no iFood o mesmo **Código PDV** que o 
 Os pedidos do iFood entram no caixa e na DRE, na linha "Delivery: iFood".`,
   },
   {
+    categorySlug: 'pdv-e-caixa',
+    slug: 'encomendas',
+    title: 'Como anoto uma encomenda com sinal (bolo, salgados para festa)?',
+    summary: 'Em Vender > Encomendas, crie a encomenda com a data da retirada, lance os itens e receba o sinal em Conta.',
+    keywords: 'encomenda, bolo, aniversário, salgados, cento, festa, sinal, entrada, retirada, agenda, padaria, doceria, confeitaria',
+    order: 6,
+    content: `## Anotando a encomenda
+
+1. Vá em **Vender > Encomendas** e toque em **Nova encomenda**
+2. Preencha o **cliente**, o **celular** (opcional: o cliente entra no cadastro e ganha cashback), a **data e hora da retirada** e a **observação** (por exemplo, "escrever Parabéns, Ana")
+3. Toque em **Criar e lançar itens**: abre a tela da comanda. Lance os itens como numa venda (por unidade ou por peso)
+
+## O sinal
+
+Em **Conta**, receba o sinal com a forma de pagamento (o botão diz **Receber sinal**). O dinheiro entra no caixa do dia em que foi recebido. A conta da encomenda **não fecha** ao ser paga, nem se o cliente pagar tudo adiantado: ela fecha na retirada.
+
+## A agenda
+
+Em **Vender > Encomendas** ficam as encomendas por dia: **Atrasadas**, **Hoje**, **Amanhã** e **Próximos dias**, com os itens, o total, o que já foi pago e o que falta. A encomenda **não aparece no salão** com as mesas. Se quiser que a produção veja no KDS, use **Enviar para a cozinha** na tela da encomenda.
+
+## Na retirada
+
+Toque em **Cliente retirou** (na agenda ou na tela da encomenda):
+
+- **Já paga**: a venda fecha na hora, o estoque baixa e a NFC-e sai, se você emite
+- **Falta pagar**: a encomenda vira uma comanda aberta; receba o restante em **Conta**
+
+A venda conta nos relatórios no dia da retirada.
+
+## Cancelar
+
+Na tela da encomenda, menu **⋯**, cancelar com o motivo (exige gerente). Se houve sinal pago no caixa, o cancelamento devolve o valor no caixa aberto (sinal pago online é estornado pelo Mercado Pago antes).
+
+## O que ainda não tem
+
+O cliente ainda não faz encomenda pelo site nem recebe aviso de "pronta" por WhatsApp.`,
+  },
+  {
     categorySlug: 'cardapio-e-receitas',
     slug: 'venda-por-peso',
     title: 'Como vendo por peso (pão, frios, doces por kg)?',

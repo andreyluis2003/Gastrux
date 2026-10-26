@@ -3,6 +3,20 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Encomendas, padaria fase 3 (2026-10-26)
+
+Spec `docs/superpowers/specs/2026-10-26-encomendas-design.md`. Ficou de fora, de propósito:
+
+- **Encomenda feita pelo cliente** (site de delivery, WhatsApp) e **aviso de "pronta"** por WhatsApp ou e-mail.
+- **Planejamento de produção** somando as encomendas do dia (hoje a produção vê a agenda ou o KDS, se a
+  encomenda for enviada para a cozinha).
+- **Ficha impressa da encomenda** para a produção (a pré-conta imprime os itens, sem a data da retirada).
+- Na tela da comanda, o subtítulo de uma encomenda ainda diz "aberta agora" (quando foi anotada); a data da
+  retirada está na faixa roxa logo abaixo.
+- A **Conta** de uma encomenda pede de novo o celular do cliente para o cashback, mesmo quando ele foi dado na
+  criação (o cliente já fica ligado à encomenda; o campo é só redundante).
+- Uma encomenda pode ser **juntada ou transferida** pelo menu "⋯" como qualquer comanda; não há bloqueio.
+
 ## Venda por peso, padaria fase 2 (2026-10-25)
 
 Spec `docs/superpowers/specs/2026-10-25-venda-por-peso-design.md`. Ficou de fora, de propósito:

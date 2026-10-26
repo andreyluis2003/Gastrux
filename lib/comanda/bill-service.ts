@@ -189,7 +189,7 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
     const after = (await loadBill(tx, member.restaurantId, sessionId))!;
     // What was already paid covers the new total: the bill closes now (it would be stuck open with
     // nothing left to receive — review of stage 2)
-    if (after.paidCents > 0 && after.remainingCents === 0) {
+    if (after.paidCents > 0 && after.remainingCents === 0 && after.status !== 'ENCOMENDA') {
       await tx.orderSession.updateMany({
         where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
         data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents },
@@ -264,7 +264,8 @@ export async function recordBillPayment(
     // The staff took a payment: the table's "pagar com o garçom" was answered (spec 2026-10-10 §5.3)
     await tx.orderSession.update({ where: { id: sessionId }, data: { payAtWaiterRequestedAt: null } });
     const paidNow = settled.paidCents - settled.changeCents;
-    const closed = bill.paidCents + paidNow >= bill.totalCents;
+    // An encomenda takes its deposit (even the whole amount) and closes only at the pickup (spec 2026-10-26)
+    const closed = bill.status !== 'ENCOMENDA' && bill.paidCents + paidNow >= bill.totalCents;
     if (closed) {
       const guard = await tx.orderSession.updateMany({
         where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },

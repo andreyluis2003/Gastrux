@@ -20,7 +20,8 @@ export interface ItemSales {
 export async function itemSalesInRange(restaurantId: string, from: Date, to: Date): Promise<ItemSales[]> {
   const [lines, kitchen] = await Promise.all([
     prisma.orderSessionItem.findMany({
-      where: { addedAt: { gte: from, lt: to }, session: { restaurantId, status: { not: 'CANCELLED' } } },
+      // An encomenda is sold at the pickup (its lines count from then, spec 2026-10-26)
+      where: { addedAt: { gte: from, lt: to }, session: { restaurantId, status: { notIn: ['CANCELLED', 'ENCOMENDA'] } } },
       select: { recipeId: true, quantity: true, weightGrams: true, price: true, recipe: { select: { name: true } } },
     }),
     prisma.orderItem.findMany({

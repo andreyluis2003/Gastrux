@@ -297,7 +297,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         <Button variant="ghost" onClick={onCancel}>Voltar</Button>
         {!closed && online && (
           <Button className="bg-green-600" disabled={busy || !shift.shiftId || dueNow <= 0 || !panelState(dueNow, payments).valid} onClick={receive}>
-            {dueNow >= bill.remainingCents ? 'Receber e fechar' : `Receber ${brl(dueNow)}`}
+            {/* An encomenda closes at the pickup, never here (spec 2026-10-26 encomendas) */}
+            {bill.status === 'ENCOMENDA' ? `Receber sinal ${brl(dueNow)}` : dueNow >= bill.remainingCents ? 'Receber e fechar' : `Receber ${brl(dueNow)}`}
           </Button>
         )}
       </div>

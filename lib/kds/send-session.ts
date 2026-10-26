@@ -99,7 +99,8 @@ async function sendUnlocked(restaurantId: string, sessionId: string): Promise<Re
   await prisma.orderSessionItem.updateMany({ where: { id: { in: newItems.map((i) => i.id) } }, data: { sentAt } });
   await prisma.orderSession.update({
     where: { id: sessionId },
-    data: { orderId: order.id, status: 'SENT_TO_KITCHEN', sentToKitchenAt: sentAt },
+    // An encomenda goes to the kitchen and stays an encomenda until the pickup (spec 2026-10-26)
+    data: { orderId: order.id, ...(orderSession.status === 'ENCOMENDA' ? {} : { status: 'SENT_TO_KITCHEN' }), sentToKitchenAt: sentAt },
   });
 
   return NextResponse.json({

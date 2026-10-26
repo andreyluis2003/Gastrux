@@ -11,6 +11,7 @@ import { MenuPanel } from '@/components/vender/menu-panel';
 import { ItemSheet } from '@/components/vender/item-sheet';
 import { WeightSheet } from '@/components/vender/weight-sheet';
 import { kgLabel } from '@/lib/comanda/weight';
+import { pickupLabel } from '@/lib/encomendas/agenda';
 import { ComandaPanel } from '@/components/vender/comanda-panel';
 import { ContaDialog } from '@/components/vender/conta-dialog';
 import { MesaActions } from '@/components/vender/mesa-actions';
@@ -73,7 +74,29 @@ export default function ComandaRapidaPage() {
   }
   async function backToSalao() {
     await releaseIfEmpty();
-    router.push('/vender');
+    // An encomenda came from the agenda (spec 2026-10-26 encomendas)
+    router.push(c.session?.status === 'ENCOMENDA' ? '/encomendas' : '/vender');
+  }
+  // "Cliente retirou": paid, the sale closes; else the encomenda is an open comanda to take the rest
+  const [pickingUp, setPickingUp] = useState(false);
+  async function pickUp() {
+    setPickingUp(true);
+    try {
+      const res = await fetch(`/api/encomendas/${sessionId}/retirar`, { method: 'POST', headers: { 'Idempotency-Key': `retirar-${sessionId}` } });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(body.error || 'Não foi possível registrar a retirada'); return; }
+      if (body.status === 'CLOSED') {
+        toast.success('Encomenda entregue: venda registrada');
+        router.push('/encomendas');
+      } else {
+        toast.info('Receba o que falta em Conta para fechar a venda');
+        await c.refresh();
+      }
+    } catch {
+      toast.error('Sem conexão: tente de novo');
+    } finally {
+      setPickingUp(false);
+    }
   }
 
   if (c.loading) return <div className="p-6">Carregando...</div>;
@@ -130,6 +153,17 @@ export default function ComandaRapidaPage() {
           </div>
         )}
       </div>
+
+      {s.status === 'ENCOMENDA' && (
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-violet-300 bg-violet-50 px-4 py-3 text-sm text-violet-950">
+          <div>
+            <p className="font-semibold">Encomenda{s.pickupAt ? ` para ${pickupLabel(s.pickupAt, new Date())}` : ''}</p>
+            {s.notes && <p className="italic">“{s.notes}”</p>}
+            <p>O que for pago em Conta é o sinal: a venda fecha quando o cliente retirar.</p>
+          </div>
+          <Button size="sm" disabled={pickingUp || c.lines.length === 0} onClick={pickUp}>Cliente retirou</Button>
+        </div>
+      )}
 
       {/* Pay at the table: the table asked for the waiter to pay; "Atendido" dismisses it without a payment */}
       {s.payAtWaiterRequestedAt && !c.isClosed && (
