@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacidadePage() {
-  const dataAtualizacao = '28 de abril de 2026';
+  const dataAtualizacao = '27 de outubro de 2026';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -33,7 +33,7 @@ export default function PrivacidadePage() {
               <li><strong>Dados de uso:</strong> registros de acesso, ações realizadas, preferências</li>
               <li><strong>Dados de pagamento:</strong> processados pelo Stripe (não armazenamos dados de cartão)</li>
               <li><strong>Dados de clientes do restaurante:</strong> nome, telefone, e-mail, histórico de pedidos (inseridos por você)</li>
-              <li><strong>Cookies e tecnologias similares:</strong> para analytics (Google Analytics 4) e funcionamento da sessão</li>
+              <li><strong>Cookies e tecnologias similares:</strong> para analytics (Google Analytics 4), medição de anúncios (Pixel da Meta) e funcionamento da sessão</li>
             </ul>
           </section>
 
@@ -68,9 +68,10 @@ export default function PrivacidadePage() {
               <li><strong>Processadores de pagamento:</strong> Stripe, para gestão de assinaturas</li>
               <li><strong>Serviços de infraestrutura:</strong> para hospedagem e operação da Plataforma</li>
               <li><strong>Integrações ativadas por você:</strong> iFood, Rappi, Uber Eats, WhatsApp Business, Twilio (somente quando configurados)</li>
+              <li><strong>Meta (Facebook e Instagram):</strong> somente se você aceitar os cookies, o Pixel da Meta registra as visitas às páginas públicas do site e a criação de conta, para medir nossos anúncios. Ele não roda nas telas do sistema nem nos cardápios e pedidos dos clientes do restaurante</li>
               <li><strong>Autoridades:</strong> quando exigido por lei ou ordem judicial</li>
             </ul>
-            <p className="text-gray-700 leading-relaxed">Não vendemos ou compartilhamos seus dados com terceiros para fins de marketing.</p>
+            <p className="text-gray-700 leading-relaxed">Não vendemos seus dados. Fora o Pixel da Meta descrito acima, que depende do seu consentimento, não compartilhamos seus dados com terceiros para fins de marketing.</p>
           </section>
 
           <section className="space-y-3">
@@ -100,7 +101,7 @@ export default function PrivacidadePage() {
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-slate-800">9. Cookies</h2>
-            <p className="text-gray-700 leading-relaxed">Utilizamos cookies essenciais para o funcionamento da sessão de autenticação e cookies de analytics (Google Analytics 4) para compreender o uso da Plataforma. Você pode desativar cookies não essenciais nas configurações do seu navegador.</p>
+            <p className="text-gray-700 leading-relaxed">Utilizamos cookies essenciais para o funcionamento da sessão de autenticação e cookies de analytics (Google Analytics 4) para compreender o uso da Plataforma. Nas páginas públicas do site, também usamos o Pixel da Meta para medir nossos anúncios no Facebook e no Instagram. Os cookies de analytics e da Meta só são ativados se você aceitar no aviso de cookies; você pode mudar a escolha a qualquer momento pelo link &quot;Preferências de cookies&quot; no rodapé ou nas configurações do seu navegador.</p>
           </section>
 
           <section className="space-y-3">

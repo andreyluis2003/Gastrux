@@ -14,8 +14,9 @@ import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import { FontPreload } from '@/components/font-preload';
 import { PerformanceOptimizations } from '@/components/performance-optimizations';
 import { AnalyticsProvider, GAScript } from '@/components/analytics/ga-script';
-import { gaIdFrom } from '@/lib/analytics/consent';
+import { gaIdFrom, metaPixelIdFrom } from '@/lib/analytics/consent';
 import { CookieBanner } from '@/components/analytics/cookie-banner';
+import { MetaPixel } from '@/components/analytics/meta-pixel';
 import { FeedbackWidget } from '@/components/feedback/feedback-widget';
 import { GastruxChat } from '@/components/ai/gastrux-chat';
 import { RadixPointerEventsFix } from '@/components/radix-pointer-events-fix';
@@ -76,6 +77,9 @@ export const dynamic = 'force-dynamic';
 
 // Read at request time: a plain process.env.NEXT_PUBLIC_* would be inlined at build, where Easypanel has no env
 const GA_ENV = 'NEXT_PUBLIC_GA_MEASUREMENT_ID';
+// The pixel id is public (it ships in every page that loads it); META_PIXEL_ID in Easypanel overrides it
+const META_PIXEL_ENV = 'META_PIXEL_ID';
+const GASTRUX_META_PIXEL_ID = 'PENDING';
 
 export default function RootLayout({
   children,
@@ -83,6 +87,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const gaId = gaIdFrom(process.env[GA_ENV]);
+  const metaPixelId = metaPixelIdFrom(process.env[META_PIXEL_ENV] || GASTRUX_META_PIXEL_ID);
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head suppressHydrationWarning>
@@ -92,7 +97,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${dmSans.variable} ${poppins.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        <AnalyticsProvider gaId={gaId}>
+        <AnalyticsProvider gaId={gaId} metaPixelId={metaPixelId}>
         <I18nProvider>
           <QueryProvider>
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -109,8 +114,9 @@ export default function RootLayout({
                 </OutboxProvider>
               </SessionProvider>
               <AppToaster />
-              {/* Google Analytics only after consent (lib/analytics/consent.ts) */}
+              {/* Google Analytics and the Meta Pixel only after consent (lib/analytics/consent.ts) */}
               <GAScript />
+              <MetaPixel />
               <CookieBanner />
             </ThemeProvider>
           </QueryProvider>

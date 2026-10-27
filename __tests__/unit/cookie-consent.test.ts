@@ -1,5 +1,5 @@
 // Cookie consent (lib/analytics/consent.ts): where the banner asks, and the stored choice.
-import { asksConsentOn, gaIdFrom, readConsent, writeConsent, CONSENT_EVENT } from '../../lib/analytics/consent';
+import { asksConsentOn, gaIdFrom, metaPixelIdFrom, readConsent, writeConsent, CONSENT_EVENT } from '../../lib/analytics/consent';
 
 // A browser window is enough as an event target with a localStorage (no jsdom in this suite)
 const store = new Map<string, string>();
@@ -45,6 +45,13 @@ describe('cookie consent', () => {
     expect(gaIdFrom(' G-KJNWCGWTQE ')).toBe('G-KJNWCGWTQE');
     for (const v of [undefined, null, '', 'G-PLACEHOLDER', 'UA-123', "G-ABC');alert(1)//"]) {
       expect(gaIdFrom(v as any)).toBeNull();
+    }
+  });
+
+  it('accepts only an all-digit Meta Pixel id', () => {
+    expect(metaPixelIdFrom(' 1234567890123456 ')).toBe('1234567890123456');
+    for (const v of [undefined, null, '', 'PENDING', '123', "123456789012');alert(1)//"]) {
+      expect(metaPixelIdFrom(v as any)).toBeNull();
     }
   });
 });

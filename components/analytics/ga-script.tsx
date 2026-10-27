@@ -9,13 +9,22 @@ import { CONSENT_EVENT, readConsent, type Consent } from '@/lib/analytics/consen
  * NEXT_PUBLIC_* is inlined at build and the Easypanel build has no env, so the browser bundle never had it.
  */
 const GaIdContext = createContext<string | null>(null);
+const MetaPixelIdContext = createContext<string | null>(null);
 
-export function AnalyticsProvider({ gaId, children }: { gaId: string | null; children: React.ReactNode }) {
-  return <GaIdContext.Provider value={gaId}>{children}</GaIdContext.Provider>;
+export function AnalyticsProvider({ gaId, metaPixelId, children }: { gaId: string | null; metaPixelId: string | null; children: React.ReactNode }) {
+  return (
+    <GaIdContext.Provider value={gaId}>
+      <MetaPixelIdContext.Provider value={metaPixelId}>{children}</MetaPixelIdContext.Provider>
+    </GaIdContext.Provider>
+  );
 }
 
 export function useGaId(): string | null {
   return useContext(GaIdContext);
+}
+
+export function useMetaPixelId(): string | null {
+  return useContext(MetaPixelIdContext);
 }
 
 /** The visitor's cookie choice, kept in step with the banner and the footer link. */

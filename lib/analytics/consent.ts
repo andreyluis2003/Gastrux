@@ -1,5 +1,5 @@
 /**
- * Cookie consent for Google Analytics (2026-10-13, Política de Privacidade: GA runs on consent).
+ * Cookie consent for Google Analytics and the Meta Pixel (2026-10-13; Meta 2026-10-27; Política de Privacidade: both run on consent).
  * Nothing loads until the visitor accepts. The choice lives in this browser only; the banner asks on the
  * public pages, never over the restaurant's working screens nor its customers' menu and delivery pages.
  */
@@ -35,6 +35,12 @@ export function writeConsent(value: Consent | null): void {
     // Storage blocked: the choice lasts until the page closes
   }
   window.dispatchEvent(new CustomEvent(CONSENT_EVENT, { detail: value }));
+}
+
+/** A Meta Pixel (dataset) id, all digits, or null */
+export function metaPixelIdFrom(raw: string | null | undefined): string | null {
+  const id = raw?.trim();
+  return id && /^\d{10,20}$/.test(id) ? id : null;
 }
 
 /** A real GA4 id or null (unset, the old 'G-PLACEHOLDER', or anything that could break the inline script). */

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Chrome } from 'lucide-react';
 import { GastruxLogo } from '@/components/brand/logo';
 import { useAnalytics } from '@/hooks/use-analytics';
+import { markSignupDone } from '@/components/analytics/meta-pixel';
 import { normalizeReferralCode, REFERRAL_COOKIE, REFERRAL_COOKIE_MAX_AGE } from '@/lib/referrals/code';
 
 export default function SignUpPage() {
@@ -61,6 +62,7 @@ export default function SignUpPage() {
     }
     setIsLoadingGoogle(true);
     trackSignup('google');
+    markSignupDone();
     try {
       await signIn('google', {
         redirect: true,
@@ -120,6 +122,7 @@ export default function SignUpPage() {
       if (signInResult?.ok) {
         // Track successful conversion
         trackEvent('signup_form_complete', { event_category: 'conversion', email });
+        markSignupDone();
         router.replace('/auth/qualification');
       }
     } catch (error) {
