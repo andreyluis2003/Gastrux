@@ -79,7 +79,7 @@ export const dynamic = 'force-dynamic';
 const GA_ENV = 'NEXT_PUBLIC_GA_MEASUREMENT_ID';
 // The pixel id is public (it ships in every page that loads it); META_PIXEL_ID in Easypanel overrides it
 const META_PIXEL_ENV = 'META_PIXEL_ID';
-const GASTRUX_META_PIXEL_ID = 'PENDING';
+const GASTRUX_META_PIXEL_ID = '1956565491680423';
 
 export default function RootLayout({
   children,
