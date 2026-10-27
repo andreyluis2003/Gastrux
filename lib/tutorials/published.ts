@@ -208,13 +208,14 @@ export const PUBLISHED: Record<string, { durationSec: number; steps: string[] }>
     ],
   },
   'nfce': {
-    durationSec: 40,
+    durationSec: 69,
     steps: [
-      "Em Notas fiscais você configura a emissão da NFC-e, a nota do consumidor, direto pelo Gastrux.",
-      "A Visão Geral mostra quantas notas foram emitidas, autorizadas, pendentes e rejeitadas.",
-      "Para começar, abra Configuração e preencha os dados da empresa: CNPJ, inscrição estadual e regime tributário.",
-      "Escolha o provedor fiscal e informe a chave de acesso e a senha do certificado digital A1.",
-      "A tributação padrão dos produtos é preenchida pelo seu contador. Com tudo pronto, a nota pode sair sozinha a cada venda.",
+      "Em Notas fiscais, a Visão geral mostra em que etapa está a configuração da NFC-e e o que ainda falta. Toque em Continuar.",
+      "A primeira etapa é a lista do que ter em mãos: o CNPJ com inscrição estadual, o certificado digital A1, a conta na Focus NFe, o CSC da SEFAZ e a tributação passada pelo contador.",
+      "Na etapa Empresa, preencha o CNPJ, a inscrição estadual, a razão social, o estado e o regime. Cada etapa salva quando você avança.",
+      "Depois, cole o token da sua empresa na Focus NFe. Comece no ambiente de Teste. O certificado e o CSC ficam cadastrados na Focus.",
+      "Na tributação, copie o texto pronto e mande ao seu contador. Ele passa o NCM, o CFOP, a origem, o CSOSN e o código de PIS e COFINS.",
+      "Por fim, confira se todas as etapas estão completas e emita uma nota de teste. Se ela sair autorizada, troque para Produção com o token de produção, e a nota sai sozinha a cada venda.",
     ],
   },
   'notas-emitidas': {
