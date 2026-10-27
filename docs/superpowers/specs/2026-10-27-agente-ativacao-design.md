@@ -51,7 +51,7 @@ A decisão de **quando** e **por quê** é por regra escrita no código, testáv
 
 | Gatilho | Situação | Ajuda |
 |---|---|---|
-| Boas-vindas | cadastro há 1 h | caminho mais curto até vender no tipo de negócio dele + vídeo "Comece por aqui" |
+| Boas-vindas | cadastro há 5 min | caminho mais curto até vender no tipo de negócio dele + vídeo "Comece por aqui" |
 | Cardápio parado | dia 1, ainda só o cardápio de exemplo | "mande uma foto do cardápio no chat que a IA monta" |
 | Sem caixa | dia 2, cardápio pronto, caixa nunca aberto | abrir o caixa e fazer uma venda de teste (vídeo do Vender) |
 | Sem venda | dia 3, caixa aberto, nenhuma venda fechada | passo a passo da primeira comanda (vídeo) |
@@ -99,8 +99,9 @@ junto com as notas da equipe. É daí que saem as medidas de sucesso.
 
 ### 7. Como roda
 
-Uma rotina por hora (crontab do VPS, como as outras, POST com CRON_SECRET) avalia as contas em teste, aplica as
-regras e cria os rascunhos (ou envia, na fase 2). Texto escrito com o Claude que o Gastrux já usa (lib/ai), com a
+Uma rotina a cada 5 minutos (crontab do VPS, como as outras, POST com CRON_SECRET) avalia as contas em teste,
+aplica as regras e cria os rascunhos (ou envia, na fase 2); cada gatilho só dispara uma vez por conta, então rodar
+mais vezes não repete mensagem. Os 5 minutos existem por causa das boas-vindas; os outros gatilhos são por dia. Texto escrito com o Claude que o Gastrux já usa (lib/ai), com a
 base de conhecimento (lib/ai/knowledge) e os dados daquela conta; custo registrado como os outros usos de IA.
 
 ### 8. E-mails fixos de hoje
@@ -116,14 +117,25 @@ aprovação** e **registro**. Atendimento, vendas (SDR) e financeiro usam a mesm
 permissões próprias. Fica dentro do Gastrux primeiro; quando o agente do Fryonex começar, as peças comuns saem para
 um pacote da Help Flow (decidir naquela hora, com o Fryonex na mesa). Não construir agora nada só para o Fryonex.
 
-## Para o dono decidir
+## Decisões do dono (2026-10-27)
 
-1. **WhatsApp no cadastro:** pedir o número no cadastro? Sugiro **sim, opcional**, com o texto "para receber ajuda
-   no WhatsApp durante o teste".
-2. **Número oficial de WhatsApp do Gastrux** na API da Meta: começar o processo agora (leva dias: número dedicado,
-   verificação, modelos aprovados)? Sugiro **sim**; até lá vai pelo botão "Abrir no WhatsApp".
-3. **Começar com fila de aprovação** (você aprova cada mensagem nas primeiras semanas)? Sugiro **sim**.
-4. **Trocar os e-mails fixos do dia 1, 7 e 14** pelas mensagens do agente? Sugiro **sim**.
+1. **WhatsApp no cadastro: obrigatório**, com o texto "para receber ajuda durante o teste" e como parar
+   (responder SAIR ou o link "Parar as dicas", que vale para todos os canais).
+2. **Número oficial de WhatsApp do Gastrux: sim.** O chip dedicado fica livre em **29/10/2026**; depois vêm a
+   verificação da empresa (Help Flow) no portfólio da Meta e os modelos de mensagem (categoria "utilidade" para a
+   ajuda). Até lá, e para quem ainda não tem modelo aprovado, o WhatsApp sai pelo botão "Abrir no WhatsApp".
+3. **Fila de aprovação: sim**, nas primeiras 2-3 semanas; depois, automático por tipo.
+4. **Os e-mails fixos do dia 1, 7 e 14 saem**; o agente os substitui.
+
+Acrescentado na mesma conversa (o que o mercado pratica e dá resultado):
+- **Boas-vindas em até 5 minutos** depois do cadastro (não 1 hora): é quando a pessoa ainda está com o sistema aberto.
+- **Ajuda para montar:** a primeira mensagem oferece a montagem do cardápio pela IA (foto do cardápio) e uma
+  **conversa de 15 minutos com o dono** para quem quiser; o pedido de conversa vira aviso para o dono.
+- **Toda mensagem puxa para a primeira venda**, que é o momento em que o cliente vê o valor.
+- **"O que faltou?"**: quem chega ao fim do teste sem assinar recebe uma pergunta curta; a resposta vai para o dono
+  e fica na ficha do cliente.
+- **Fim do teste com o dono:** nos últimos dias, o agente prepara o texto e o dono manda; desconto e prazo extra
+  continuam só com ele.
 
 ## Fica para quem constrói
 
