@@ -50,9 +50,9 @@ const PUBLIC_PATHS = [
 
 /**
  * Brand files, app icons, the home page video and the tutorial videos in public/ (2026-10-13: the new
- * logo did not show to visitors; 2026-10-25: the same for the videos)
+ * logo did not show to visitors; 2026-10-25: the same for the videos; 2026-10-27: the ad files the Meta API fetches)
  */
-const PUBLIC_ASSET = /^\/(brand\/[\w.-]+\.(svg|png)|videos\/(tutoriais\/)?[\w-]+\.(mp4|jpg)|favicon\.svg|icon-[\w-]+\.png|og-image\.png|screenshot-[\w-]+\.png)$/;
+const PUBLIC_ASSET = /^\/(brand\/[\w.-]+\.(svg|png)|videos\/(tutoriais\/)?[\w-]+\.(mp4|jpg)|videos\/anuncios\/[\w-]+\.(mp4|jpg|png)|favicon\.svg|icon-[\w-]+\.png|og-image\.png|screenshot-[\w-]+\.png)$/;
 
 function isPublicPage(pathname: string): boolean {
   if (PUBLIC_ASSET.test(pathname)) return true;

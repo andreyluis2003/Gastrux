@@ -34,11 +34,14 @@ describe('middleware: public pages without login', () => {
     // The tutorial videos (spec 2026-10-25 tutoriais-em-video)
     '/videos/tutoriais/caixa.mp4',
     '/videos/tutoriais/caixa.jpg',
+    // The ad files the Meta API fetches by URL (2026-10-27)
+    '/videos/anuncios/B-faltou-dinheiro-no-caixa-9x16.mp4',
+    '/videos/anuncios/1-custo-do-prato-feed-4x5.png',
   ])('%s opens for a visitor', async (path) => {
     expect(redirectsToSignIn(await visit(path))).toBe(false);
   });
 
-  it.each(['/dashboard', '/dashboard/pagamentos/conectar', '/deliveryx', '/videos/../dashboard', '/videos/x.mp4/dashboard', '/tutoriais', '/videos/tutoriais/../../dashboard'])(
+  it.each(['/dashboard', '/dashboard/pagamentos/conectar', '/deliveryx', '/videos/../dashboard', '/videos/x.mp4/dashboard', '/tutoriais', '/videos/tutoriais/../../dashboard', '/videos/anuncios/../../dashboard', '/videos/anuncios/x.png/dashboard'])(
     '%s still requires login',
     async (path) => {
       expect(redirectsToSignIn(await visit(path))).toBe(true);
