@@ -5,12 +5,12 @@ import { ONBOARDING_STEPS, buildOnboardingEmail, dueWindow, unsubscribeToken, ve
 const DAY = 86_400_000;
 const now = new Date('2026-10-20T12:00:00Z');
 
-it('each e-mail is due from its day of the account until 3 days later', () => {
-  const day7 = ONBOARDING_STEPS.find((s) => s.key === 'day7')!;
-  const { from, to } = dueWindow(day7, now);
-  expect(now.getTime() - to.getTime()).toBe(7 * DAY);
-  expect(now.getTime() - from.getTime()).toBe(10 * DAY);
-  expect(ONBOARDING_STEPS.map((s) => s.day)).toEqual([0, 1, 7, 14]);
+// The tips of day 1, 7 and 14 left on 2026-10-28: the activation agent nudges by what the account did
+it('only the welcome is left, due from the sign-up until 3 days later', () => {
+  expect(ONBOARDING_STEPS.map((s) => s.key)).toEqual(['welcome']);
+  const { from, to } = dueWindow(ONBOARDING_STEPS[0], now);
+  expect(now.getTime() - to.getTime()).toBe(0);
+  expect(now.getTime() - from.getTime()).toBe(3 * DAY);
 });
 
 it('the stop link is signed for that person only', () => {

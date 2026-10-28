@@ -102,7 +102,7 @@ describe('writeActivationMessage', () => {
 
   it('an owner alert names the restaurant, the days, the steps and a suggested message', async () => {
     const create = mockReply('ignored');
-    const alert = await writeActivationMessage(signals, { trigger: 'fim_teste_sem_venda', reason: 'O teste acaba em até 4 dias e ainda não houve venda', ownerAlert: true, nextStep: cardapio }, 'OWNER_ALERT', now);
+    const alert = await writeActivationMessage(signals, { trigger: 'fim_teste_sem_venda', reason: 'O teste acaba em até 5 dias e ainda não houve venda', ownerAlert: true, nextStep: cardapio }, 'OWNER_ALERT', now);
     expect(create).not.toHaveBeenCalled();
     expect(alert.subject).toContain('Pizzaria da Maria');
     expect(alert.text).toContain('Pizzaria da Maria');

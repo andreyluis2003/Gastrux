@@ -82,7 +82,7 @@ export function decide(s: ActivationSignals, now: Date): ActivationDecision | nu
   const done = (key: FirstStepKey) => !!step(key)?.done;
   const pending = s.steps.find((x) => !x.done && !x.optional) ?? s.steps.find((x) => !x.done) ?? null;
   const trialLeft = s.trialEndsAt ? s.trialEndsAt.getTime() - now.getTime() : null;
-  const trialEnding = trialLeft !== null && trialLeft > 0 && trialLeft <= 4 * DAY;
+  const trialEnding = trialLeft !== null && trialLeft > 0 && trialLeft <= 5 * DAY;
   const trialEnded = trialLeft !== null && trialLeft <= 0;
 
   // Client messages, one per trigger (the e-mail and the WhatsApp rows of one trigger are one message)
@@ -101,10 +101,10 @@ export function decide(s: ActivationSignals, now: Date): ActivationDecision | nu
     && now.getTime() - last.createdAt.getTime() >= 3 * DAY;
 
   const candidates: Array<[boolean, ActivationTrigger, string, FirstStep | null]> = [
-    [trialEnding && !done('venda'), 'fim_teste_sem_venda', 'O teste acaba em até 4 dias e ainda não houve venda', pending],
+    [trialEnding && !done('venda'), 'fim_teste_sem_venda', 'O teste acaba em até 5 dias e ainda não houve venda', pending],
     [stuck && !trialEnded, 'travou', 'Duas mensagens e nenhum passo novo em 3 dias', pending],
     [done('venda'), 'primeira_venda', 'Fechou a primeira venda', pending],
-    [trialEnding && done('venda'), 'fim_teste_vendendo', 'O teste acaba em até 4 dias e já está vendendo', null],
+    [trialEnding && done('venda'), 'fim_teste_vendendo', 'O teste acaba em até 5 dias e já está vendendo', null],
     [trialEnded, 'o_que_faltou', 'O teste acabou sem assinatura', null],
     [!trialEnded && age >= WELCOME_AFTER_MS, 'boas_vindas', 'Acabou de criar a conta', pending],
     [!trialEnded && days >= 3 && done('caixa') && !done('venda'), 'sem_venda', 'Abriu o caixa e ainda não vendeu', step('venda')],

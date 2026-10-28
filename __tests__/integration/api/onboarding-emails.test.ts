@@ -49,10 +49,11 @@ describe('onboarding e-mails', () => {
 
   beforeEach(() => (sendTransactionalEmail as jest.Mock).mockClear());
 
-  it('the new owner gets the welcome; the 8-day owner gets day 7; staff, tests, opted out and old accounts get nothing', async () => {
+  // The tips of day 1, 7 and 14 left on 2026-10-28 (the activation agent took over): an 8-day owner gets nothing
+  it('the new owner gets the welcome; the 8-day owner, staff, tests, opted out and old accounts get nothing', async () => {
     await runOnboardingEmails(now);
     const mine = sentTo().filter((s) => s.includes(tag));
-    expect(mine.sort()).toEqual([`${users.day8.email}|onboarding-day7`, `${users.new.email}|onboarding-welcome`].sort());
+    expect(mine).toEqual([`${users.new.email}|onboarding-welcome`]);
     expect((await prisma.user.findUnique({ where: { id: users.new.id } })).emailSentWelcome).toBe(true);
   });
 
@@ -67,15 +68,15 @@ describe('onboarding e-mails', () => {
       if (to === late.email) throw new Error('Resend 500');
       return { provider: 'resend' };
     });
-    // 1.5 days old: the welcome (days 0-3) and day 1 (days 1-4) are both due; both fail
+    // 1.5 days old: the welcome (days 0-3) is due and fails
     const first = await runOnboardingEmails(now);
-    expect(first.failed).toBe(2);
+    expect(first.failed).toBe(1);
     const after = await prisma.user.findUnique({ where: { id: late.id } });
-    expect([after.emailSentWelcome, after.emailSentDay1]).toEqual([false, false]);
+    expect(after.emailSentWelcome).toBe(false);
     (sendTransactionalEmail as jest.Mock).mockClear();
     (sendTransactionalEmail as jest.Mock).mockImplementation(async () => ({ provider: 'resend' }));
     await runOnboardingEmails(now);
-    expect(sentTo().filter((s) => s.startsWith(late.email)).sort()).toEqual([`${late.email}|onboarding-day1`, `${late.email}|onboarding-welcome`]);
+    expect(sentTo().filter((s) => s.startsWith(late.email))).toEqual([`${late.email}|onboarding-welcome`]);
   });
 
   it('"Parar as dicas" stops them with a valid link only', async () => {

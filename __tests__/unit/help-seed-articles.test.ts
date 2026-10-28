@@ -23,6 +23,7 @@ jest.mock('@/lib/prisma', () => ({
 }));
 
 import { HELP_ARTICLES, syncHelpContent } from '@/lib/help/seed-articles';
+import implantacao from '@/lib/ai/knowledge/implantacao';
 
 it('the ficha article tells the cost inside the product (2026-10-18)', () => {
   const a = HELP_ARTICLES.find((x) => x.slug === 'cadastrar-receita');
@@ -38,6 +39,13 @@ it('the WhatsApp menu article is in Delivery (2026-10-18)', () => {
   const a = HELP_ARTICLES.find((x) => x.slug === 'cardapio-no-whatsapp');
   expect(a?.categorySlug).toBe('integracao-delivery');
   for (const fact of ['Mensagem de saudação', 'Mensagem de ausência', '/cardapio', '14 dias', 'Site de delivery']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+});
+
+it('the trial help messages article and knowledge (activation agent, spec 2026-10-27)', () => {
+  const a = HELP_ARTICLES.find((x) => x.slug === 'mensagens-durante-o-teste');
+  expect(a?.categorySlug).toBe('primeiros-passos');
+  for (const fact of ['Equipe Gastrux', 'WhatsApp', 'e-mail', 'SAIR', 'Parar as dicas']) expect([fact, a?.content.includes(fact)]).toEqual([fact, true]);
+  for (const fact of ['WhatsApp e e-mail', 'SAIR', 'Parar as dicas']) expect([fact, implantacao.includes(fact)]).toEqual([fact, true]);
 });
 
 it('contas a pagar has its article in Vendas e caixa (spec 2026-10-18 contas a pagar)', () => {

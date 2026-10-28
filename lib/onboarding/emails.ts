@@ -11,15 +11,15 @@ import { getPlatformAdminEmails } from '@/lib/admin/guard';
  * Who: the owner of a restaurant that is not internal (tests), never the platform team, never staff, never after
  * "Parar as dicas". When: each e-mail on its day of the account, and only in the 3 days after it, so an old account
  * never gets the whole series at once. The "sent" flags are the User columns of the old sequence.
+ *
+ * Since 2026-10-28 only the welcome is left: the tips of day 1, 7 and 14 went out with the activation agent
+ * (docs/superpowers/specs/2026-10-27-agente-ativacao-design.md), which nudges by what the account actually did.
  */
 const DAY_MS = 86_400_000;
 export const SEND_WINDOW_DAYS = 3;
 
 export const ONBOARDING_STEPS = [
   { key: 'welcome', day: 0, label: 'Boas-vindas e primeiros passos', flag: 'emailSentWelcome', sentAt: 'emailWelcomeSentAt' },
-  { key: 'day1', day: 1, label: 'Mesas, caixa, cozinha e equipe', flag: 'emailSentDay1', sentAt: 'emailDay1SentAt' },
-  { key: 'day7', day: 7, label: 'Custo dos pratos e estoque', flag: 'emailSentDay7', sentAt: 'emailDay7SentAt' },
-  { key: 'day14', day: 14, label: 'Relatórios, DRE e contas a pagar', flag: 'emailSentDay14', sentAt: 'emailDay14SentAt' },
 ] as const;
 
 export type OnboardingStepKey = (typeof ONBOARDING_STEPS)[number]['key'];
@@ -93,54 +93,6 @@ export function buildOnboardingEmail(key: OnboardingStepKey, user: { id: string;
           p(`Em ${b('Vender › Mesas e balcão')}, toque numa mesa ou no balcão, escolha os itens e receba.`),
           button(`${url}/dashboard`, 'Abrir o Gastrux'),
           p('Nos primeiros 30 dias, as primeiras 100 perguntas ao assistente são grátis.'),
-        ].join(''), user.id),
-      };
-    case 'day1':
-      return {
-        subject: 'Mesas, caixa e cozinha: o básico do dia a dia',
-        html: layout([
-          hello,
-          p('Com o cardápio pronto, estes são os passos que mais ajudam no movimento:'),
-          h('Mesas'),
-          p(`Em ${b('Vender › Mesas e balcão')}, toque na mesa, lance os itens e envie para a cozinha. Para fechar, toque em ${b('Conta')} e escolha a forma de pagamento. As mesas são criadas em ${b('Vender › Mesas')}.`),
-          h('Cozinha'),
-          p(`Deixe ${b('Vender › Cozinha (KDS)')} aberto num tablet na cozinha: os pedidos enviados aparecem na hora.`),
-          h('Equipe'),
-          p(`Em ${b('Equipe › Equipe e acessos')}, cada pessoa ganha o próprio login: garçom, caixa ou cozinha. Cada um vê só o que precisa.`),
-          h('Fechar o caixa'),
-          p(`No fim do dia, em ${b('Caixa e pagamentos › Caixa')}, feche o caixa: você conta o dinheiro sem ver o valor esperado, e o Gastrux mostra a diferença.`),
-          button(`${url}/vender`, 'Ir para Mesas e balcão'),
-        ].join(''), user.id),
-      };
-    case 'day7':
-      return {
-        subject: 'Uma semana de Gastrux: o custo de cada prato',
-        html: layout([
-          hello,
-          p('Com as vendas rodando, o próximo passo é saber quanto cada prato custa e quanto você ganha nele.'),
-          h('Fichas técnicas'),
-          p(`Em ${b('Cardápio e produtos › Fichas técnicas')}, diga quais insumos, e quanto de cada um, vão em cada prato. Ao editar o produto no Cardápio digital, aparecem o custo, a margem e o CMV.`),
-          h('Custo dos insumos'),
-          p(`Mantenha o custo em ${b('Cardápio e produtos › Insumos')}. Em ${b('Estoque e compras › Importar nota de compra')}, o XML da nota do fornecedor atualiza os custos.`),
-          h('Estoque'),
-          p(`Cada venda baixa o estoque pelas fichas. Lance as compras em ${b('Estoque e compras › Estoque')} (Entrada em lote) e confira em ${b('Contagem de estoque')}, pelo celular.`),
-          button(`${url}/receitas`, 'Abrir as fichas técnicas'),
-        ].join(''), user.id),
-      };
-    case 'day14':
-      return {
-        subject: 'Metade do teste: os números do seu restaurante',
-        html: layout([
-          hello,
-          p('Duas semanas de vendas já dão números para olhar:'),
-          h('Vendas e CMV'),
-          p(`Em ${b('Relatórios › Vendas')}, veja o que vendeu por dia e por produto. Em ${b('Relatórios › CMV')}, quanto do que você vendeu foi custo de mercadoria.`),
-          h('Resultado do mês'),
-          p(`Em ${b('Mais recursos › DRE')}, a receita, o CMV e as despesas do mês num só lugar.`),
-          h('Contas a pagar'),
-          p(`Em ${b('Caixa e pagamentos › Contas a pagar')}, lance aluguel, fornecedores e boletos com vencimento, e não esqueça nenhum.`),
-          p(`O teste continua até o 30º dia. Depois, escolha entre o ${b('Pro (R$ 149/mês)')} e o ${b('Business (R$ 199/mês)')}.`),
-          button(`${url}/dashboard/reports/sales`, 'Ver minhas vendas'),
         ].join(''), user.id),
       };
   }

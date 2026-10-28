@@ -194,6 +194,26 @@ Ele só lê; nada muda no sistema sem você confirmar. Cada pessoa vê só o que
 Pro 50 perguntas por mês, Business 350 (no teste grátis, 350). O uso aparece em **Configurações > Uso da IA**.`,
   },
   {
+    categorySlug: 'primeiros-passos',
+    slug: 'mensagens-durante-o-teste',
+    title: 'Mensagens de ajuda durante o teste',
+    summary: 'A Equipe Gastrux manda dicas por WhatsApp e e-mail conforme o que falta para a primeira venda. Dá para parar quando quiser.',
+    keywords: 'whatsapp, e-mail, dicas, mensagens, teste grátis, parar, sair, cancelar dicas, ajuda',
+    order: 5,
+    content: `## O que são
+
+Durante o teste grátis, a **Equipe Gastrux** manda dicas por **WhatsApp** e por **e-mail** conforme o que ainda falta no seu restaurante: cadastrar os produtos, abrir o caixa, fazer a primeira venda. Cada mensagem traz um próximo passo e o link da tela certa. São no máximo uma por dia, em horário comercial.
+
+O WhatsApp é pedido no cadastro para isso. Se responder a mensagem, quem lê é a nossa equipe.
+
+## Para parar
+
+- No **WhatsApp**: responda **SAIR**
+- No **e-mail**: toque em **Parar as dicas**, no rodapé
+
+Os avisos da sua conta (fim do teste, troca de senha) continuam chegando.`,
+  },
+  {
     categorySlug: 'pdv-e-caixa',
     slug: 'cashback',
     title: 'Como funciona o cashback?',

@@ -55,6 +55,21 @@ export function ClientProfilePanel({ restaurantId, profile, notes, agentActions 
     }
   }
 
+  // The client answered SAIR on WhatsApp: until the official number reads replies, the team records it here
+  async function stopMessages() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${restaurantId}/stop-messages`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      toast.success('Mensagens do agente paradas para este cliente');
+      onChange();
+    } catch {
+      toast.error('Não foi possível parar as mensagens');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function removeNote(noteId: string) {
     const res = await fetch(`/api/admin/customers/${restaurantId}/notes?noteId=${noteId}`, { method: 'DELETE' });
     if (res.ok) onChange();
@@ -128,7 +143,11 @@ export function ClientProfilePanel({ restaurantId, profile, notes, agentActions 
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Bot className="h-4 w-4" /> Mensagens do agente</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={stopMessages} disabled={busy}>Cliente pediu para parar (SAIR)</Button>
+            <p className="text-xs text-muted-foreground">Igual ao &quot;Parar as dicas&quot; do e-mail: para tudo e descarta o que está na fila.</p>
+          </div>
           {agentActions.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhuma mensagem do agente ainda.</p>
           ) : (

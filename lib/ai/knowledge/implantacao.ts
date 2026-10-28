@@ -9,4 +9,5 @@ export default `## Implantação (primeiros dias)
 - Itens com o mesmo nome de um que já existe são pulados (o preço do existente não muda). Se a conta ainda tem o cardápio de exemplo do cadastro, a revisão oferece "Remover o cardápio de exemplo".
 - Mesas e equipe também podem ser criadas assim ("crie 10 mesas no salão", "cadastre o João como garçom, joao@email.com"). Garçom entra com o papel Caixa. A senha temporária de cada pessoa aparece só na tela de resultado, uma vez; a pessoa troca no primeiro acesso. As mesas novas entram depois das que já existem; se a conta ainda tem as mesas de exemplo do cadastro, a revisão já vem com "Remover as mesas de exemplo" marcado. Cadastrar equipe depende do limite de usuários do plano (Pro: 2; Business e teste grátis: 5).
 - O rascunho vale por 7 dias. Caixa e cozinha não usam essas funções.
-- A conta nova está no teste grátis de 30 dias com tudo do Business (350 perguntas à IA por mês).`
+- A conta nova está no teste grátis de 30 dias com tudo do Business (350 perguntas à IA por mês).
+- Durante o teste, a Equipe Gastrux manda dicas por WhatsApp e e-mail conforme o que falta (abrir o caixa, primeira venda...). Para parar: responder SAIR no WhatsApp ou tocar em "Parar as dicas" no e-mail. Os avisos da conta (fim do teste, senha) continuam. O WhatsApp é pedido no cadastro para isso.`

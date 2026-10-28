@@ -14,6 +14,7 @@ import { clientProfiles, clientFunnel } from '../../../lib/admin/client-profile'
 import { GET as LIST } from '../../../app/api/admin/customers/route';
 import { GET as ONE } from '../../../app/api/admin/customers/[id]/route';
 import { POST as NOTE, DELETE as UNNOTE } from '../../../app/api/admin/customers/[id]/notes/route';
+import { POST as STOP } from '../../../app/api/admin/customers/[id]/stop-messages/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -103,6 +104,17 @@ describe('platform client management', () => {
     as(TEAM);
     const body = await (await ONE(new NextRequest('http://x'), { params: { id: busy } })).json();
     expect(body.agentActions.map((a) => [a.trigger, a.channel, a.status])).toEqual([['sem_venda', 'EMAIL', 'DRAFT'], ['boas_vindas', 'WHATSAPP', 'SENT']]);
+  });
+
+  it('a client who answered SAIR is stopped by the team: no more tips, the queued drafts are discarded', async () => {
+    const draft = await prisma.agentAction.create({ data: { restaurantId: idle, userId: idleOwnerId, trigger: 'sumiu', channel: 'WHATSAPP', status: 'DRAFT', text: 'Oi' } });
+    as(`dono-${tag}@gastrux.test`);
+    expect((await STOP(new NextRequest('http://x', { method: 'POST' }), { params: { id: idle } })).status).toBe(401);
+    as(TEAM);
+    const res = await STOP(new NextRequest('http://x', { method: 'POST' }), { params: { id: idle } });
+    expect(res.status).toBe(200);
+    expect((await prisma.user.findUnique({ where: { id: idleOwnerId } })).onboardingEmailsOptOut).toBe(true);
+    expect(await prisma.agentAction.findUnique({ where: { id: draft.id } })).toMatchObject({ status: 'DISCARDED', decidedBy: TEAM });
   });
 
   it('the team writes and removes notes; a note of one client cannot be removed through another', async () => {

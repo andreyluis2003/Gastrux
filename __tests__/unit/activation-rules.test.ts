@@ -74,6 +74,12 @@ describe('decide', () => {
     expect(notSelling).toMatchObject({ trigger: 'fim_teste_sem_venda', ownerAlert: true });
   });
 
+  it('the trial-end alert starts with 5 days left (spec §5), not before', () => {
+    const s = (left: number) => make({ createdAt: ago(25 * DAY), trialEndsAt: new Date(now.getTime() + left), sent: welcomed(24 * DAY) });
+    expect(decide(s(5 * DAY - HOUR), now)?.trigger).toBe('fim_teste_sem_venda');
+    expect(decide(s(5 * DAY + HOUR), now)?.trigger).not.toBe('fim_teste_sem_venda');
+  });
+
   it('two messages and no step moved, the last one 3 days old: travou alerts the owner', () => {
     const sent = [
       { trigger: 'cardapio_parado', createdAt: ago(3 * DAY + HOUR), stepsDone: 1 },
