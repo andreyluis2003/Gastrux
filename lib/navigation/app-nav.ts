@@ -161,6 +161,7 @@ export const NAV_GROUPS: NavGroup[] = [
     links: [
       { label: 'Visão da plataforma', href: '/admin/platform' },
       { label: 'Clientes', href: '/admin/customers' },
+      { label: 'Fila do agente', href: '/admin/agente' },
       { label: 'Usuários', href: '/admin/users' },
       { label: 'Custo da IA', href: '/admin/platform/ia' },
       { label: 'Indicações', href: '/admin/platform/indicacoes' },

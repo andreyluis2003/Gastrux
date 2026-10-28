@@ -78,6 +78,9 @@ describe('one navigation for the whole app (lib/navigation/app-nav.ts)', () => {
   it('platform screens only for Gastrux staff', () => {
     expect(navFor('OWNER', false).some((g) => g.id === 'plataforma')).toBe(false);
     expect(navFor('ADMIN', true).some((g) => g.id === 'plataforma')).toBe(true);
+    // The activation agent's queue sits right after Clientes (spec 2026-10-27)
+    const links = NAV_GROUPS.find((g) => g.id === 'plataforma')!.links;
+    expect(links[links.findIndex((l) => l.href === '/admin/customers') + 1]).toEqual({ label: 'Fila do agente', href: '/admin/agente' });
   });
 
   it('highlights the most specific link', () => {

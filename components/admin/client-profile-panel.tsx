@@ -4,20 +4,26 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { AlertTriangle, Mail, MessageCircle, NotebookPen, Phone, Trash2, User } from 'lucide-react';
+import { AlertTriangle, Bot, Mail, MessageCircle, NotebookPen, Phone, Trash2, User } from 'lucide-react';
 import { STAGES, whatsappLink } from '@/lib/admin/client-health';
 import type { ClientProfile } from '@/lib/admin/client-profile';
+import { TRIGGER_LABELS, type ActivationTrigger } from '@/lib/agents/activation/rules';
 
 export interface ClientNote { id: string; authorEmail: string; text: string; createdAt: string }
+export interface ClientAgentAction { id: string; trigger: string; channel: 'EMAIL' | 'WHATSAPP' | 'OWNER_ALERT'; status: 'DRAFT' | 'SENT' | 'DISCARDED' | 'FAILED'; createdAt: string }
+
+const CHANNEL_LABELS = { EMAIL: 'E-mail', WHATSAPP: 'WhatsApp', OWNER_ALERT: 'Aviso para a equipe' } as const;
+const STATUS_LABELS = { DRAFT: 'Na fila', SENT: 'Enviada', DISCARDED: 'Descartada', FAILED: 'Falhou' } as const;
 
 /**
  * The client's file for the Gastrux team (2026-10-07): who to talk to, what they said at sign-up,
  * how far they got, what is wrong, and the team's own notes.
  */
-export function ClientProfilePanel({ restaurantId, profile, notes, onChange }: {
+export function ClientProfilePanel({ restaurantId, profile, notes, agentActions = [], onChange }: {
   restaurantId: string;
   profile: ClientProfile;
   notes: ClientNote[];
+  agentActions?: ClientAgentAction[];
   onChange: () => void;
 }) {
   const [text, setText] = useState('');
@@ -119,6 +125,24 @@ export function ClientProfilePanel({ restaurantId, profile, notes, onChange }: {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Bot className="h-4 w-4" /> Mensagens do agente</CardTitle></CardHeader>
+        <CardContent>
+          {agentActions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma mensagem do agente ainda.</p>
+          ) : (
+            <ul className="divide-y text-sm">
+              {agentActions.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2">
+                  <span><span className="font-medium">{TRIGGER_LABELS[a.trigger as ActivationTrigger] ?? a.trigger}</span> · {CHANNEL_LABELS[a.channel]}</span>
+                  <span className="text-muted-foreground">{STATUS_LABELS[a.status]} · {new Date(a.createdAt).toLocaleString('pt-BR')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><NotebookPen className="h-4 w-4" /> Anotações da equipe</CardTitle></CardHeader>

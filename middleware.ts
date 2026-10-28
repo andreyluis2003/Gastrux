@@ -84,6 +84,7 @@ const PLATFORM_ADMIN_PAGE_PREFIXES = [
   '/admin/knowledge-base',
   '/admin/marketing',
   '/admin/nurturing',
+  '/admin/agente',
 ];
 
 const PLATFORM_ADMIN_API_PREFIXES = [
@@ -97,6 +98,7 @@ const PLATFORM_ADMIN_API_PREFIXES = [
   '/api/admin/marketing',
   '/api/admin/nurturing',
   '/api/admin/onboarding',
+  '/api/admin/agent-actions',
 ];
 
 // Plans of 2026-10-18 §6: what a locked restaurant can still do (pay, log in/out, account, support)

@@ -97,6 +97,14 @@ describe('platform client management', () => {
     expect(focused.customers.map((c) => c.id)).not.toContain(busy);
   });
 
+  it("the client's file lists the activation agent's messages, newest first", async () => {
+    await prisma.agentAction.create({ data: { restaurantId: busy, userId: ownerId, trigger: 'boas_vindas', channel: 'WHATSAPP', status: 'SENT', text: 'Oi', createdAt: daysAgo(9) } });
+    await prisma.agentAction.create({ data: { restaurantId: busy, userId: ownerId, trigger: 'sem_venda', channel: 'EMAIL', status: 'DRAFT', text: 'Oi', createdAt: daysAgo(1) } });
+    as(TEAM);
+    const body = await (await ONE(new NextRequest('http://x'), { params: { id: busy } })).json();
+    expect(body.agentActions.map((a) => [a.trigger, a.channel, a.status])).toEqual([['sem_venda', 'EMAIL', 'DRAFT'], ['boas_vindas', 'WHATSAPP', 'SENT']]);
+  });
+
   it('the team writes and removes notes; a note of one client cannot be removed through another', async () => {
     as(TEAM);
     expect((await NOTE(new NextRequest('http://x', { method: 'POST', body: JSON.stringify({ text: '  ' }) }), { params: { id: busy } })).status).toBe(400);

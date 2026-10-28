@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ClientProfilePanel, type ClientNote } from '@/components/admin/client-profile-panel';
+import { ClientProfilePanel, type ClientAgentAction, type ClientNote } from '@/components/admin/client-profile-panel';
 import type { ClientProfile } from '@/lib/admin/client-profile';
 import {
   ArrowLeft,
@@ -68,6 +68,7 @@ interface UserRow {
 interface CustomerDetail {
   profile: ClientProfile | null;
   notes: ClientNote[];
+  agentActions?: ClientAgentAction[];
   restaurant: {
     id: string;
     name: string;
@@ -260,7 +261,7 @@ export default function CustomerDetailPage() {
       </div>
 
       {detail.profile && (
-        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} onChange={fetchDetail} />
+        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} agentActions={detail.agentActions || []} onChange={fetchDetail} />
       )}
 
       {/* Summary cards */}

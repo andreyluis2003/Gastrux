@@ -21,8 +21,8 @@ async function visit(path: string) {
   return middleware(new NextRequest(new URL(path, 'https://gastrux.com')));
 }
 
-const PAGES = ['/admin/platform', '/admin/customers', '/admin/customers/cmabc', '/admin/users', '/admin/audit-logs', '/admin/support', '/admin/onboarding', '/admin/knowledge-base', '/admin/nurturing', '/admin/marketing/leads'];
-const APIS = ['/api/admin/platform/metrics', '/api/admin/customers', '/api/admin/customers/cmabc', '/api/admin/users', '/api/admin/users/u2', '/api/admin/audit-logs', '/api/admin/support/tickets', '/api/admin/help/articles', '/api/admin/marketing/leads', '/api/admin/nurturing/content', '/api/admin/onboarding'];
+const PAGES = ['/admin/platform', '/admin/customers', '/admin/customers/cmabc', '/admin/users', '/admin/audit-logs', '/admin/support', '/admin/onboarding', '/admin/knowledge-base', '/admin/nurturing', '/admin/marketing/leads', '/admin/agente'];
+const APIS = ['/api/admin/platform/metrics', '/api/admin/customers', '/api/admin/customers/cmabc', '/api/admin/users', '/api/admin/users/u2', '/api/admin/audit-logs', '/api/admin/support/tickets', '/api/admin/help/articles', '/api/admin/marketing/leads', '/api/admin/nurturing/content', '/api/admin/onboarding', '/api/admin/agent-actions', '/api/admin/agent-actions/a1'];
 
 describe('middleware: platform screens are for the Gastrux team only', () => {
   const env = process.env.PLATFORM_ADMIN_EMAILS;
