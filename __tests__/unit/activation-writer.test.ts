@@ -15,7 +15,7 @@ const signals: ActivationSignals = {
   restaurantId: 'r1', restaurantName: 'Pizzaria da Maria', ownerId: 'u1', ownerName: 'Maria Silva',
   email: 'maria@x.test', whatsapp: '5566999998888', businessType: 'pizzaria', timezone: 'America/Cuiaba',
   createdAt: new Date(now.getTime() - 3 * DAY), trialEndsAt: new Date(now.getTime() + 3 * DAY), status: 'TRIAL', stage: 'SIGNED_UP',
-  lastActivityAt: null, steps: [cardapio, { key: 'caixa', label: 'Abrir o caixa', href: '/vender', done: true }], stepsDone: 1,
+  lastActivityAt: null, firstSaleAt: null, steps: [cardapio, { key: 'caixa', label: 'Abrir o caixa', href: '/vender', done: true }], stepsDone: 1,
   excluded: false, sent: [],
 };
 const decision: ActivationDecision = { trigger: 'cardapio_parado', reason: 'Ainda não cadastrou os produtos', ownerAlert: false, nextStep: cardapio };

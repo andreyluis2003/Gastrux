@@ -76,7 +76,9 @@ export async function runActivationAgent(now = new Date(), opts: { only?: string
         continue;
       }
 
-      const channels: AgentChannel[] = [...(s.email ? ['EMAIL' as const] : []), ...(s.whatsapp ? ['WHATSAPP' as const] : [])];
+      // The fixed welcome e-mail stays (owner decision 2026-10-27), so the agent welcomes by WhatsApp only
+      const emailToo = d.trigger !== 'boas_vindas';
+      const channels: AgentChannel[] = [...(s.email && emailToo ? ['EMAIL' as const] : []), ...(s.whatsapp ? ['WHATSAPP' as const] : [])];
       // The first channel's row decides who tells the team, so two runs at once notify once
       let first = true;
       let notify = false;

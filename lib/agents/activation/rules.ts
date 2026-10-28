@@ -28,6 +28,8 @@ export interface ActivationSignals {
   stage: ClientStage;
   /** Latest of: owner sign-in, closed bill, menu item created */
   lastActivityAt: Date | null;
+  /** First closed bill */
+  firstSaleAt: Date | null;
   steps: FirstStep[];
   /** Required first steps done */
   stepsDone: number;
@@ -47,6 +49,11 @@ export interface ActivationDecision {
 const MIN = 60_000;
 const DAY = 86_400_000;
 export const WELCOME_AFTER_MS = 5 * MIN;
+// Bounds so the accounts that existed before the agent are not greeted, congratulated or asked weeks late
+// (final review I-1: the first run after the deploy sees every trial account of the last 40 days)
+const WELCOME_UNTIL_MS = 2 * DAY;
+const FIRST_SALE_NEWS_MS = 3 * DAY;
+const ASK_AFTER_TRIAL_MS = 7 * DAY;
 const FIRST_HOUR = 8;
 const LAST_HOUR = 20;
 
@@ -103,10 +110,10 @@ export function decide(s: ActivationSignals, now: Date): ActivationDecision | nu
   const candidates: Array<[boolean, ActivationTrigger, string, FirstStep | null]> = [
     [trialEnding && !done('venda'), 'fim_teste_sem_venda', 'O teste acaba em até 5 dias e ainda não houve venda', pending],
     [stuck && !trialEnded, 'travou', 'Duas mensagens e nenhum passo novo em 3 dias', pending],
-    [done('venda'), 'primeira_venda', 'Fechou a primeira venda', pending],
+    [!!s.firstSaleAt && now.getTime() - s.firstSaleAt.getTime() <= FIRST_SALE_NEWS_MS, 'primeira_venda', 'Fechou a primeira venda', pending],
     [trialEnding && done('venda'), 'fim_teste_vendendo', 'O teste acaba em até 5 dias e já está vendendo', null],
-    [trialEnded, 'o_que_faltou', 'O teste acabou sem assinatura', null],
-    [!trialEnded && age >= WELCOME_AFTER_MS, 'boas_vindas', 'Acabou de criar a conta', pending],
+    [trialEnded && -trialLeft! <= ASK_AFTER_TRIAL_MS, 'o_que_faltou', 'O teste acabou sem assinatura', null],
+    [!trialEnded && age >= WELCOME_AFTER_MS && age <= WELCOME_UNTIL_MS, 'boas_vindas', 'Acabou de criar a conta', pending],
     [!trialEnded && days >= 3 && done('caixa') && !done('venda'), 'sem_venda', 'Abriu o caixa e ainda não vendeu', step('venda')],
     [!trialEnded && days >= 2 && done('cardapio') && !done('caixa'), 'sem_caixa', 'Montou o cardápio e não abriu o caixa', step('caixa')],
     [!trialEnded && days >= 1 && !done('cardapio'), 'cardapio_parado', 'Ainda não cadastrou os produtos', step('cardapio')],

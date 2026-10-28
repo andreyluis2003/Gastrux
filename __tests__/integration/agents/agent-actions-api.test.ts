@@ -81,13 +81,31 @@ describe('agent actions queue', () => {
     expect(row.sentAt).not.toBeNull();
   });
 
-  it('an e-mail that fails to send is marked FAILED', async () => {
-    (sendTransactionalEmail as jest.Mock).mockRejectedValue(new Error('Resend 500'));
+  // Final review I-4: a failed send went to FAILED, out of the queue for good; it now stays to try again
+  it('an e-mail that fails to send goes back to the queue with the error, and a retry sends it', async () => {
+    (sendTransactionalEmail as jest.Mock).mockRejectedValueOnce(new Error('Resend 500'));
     const d = await draft('EMAIL');
-    expect((await patch(d.id, { action: 'approve' })).status).toBe(502);
+    const edited = 'Editado\n\nEquipe Gastrux';
+    expect((await patch(d.id, { action: 'approve', text: edited })).status).toBe(502);
     const row = await prisma.agentAction.findUnique({ where: { id: d.id } });
-    expect(row.status).toBe('FAILED');
+    expect(row).toMatchObject({ status: 'DRAFT', text: edited, sentAt: null });
     expect(row.error).toContain('Resend 500');
+    expect((await patch(d.id, { action: 'approve' })).status).toBe(200);
+    expect(await prisma.agentAction.findUnique({ where: { id: d.id } })).toMatchObject({ status: 'SENT', error: null });
+  });
+
+  // Final review I-2: a draft that waited in the queue while the client subscribed must not go out
+  it('a client who is no longer in trial is not written to', async () => {
+    const d = await draft('WHATSAPP');
+    await prisma.restaurant.update({ where: { id: a.restaurant.id }, data: { status: 'ACTIVE', subscriptionStatus: 'active' } });
+    try {
+      const res = await patch(d.id, { action: 'approve' });
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe('O cliente não está mais em teste');
+      expect((await prisma.agentAction.findUnique({ where: { id: d.id } })).status).toBe('DRAFT');
+    } finally {
+      await prisma.restaurant.update({ where: { id: a.restaurant.id }, data: { status: 'TRIAL', subscriptionStatus: 'trialing' } });
+    }
   });
 
   it('approving a WhatsApp gives the wa.me link with the text', async () => {

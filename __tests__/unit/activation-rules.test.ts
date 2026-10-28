@@ -23,13 +23,33 @@ function make(o: Partial<ActivationSignals> & { done?: FirstStepKey[] } = {}): A
     restaurantId: 'r1', restaurantName: 'Pizzaria Teste', ownerId: 'u1', ownerName: 'Maria Silva',
     email: 'maria@x.test', whatsapp: '5566999998888', businessType: 'pizzaria', timezone: 'America/Cuiaba',
     createdAt: ago(6 * MIN), trialEndsAt: new Date(now.getTime() + 14 * DAY), status: 'TRIAL', stage: 'SIGNED_UP',
-    lastActivityAt: ago(MIN), steps: st, stepsDone: st.filter((s) => s.done).length, excluded: false, sent: [],
+    lastActivityAt: ago(MIN), firstSaleAt: done.includes('venda') ? ago(HOUR) : null, steps: st, stepsDone: st.filter((s) => s.done).length,
+    excluded: false, sent: [],
     ...rest,
   };
 }
 const welcomed = (when = DAY + HOUR) => [{ trigger: 'boas_vindas', createdAt: ago(when), stepsDone: 0 }];
 
 describe('decide', () => {
+  // Final review I-1: the first run after the deploy must not greet, congratulate or ask "o que faltou?" weeks late
+  describe('accounts that existed before the agent', () => {
+    it('the welcome only in the first 2 days', () => {
+      expect(decide(make({ createdAt: ago(2 * DAY - HOUR) }), now)?.trigger).toBe('boas_vindas');
+      expect(decide(make({ createdAt: ago(2 * DAY + HOUR) }), now)?.trigger).not.toBe('boas_vindas');
+    });
+
+    it('the congratulation only within 3 days of the first sale', () => {
+      const base = { createdAt: ago(10 * DAY), done: ['cardapio', 'caixa', 'venda'] as FirstStepKey[], sent: welcomed(9 * DAY) };
+      expect(decide(make({ ...base, firstSaleAt: ago(2 * DAY) }), now)?.trigger).toBe('primeira_venda');
+      expect(decide(make({ ...base, firstSaleAt: ago(4 * DAY) }), now)).toBeNull();
+    });
+
+    it('"o que faltou?" only in the 7 days after the trial ended', () => {
+      expect(decide(make({ createdAt: ago(35 * DAY), trialEndsAt: ago(6 * DAY) }), now)?.trigger).toBe('o_que_faltou');
+      expect(decide(make({ createdAt: ago(38 * DAY), trialEndsAt: ago(8 * DAY) }), now)).toBeNull();
+    });
+  });
+
   it('waits 5 minutes after sign-up, then welcomes', () => {
     expect(decide(make({ createdAt: ago(4 * MIN) }), now)).toBeNull();
     expect(decide(make(), now)?.trigger).toBe('boas_vindas');
@@ -159,6 +179,6 @@ describe('decide', () => {
   });
 
   it('priority: welcome before the step nudges', () => {
-    expect(decide(make({ createdAt: ago(3 * DAY), done: ['cardapio', 'caixa'] }), now)?.trigger).toBe('boas_vindas');
+    expect(decide(make({ createdAt: ago(DAY + 2 * HOUR) }), now)?.trigger).toBe('boas_vindas'); // cardapio_parado also applies
   });
 });

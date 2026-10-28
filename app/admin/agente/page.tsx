@@ -22,6 +22,8 @@ interface QueueItem {
   subject: string | null;
   text: string;
   data: { reason?: string } | null;
+  /** Why the last send failed (the message stays here to try again) */
+  error: string | null;
   createdAt: string;
 }
 
@@ -76,6 +78,7 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: (id: string) => 
           <span className="font-medium">{triggerLabel(item.trigger)}</span>
           {item.data?.reason && <span className="text-muted-foreground">: {item.data.reason}</span>}
         </p>
+        {item.error && <p className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-800">Não foi enviado: {item.error}. Tente de novo.</p>}
         {email && <Input aria-label="Assunto" value={subject} onChange={(e) => setSubject(e.target.value)} />}
         <textarea
           aria-label="Mensagem"

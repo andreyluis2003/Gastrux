@@ -60,12 +60,13 @@ describe('activation agent routine', () => {
 
   beforeEach(() => (sendTransactionalEmail as jest.Mock).mockClear());
 
-  it('a new account gets an e-mail and a WhatsApp draft, and the team is told', async () => {
+  // The fixed welcome e-mail stays (owner decision 2026-10-27), so the agent's welcome is the WhatsApp only (final review I-3)
+  it('a new account gets a WhatsApp welcome draft (the welcome e-mail is the fixed one), and the team is told', async () => {
     const a = await account(); made.push(a);
     const res = await runActivationAgent(now, { only: [a.restaurant.id] });
-    expect(res.drafted).toBe(2);
+    expect(res.drafted).toBe(1);
     const rows = await prisma.agentAction.findMany({ where: { restaurantId: a.restaurant.id }, orderBy: { channel: 'asc' } });
-    expect(rows.map((r) => [r.trigger, r.channel, r.status])).toEqual([['boas_vindas', 'EMAIL', 'DRAFT'], ['boas_vindas', 'WHATSAPP', 'DRAFT']]);
+    expect(rows.map((r) => [r.trigger, r.channel, r.status])).toEqual([['boas_vindas', 'WHATSAPP', 'DRAFT']]);
     expect(rows[0].data).toMatchObject({ stepsDone: expect.any(Number) });
     expect(rows[0].userId).toBe(a.owner.id);
     const bell = await prisma.notification.findMany({ where: { userId: admin.id, title: 'Novo cliente: mandar boas-vindas' } });
@@ -80,8 +81,8 @@ describe('activation agent routine', () => {
     expect((await runActivationAgent(now, { only: [a.restaurant.id] })).drafted).toBe(0);
     const b = await account(); made.push(b);
     await Promise.all([runActivationAgent(now, { only: [b.restaurant.id] }), runActivationAgent(now, { only: [b.restaurant.id] })]);
-    expect(await prisma.agentAction.count({ where: { restaurantId: a.restaurant.id } })).toBe(2);
-    expect(await prisma.agentAction.count({ where: { restaurantId: b.restaurant.id } })).toBe(2);
+    expect(await prisma.agentAction.count({ where: { restaurantId: a.restaurant.id } })).toBe(1);
+    expect(await prisma.agentAction.count({ where: { restaurantId: b.restaurant.id } })).toBe(1);
     const bell = await prisma.notification.count({ where: { userId: admin.id, data: { path: ['restaurantId'], equals: b.restaurant.id } } });
     expect(bell).toBe(1);
   });

@@ -34,7 +34,7 @@ export async function loadActivationSignals(restaurantId: string, now: Date): Pr
   });
   if (!r) return null;
 
-  const [owner, status, menuItems, closedBills, lastBill, lastItem, actions] = await Promise.all([
+  const [owner, status, menuItems, closedBills, lastBill, firstBill, lastItem, actions] = await Promise.all([
     prisma.user.findUnique({
       where: { id: r.ownerId },
       select: { id: true, name: true, email: true, whatsapp: true, businessType: true, lastSignInAt: true, onboardingEmailsOptOut: true },
@@ -43,6 +43,7 @@ export async function loadActivationSignals(restaurantId: string, now: Date): Pr
     prisma.menuItem.count({ where: { restaurantId } }),
     prisma.orderSession.count({ where: { restaurantId, status: 'CLOSED' } }),
     prisma.orderSession.findFirst({ where: { restaurantId, status: 'CLOSED', closedAt: { not: null } }, orderBy: { closedAt: 'desc' }, select: { closedAt: true } }),
+    prisma.orderSession.findFirst({ where: { restaurantId, status: 'CLOSED', closedAt: { not: null } }, orderBy: { closedAt: 'asc' }, select: { closedAt: true } }),
     prisma.menuItem.findFirst({ where: { restaurantId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
     prisma.agentAction.findMany({
       where: { restaurantId, agent: 'activation' },
@@ -72,6 +73,7 @@ export async function loadActivationSignals(restaurantId: string, now: Date): Pr
     status: r.status,
     stage,
     lastActivityAt: latest(owner.lastSignInAt, lastBill?.closedAt, lastItem?.createdAt),
+    firstSaleAt: firstBill?.closedAt ?? null,
     steps: status.steps,
     stepsDone: status.done,
     excluded: r.isInternal || owner.onboardingEmailsOptOut || platformEmails.includes(owner.email.toLowerCase()),

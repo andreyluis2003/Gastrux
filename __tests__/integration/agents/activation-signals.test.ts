@@ -61,6 +61,7 @@ describe('activation signals', () => {
     expect(s.steps.find((x) => x.key === 'venda').done).toBe(true);
     expect(s.stepsDone).toBe(2);
     expect(s.lastActivityAt.getTime()).toBe(closedAt.getTime());
+    expect(s.firstSaleAt.getTime()).toBe(closedAt.getTime());
     expect(s.sent).toEqual([{ trigger: 'boas_vindas', createdAt: expect.any(Date), stepsDone: 0 }]);
   });
 
