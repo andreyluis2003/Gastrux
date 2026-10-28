@@ -60,6 +60,8 @@ model User {
   emailWelcomeSentAt     DateTime?
   /// Asked to stop the onboarding tips (link in the e-mails, 2026-10-19); account e-mails still go
   onboardingEmailsOptOut Boolean                 @default(false)
+  /// Asked at sign-up (activation agent, 2026-10-28): digits, 55 + DDD + number
+  whatsapp               String?
   acceptedTermsAt        DateTime?
   businessStage          String?
   businessType           String?
@@ -2888,6 +2890,7 @@ model Notification {
 
 model Restaurant {
   id                      String                    @id @default(cuid())
+  agentActions            AgentAction[]
   name                    String
   cnpj                    String?                   @unique
   /// Referral link code (plan 2026-10-24 indicacao): created on first use, gastrux.com/?ref=CODE
@@ -4941,4 +4944,44 @@ model TutorialView {
 
   @@unique([userId, slug])
   @@map("tutorial_views")
+}
+
+/// What the agents drafted, sent or flagged for an account (activation agent, spec 2026-10-27).
+/// One row per account x agent x trigger x channel, so a rerun of the routine never repeats a message.
+model AgentAction {
+  id           String            @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  userId       String
+  agent        String            @default("activation")
+  trigger      String
+  channel      AgentChannel
+  status       AgentActionStatus
+  subject      String?
+  text         String
+  data         Json?
+  costUsd      Float             @default(0)
+  /// E-mail of the platform admin who approved or discarded it
+  decidedBy    String?
+  sentAt       DateTime?
+  error        String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([restaurantId, agent, trigger, channel])
+  @@index([status, createdAt])
+  @@map("agent_actions")
+}
+
+enum AgentChannel {
+  EMAIL
+  WHATSAPP
+  OWNER_ALERT
+}
+
+enum AgentActionStatus {
+  DRAFT
+  SENT
+  DISCARDED
+  FAILED
 }

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { SEGMENTS } from '@/lib/marketing/segments';
 import { seedStarterTemplate } from '@/lib/onboarding/seed-template';
 import { parseRestaurantAddress } from '@/lib/onboarding/address';
+import { parseWhatsapp } from '@/lib/onboarding/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,8 @@ const BUSINESS_TYPES = SEGMENTS.map((s) => s.slug).filter((slug) => !['delivery'
  * The sign-up questions (/auth/qualification). Besides the answers, they carry the "Comece com"
  * choice (startWith: 'template' = the example menu of the chosen business type, 'blank' = nothing)
  * and the restaurant address, which may be left for later. "Pular por enquanto" sends skip: true
- * and gets the general example, as every account did before.
+ * and gets the general example, as every account did before. The owner's WhatsApp is required on
+ * both (activation agent, 2026-10-28): the Equipe Gastrux uses it to help during the trial.
  */
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -37,7 +39,13 @@ export async function POST(request: NextRequest) {
     ? await prisma.restaurant.findFirst({ where: { id: user.currentRestaurantId, ownerId: userId }, select: { id: true } })
     : null;
 
+  const whatsapp = parseWhatsapp(body.whatsapp);
+  if (!whatsapp.ok) {
+    return NextResponse.json({ error: whatsapp.error }, { status: 400 });
+  }
+
   if (body.skip === true) {
+    await prisma.user.update({ where: { id: userId }, data: { whatsapp: whatsapp.value } });
     const seed = restaurant ? await seedStarterTemplate(restaurant.id, null) : null;
     return NextResponse.json({ skipped: true, template: seed?.seeded ? seed.template : null });
   }
@@ -69,6 +77,7 @@ export async function POST(request: NextRequest) {
     where: { id: userId },
     data: {
       businessType,
+      whatsapp: whatsapp.value,
       ...(businessStage ? { businessStage, leadQuality } : {}),
       ...(locationCount ? { locationCount } : {}),
       ...(mainPainPoint ? { mainPainPoint } : {}),

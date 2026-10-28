@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { GastruxSymbol } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
 import { SEGMENTS } from '@/lib/marketing/segments';
+import { parseWhatsapp } from '@/lib/onboarding/whatsapp';
 
 // Reuses the marketing segment taxonomy so answers stay consistent with
 // /para/[segmento], minus 'delivery'/'franquias' - those are a business
@@ -60,13 +61,16 @@ export default function QualificationPage() {
   // Owner, 2026-10-12: the stage, units and main pain questions left (nobody used the answers, and each
   // one delays the first sale); the business type, "Comece com" and the address stay
   const [businessType, setBusinessType] = useState<string | null>(null);
+  // Required on both buttons (activation agent, 2026-10-28): how the Equipe Gastrux helps during the trial
+  const [whatsapp, setWhatsapp] = useState('');
+  const whatsappOk = parseWhatsapp(whatsapp).ok;
   // "Comece com" (2026-10-06): the example menu of the chosen business type, or nothing
   const [startWith, setStartWith] = useState<'template' | 'blank'>('template');
   const [address, setAddress] = useState<Record<AddressField, string>>(EMPTY_ADDRESS);
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = !!businessType;
+  const canSubmit = !!businessType && whatsappOk;
   const typeLabel = BUSINESS_TYPE_OPTIONS.find((o) => o.value === businessType)?.label;
 
   function setField(field: AddressField, value: string) {
@@ -105,7 +109,7 @@ export default function QualificationPage() {
       const res = await fetch('/api/onboarding/qualification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessType, startWith, address }),
+        body: JSON.stringify({ businessType, startWith, address, whatsapp }),
       });
       if (res.status === 400) {
         // A half-filled address: say what is missing and stay on the page
@@ -123,12 +127,13 @@ export default function QualificationPage() {
 
   // Skipping keeps the general example menu, so the dashboard is never empty on the first visit
   async function handleSkip() {
+    if (!whatsappOk) return;
     setSubmitting(true);
     try {
       await fetch('/api/onboarding/qualification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skip: true }),
+        body: JSON.stringify({ skip: true, whatsapp }),
       });
     } catch {
       // The examples are a convenience: never block the way in
@@ -145,6 +150,19 @@ export default function QualificationPage() {
           <p className="text-sm text-slate-600">
             Duas escolhas rápidas e o Gastrux já começa com o cardápio do seu tipo de negócio.
           </p>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="whatsapp" className="text-lg font-semibold text-slate-900">Seu WhatsApp</label>
+          <Input
+            id="whatsapp"
+            placeholder="(66) 99999-8888"
+            inputMode="tel"
+            autoComplete="tel"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+          />
+          <p className="text-xs text-slate-500">Para receber ajuda durante o teste. Para parar, é só responder SAIR.</p>
         </div>
 
         <ChoiceStep
@@ -202,7 +220,8 @@ export default function QualificationPage() {
           <button
             type="button"
             onClick={handleSkip}
-            className="w-full text-center text-sm text-slate-500 hover:underline"
+            disabled={!whatsappOk || submitting}
+            className="w-full text-center text-sm text-slate-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
           >
             Pular por enquanto
           </button>

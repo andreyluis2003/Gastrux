@@ -37,7 +37,8 @@ function answer(userId: string, payload: any) {
   return qualify(new Request('http://x/api/onboarding/qualification', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    // The WhatsApp became required on 2026-10-28 (activation agent); these cases are about the rest
+    body: JSON.stringify({ whatsapp: '(66) 99999-8888', ...payload }),
   }) as any);
 }
 

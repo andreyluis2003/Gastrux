@@ -29,6 +29,7 @@ export default function PrivacidadePage() {
             <p className="text-gray-700 leading-relaxed">Coletamos os seguintes dados pessoais:</p>
             <ul className="list-disc pl-6 text-gray-700 space-y-1">
               <li><strong>Dados de cadastro:</strong> nome, e-mail, senha (criptografada), telefone</li>
+              <li><strong>WhatsApp informado no cadastro:</strong> usado para enviar ajuda durante o teste e avisos da conta; você pode parar quando quiser respondendo SAIR.</li>
               <li><strong>Dados do restaurante:</strong> nome, CNPJ, endereço, telefone, horário de funcionamento</li>
               <li><strong>Dados de uso:</strong> registros de acesso, ações realizadas, preferências</li>
               <li><strong>Dados de pagamento:</strong> processados pelo Stripe (não armazenamos dados de cartão)</li>
