@@ -254,7 +254,7 @@ export async function getPreApproval(preApprovalId: string) {
   return preApproval.get({ id: preApprovalId });
 }
 
-export async function updatePreApproval(preApprovalId: string, status: 'paused' | 'cancelled') {
+export async function updatePreApproval(preApprovalId: string, status: 'paused' | 'authorized' | 'cancelled') {
   const client = getMercadoPagoClient();
   const preApproval = new PreApproval(client);
   return preApproval.update({

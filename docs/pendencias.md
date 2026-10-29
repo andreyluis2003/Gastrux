@@ -126,9 +126,10 @@ Plano `docs/superpowers/plans/2026-10-24-indicacao.md`.
 
 ### Abertos
 
-- **Mercado Pago (Tarefa 1 e 6):** o teste da pausa de um ciclo no sandbox precisa das contas de teste do dono (token do
-  vendedor de teste em `MP_SANDBOX_ACCESS_TOKEN` e o comprador de teste); script `scripts/mp-pause-experiment.ts`. Até o
-  resultado, o mês de quem assina pelo Mercado Pago fica "Mês ganho (guardado)". Se a pausa falhar, o dono decide de novo.
+- **Mercado Pago (Tarefa 1 e 6): FEITO 29/10/2026.** O teste no sandbox passou (`docs/mp-pause-experiment.md`); a
+  rotina diária pausa a assinatura antes da próxima cobrança e retoma no dia seguinte (`lib/referrals/apply-mp.ts`).
+  Pendente: o primeiro mês grátis real pelo Mercado Pago, conferir no painel do MP que a cobrança foi pulada; enquanto
+  pausada, a Plataforma mostra a assinatura como "Pagamento em atraso" (o webhook grava past_due).
 - **Rotina diária no servidor (dono):** linha no crontab `0 11 * * * /root/gastrux-cron.sh /api/referrals/daily`.
 - **Contador:** como emitir a NFS-e de uma mensalidade com o mês grátis (Stripe: desconto na fatura) antes do primeiro
   mês grátis real.

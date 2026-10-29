@@ -10,7 +10,7 @@ jest.mock('../../../lib/stripe-connect', () => ({
     charges: { list: jest.fn() },
   },
 }));
-jest.mock('../../../lib/mercado-pago', () => ({ getPayment: jest.fn() }));
+jest.mock('../../../lib/mercado-pago', () => ({ getPayment: jest.fn(), getPreApproval: jest.fn(), updatePreApproval: jest.fn() }));
 jest.mock('../../../lib/email/transactional', () => ({ sendTransactionalEmail: jest.fn().mockResolvedValue({ provider: 'resend' }) }));
 import { stripe } from '../../../lib/stripe-connect';
 import { getPayment } from '../../../lib/mercado-pago';

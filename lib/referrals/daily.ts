@@ -6,12 +6,14 @@ import { findPayingSubscription } from '@/lib/billing/cancel';
 import { brtYear, CONFIRM_DAYS, YEARLY_CAP } from './rules';
 import { escape, ownerOf } from './signup';
 import { applyEarnedOnStripe } from './apply-stripe';
+import { applyEarnedOnMp, resumeSkipped } from './apply-mp';
 
 /**
  * The daily referral job (plan 2026-10-24 indicacao, Task 5), POST /api/referrals/daily from the VPS cron:
  * 1. a referred restaurant that paid its first charge 7+ days ago and still pays earns the referrer one free month
  *    (or the referral is cancelled: same owner, internal account, cancelled or refunded, or the year's limit);
- * 2. earned months are applied (Stripe credit; Mercado Pago in Task 6). An owner not subscribed keeps them EARNED.
+ * 2. a Mercado Pago charge skipped for a free month is resumed the day after (Task 6);
+ * 3. earned months are applied (Stripe credit; Mercado Pago skips one charge). An owner not subscribed keeps them EARNED.
  */
 const DAY_MS = 86_400_000;
 
@@ -78,7 +80,7 @@ async function tellEarned(r: Due) {
     subject: 'Você ganhou 1 mês grátis no Gastrux',
     html: `<p>Olá${owner.name ? `, ${escape(owner.name)}` : ''}!</p>
 <p><strong>${escape(r.referred.name)}</strong>, que se cadastrou pelo seu link, já é assinante do Gastrux.</p>
-<p>Você ganhou <strong>1 mês grátis</strong> do seu plano. Na assinatura pelo cartão, ele é descontado da sua próxima mensalidade; se você ainda está no teste, fica guardado e é descontado da próxima mensalidade depois que você assinar. Acompanhe em Minha assinatura &gt; Indique e ganhe.</p>
+<p>Você ganhou <strong>1 mês grátis</strong> do seu plano. Na assinatura pelo cartão, ele é descontado da sua próxima mensalidade; no Mercado Pago, a próxima mensalidade não é cobrada; se você ainda está no teste, fica guardado e é descontado da próxima mensalidade depois que você assinar. Acompanhe em Minha assinatura &gt; Indique e ganhe.</p>
 <p>Obrigado por indicar o Gastrux!</p>`,
   }).catch((e) => console.error('[referral] earned e-mail failed:', e?.message ?? e));
 }
@@ -108,11 +110,15 @@ export async function runReferralDaily(now = new Date()): Promise<{ confirmed: n
     }
   }
 
+  await resumeSkipped(now);
   const referrers = await prisma.referral.findMany({
     where: { status: 'EARNED' },
     distinct: ['referrerRestaurantId'],
     select: { referrerRestaurantId: true },
   });
-  for (const { referrerRestaurantId } of referrers) result.applied += await applyEarnedOnStripe(referrerRestaurantId);
+  for (const { referrerRestaurantId } of referrers) {
+    result.applied += await applyEarnedOnStripe(referrerRestaurantId);
+    result.applied += await applyEarnedOnMp(referrerRestaurantId, now);
+  }
   return result;
 }

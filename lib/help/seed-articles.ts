@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  'cabe0810c5f514493c0a63b71b47c30739d9c7fd960eea78b599d1338b2ee6a6', // indique-e-ganhe (before the Mercado Pago skip, 2026-10-29)
   '00ae95b1cbaec17ccfa675598c4511a75c6ef19b287ab2c4d2011d5ac34477c9', // como-criar-restaurante
   'b24e6588fbc264022b24b2a9c0141c14c31037677073a78f516c96f3b81e03b7', // convidar-equipe
   '5ceb36b37ddbf804c4160078f30140d111d636d4ee0487e05cb3d1e4e9ea69c4', // configurar-mesas-qrcode
@@ -894,9 +895,13 @@ Quem abre o link tem 60 dias para se cadastrar. Também dá para digitar o códi
 1. O restaurante indicado se cadastra: aparece na lista como **Em teste**
 2. Ele paga a primeira mensalidade: **Pagou: confirmando**
 3. Sete dias depois, se ele continua assinando: **Mês ganho**, e você recebe um e-mail
-4. Na assinatura pelo cartão, o mês entra como crédito e é descontado da sua próxima mensalidade: **Mês usado**
+4. O mês é usado na sua próxima mensalidade: **Mês usado**
+   - Na assinatura pelo cartão (Stripe), entra como crédito e é descontado da próxima mensalidade.
+   - Na assinatura pelo Mercado Pago, a próxima mensalidade não é cobrada: a assinatura fica pausada só até o dia seguinte a essa cobrança e volta sozinha. O seu plano continua funcionando normalmente nesse tempo.
 
-Se você ainda está no teste, o mês fica **guardado** e é descontado da próxima mensalidade depois que você assinar. Na assinatura pelo Mercado Pago, o mês também fica guardado até o desconto automático nesse meio de pagamento ser liberado.
+Se você ganhar mais de um mês, eles são usados um por mensalidade, em sequência.
+
+Se você ainda está no teste, o mês fica **guardado** e é usado na primeira mensalidade depois que você assinar.
 
 ## Limites
 
