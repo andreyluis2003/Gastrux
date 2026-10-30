@@ -57,6 +57,7 @@ describe('daily count: espeto cancelled in the kitchen', () => {
     await cancelOrder(cooking.id, { restaurantId: rid });
     const all = await losses();
     expect(all.length).toBe(before + 1);
-    expect(all.at(-1)).toMatchObject({ quantity: 1, reason: 'Cancelado na cozinha', userId: ownerId });
+    // findMany has no orderBy: the new loss is not guaranteed to be the last row
+    expect(all).toContainEqual(expect.objectContaining({ quantity: 1, reason: 'Cancelado na cozinha', userId: ownerId }));
   });
 });
