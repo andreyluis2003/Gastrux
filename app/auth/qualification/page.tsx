@@ -162,7 +162,7 @@ export default function QualificationPage() {
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
           />
-          <p className="text-xs text-slate-500">Para receber ajuda durante o teste. Para parar, é só responder SAIR.</p>
+          <p className="text-xs text-slate-500">Ao continuar, você aceita receber dicas e novidades do Gastrux neste WhatsApp. Para parar, é só responder SAIR.</p>
         </div>
 
         <ChoiceStep

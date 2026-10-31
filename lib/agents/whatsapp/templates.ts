@@ -1,5 +1,5 @@
 /**
- * The ten utility templates of the Gastrux official number, submitted to Meta on 2026-10-31 (WABA
+ * The ten templates of the Gastrux official number, sent to Meta on 2026-10-31 as utility and moved to marketing by Meta (WABA
  * 1101798518937750, pt_BR, footer "Equipe Gastrux", URL button https://gastrux.com/{{1}}). A template sent
  * must match its text at Meta, so these bodies are a record of what the client receives. Changing one here
  * is not enough: the new text has to be approved at Meta first.
