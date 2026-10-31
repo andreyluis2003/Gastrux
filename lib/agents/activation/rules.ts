@@ -20,6 +20,8 @@ export interface ActivationSignals {
   ownerName: string | null;
   email: string | null;
   whatsapp: string | null;
+  /** Ticked the opt-in for marketing templates at sign-up */
+  whatsappConsent: boolean;
   businessType: string | null;
   timezone: string;
   createdAt: Date;

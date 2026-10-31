@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '5f7688bd87cffa6bbd0f3b33eb0fd920ee8168865dedeac17079e136203b991c',
   'cabe0810c5f514493c0a63b71b47c30739d9c7fd960eea78b599d1338b2ee6a6', // indique-e-ganhe (before the Mercado Pago skip, 2026-10-29)
   '00ae95b1cbaec17ccfa675598c4511a75c6ef19b287ab2c4d2011d5ac34477c9', // como-criar-restaurante
   'b24e6588fbc264022b24b2a9c0141c14c31037677073a78f516c96f3b81e03b7', // convidar-equipe
@@ -197,14 +198,14 @@ Pro 50 perguntas por mês, Business 350 (no teste grátis, 350). O uso aparece e
     categorySlug: 'primeiros-passos',
     slug: 'mensagens-durante-o-teste',
     title: 'Mensagens de ajuda durante o teste',
-    summary: 'A Equipe Gastrux manda dicas por WhatsApp e e-mail conforme o que falta para a primeira venda. Dá para parar quando quiser.',
+    summary: 'A Equipe Gastrux manda dicas por e-mail e, para quem aceitou no cadastro, por WhatsApp. Dá para parar quando quiser.',
     keywords: 'whatsapp, e-mail, dicas, mensagens, teste grátis, parar, sair, cancelar dicas, ajuda',
     order: 5,
     content: `## O que são
 
-Durante o teste grátis, a **Equipe Gastrux** manda dicas por **WhatsApp** e por **e-mail** conforme o que ainda falta no seu restaurante: cadastrar os produtos, abrir o caixa, fazer a primeira venda. Cada mensagem traz um próximo passo e o link da tela certa. São no máximo uma por dia, em horário comercial.
+Durante o teste grátis, a **Equipe Gastrux** manda dicas por **e-mail** e, se você marcou o aceite no cadastro, por **WhatsApp**, conforme o que ainda falta no seu restaurante: cadastrar os produtos, abrir o caixa, fazer a primeira venda. Cada mensagem traz um próximo passo e o link da tela certa. São no máximo uma por dia, em horário comercial.
 
-O WhatsApp é pedido no cadastro para isso. Se responder a mensagem, quem lê é a nossa equipe.
+O WhatsApp é pedido no cadastro para falarmos com você sobre a conta. As dicas por WhatsApp dependem do aceite, que é separado. Se responder a mensagem, quem lê é a nossa equipe.
 
 ## Para parar
 

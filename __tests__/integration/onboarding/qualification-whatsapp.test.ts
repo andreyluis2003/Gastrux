@@ -35,6 +35,25 @@ function answer(userId: string, payload: any) {
 }
 
 describe('sign-up questions: WhatsApp required', () => {
+  it('marketing by WhatsApp needs its own tick, and an untick withdraws it', async () => {
+    const a = await newAccount();
+    await answer(a.userId, { skip: true, whatsapp: '(66) 99999-8888' });
+    let user = await prisma.user.findUnique({ where: { id: a.userId } });
+    expect(user.whatsapp).toBe('5566999998888');
+    expect(user.whatsappMarketingConsentAt).toBeNull();
+
+    await answer(a.userId, { skip: true, whatsapp: '(66) 99999-8888', whatsappMarketing: 'true' });
+    expect((await prisma.user.findUnique({ where: { id: a.userId } })).whatsappMarketingConsentAt).toBeNull();
+
+    await answer(a.userId, { skip: true, whatsapp: '(66) 99999-8888', whatsappMarketing: true });
+    user = await prisma.user.findUnique({ where: { id: a.userId } });
+    expect(user.whatsappMarketingConsentAt).toBeInstanceOf(Date);
+    expect(user.whatsappMarketingConsentVersion).toBe('2026-10-31');
+
+    await answer(a.userId, { skip: true, whatsapp: '(66) 99999-8888', whatsappMarketing: false });
+    expect((await prisma.user.findUnique({ where: { id: a.userId } })).whatsappMarketingConsentAt).toBeNull();
+  });
+
   const made: Array<{ userId: string; restaurantId: string }> = [];
 
   beforeAll(() => {

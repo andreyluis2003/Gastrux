@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { SEGMENTS } from '@/lib/marketing/segments';
 import { seedStarterTemplate } from '@/lib/onboarding/seed-template';
 import { parseRestaurantAddress } from '@/lib/onboarding/address';
-import { parseWhatsapp } from '@/lib/onboarding/whatsapp';
+import { WHATSAPP_CONSENT_VERSION, parseWhatsapp } from '@/lib/onboarding/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,8 +44,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: whatsapp.error }, { status: 400 });
   }
 
+  // Only an explicit tick counts, on both buttons; unticking on a new answer withdraws it
+  const consent = body.whatsappMarketing === true
+    ? { whatsappMarketingConsentAt: new Date(), whatsappMarketingConsentVersion: WHATSAPP_CONSENT_VERSION }
+    : { whatsappMarketingConsentAt: null, whatsappMarketingConsentVersion: null };
+
   if (body.skip === true) {
-    await prisma.user.update({ where: { id: userId }, data: { whatsapp: whatsapp.value } });
+    await prisma.user.update({ where: { id: userId }, data: { whatsapp: whatsapp.value, ...consent } });
     const seed = restaurant ? await seedStarterTemplate(restaurant.id, null) : null;
     return NextResponse.json({ skipped: true, template: seed?.seeded ? seed.template : null });
   }
@@ -78,6 +83,7 @@ export async function POST(request: NextRequest) {
     data: {
       businessType,
       whatsapp: whatsapp.value,
+      ...consent,
       ...(businessStage ? { businessStage, leadQuality } : {}),
       ...(locationCount ? { locationCount } : {}),
       ...(mainPainPoint ? { mainPainPoint } : {}),

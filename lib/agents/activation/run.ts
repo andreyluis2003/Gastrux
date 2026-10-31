@@ -9,6 +9,7 @@ import type { AgentChannel, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { sendTransactionalEmail } from '@/lib/email/transactional';
 import { platformTeam } from '../platform-team';
+import { windowOpen } from '../whatsapp/conversation';
 import { TRIGGER_LABELS, decide, type ActivationDecision, type ActivationSignals } from './rules';
 import { listTrialRestaurantIds, loadActivationSignals } from './signals';
 import { writeActivationMessage } from './writer';
@@ -68,7 +69,9 @@ export async function runActivationAgent(now = new Date(), opts: { only?: string
 
       // The fixed welcome e-mail stays (owner decision 2026-10-27), so the agent welcomes by WhatsApp only
       const emailToo = d.trigger !== 'boas_vindas';
-      const channels: AgentChannel[] = [...(s.email && emailToo ? ['EMAIL' as const] : []), ...(s.whatsapp ? ['WHATSAPP' as const] : [])];
+      // Templates are marketing: only with the opt-in, or while the client is talking to the number
+      const whatsappAllowed = !!s.whatsapp && (s.whatsappConsent || (await windowOpen(s.whatsapp)));
+      const channels: AgentChannel[] = [...(s.email && emailToo ? ['EMAIL' as const] : []), ...(whatsappAllowed ? ['WHATSAPP' as const] : [])];
       // The first channel's row decides who tells the team, so two runs at once notify once
       let first = true;
       let notify = false;

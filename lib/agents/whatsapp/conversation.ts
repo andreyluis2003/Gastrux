@@ -69,7 +69,7 @@ export async function handleInbound(msg: any, profileName?: string): Promise<voi
 
   const who = client?.restaurant?.name || client?.user.name || profileName || waId;
   if (STOP_WORDS.has(text.trim().toUpperCase())) {
-    if (client) await prisma.user.update({ where: { id: client.user.id }, data: { onboardingEmailsOptOut: true } });
+    if (client) await prisma.user.update({ where: { id: client.user.id }, data: { onboardingEmailsOptOut: true, whatsappMarketingConsentAt: null, whatsappMarketingConsentVersion: null } });
     const waMessageId = await sendPlatformText(waId, STOP_REPLY);
     await recordOutbound({ waId, text: STOP_REPLY, waMessageId, messageType: 'text', userId: client?.user.id, restaurantId: client?.restaurant?.id });
     await tellTeam('Cliente pediu para parar as mensagens', `${who} respondeu ${text.trim()} no WhatsApp.`, { phone: phoneKey(waId) }, 'LOW');

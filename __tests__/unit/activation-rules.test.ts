@@ -21,7 +21,7 @@ function make(o: Partial<ActivationSignals> & { done?: FirstStepKey[] } = {}): A
   const st = steps(done);
   return {
     restaurantId: 'r1', restaurantName: 'Pizzaria Teste', ownerId: 'u1', ownerName: 'Maria Silva',
-    email: 'maria@x.test', whatsapp: '5566999998888', businessType: 'pizzaria', timezone: 'America/Cuiaba',
+    email: 'maria@x.test', whatsapp: '5566999998888', whatsappConsent: true, businessType: 'pizzaria', timezone: 'America/Cuiaba',
     createdAt: ago(6 * MIN), trialEndsAt: new Date(now.getTime() + 14 * DAY), status: 'TRIAL', stage: 'SIGNED_UP',
     lastActivityAt: ago(MIN), firstSaleAt: done.includes('venda') ? ago(HOUR) : null, steps: st, stepsDone: st.filter((s) => s.done).length,
     excluded: false, sent: [],

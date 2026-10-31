@@ -26,7 +26,7 @@ let adminRestaurant: any;
 async function account(opts: { internal?: boolean; optOut?: boolean; createdAt?: Date; trialEndsAt?: Date } = {}) {
   const tag = crypto.randomBytes(4).toString('hex');
   const owner = await prisma.user.create({
-    data: { email: `act-run-${tag}@gastrux.test`, name: 'Maria Silva', role: 'OWNER', whatsapp: '5566999998888', onboardingEmailsOptOut: !!opts.optOut },
+    data: { email: `act-run-${tag}@gastrux.test`, name: 'Maria Silva', role: 'OWNER', whatsapp: '5566999998888', whatsappMarketingConsentAt: new Date(), onboardingEmailsOptOut: !!opts.optOut },
   });
   const restaurant = await prisma.restaurant.create({
     data: {
@@ -59,6 +59,14 @@ describe('activation agent routine', () => {
   });
 
   beforeEach(() => (sendTransactionalEmail as jest.Mock).mockClear());
+
+  it('without the WhatsApp opt-in the agent drafts no WhatsApp', async () => {
+    const a = await account();
+    made.push(a);
+    await prisma.user.update({ where: { id: a.owner.id }, data: { whatsappMarketingConsentAt: null } });
+    await runActivationAgent(now, { only: [a.restaurant.id] });
+    expect(await prisma.agentAction.count({ where: { restaurantId: a.restaurant.id, channel: 'WHATSAPP' } })).toBe(0);
+  });
 
   // The fixed welcome e-mail stays (owner decision 2026-10-27), so the agent's welcome is the WhatsApp only (final review I-3)
   it('a new account gets a WhatsApp welcome draft (the welcome e-mail is the fixed one), and the team is told', async () => {

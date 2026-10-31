@@ -47,7 +47,7 @@ describe('official WhatsApp number', () => {
   beforeAll(async () => {
     const tag = crypto.randomBytes(4).toString('hex');
     const n = String(crypto.randomInt(90000000, 99999999));
-    const owner = await prisma.user.create({ data: { email: `wa-${tag}@gastrux.test`, name: 'Maria Silva', role: 'OWNER', whatsapp: `55669${n}` } });
+    const owner = await prisma.user.create({ data: { email: `wa-${tag}@gastrux.test`, name: 'Maria Silva', role: 'OWNER', whatsapp: `55669${n}`, whatsappMarketingConsentAt: new Date() } });
     const restaurant = await prisma.restaurant.create({ data: { name: `Pizzaria ${tag}`, ownerId: owner.id, status: 'TRIAL' } });
     // Meta reports this mobile without the ninth digit
     a = { owner, restaurant, waId: `5566${n}`, key: `5566${n}` };
@@ -77,7 +77,7 @@ describe('official WhatsApp number', () => {
     });
     await prisma.agentWhatsAppMessage.deleteMany({ where: { phone: a.key } });
     await prisma.agentAction.deleteMany({ where: { restaurantId: a.restaurant.id } });
-    await prisma.user.update({ where: { id: a.owner.id }, data: { onboardingEmailsOptOut: false } });
+    await prisma.user.update({ where: { id: a.owner.id }, data: { onboardingEmailsOptOut: false, whatsappMarketingConsentAt: new Date() } });
   });
 
   it('outside the 24 hours an approved draft goes as the template, with the button path, ignoring edits', async () => {
@@ -93,6 +93,19 @@ describe('official WhatsApp number', () => {
     expect(row.status).toBe('SENT');
     expect(row.text).toContain('já está pronto');
     expect(await prisma.agentWhatsAppMessage.count({ where: { agentActionId: d.id, direction: 'OUT', messageType: 'template' } })).toBe(1);
+  });
+
+  it('a template without the opt-in is refused and nothing goes out; a client who wrote still gets free text', async () => {
+    await prisma.user.update({ where: { id: a.owner.id }, data: { whatsappMarketingConsentAt: null } });
+    const d = await draft('sem_caixa');
+    expect((await approve(d.id)).status).toBe(409);
+    expect(sent).toHaveLength(0);
+    expect((await prisma.agentAction.findUnique({ where: { id: d.id } })).status).toBe('DRAFT');
+
+    await inbound('Oi');
+    sent = [];
+    expect((await approve(d.id, 'Claro')).status).toBe(200);
+    expect(sent[0].type).toBe('text');
   });
 
   it('within the 24 hours the edited text goes as free text', async () => {
@@ -183,7 +196,9 @@ describe('official WhatsApp number', () => {
 
   it('SAIR stops the tips, confirms, and the queue refuses new messages', async () => {
     await inbound(' sair ');
-    expect((await prisma.user.findUnique({ where: { id: a.owner.id } })).onboardingEmailsOptOut).toBe(true);
+    const stopped = await prisma.user.findUnique({ where: { id: a.owner.id } });
+    expect(stopped.onboardingEmailsOptOut).toBe(true);
+    expect(stopped.whatsappMarketingConsentAt).toBeNull();
     expect(sent).toHaveLength(1);
     expect(sent[0].text.body).toContain('não vamos mais mandar dicas');
     const d = await draft('sumiu');

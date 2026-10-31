@@ -54,7 +54,7 @@ describe('activation signals', () => {
 
     const s = await loadActivationSignals(a.restaurant.id, new Date());
     expect(s).toMatchObject({
-      restaurantId: a.restaurant.id, ownerId: a.owner.id, ownerName: 'Maria Silva', whatsapp: '5566999998888',
+      restaurantId: a.restaurant.id, ownerId: a.owner.id, ownerName: 'Maria Silva', whatsapp: '5566999998888', whatsappConsent: false,
       businessType: 'pizzaria', timezone: 'America/Cuiaba', status: 'TRIAL', stage: 'SELLING', excluded: false,
     });
     expect(s.email).toBe(a.owner.email);

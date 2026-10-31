@@ -527,3 +527,8 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 - Conversas listam as últimas 1.000 mensagens, e cada conversa abre as últimas 200.
 - Sem envio de foto ou áudio pela Fila: mídia do cliente aparece só como [image] ou [audio].
 - Conta de teste de pessoa da equipe sem a marca Interna continua recebendo rascunhos do agente (ex.: Brasa Pura).
+
+## Aceite de marketing no WhatsApp (2026-10-31)
+
+- Contas criadas antes do aceite ficam sem WhatsApp de marketing, a menos que o cliente escreva para o número oficial. Não há tela para aceitar depois do cadastro.
+- O link "Parar as dicas" do e-mail para as dicas nos dois canais, mas não apaga a data do aceite; responder SAIR apaga.

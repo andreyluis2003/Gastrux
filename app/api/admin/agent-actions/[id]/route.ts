@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ status: 'DISCARDED' });
   }
 
-  const owner = await prisma.user.findUnique({ where: { id: action.userId }, select: { id: true, name: true, email: true, whatsapp: true, onboardingEmailsOptOut: true } });
+  const owner = await prisma.user.findUnique({ where: { id: action.userId }, select: { id: true, name: true, email: true, whatsapp: true, whatsappMarketingConsentAt: true, onboardingEmailsOptOut: true } });
   if (!owner || owner.onboardingEmailsOptOut) {
     return NextResponse.json({ error: 'O cliente pediu para parar as mensagens' }, { status: 409 });
   }
@@ -59,6 +59,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const template = official && !official.open
     ? renderTemplate(action.trigger, { firstName: firstNameOf(owner.name), restaurantName: restaurant.name, draft: action.text })
     : null;
+  if (template && !owner.whatsappMarketingConsentAt) {
+    return NextResponse.json({ error: 'O cliente não aceitou mensagens de marketing no WhatsApp' }, { status: 409 });
+  }
   if (official && !official.open && !template) return NextResponse.json({ error: 'Esta mensagem não tem modelo aprovado' }, { status: 409 });
   const text = template?.text ?? edited;
 

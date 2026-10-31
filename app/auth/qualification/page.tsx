@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { GastruxSymbol } from '@/components/brand/logo';
 import { cn } from '@/lib/utils';
 import { SEGMENTS } from '@/lib/marketing/segments';
-import { parseWhatsapp } from '@/lib/onboarding/whatsapp';
+import { WHATSAPP_CONSENT_TEXT, parseWhatsapp } from '@/lib/onboarding/whatsapp';
 
 // Reuses the marketing segment taxonomy so answers stay consistent with
 // /para/[segmento], minus 'delivery'/'franquias' - those are a business
@@ -64,6 +64,8 @@ export default function QualificationPage() {
   // Required on both buttons (activation agent, 2026-10-28): how the Equipe Gastrux helps during the trial
   const [whatsapp, setWhatsapp] = useState('');
   const whatsappOk = parseWhatsapp(whatsapp).ok;
+  // Separate from the number and unticked: marketing by WhatsApp is the owner's free choice
+  const [whatsappMarketing, setWhatsappMarketing] = useState(false);
   // "Comece com" (2026-10-06): the example menu of the chosen business type, or nothing
   const [startWith, setStartWith] = useState<'template' | 'blank'>('template');
   const [address, setAddress] = useState<Record<AddressField, string>>(EMPTY_ADDRESS);
@@ -109,7 +111,7 @@ export default function QualificationPage() {
       const res = await fetch('/api/onboarding/qualification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessType, startWith, address, whatsapp }),
+        body: JSON.stringify({ businessType, startWith, address, whatsapp, whatsappMarketing }),
       });
       if (res.status === 400) {
         // A half-filled address: say what is missing and stay on the page
@@ -133,7 +135,7 @@ export default function QualificationPage() {
       await fetch('/api/onboarding/qualification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skip: true, whatsapp }),
+        body: JSON.stringify({ skip: true, whatsapp, whatsappMarketing }),
       });
     } catch {
       // The examples are a convenience: never block the way in
@@ -162,7 +164,11 @@ export default function QualificationPage() {
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
           />
-          <p className="text-xs text-slate-500">Ao continuar, você aceita receber dicas e novidades do Gastrux neste WhatsApp. Para parar, é só responder SAIR.</p>
+          <p className="text-xs text-slate-500">Para falarmos com você sobre a sua conta.</p>
+          <label className="flex items-start gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="mt-0.5 h-4 w-4" checked={whatsappMarketing} onChange={(e) => setWhatsappMarketing(e.target.checked)} />
+            <span>{WHATSAPP_CONSENT_TEXT}</span>
+          </label>
         </div>
 
         <ChoiceStep

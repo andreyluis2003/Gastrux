@@ -37,7 +37,7 @@ export async function loadActivationSignals(restaurantId: string, now: Date): Pr
   const [owner, status, menuItems, closedBills, lastBill, firstBill, lastItem, actions] = await Promise.all([
     prisma.user.findUnique({
       where: { id: r.ownerId },
-      select: { id: true, name: true, email: true, whatsapp: true, businessType: true, lastSignInAt: true, onboardingEmailsOptOut: true },
+      select: { id: true, name: true, email: true, whatsapp: true, whatsappMarketingConsentAt: true, businessType: true, lastSignInAt: true, onboardingEmailsOptOut: true },
     }),
     onboardingStatus(restaurantId, now),
     prisma.menuItem.count({ where: { restaurantId } }),
@@ -66,6 +66,7 @@ export async function loadActivationSignals(restaurantId: string, now: Date): Pr
     ownerName: owner.name,
     email: owner.email || null,
     whatsapp: owner.whatsapp,
+    whatsappConsent: !!owner.whatsappMarketingConsentAt,
     businessType: owner.businessType,
     timezone: r.timezone,
     createdAt: r.createdAt,

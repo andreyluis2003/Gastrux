@@ -4,6 +4,10 @@
  * landlines 10; a leading country code 55 is dropped before checking.
  */
 
+/** Sign-up opt-in for marketing templates (Meta classified the agent's templates as marketing). Unticked by default. */
+export const WHATSAPP_CONSENT_TEXT = 'Quero receber dicas e novidades do Gastrux no WhatsApp. Para parar, é só responder SAIR.';
+export const WHATSAPP_CONSENT_VERSION = '2026-10-31';
+
 type Result = { ok: true; value: string } | { ok: false; error: string };
 
 export const WHATSAPP_ERROR = 'Informe o WhatsApp com DDD';

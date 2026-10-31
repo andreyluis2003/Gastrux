@@ -10,95 +10,99 @@ datasource db {
 }
 
 model User {
-  id                     String                  @id @default(cuid())
-  email                  String                  @unique
-  name                   String?
-  password               String?
+  id                              String                  @id @default(cuid())
+  email                           String                  @unique
+  name                            String?
+  password                        String?
   /// Set when someone else chose the password (a hire, a reset): changed at the first access
-  mustChangePassword     Boolean                 @default(false)
-  image                  String?
-  emailVerified          DateTime?
-  role                   UserRole                @default(COOK)
-  active                 Boolean                 @default(true)
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  lastSignInAt           DateTime?
-  stripeCustomerId       String?
-  subscriptionId         String?
-  subscriptionTier       String                  @default("starter")
-  subscriptionStatus     String                  @default("active")
-  billingCycleStart      DateTime?
-  billingCycleEnd        DateTime?
-  lastInvoiceDate        DateTime?
-  trialEndsAt            DateTime?
-  emailSentDay3          Boolean                 @default(false)
-  emailSentDay7          Boolean                 @default(false)
-  emailDay3SentAt        DateTime?
-  emailDay7SentAt        DateTime?
-  emailVariantDay3       String?
-  emailVariantDay7       String?
-  emailDay3OpenedAt      DateTime?
-  emailDay7OpenedAt      DateTime?
-  convertedToProAt       DateTime?
-  conversionSource       String?
-  convertedToPlan        String?
-  referralCode           String?                 @unique
-  referredByUserId       String?
-  referralBonusEarned    Int                     @default(0)
-  referralBonusCount     Int                     @default(0)
-  referralTier           String                  @default("bronze")
-  currentRestaurantId    String?
-  emailDay14SentAt       DateTime?
-  emailDay1SentAt        DateTime?
-  emailDay21SentAt       DateTime?
-  emailSentDay1          Boolean                 @default(false)
-  emailSentDay14         Boolean                 @default(false)
-  emailSentDay21         Boolean                 @default(false)
-  emailSentTrialEnding   Boolean                 @default(false)
-  emailSentWelcome       Boolean                 @default(false)
-  emailTrialEndingSentAt DateTime?
-  emailWelcomeSentAt     DateTime?
+  mustChangePassword              Boolean                 @default(false)
+  image                           String?
+  emailVerified                   DateTime?
+  role                            UserRole                @default(COOK)
+  active                          Boolean                 @default(true)
+  createdAt                       DateTime                @default(now())
+  updatedAt                       DateTime                @updatedAt
+  lastSignInAt                    DateTime?
+  stripeCustomerId                String?
+  subscriptionId                  String?
+  subscriptionTier                String                  @default("starter")
+  subscriptionStatus              String                  @default("active")
+  billingCycleStart               DateTime?
+  billingCycleEnd                 DateTime?
+  lastInvoiceDate                 DateTime?
+  trialEndsAt                     DateTime?
+  emailSentDay3                   Boolean                 @default(false)
+  emailSentDay7                   Boolean                 @default(false)
+  emailDay3SentAt                 DateTime?
+  emailDay7SentAt                 DateTime?
+  emailVariantDay3                String?
+  emailVariantDay7                String?
+  emailDay3OpenedAt               DateTime?
+  emailDay7OpenedAt               DateTime?
+  convertedToProAt                DateTime?
+  conversionSource                String?
+  convertedToPlan                 String?
+  referralCode                    String?                 @unique
+  referredByUserId                String?
+  referralBonusEarned             Int                     @default(0)
+  referralBonusCount              Int                     @default(0)
+  referralTier                    String                  @default("bronze")
+  currentRestaurantId             String?
+  emailDay14SentAt                DateTime?
+  emailDay1SentAt                 DateTime?
+  emailDay21SentAt                DateTime?
+  emailSentDay1                   Boolean                 @default(false)
+  emailSentDay14                  Boolean                 @default(false)
+  emailSentDay21                  Boolean                 @default(false)
+  emailSentTrialEnding            Boolean                 @default(false)
+  emailSentWelcome                Boolean                 @default(false)
+  emailTrialEndingSentAt          DateTime?
+  emailWelcomeSentAt              DateTime?
   /// Asked to stop the onboarding tips (link in the e-mails, 2026-10-19); account e-mails still go
-  onboardingEmailsOptOut Boolean                 @default(false)
+  onboardingEmailsOptOut          Boolean                 @default(false)
   /// Asked at sign-up (activation agent, 2026-10-28): digits, 55 + DDD + number
-  whatsapp               String?
-  acceptedTermsAt        DateTime?
-  businessStage          String?
-  businessType           String?
-  locationCount          String?
-  mainPainPoint          String?
-  leadQuality            String?
-  notifications          Notification[]          @relation("UserNotifications")
-  accounts               Account[]
-  passwordResetTokens    PasswordResetToken[]
-  adminLogs              AdminLog[]              @relation("AdminLogsUser")
-  aiInsightsCreated      AIInsight[]             @relation("userAIInsights")
-  alertPreferences       AlertPreference[]
-  auditLogs              AuditLog[]
-  billingInvoices        BillingInvoice[]        @relation("BillingInvoiceUser")
-  dailyTransactionCounts DailyTransactionCount[]
-  abTestResults          EmailABTestResult[]
-  emailDeliveryLogs      EmailDeliveryLog[]
-  emailFeedback          EmailFeedback[]
-  featureRequestsCreated FeatureRequest[]        @relation("UserFeatureRequests")
-  featureVotes           FeatureVote[]           @relation("UserFeatureVotes")
-  feedbackSubmitted      Feedback[]              @relation("UserFeedback")
-  helpArticlesAuthored   HelpArticle[]           @relation("HelpArticleAuthor")
-  orderSessions          OrderSession[]          @relation("OrderSessionUser")
-  refundsProcessed       PaymentRefund[]
-  referralCreatedHistory ReferralHistory[]       @relation("ReferralCreated")
-  referralHistory        ReferralHistory[]
-  restaurants            RestaurantUser[]        @relation("UserRestaurants")
-  sessions               Session[]
-  staffMember            StaffMember?            @relation("StaffMemberUser")
-  subscriptions          Subscription[]
-  supportMessages        SupportMessage[]        @relation("SupportMessageSender")
-  supportTicketsAssigned SupportTicket[]         @relation("SupportTicketAssignedTo")
-  supportTicketsOpened   SupportTicket[]         @relation("SupportTicketOpenedBy")
-  surveyResponse         SurveyResponse?
-  onboarding             UserOnboarding?
-  referredByUser         User?                   @relation("ReferredBy", fields: [referredByUserId], references: [id])
-  referrals              User[]                  @relation("ReferredBy")
+  whatsapp                        String?
+  /// Ticked the separate opt-in for marketing templates; empty means no marketing by WhatsApp
+  whatsappMarketingConsentAt      DateTime?
+  /// Which wording was accepted (WHATSAPP_CONSENT_VERSION)
+  whatsappMarketingConsentVersion String?
+  acceptedTermsAt                 DateTime?
+  businessStage                   String?
+  businessType                    String?
+  locationCount                   String?
+  mainPainPoint                   String?
+  leadQuality                     String?
+  notifications                   Notification[]          @relation("UserNotifications")
+  accounts                        Account[]
+  passwordResetTokens             PasswordResetToken[]
+  adminLogs                       AdminLog[]              @relation("AdminLogsUser")
+  aiInsightsCreated               AIInsight[]             @relation("userAIInsights")
+  alertPreferences                AlertPreference[]
+  auditLogs                       AuditLog[]
+  billingInvoices                 BillingInvoice[]        @relation("BillingInvoiceUser")
+  dailyTransactionCounts          DailyTransactionCount[]
+  abTestResults                   EmailABTestResult[]
+  emailDeliveryLogs               EmailDeliveryLog[]
+  emailFeedback                   EmailFeedback[]
+  featureRequestsCreated          FeatureRequest[]        @relation("UserFeatureRequests")
+  featureVotes                    FeatureVote[]           @relation("UserFeatureVotes")
+  feedbackSubmitted               Feedback[]              @relation("UserFeedback")
+  helpArticlesAuthored            HelpArticle[]           @relation("HelpArticleAuthor")
+  orderSessions                   OrderSession[]          @relation("OrderSessionUser")
+  refundsProcessed                PaymentRefund[]
+  referralCreatedHistory          ReferralHistory[]       @relation("ReferralCreated")
+  referralHistory                 ReferralHistory[]
+  restaurants                     RestaurantUser[]        @relation("UserRestaurants")
+  sessions                        Session[]
+  staffMember                     StaffMember?            @relation("StaffMemberUser")
+  subscriptions                   Subscription[]
+  supportMessages                 SupportMessage[]        @relation("SupportMessageSender")
+  supportTicketsAssigned          SupportTicket[]         @relation("SupportTicketAssignedTo")
+  supportTicketsOpened            SupportTicket[]         @relation("SupportTicketOpenedBy")
+  surveyResponse                  SurveyResponse?
+  onboarding                      UserOnboarding?
+  referredByUser                  User?                   @relation("ReferredBy", fields: [referredByUserId], references: [id])
+  referrals                       User[]                  @relation("ReferredBy")
 
   printedFoodLabels   FoodLabel[]       @relation("FoodLabelPrintedBy")
   dailyCountsClosed   DailyCount[]      @relation("DailyCountClosedBy")
@@ -1486,25 +1490,25 @@ model DeliveryIntegration {
 }
 
 model ExternalOrder {
-  id                    String              @id @default(cuid())
+  id                    String                 @id @default(cuid())
   restaurantId          String
   integrationId         String
   /// The OrderApiKey that sent it (Gastrux order API); its callback gets the status changes
   apiKeyId              String?
-  subtotal              Float               @default(0)
-  discount              Float               @default(0)
+  subtotal              Float                  @default(0)
+  discount              Float                  @default(0)
   paymentMethod         DeliveryPaymentMethod?
-  paidOnline            Boolean             @default(false)
+  paidOnline            Boolean                @default(false)
   scheduledFor          DateTime?
   /// The restaurant's customer (Gastrux order API only: platform customers are the platform's)
   customerId            String?
   externalOrderId       String
   externalCustomerId    String?
   internalOrderId       String?
-  status                ExternalOrderStatus @default(PENDING)
+  status                ExternalOrderStatus    @default(PENDING)
   totalAmount           Float
-  deliveryFee           Float               @default(0)
-  platformFee           Float               @default(0)
+  deliveryFee           Float                  @default(0)
+  platformFee           Float                  @default(0)
   customerName          String
   customerPhone         String
   customerEmail         String?
@@ -1513,7 +1517,7 @@ model ExternalOrder {
   deliveryZipcode       String?
   items                 String
   specialInstructions   String?
-  orderReceivedAt       DateTime            @default(now())
+  orderReceivedAt       DateTime               @default(now())
   estimatedDeliveryTime DateTime?
   deliveredAt           DateTime?
   /// What the platform says beyond the pipeline fields (iFood: displayId, orderType, deliveredBy, pickupCode)
@@ -1527,12 +1531,12 @@ model ExternalOrder {
   driverName            String?
   /// The driver settlement that brought its money to the drawer; null = not settled
   settlementId          String?
-  settlement            DeliverySettlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  settlement            DeliverySettlement?    @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
   deliveryLogs          DeliveryLog[]
-  integration           DeliveryIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  restaurant            Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  integration           DeliveryIntegration    @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  restaurant            Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   internalOrder         Order?
 
   @@unique([restaurantId, externalOrderId])
@@ -1961,25 +1965,25 @@ model CashRegister {
 /// A cash shift: from "Abrir caixa" to the blind close (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md).
 /// One OPEN shift per register, enforced by a partial unique index in migration 20261005120000_cash_sessions.
 model CashSession {
-  id                String             @id @default(cuid())
-  restaurantId      String
-  cashRegisterId    String
-  status            CashSessionStatus  @default(OPEN)
-  openedById        String
-  openedAt          DateTime           @default(now())
-  openingFloatCents Int                @default(0)
-  closedById        String?
-  closedAt          DateTime?
-  countedCents      Json?
-  expectedCents     Json?
-  differenceCents   Json?
-  closingNotes      String?
-  lateEntries       Int                @default(0)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  cashRegister      CashRegister       @relation(fields: [cashRegisterId], references: [id])
-  entries           CashSessionEntry[]
-  onlinePayments    Payment[]          @relation("CashSessionOnlinePayments")
+  id                  String               @id @default(cuid())
+  restaurantId        String
+  cashRegisterId      String
+  status              CashSessionStatus    @default(OPEN)
+  openedById          String
+  openedAt            DateTime             @default(now())
+  openingFloatCents   Int                  @default(0)
+  closedById          String?
+  closedAt            DateTime?
+  countedCents        Json?
+  expectedCents       Json?
+  differenceCents     Json?
+  closingNotes        String?
+  lateEntries         Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  cashRegister        CashRegister         @relation(fields: [cashRegisterId], references: [id])
+  entries             CashSessionEntry[]
+  onlinePayments      Payment[]            @relation("CashSessionOnlinePayments")
   deliverySettlements DeliverySettlement[]
 
   @@index([restaurantId])
@@ -2030,7 +2034,7 @@ model CashSessionEntry {
   cashSession    CashSession    @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
 
   /// The bill this drawer expense paid (spec 2026-10-18 contas a pagar): the DRE counts the bill, not this entry
-  payableId String?
+  payableId            String?
   /// The driver settlement this line belongs to (spec 2026-10-26 acerto com o entregador)
   deliverySettlementId String?
 
@@ -2598,34 +2602,34 @@ model OrderTrace {
 }
 
 model Customer {
-  id                  String                   @id @default(cuid())
-  name                String
+  id              String                @id @default(cuid())
+  name            String
   /// Optional since the cashback (2026-10-23): the cashier identifies the customer by phone
-  email               String?                  @unique
-  phone               String?
+  email           String?               @unique
+  phone           String?
   /// DDD + number, digits only (lib/cashback/rules.ts normalizePhone); one customer per phone in a restaurant
-  phoneDigits         String?
-  birthDate           DateTime?
-  address             String?
-  city                String?
-  state               String?
-  zipCode             String?
-  active              Boolean                  @default(true)
-  status              CustomerStatus           @default(ACTIVE)
-  segment             String?
-  totalSpent          Decimal                  @default(0)
-  totalOrders         Int                      @default(0)
-  lastOrderAt         DateTime?
-  averageTicket       Decimal                  @default(0)
-  restaurantId        String?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  interactions        CustomerInteraction[]
-  customerSegment     CustomerSegment?
-  orders              Order[]
-  orderSessions       OrderSession[]           @relation("OrderSessionCustomer")
-  cashbackCredits     CashbackCredit[]
-  cashbackUses        CashbackUse[]
+  phoneDigits     String?
+  birthDate       DateTime?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  active          Boolean               @default(true)
+  status          CustomerStatus        @default(ACTIVE)
+  segment         String?
+  totalSpent      Decimal               @default(0)
+  totalOrders     Int                   @default(0)
+  lastOrderAt     DateTime?
+  averageTicket   Decimal               @default(0)
+  restaurantId    String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  interactions    CustomerInteraction[]
+  customerSegment CustomerSegment?
+  orders          Order[]
+  orderSessions   OrderSession[]        @relation("OrderSessionCustomer")
+  cashbackCredits CashbackCredit[]
+  cashbackUses    CashbackUse[]
 
   @@unique([restaurantId, phoneDigits])
   @@index([email])
