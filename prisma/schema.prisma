@@ -4985,3 +4985,36 @@ enum AgentActionStatus {
   DISCARDED
   FAILED
 }
+
+/// The Gastrux official WhatsApp number's conversations with clients (activation agent, stage 2). `phone` is
+/// the canonical key of lib/agents/whatsapp/numbers.ts, because Meta may report a Brazilian mobile without the 9.
+model AgentWhatsAppMessage {
+  id            String                @id @default(cuid())
+  phone         String
+  /// The number exactly as Meta knows it, used to answer
+  waId          String
+  userId        String?
+  restaurantId  String?
+  direction     AgentMessageDirection
+  text          String
+  messageType   String                @default("text")
+  waMessageId   String?               @unique
+  /// sent, delivered, read or failed (outgoing, from Meta's status events)
+  status        String?
+  error         String?
+  agentActionId String?
+  /// E-mail of the team member who answered; empty for the client or an automatic reply
+  sentBy        String?
+  /// When the team opened an incoming message
+  readAt        DateTime?
+  createdAt     DateTime              @default(now())
+
+  @@index([phone, createdAt])
+  @@index([direction, readAt])
+  @@map("agent_whatsapp_messages")
+}
+
+enum AgentMessageDirection {
+  IN
+  OUT
+}

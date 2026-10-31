@@ -59,7 +59,7 @@ const COPY: Record<ActivationTrigger, Copy> = {
   },
   fim_teste_vendendo: {
     subject: 'Seu teste do Gastrux está acabando',
-    body: (c) => `O teste do ${c.restaurantName} acaba em poucos dias. Para continuar vendendo sem parar, escolha o seu plano.`,
+    body: (c) => `O teste do ${c.restaurantName} acaba em poucos dias. Para continuar usando sem interrupção, escolha o seu plano.`,
   },
   fim_teste_sem_venda: {
     subject: 'Seu teste do Gastrux está acabando',

@@ -7,8 +7,8 @@
  */
 import type { AgentChannel, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { getPlatformAdminEmails } from '@/lib/admin/guard';
 import { sendTransactionalEmail } from '@/lib/email/transactional';
+import { platformTeam } from '../platform-team';
 import { TRIGGER_LABELS, decide, type ActivationDecision, type ActivationSignals } from './rules';
 import { listTrialRestaurantIds, loadActivationSignals } from './signals';
 import { writeActivationMessage } from './writer';
@@ -16,16 +16,6 @@ import { writeActivationMessage } from './writer';
 export interface ActivationRunResult { drafted: number; alerts: number; skipped: number }
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-/** The platform team: role ADMIN or listed in PLATFORM_ADMIN_EMAILS */
-async function platformTeam() {
-  const emails = getPlatformAdminEmails();
-  return prisma.user.findMany({
-    where: { OR: [{ role: 'ADMIN' }, ...(emails.length ? [{ email: { in: emails } }] : [])] },
-    select: { id: true, email: true, currentRestaurantId: true },
-    take: 20,
-  });
-}
 
 /** Inserts one row; true when this run recorded it (false: it already existed) */
 async function insert(row: Prisma.AgentActionCreateManyInput): Promise<boolean> {

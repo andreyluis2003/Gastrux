@@ -8,6 +8,7 @@ import { Bot, Mail, MessageCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGES } from '@/lib/admin/client-health';
 import { TRIGGER_LABELS, type ActivationTrigger } from '@/lib/agents/activation/rules';
+import { AgentConversations, type Conversation } from '@/components/admin/agent-conversations';
 
 interface QueueItem {
   id: string;
@@ -24,14 +25,17 @@ interface QueueItem {
   data: { reason?: string } | null;
   /** Why the last send failed (the message stays here to try again) */
   error: string | null;
+  /** Set when only the template approved at Meta can go: what the client will read */
+  templateText: string | null;
   createdAt: string;
 }
 
 const stageLabel = (stage: string) => STAGES.find((s) => s.value === stage)?.label ?? stage;
 const triggerLabel = (trigger: string) => TRIGGER_LABELS[trigger as ActivationTrigger] ?? trigger;
 
-function QueueCard({ item, onDone }: { item: QueueItem; onDone: (id: string) => void }) {
-  const [text, setText] = useState(item.text);
+function QueueCard({ item, official, onDone }: { item: QueueItem; official: boolean; onDone: (id: string) => void }) {
+  const locked = !!item.templateText;
+  const [text, setText] = useState(item.templateText ?? item.text);
   const [subject, setSubject] = useState(item.subject ?? '');
   const [busy, setBusy] = useState(false);
   const email = item.channel === 'EMAIL';
@@ -39,7 +43,7 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: (id: string) => 
   async function decide(action: 'approve' | 'discard') {
     setBusy(true);
     // Opened now, while the click still counts, so the browser does not block the WhatsApp tab
-    const tab = action === 'approve' && !email ? window.open('', '_blank') : null;
+    const tab = action === 'approve' && !email && !official ? window.open('', '_blank') : null;
     try {
       const res = await fetch(`/api/admin/agent-actions/${item.id}`, {
         method: 'PATCH',
@@ -50,7 +54,7 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: (id: string) => 
       if (!res.ok) throw new Error(out.error || 'Não foi possível concluir');
       if (out.waUrl && tab) tab.location.href = out.waUrl;
       else if (out.waUrl) window.open(out.waUrl, '_blank', 'noopener');
-      toast.success(action === 'discard' ? 'Mensagem descartada' : email ? 'E-mail enviado' : 'WhatsApp aberto com a mensagem');
+      toast.success(action === 'discard' ? 'Mensagem descartada' : email ? 'E-mail enviado' : official ? 'WhatsApp enviado' : 'WhatsApp aberto com a mensagem');
       onDone(item.id);
     } catch (e: any) {
       tab?.close();
@@ -82,15 +86,20 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: (id: string) => 
         {email && <Input aria-label="Assunto" value={subject} onChange={(e) => setSubject(e.target.value)} />}
         <textarea
           aria-label="Mensagem"
-          className="w-full min-h-[160px] rounded-md border p-2 text-sm"
+          className={`w-full min-h-[160px] rounded-md border p-2 text-sm ${locked ? 'bg-muted' : ''}`}
           value={text}
+          readOnly={locked}
           onChange={(e) => setText(e.target.value)}
         />
-        {!email && <p className="text-xs text-muted-foreground">{text.length} de 700 caracteres</p>}
+        {locked ? (
+          <p className="text-xs text-muted-foreground">Modelo aprovado pela Meta, com botão para a próxima tela. O texto só pode ser editado até 24 horas depois da última mensagem do cliente.</p>
+        ) : (
+          !email && <p className="text-xs text-muted-foreground">{text.length} de 700 caracteres</p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" className="gap-1" disabled={busy || !text.trim()} onClick={() => decide('approve')}>
             {email ? <Mail className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
-            {email ? 'Enviar e-mail' : 'Abrir no WhatsApp'}
+            {email ? 'Enviar e-mail' : official ? 'Enviar pelo WhatsApp' : 'Abrir no WhatsApp'}
           </Button>
           <Button size="sm" variant="outline" className="gap-1" disabled={busy} onClick={() => decide('discard')}>
             <Trash2 className="h-4 w-4" /> Descartar
@@ -103,19 +112,26 @@ function QueueCard({ item, onDone }: { item: QueueItem; onDone: (id: string) => 
 }
 
 /**
- * Plataforma › Fila do agente (spec 2026-10-27): the activation agent's drafts for trial accounts. Nothing
- * reaches a client until the team approves it here; the WhatsApp opens ready to send.
+ * Plataforma › Fila do agente (spec 2026-10-27): the activation agent's drafts for trial accounts, and the
+ * conversations of the official number. Nothing reaches a client until the team approves it here.
  */
 export default function AgentQueuePage() {
   const [items, setItems] = useState<QueueItem[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [official, setOfficial] = useState(false);
+  const [tab, setTab] = useState<'queue' | 'conversations'>('queue');
   const [loading, setLoading] = useState(true);
+  const unread = conversations.reduce((sum, c) => sum + c.unread, 0);
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/agent-actions?status=DRAFT');
-      if (!res.ok) throw new Error();
-      setItems((await res.json()).actions);
+      const [queue, talks] = await Promise.all([fetch('/api/admin/agent-actions?status=DRAFT'), fetch('/api/admin/agent-conversations')]);
+      if (!queue.ok || !talks.ok) throw new Error();
+      const out = await queue.json();
+      setItems(out.actions);
+      setOfficial(out.official);
+      setConversations((await talks.json()).conversations);
     } catch {
       toast.error('Não foi possível carregar a fila');
     } finally {
@@ -138,14 +154,22 @@ export default function AgentQueuePage() {
           <RefreshCw className="h-4 w-4" /> Atualizar
         </Button>
       </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant={tab === 'queue' ? 'default' : 'outline'} onClick={() => setTab('queue')}>Para aprovar ({items.length})</Button>
+        <Button size="sm" variant={tab === 'conversations' ? 'default' : 'outline'} onClick={() => setTab('conversations')}>
+          Conversas{unread > 0 ? ` (${unread})` : ''}
+        </Button>
+      </div>
       {loading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
+      ) : tab === 'conversations' ? (
+        <AgentConversations items={conversations} onChange={load} />
       ) : items.length === 0 ? (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Nada para aprovar agora</CardContent></Card>
       ) : (
         <div className="space-y-4">
           {items.map((item) => (
-            <QueueCard key={item.id} item={item} onDone={(id) => setItems((list) => list.filter((x) => x.id !== id))} />
+            <QueueCard key={item.id} item={item} official={official} onDone={(id) => setItems((list) => list.filter((x) => x.id !== id))} />
           ))}
         </div>
       )}

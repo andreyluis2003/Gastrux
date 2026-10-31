@@ -518,3 +518,12 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 ### Decisão do dono (o revisor não julgou)
 
 - O cozinheiro vê o histórico com valores em R$ (diferença pelo custo).
+
+## Número oficial do WhatsApp (2026-10-31)
+
+- Primeiro envio real: confirmar entrega e leitura, inclusive com número salvo com e sem o nono dígito.
+- Clientes sem WhatsApp no cadastro não recebem boas-vindas do agente: as boas-vindas saem só por WhatsApp. Avaliar um e-mail pessoal do agente para esses casos.
+- Falha na resposta automática ao SAIR: o pedido de parar é gravado, mas a equipe não recebe o aviso no sino.
+- Conversas listam as últimas 1.000 mensagens, e cada conversa abre as últimas 200.
+- Sem envio de foto ou áudio pela Fila: mídia do cliente aparece só como [image] ou [audio].
+- Conta de teste de pessoa da equipe sem a marca Interna continua recebendo rascunhos do agente (ex.: Brasa Pura).

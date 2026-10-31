@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { handleInboundMessage, type InboundMessage } from '@/lib/whatsapp/bot';
+import { isPlatformNumber } from '@/lib/agents/whatsapp/client';
+import { handleInbound, handleStatus } from '@/lib/agents/whatsapp/conversation';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +99,20 @@ export async function POST(req: NextRequest) {
 
         const phoneNumberId: string | undefined = value?.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
+
+        // Número oficial do Gastrux: é conversa com cliente da plataforma, nunca vai para o bot de pedidos
+        if (isPlatformNumber(phoneNumberId)) {
+          const contacts: any[] = value?.contacts || [];
+          for (const msg of value?.messages || []) {
+            await handleInbound(msg, contacts.find((c) => c.wa_id === msg.from)?.profile?.name).catch((err) =>
+              console.error('[wa-webhook] platform message error:', err?.message),
+            );
+          }
+          for (const status of value?.statuses || []) {
+            await handleStatus(status).catch((err) => console.error('[wa-webhook] platform status error:', err?.message));
+          }
+          continue;
+        }
 
         // Descobre o restaurante dono desse phoneNumberId
         const config = await (prisma as any).whatsAppConfig.findFirst({
