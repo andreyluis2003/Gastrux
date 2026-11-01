@@ -1,7 +1,7 @@
 import type { DeliveryPaymentMethod, DeliveryPlatform, ExternalOrder } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
-import { createOrderFromExternalOrder } from '@/lib/kds-integration';
+import { alertDeliveryProblem, createOrderFromExternalOrder, orderHasKitchenItem } from '@/lib/kds-integration';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { formatPhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
@@ -137,6 +137,15 @@ export async function ingestDeliveryOrder(args: {
     const winner = await prisma.externalOrder.findUnique({ where: key });
     if (!winner) throw e;
     return answerResend(winner, restaurantId, integrationId);
+  }
+
+  // iFood hears "confirmed" and charges the customer: with nothing the kitchen knows, a person decides (owner, 2026-11-01)
+  if (args.platform === 'ifood' && !(await orderHasKitchenItem(externalOrder))) {
+    await alertDeliveryProblem(externalOrder, {
+      kind: 'ifood-no-items', severity: 'CRITICAL', title: 'Pedido do iFood não foi confirmado',
+      message: `O pedido ${input.codigo} não tem nenhum produto reconhecido, e o iFood cancela em 8 minutos. Em Pedidos de delivery, aceite e prepare pela lista, ou recuse. Depois confira o Código PDV dos produtos no iFood.`,
+    });
+    return { externalOrder, kitchenOrderId: null, duplicate: false };
   }
 
   if (restaurant?.deliveryAutoAccept !== false) {

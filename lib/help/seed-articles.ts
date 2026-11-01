@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  'b638253c63169f3958f8f16ebd73add8f381cba540e9da39d4050e57888599ad', // ligar-ifood (before unknown products stopped being confirmed, 2026-11-01)
   '9aff1d4e659539078a7b7c3facabe87f6f354309432f03413f84fbea74a9d095', // baixar-fatura (before the invoice details, 2026-11-01)
   'e02c0eb23e9c627aca08b3f38492c1b88e1f01b17c3b3fea3cf6b972a16ef4fc', // mensagens de ajuda (before the prompt for older accounts, 2026-11-01)
   '5f7688bd87cffa6bbd0f3b33eb0fd920ee8168865dedeac17079e136203b991c',
@@ -727,6 +728,8 @@ Se a conta tem mais de uma loja, o Gastrux pergunta qual é a deste restaurante.
 Os pedidos chegam em **Vender > Pedidos de delivery** como "iFood #número" e vão para a cozinha quando são aceitos (sozinhos, com **Aceitar pedidos sozinho** ligado). O iFood cancela o pedido que ninguém aceita em 8 minutos. Em preparo, pronto e saiu para entrega (quando a entrega é da loja) voltam para o iFood.
 
 Para o Gastrux reconhecer cada item, use no iFood o mesmo **Código PDV** que o **Código do produto** do Cardápio digital. Item sem código é procurado pelo nome.
+
+Se nenhum produto do pedido for reconhecido, o Gastrux **não confirma sozinho**: o pedido fica em **Novos** e o sino avisa. Aceite e prepare pela lista, ou recuse, em até 8 minutos, porque depois disso o iFood cancela.
 
 ## Recusar, cancelar e pedidos de cancelamento
 

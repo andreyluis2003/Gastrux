@@ -8,6 +8,38 @@ import { nextKdsOrderNumber } from './kds/order-number';
 /**
  * Create a KDS order from an external delivery order
  */
+/** The restaurant's own recipe for an item of a platform order (never another restaurant's) */
+async function recipeForItem(order: { restaurantId: string; integrationId: string | null }, item: { externalItemId?: string; name?: string }) {
+  // A missing name or id must not become an empty filter (Prisma treats `contains: undefined`
+  // as "no condition", which would match ANY recipe of the restaurant).
+  // The item's code first (a mapping of the platform, or the product code of the Cardápio digital, plan
+  // 2026-10-23 api-de-pedidos), the name only when no code matched
+  const byCode: any[] = [];
+  if (item.externalItemId) {
+    byCode.push({
+      menuMappings: { some: { integrationId: order.integrationId, externalItemId: item.externalItemId } },
+    });
+    byCode.push({ menuItems: { some: { restaurantId: order.restaurantId, code: String(item.externalItemId).trim().toUpperCase() } } });
+  }
+  const recipe = byCode.length
+    ? await prisma.recipe.findFirst({ where: { restaurantId: order.restaurantId, OR: byCode } })
+    : null;
+  if (recipe || typeof item.name !== 'string' || !item.name.trim()) return recipe;
+  return prisma.recipe.findFirst({ where: { restaurantId: order.restaurantId, name: { contains: item.name.trim(), mode: 'insensitive' } } });
+}
+
+/** At least one item of this order would reach the kitchen. Unreadable items count as none. */
+export async function orderHasKitchenItem(order: { restaurantId: string; integrationId: string | null; items: string }): Promise<boolean> {
+  let items: any[];
+  try {
+    items = JSON.parse(order.items);
+  } catch {
+    return false;
+  }
+  for (const item of items) if (await recipeForItem(order, item)) return true;
+  return false;
+}
+
 export async function createOrderFromExternalOrder(
   externalOrderId: string
 ) {
@@ -41,23 +73,7 @@ export async function createOrderFromExternalOrder(
     const orderItems = [];
     const unmapped: Array<{ name: string; quantity: number }> = [];
     for (const item of items) {
-      // A missing name or id must not become an empty filter (Prisma treats `contains: undefined`
-      // as "no condition", which would match ANY recipe of the restaurant).
-      // The item's code first (a mapping of the platform, or the product code of the Cardápio digital, plan
-      // 2026-10-23 api-de-pedidos), the name only when no code matched
-      const byCode: any[] = [];
-      if (item.externalItemId) {
-        byCode.push({
-          menuMappings: { some: { integrationId: externalOrder.integrationId, externalItemId: item.externalItemId } },
-        });
-        byCode.push({ menuItems: { some: { restaurantId: externalOrder.restaurantId, code: String(item.externalItemId).trim().toUpperCase() } } });
-      }
-      let recipe = byCode.length
-        ? await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, OR: byCode } })
-        : null;
-      if (!recipe && typeof item.name === 'string' && item.name.trim()) {
-        recipe = await prisma.recipe.findFirst({ where: { restaurantId: externalOrder.restaurantId, name: { contains: item.name.trim(), mode: 'insensitive' } } });
-      }
+      const recipe = await recipeForItem(externalOrder, item);
 
       if (recipe) {
         orderItems.push({

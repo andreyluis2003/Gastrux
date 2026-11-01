@@ -95,6 +95,27 @@ describe('pollIfoodOnce', () => {
     expect(integ.syncStatus).toBe('SUCCESS');
   });
 
+  it('nothing the kitchen knows: not confirmed on iFood, a person decides; part of it: confirmed as before', async () => {
+    const none = await restaurant();
+    await prisma.recipe.deleteMany({ where: { restaurantId: none.rid } });
+    const orderId = place(none);
+    server.events.push(event(none, 'PLC', orderId));
+    await pollIfoodOnce();
+    const ext = await extOf(orderId);
+    expect(ext.status).toBe('PENDING');
+    expect(server.calls.some((c) => c.path.endsWith(`/${orderId}/confirm`))).toBe(false);
+    const alert = await prisma.notification.findFirst({ where: { restaurantId: none.rid, severity: 'CRITICAL' } });
+    expect(alert.title).toBe('Pedido do iFood não foi confirmado');
+
+    const part = await restaurant();
+    await prisma.recipe.deleteMany({ where: { restaurantId: part.rid, name: 'Refrigerante lata' } });
+    const other = place(part);
+    server.events.push(event(part, 'PLC', other));
+    await pollIfoodOnce();
+    expect((await extOf(other)).status).toBe('CONFIRMED');
+    expect(server.calls.some((c) => c.path.endsWith(`/${other}/confirm`))).toBe(true);
+  });
+
   it('an event that fails is not acked and the next poll recovers it', async () => {
     const r = await restaurant();
     const orderId = place(r);
