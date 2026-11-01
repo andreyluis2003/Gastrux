@@ -1,8 +1,15 @@
+import { isIP } from 'net';
 import type { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 /** The date on app/termos/page.tsx: change both together when the Terms change */
 export const TERMS_VERSION = '2026-10-18';
+
+/** The proxy (Traefik, on Easypanel) adds the caller as the last entry; anything before it can be forged */
+function clientIp(request: NextRequest): string | null {
+  const last = request.headers.get('x-forwarded-for')?.split(',').pop()?.trim();
+  return last && isIP(last) ? last : null;
+}
 
 /**
  * Proof that the owner accepted the Terms for this plan (owner decision 2026-11-01: no separate contract).
@@ -16,7 +23,7 @@ export async function recordSubscriptionAcceptance(
     data: {
       ...input,
       termsVersion: TERMS_VERSION,
-      ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 64) || null,
+      ip: clientIp(request),
       userAgent: request.headers.get('user-agent')?.slice(0, 300) || null,
     },
   });

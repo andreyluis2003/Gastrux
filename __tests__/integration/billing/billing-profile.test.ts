@@ -88,7 +88,7 @@ describe('invoice details before subscribing', () => {
     as(owner);
     const res = await mpCheckout(new NextRequest('http://x/checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.9, 10.0.0.1', 'user-agent': 'Teste' },
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '8.8.8.8, 203.0.113.9', 'user-agent': 'Teste' },
       body: JSON.stringify(plan),
     }));
     expect((await res.json()).code).toBeUndefined();
