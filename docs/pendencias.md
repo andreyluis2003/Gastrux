@@ -532,3 +532,7 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 
 - Contas criadas antes do aceite ficam sem WhatsApp de marketing, a menos que o cliente escreva para o número oficial. Quem não tinha número recebe um aviso ao entrar, com a caixa de aceite (2026-11-01). Quem já tinha número e não aceitou ainda não tem tela para aceitar depois.
 - O link "Parar as dicas" do e-mail para as dicas nos dois canais, mas não apaga a data do aceite; responder SAIR apaga.
+
+## Número do WhatsApp sem verificação (2026-11-01)
+
+- O número do dono é digitado no cadastro e no aviso de contas antigas, sem código de confirmação, e pode repetir entre contas (mesmo dono com dois restaurantes). Um número digitado errado pode receber dicas até a pessoa responder SAIR, e a conversa fica ligada à primeira conta encontrada com aquele número. SAIR para todas as contas do número. Avaliar confirmação por código quando o volume crescer.

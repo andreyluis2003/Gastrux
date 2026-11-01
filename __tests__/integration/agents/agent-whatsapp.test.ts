@@ -195,7 +195,15 @@ describe('official WhatsApp number', () => {
   });
 
   it('SAIR stops the tips, confirms, and the queue refuses new messages', async () => {
+    const { whatsapp } = await prisma.user.findUnique({ where: { id: a.owner.id } });
+    const twin = await prisma.user.create({
+      data: { email: `gemeo-${crypto.randomBytes(4).toString('hex')}@gastrux.test`, name: 'Mesmo numero', password: 'x', role: 'OWNER', whatsapp, whatsappMarketingConsentAt: new Date() },
+    });
     await inbound(' sair ');
+    const twinStopped = await prisma.user.findUnique({ where: { id: twin.id } });
+    await prisma.user.delete({ where: { id: twin.id } });
+    expect(twinStopped.onboardingEmailsOptOut).toBe(true);
+    expect(twinStopped.whatsappMarketingConsentAt).toBeNull();
     const stopped = await prisma.user.findUnique({ where: { id: a.owner.id } });
     expect(stopped.onboardingEmailsOptOut).toBe(true);
     expect(stopped.whatsappMarketingConsentAt).toBeNull();

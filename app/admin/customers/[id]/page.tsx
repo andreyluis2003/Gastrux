@@ -326,6 +326,7 @@ export default function CustomerDetailPage() {
           <div>
             <Label className="text-xs">Motivo (obrigatório)</Label>
             <Input className="mt-1" value={reason} maxLength={200} placeholder="Ex.: piloto da espetaria" onChange={(e) => setReason(e.target.value)} />
+            {noReason && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Escreva o motivo aqui (3 letras ou mais) para liberar os botões abaixo.</p>}
           </div>
           {!paid && (
             <div className="flex flex-wrap items-center gap-2">
