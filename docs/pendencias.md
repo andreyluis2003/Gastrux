@@ -156,8 +156,8 @@ Plano `docs/superpowers/plans/2026-10-24-ifood.md`. O código está pronto; a lo
 
 ### Abertos
 
-- **Homologação no iFood (dono):** seguir `docs/ifood-homologacao.md` (app de produção distribuído, variáveis
-  `IFOOD_CLIENT_ID`, `IFOOD_CLIENT_SECRET`, `IFOOD_APP_MODE=distributed`, `IFOOD_POLLING=on` no Easypanel, Deploy).
+- **Homologação no iFood (dono):** seguir `docs/ifood-homologacao.md`. O app de produção Gastrux foi criado em 01/11/2026; a
+  homologação roda no homolog com as credenciais de teste, e as de produção só saem depois da aprovação.
 - **Depois de aprovada, trocar os textos que dizem "ainda não há conexão com o iFood":** `components/marketing/faq-section.tsx`,
   `components/marketing/features-showcase.tsx`, `lib/marketing/segments.ts` (delivery), `lib/ai/knowledge/delivery.ts`, os
   artigos `site-de-delivery` e `ligar-ifood` de `lib/help/seed-articles.ts` (o texto antigo vai para LEGACY_DEFAULT_HASHES)

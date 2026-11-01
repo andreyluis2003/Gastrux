@@ -5,17 +5,24 @@ aceita uma tentativa a cada 4 horas. Cada etapa aceita até cinco prints.
 
 ## Antes de começar
 
-1. **App de produção:** no Portal do Desenvolvedor, em "Meus apps", crie o app de produção do tipo **distribuído**, na
-   categoria **PDV**. O app de teste não pode ser homologado.
-2. **Credenciais no Easypanel:** coloque as do app de produção nas variáveis do app:
+O iFood só libera as credenciais do app de produção **depois** da homologação, e os testes rodam com as credenciais de
+teste (conferido em 01/11/2026, na página "Critérios de homologação"). O app de produção **Gastrux** (distribuído, PDV,
+não listado) já existe. O aviso "abra um ticket" na página dele não vale para Pedidos e Eventos: esses dois usam o fluxo
+automático de Homologação > Nova homologação.
+
+1. **Credenciais de teste no homolog:** copie as do app "HELP FLOW LTDA - Teste (C)" para as variáveis do serviço
+   `homolog` no Easypanel:
    - `IFOOD_CLIENT_ID` e `IFOOD_CLIENT_SECRET`;
-   - `IFOOD_APP_MODE=distributed`;
+   - `IFOOD_APP_MODE=centralized`;
    - `IFOOD_POLLING=on`.
 
-   Depois, Deploy.
-3. **Ligar a loja de teste:** no Gastrux, em **Configurações > iFood**, clique em **Conectar iFood**. Digite
-   o código no Portal do Parceiro e cole de volta o código de autorização.
-4. **Conferir:** a tela do iFood no Gastrux deve mostrar **Conectada**, e a loja de teste deve aparecer aberta no iFood.
+   Depois, Deploy do homolog. Não coloque nada disso no `app` (produção) nesta fase.
+2. **Ligar a loja de teste:** no modo de teste quem liga é a equipe Gastrux, pela rota
+   `POST /api/admin/platform/ifood-link` com `restaurantId` e `merchantId` (o Merchant UUID da loja em Pedidos de teste).
+3. **Conferir:** a tela do iFood no homolog deve mostrar **Conectada**, e a loja de teste deve aparecer aberta no iFood.
+
+Depois da aprovação e da análise do iFood: as credenciais do app Gastrux vão para o serviço `app`, com
+`IFOOD_APP_MODE=distributed` e `IFOOD_POLLING=on`, e as de teste saem do homolog.
 
 ## Pedir a homologação
 
