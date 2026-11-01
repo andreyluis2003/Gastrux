@@ -40,7 +40,7 @@ export async function clientProfiles(restaurantIds: string[], now = new Date()):
   const [owners, members, menuItems, recipes, bills, bills30d, mp, fiscal, tickets] = await Promise.all([
     prisma.user.findMany({
       where: { id: { in: ownerIds } },
-      select: { id: true, name: true, email: true, lastSignInAt: true, businessStage: true, businessType: true, locationCount: true, mainPainPoint: true, leadQuality: true },
+      select: { id: true, name: true, email: true, whatsapp: true, whatsappMarketingConsentAt: true, lastSignInAt: true, businessStage: true, businessType: true, locationCount: true, mainPainPoint: true, leadQuality: true },
     }),
     prisma.restaurantUser.findMany({ where: { restaurantId: ids }, select: { restaurantId: true, user: { select: { lastSignInAt: true } } } }),
     prisma.menuItem.groupBy({ by: ['restaurantId'], where: { restaurantId: ids }, _count: { _all: true } }),
@@ -92,6 +92,7 @@ export async function clientProfiles(restaurantIds: string[], now = new Date()):
     const answers: ClientProfile['answers'] = [];
     const origin = originBy.get(r.id);
     if (origin) answers.push({ question: 'Origem do cadastro', answer: attributionLabel(origin) });
+    if (owner?.whatsapp) answers.push({ question: 'Aceita dicas por WhatsApp', answer: owner.whatsappMarketingConsentAt ? 'Sim' : 'Não' });
     if (owner?.businessStage) answers.push({ question: 'Situação do negócio', answer: ANSWER_LABELS.businessStage[owner.businessStage] ?? owner.businessStage });
     if (owner?.businessType) answers.push({ question: 'Tipo de negócio', answer: businessTypeLabel(owner.businessType) });
     if (owner?.locationCount) answers.push({ question: 'Unidades', answer: ANSWER_LABELS.locationCount[owner.locationCount] ?? owner.locationCount });
@@ -103,7 +104,8 @@ export async function clientProfiles(restaurantIds: string[], now = new Date()):
         ownerName: owner?.name ?? null,
         ownerEmail: owner?.email ?? null,
         restaurantEmail: r.email,
-        phone: r.phone,
+        // The number asked at sign-up is the owner's; the restaurant's phone only exists on older accounts
+        phone: owner?.whatsapp ?? r.phone,
         city: r.city,
         state: r.state,
         addressMissing: !r.address,

@@ -530,5 +530,5 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 
 ## Aceite de marketing no WhatsApp (2026-10-31)
 
-- Contas criadas antes do aceite ficam sem WhatsApp de marketing, a menos que o cliente escreva para o número oficial. Não há tela para aceitar depois do cadastro.
+- Contas criadas antes do aceite ficam sem WhatsApp de marketing, a menos que o cliente escreva para o número oficial. Quem não tinha número recebe um aviso ao entrar, com a caixa de aceite (2026-11-01). Quem já tinha número e não aceitou ainda não tem tela para aceitar depois.
 - O link "Parar as dicas" do e-mail para as dicas nos dois canais, mas não apaga a data do aceite; responder SAIR apaga.

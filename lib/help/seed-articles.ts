@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  'e02c0eb23e9c627aca08b3f38492c1b88e1f01b17c3b3fea3cf6b972a16ef4fc', // mensagens de ajuda (before the prompt for older accounts, 2026-11-01)
   '5f7688bd87cffa6bbd0f3b33eb0fd920ee8168865dedeac17079e136203b991c',
   'cabe0810c5f514493c0a63b71b47c30739d9c7fd960eea78b599d1338b2ee6a6', // indique-e-ganhe (before the Mercado Pago skip, 2026-10-29)
   '00ae95b1cbaec17ccfa675598c4511a75c6ef19b287ab2c4d2011d5ac34477c9', // como-criar-restaurante
@@ -205,7 +206,7 @@ Pro 50 perguntas por mês, Business 350 (no teste grátis, 350). O uso aparece e
 
 Durante o teste grátis, a **Equipe Gastrux** manda dicas por **e-mail** e, se você marcou o aceite no cadastro, por **WhatsApp**, conforme o que ainda falta no seu restaurante: cadastrar os produtos, abrir o caixa, fazer a primeira venda. Cada mensagem traz um próximo passo e o link da tela certa. São no máximo uma por dia, em horário comercial.
 
-O WhatsApp é pedido no cadastro para falarmos com você sobre a conta. As dicas por WhatsApp dependem do aceite, que é separado. Se responder a mensagem, quem lê é a nossa equipe.
+O WhatsApp é pedido no cadastro para falarmos com você sobre a conta. Quem criou a conta antes disso recebe um aviso ao entrar, uma vez, para informar o número. As dicas por WhatsApp dependem do aceite, que é separado. Se responder a mensagem, quem lê é a nossa equipe.
 
 ## Para parar
 

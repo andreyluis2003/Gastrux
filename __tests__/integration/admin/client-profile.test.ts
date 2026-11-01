@@ -72,6 +72,17 @@ describe('platform client management', () => {
     expect(b.alerts.map((x) => x.text)).toEqual(expect.arrayContaining(['Sem entrar há 12 dias', 'Parado no cadastro: sem cardápio']));
   });
 
+  it("shows the owner's WhatsApp from the sign-up and whether marketing was accepted", async () => {
+    await prisma.user.update({ where: { id: idleOwnerId }, data: { whatsapp: '5566999998888' } });
+    const p = (await clientProfiles([idle], now)).get(idle);
+    expect(p.contact.phone).toBe('5566999998888');
+    expect(p.answers).toContainEqual({ question: 'Aceita dicas por WhatsApp', answer: 'Não' });
+
+    await prisma.user.update({ where: { id: idleOwnerId }, data: { whatsappMarketingConsentAt: new Date() } });
+    expect((await clientProfiles([idle], now)).get(idle).answers).toContainEqual({ question: 'Aceita dicas por WhatsApp', answer: 'Sim' });
+    await prisma.user.update({ where: { id: idleOwnerId }, data: { whatsapp: null, whatsappMarketingConsentAt: null } });
+  });
+
   it('the funnel counts every live client', async () => {
     const f = await clientFunnel(now);
     expect(f.stageIds('SELLING')).toContain(busy);
