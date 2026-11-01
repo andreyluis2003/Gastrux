@@ -13,6 +13,7 @@ import { getToken } from 'next-auth/jwt';
 import { entryRedirect } from '@/lib/navigation/entry';
 import { LOCK_CODE, LOCK_MESSAGE } from '@/lib/billing/plan-lock-text';
 import { normalizeReferralCode, REFERRAL_COOKIE, REFERRAL_COOKIE_MAX_AGE } from '@/lib/referrals/code';
+import { ATTRIBUTION_COOKIE, ATTRIBUTION_COOKIE_MAX_AGE, attributionFromParams } from '@/lib/marketing/attribution';
 
 export const config = {
   matcher: [
@@ -186,6 +187,12 @@ export async function middleware(request: NextRequest) {
   // and signs up next week still gets the 45 days. Readable by the signup page, which shows who referred them.
   const ref = isApiRoute(pathname) ? null : normalizeReferralCode(request.nextUrl.searchParams.get('ref'));
   if (ref) response.cookies.set(REFERRAL_COOKIE, ref, { maxAge: REFERRAL_COOKIE_MAX_AGE, sameSite: 'lax', path: '/' });
+
+  // The latest ad or campaign link, for the origin of the sign-up (lib/marketing/attribution.ts)
+  const attribution = isApiRoute(pathname) ? null : attributionFromParams(request.nextUrl.searchParams);
+  if (attribution) {
+    response.cookies.set(ATTRIBUTION_COOKIE, JSON.stringify(attribution), { maxAge: ATTRIBUTION_COOKIE_MAX_AGE, sameSite: 'lax', httpOnly: true, path: '/' });
+  }
 
   // ============================================
   // PARTE 1: REGIONAL ROUTING

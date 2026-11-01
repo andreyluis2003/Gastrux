@@ -7,6 +7,8 @@ import { sendWelcomeIfDue } from '@/lib/onboarding/emails';
 import { attachReferral, findReferrer } from '@/lib/referrals/signup';
 import { REFERRAL_TRIAL_BONUS_DAYS } from '@/lib/referrals/rules';
 import { REFERRAL_COOKIE } from '@/lib/referrals/code';
+import { ATTRIBUTION_COOKIE } from '@/lib/marketing/attribution';
+import { saveSignupAttribution } from '@/lib/marketing/save-attribution';
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,6 +90,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (referrer) await attachReferral(restaurant.id, referrer);
+    await saveSignupAttribution(restaurant.id, req.cookies?.get?.(ATTRIBUTION_COOKIE)?.value);
 
     // Seed default categories for the new restaurant
     const defaultCategories = ['Carnes', 'Vegetais', 'Laticínios', 'Temperos', 'Bebidas', 'Outros'];

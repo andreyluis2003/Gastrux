@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { attributionLabel } from '@/lib/marketing/attribution';
 import { SEGMENTS } from '@/lib/marketing/segments';
 import { ANSWER_LABELS, clientAlerts, clientStage, type ClientAlert, type ClientSignals, type ClientStage } from './client-health';
 
@@ -32,6 +33,9 @@ export async function clientProfiles(restaurantIds: string[], now = new Date()):
     select: { id: true, ownerId: true, email: true, phone: true, address: true, city: true, state: true, status: true, subscriptionStatus: true, trialEndsAt: true, createdAt: true },
   });
   const ownerIds = restaurants.map((r) => r.ownerId).filter((x): x is string => !!x);
+
+  const origins = await prisma.signupAttribution.findMany({ where: { restaurantId: ids } });
+  const originBy = new Map(origins.map((o) => [o.restaurantId, o]));
 
   const [owners, members, menuItems, recipes, bills, bills30d, mp, fiscal, tickets] = await Promise.all([
     prisma.user.findMany({
@@ -86,6 +90,8 @@ export async function clientProfiles(restaurantIds: string[], now = new Date()):
     };
 
     const answers: ClientProfile['answers'] = [];
+    const origin = originBy.get(r.id);
+    if (origin) answers.push({ question: 'Origem do cadastro', answer: attributionLabel(origin) });
     if (owner?.businessStage) answers.push({ question: 'Situação do negócio', answer: ANSWER_LABELS.businessStage[owner.businessStage] ?? owner.businessStage });
     if (owner?.businessType) answers.push({ question: 'Tipo de negócio', answer: businessTypeLabel(owner.businessType) });
     if (owner?.locationCount) answers.push({ question: 'Unidades', answer: ANSWER_LABELS.locationCount[owner.locationCount] ?? owner.locationCount });

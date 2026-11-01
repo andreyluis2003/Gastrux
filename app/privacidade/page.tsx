@@ -102,7 +102,7 @@ export default function PrivacidadePage() {
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-slate-800">9. Cookies</h2>
-            <p className="text-gray-700 leading-relaxed">Utilizamos cookies essenciais para o funcionamento da sessão de autenticação e cookies de analytics (Google Analytics 4) para compreender o uso da Plataforma. Nas páginas públicas do site, também usamos o Pixel da Meta para medir nossos anúncios no Facebook e no Instagram. Os cookies de analytics e da Meta só são ativados se você aceitar no aviso de cookies; você pode mudar a escolha a qualquer momento pelo link &quot;Preferências de cookies&quot; no rodapé ou nas configurações do seu navegador.</p>
+            <p className="text-gray-700 leading-relaxed">Quando você chega por um link de campanha, guardamos por até 60 dias, em um cookie nosso, só as etiquetas desse link (origem, meio, campanha e anúncio), para saber qual campanha trouxe o seu cadastro. Esse cookie não é compartilhado com terceiros. Utilizamos cookies essenciais para o funcionamento da sessão de autenticação e cookies de analytics (Google Analytics 4) para compreender o uso da Plataforma. Nas páginas públicas do site, também usamos o Pixel da Meta para medir nossos anúncios no Facebook e no Instagram. Os cookies de analytics e da Meta só são ativados se você aceitar no aviso de cookies; você pode mudar a escolha a qualquer momento pelo link &quot;Preferências de cookies&quot; no rodapé ou nas configurações do seu navegador.</p>
           </section>
 
           <section className="space-y-3">

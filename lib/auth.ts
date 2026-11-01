@@ -11,6 +11,8 @@ import { refreshPlanClaim } from '@/lib/billing/plan-claim';
 import { attachReferral, findReferrer } from '@/lib/referrals/signup';
 import { REFERRAL_TRIAL_BONUS_DAYS } from '@/lib/referrals/rules';
 import { REFERRAL_COOKIE } from '@/lib/referrals/code';
+import { ATTRIBUTION_COOKIE } from '@/lib/marketing/attribution';
+import { saveSignupAttribution } from '@/lib/marketing/save-attribution';
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? process.env.NODE_ENV === 'production';
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
@@ -237,6 +239,7 @@ export const authOptions: NextAuthOptions = {
         // 15 extra days here too. Outside a request (no cookies) nothing happens.
         try {
           const { cookies } = await import('next/headers');
+          await saveSignupAttribution(restaurant.id, cookies().get(ATTRIBUTION_COOKIE)?.value);
           const referrer = await findReferrer(cookies().get(REFERRAL_COOKIE)?.value);
           if (referrer) {
             const ends = new Date(trialEnd().getTime() + REFERRAL_TRIAL_BONUS_DAYS * 86_400_000);

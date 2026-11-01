@@ -2893,6 +2893,7 @@ model Notification {
 }
 
 model Restaurant {
+  signupAttribution       SignupAttribution?
   id                      String                    @id @default(cuid())
   agentActions            AgentAction[]
   name                    String
@@ -5021,4 +5022,17 @@ model AgentWhatsAppMessage {
 enum AgentMessageDirection {
   IN
   OUT
+}
+
+/// The link a new account came from (UTM kept in a first-party cookie), see lib/marketing/attribution.ts
+model SignupAttribution {
+  restaurantId String     @id
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  source       String
+  medium       String?
+  campaign     String?
+  content      String?
+  createdAt    DateTime   @default(now())
+
+  @@map("signup_attributions")
 }
