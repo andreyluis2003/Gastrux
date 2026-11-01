@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { ClientProfilePanel, type ClientAgentAction, type ClientNote } from '@/components/admin/client-profile-panel';
 import type { ClientProfile } from '@/lib/admin/client-profile';
+import type { BillingProfileData } from '@/lib/billing/billing-profile';
 import {
   ArrowLeft,
   Building2,
@@ -67,6 +68,7 @@ interface UserRow {
 
 interface CustomerDetail {
   profile: ClientProfile | null;
+  billingProfile?: BillingProfileData | null;
   notes: ClientNote[];
   agentActions?: ClientAgentAction[];
   restaurant: {
@@ -261,7 +263,7 @@ export default function CustomerDetailPage() {
       </div>
 
       {detail.profile && (
-        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} agentActions={detail.agentActions || []} onChange={fetchDetail} />
+        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} agentActions={detail.agentActions || []} billingProfile={detail.billingProfile} onChange={fetchDetail} />
       )}
 
       {/* Summary cards */}

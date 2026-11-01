@@ -8,6 +8,7 @@ Minha assinatura: no rodapé do menu lateral, abaixo de "Enviar sugestão" (só 
 - Business (R$ 199 por mês ou R$ 2.189 por ano): tudo do Pro, mais pagamento na mesa pelo celular, controle de validades com aviso, indicadores das contas de consumo, contas a pagar com avisos, repetição automática e boletos da nota de compra, aviso de diferença na contagem do dia, cashback e campanhas, relatórios avançados e até 2 lojas; 3.500 vendas por mês, 5 usuários, 5 estações de cozinha, 350 perguntas à IA por mês.
 - Enterprise: sob consulta; vendas, lojas, usuários e estações de cozinha ilimitados.
 - Plano anual: 11 meses pelo preço de 12.
+- Dados da nota fiscal: ao assinar, o dono informa CPF ou CNPJ, nome ou razão social e endereço, antes do pagamento. Para corrigir: tela Cobrança e assinatura.
 - Passar do limite de vendas não bloqueia nenhuma venda; o Gastrux avisa para mudar de plano.
 - "Análise detalhada" da IA a partir do Pro. Uso em Configurações > Uso da IA.
 - Cancelar: Minha assinatura > Gerenciar assinatura > Cancelar assinatura. O plano segue até o fim do período pago; depois a conta fica só para consulta.

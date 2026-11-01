@@ -14,6 +14,8 @@ import { useRouter } from 'next/navigation';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 import { FAQSection } from '@/components/marketing/faq-section';
 import { GatewayChoiceDialog } from '@/components/billing/gateway-choice-dialog';
+import { BillingProfileForm } from '@/components/billing/billing-profile-form';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ClarityScript } from '@/components/analytics/clarity-script';
 
@@ -91,6 +93,7 @@ export default function PricingPage() {
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [gatewayDialogTier, setGatewayDialogTier] = useState<{ id: string; name: string } | null>(null);
+  const [profileDialogTier, setProfileDialogTier] = useState<{ id: string; name: string } | null>(null);
 
   // Enterprise is consultation-only - not a self-serve card on this page.
   const tiers = Object.values(STRIPE_PRICING_TIERS).filter((t: any) => t.id !== 'enterprise');
@@ -139,6 +142,18 @@ export default function PricingPage() {
       router.push('/auth/signup?redirect=/pricing');
       return;
     }
+
+    // The invoice details come first; anyone who is not the owner gets 403 and the checkout's own message
+    const profile = await fetch('/api/billing/profile').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (profile && !profile.profile) {
+      setProfileDialogTier(tier);
+      return;
+    }
+    await continueToPayment(tier);
+  };
+
+  const continueToPayment = async (tier: { id: string; name: string }) => {
+    const tierId = tier.id;
 
     if (mercadoPagoEnabled) {
       setGatewayDialogTier(tier);
@@ -482,6 +497,23 @@ export default function PricingPage() {
       </section>
 
       <SiteFooter />
+
+        <Dialog open={!!profileDialogTier} onOpenChange={(open) => { if (!open) setProfileDialogTier(null); }}>
+          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Dados para a nota fiscal</DialogTitle>
+              <DialogDescription>A nota da sua assinatura sai nestes dados. Dá para corrigir depois em Cobrança e assinatura.</DialogDescription>
+            </DialogHeader>
+            <BillingProfileForm
+              submitLabel="Continuar para o pagamento"
+              onSaved={() => {
+                const tier = profileDialogTier;
+                setProfileDialogTier(null);
+                if (tier) continueToPayment(tier);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
 
       {gatewayDialogTier && (
         <GatewayChoiceDialog

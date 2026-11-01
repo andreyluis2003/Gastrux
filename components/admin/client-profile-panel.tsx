@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { AlertTriangle, Bot, Mail, MessageCircle, NotebookPen, Phone, Trash2, User } from 'lucide-react';
 import { STAGES, whatsappLink } from '@/lib/admin/client-health';
 import type { ClientProfile } from '@/lib/admin/client-profile';
+import { formatDocument, type BillingProfileData } from '@/lib/billing/billing-profile';
 import { TRIGGER_LABELS, type ActivationTrigger } from '@/lib/agents/activation/rules';
 
 export interface ClientNote { id: string; authorEmail: string; text: string; createdAt: string }
@@ -19,9 +20,10 @@ const STATUS_LABELS = { DRAFT: 'Na fila', SENT: 'Enviada', DISCARDED: 'Descartad
  * The client's file for the Gastrux team (2026-10-07): who to talk to, what they said at sign-up,
  * how far they got, what is wrong, and the team's own notes.
  */
-export function ClientProfilePanel({ restaurantId, profile, notes, agentActions = [], onChange }: {
+export function ClientProfilePanel({ restaurantId, profile, notes, agentActions = [], billingProfile, onChange }: {
   restaurantId: string;
   profile: ClientProfile;
+  billingProfile?: BillingProfileData | null;
   notes: ClientNote[];
   agentActions?: ClientAgentAction[];
   onChange: () => void;
@@ -109,6 +111,7 @@ export function ClientProfilePanel({ restaurantId, profile, notes, agentActions 
             {c.restaurantEmail && c.restaurantEmail !== c.ownerEmail && <p className="text-muted-foreground">Restaurante: {c.restaurantEmail}</p>}
             <p className="text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {c.phone || 'Sem telefone cadastrado'}</p>
             {c.addressMissing && <p className="text-amber-700 text-xs">Endereço ainda não preenchido</p>}
+            {billingProfile && <p className="text-muted-foreground">Nota fiscal: {billingProfile.name} · {formatDocument(billingProfile.document)} · {billingProfile.street}, {billingProfile.number}{billingProfile.complement ? ` (${billingProfile.complement})` : ''}, {billingProfile.neighborhood}, {billingProfile.city}/{billingProfile.state}, CEP {billingProfile.zipCode}</p>}
             <div className="flex gap-2 pt-2">
               {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="outline" className="gap-1"><MessageCircle className="h-4 w-4" /> WhatsApp</Button></a>}
               {mail && <a href={`mailto:${mail}`}><Button size="sm" variant="outline" className="gap-1"><Mail className="h-4 w-4" /> E-mail</Button></a>}

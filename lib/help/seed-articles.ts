@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '9aff1d4e659539078a7b7c3facabe87f6f354309432f03413f84fbea74a9d095', // baixar-fatura (before the invoice details, 2026-11-01)
   'e02c0eb23e9c627aca08b3f38492c1b88e1f01b17c3b3fea3cf6b972a16ef4fc', // mensagens de ajuda (before the prompt for older accounts, 2026-11-01)
   '5f7688bd87cffa6bbd0f3b33eb0fd920ee8168865dedeac17079e136203b991c',
   'cabe0810c5f514493c0a63b71b47c30739d9c7fd960eea78b599d1338b2ee6a6', // indique-e-ganhe (before the Mercado Pago skip, 2026-10-29)
@@ -960,7 +961,11 @@ Nada mais é cobrado. O plano continua até o fim do período já pago. Depois, 
 2. Clique em **Gerenciar assinatura**
 3. Em **Faturas emitidas**, clique em **PDF** na fatura que precisar
 
-Logo abaixo fica o **Histórico de pagamentos**. Dúvida sobre uma cobrança: abra um ticket em Suporte.`,
+Logo abaixo fica o **Histórico de pagamentos**. Dúvida sobre uma cobrança: abra um ticket em Suporte.
+
+## Dados para a nota fiscal
+
+Ao assinar, informe CPF ou CNPJ, nome ou razão social e endereço. A nota da assinatura sai nesses dados. Para corrigir, vá em **Cobrança e assinatura**.`,
   },
   {
     categorySlug: 'financeiro',

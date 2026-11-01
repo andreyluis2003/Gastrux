@@ -6,11 +6,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { BillingProfileForm } from '@/components/billing/billing-profile-form'
 import { Download, Loader2, Receipt, CreditCard, Calendar, TrendingUp, CheckCircle2 } from 'lucide-react'
 
 function formatMoney(value: any, currency = 'BRL') {
   const n = typeof value === 'string' ? parseFloat(value) : Number(value || 0)
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(n)
+}
+
+/** Hidden from staff: the form stays empty when the API answers 403 */
+function InvoiceDetails() {
+  const [owner, setOwner] = useState(false)
+  useEffect(() => {
+    fetch('/api/billing/profile').then((r) => setOwner(r.ok)).catch(() => {})
+  }, [])
+  if (!owner) return null
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>Dados para a nota fiscal</CardTitle>
+      </CardHeader>
+      <CardContent className="max-w-md">
+        <BillingProfileForm submitLabel="Salvar dados" />
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function CobrancaPage() {
@@ -88,6 +108,8 @@ export default function CobrancaPage() {
           <h1 className="text-3xl font-bold text-gray-900">Cobrança e assinatura</h1>
           <p className="text-gray-600 mt-1">Gerencie seu plano, faturas e histórico de pagamentos.</p>
         </div>
+
+        <InvoiceDetails />
 
         <Card className="mb-6">
           <CardHeader>

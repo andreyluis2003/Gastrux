@@ -207,6 +207,7 @@ describe('PDV and billing screens', () => {
     });
 
     it('only the owner subscribes, and the subscription belongs to the restaurant being worked in', async () => {
+      await prisma.billingProfile.create({ data: { restaurantId: A.restaurantId, document: '52998224725', name: 'Dono', zipCode: '78550000', street: 'Rua A', number: '1', neighborhood: 'Centro', city: 'Sinop', state: 'MT' } });
       (createPreApproval as jest.Mock).mockResolvedValue({ id: `pre-${tag}-1`, init_point: 'https://mp.test/checkout' });
 
       as(manager.id, A.restaurantId);

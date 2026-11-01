@@ -58,6 +58,10 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
+    // The accountant needs these on the invoice, so they come before the payment
+    if (!(await prisma.billingProfile.findUnique({ where: { restaurantId: member.restaurantId }, select: { restaurantId: true } }))) {
+      return NextResponse.json({ error: 'Preencha os dados da nota fiscal antes de assinar.', code: 'BILLING_PROFILE_REQUIRED' }, { status: 400 });
+    }
     // One free trial per owner: cancel-and-subscribe-again must not restart it
     const hadTrial = (await prisma.subscription.count({
       where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },

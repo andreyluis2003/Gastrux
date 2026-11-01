@@ -536,3 +536,8 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 ## Número do WhatsApp sem verificação (2026-11-01)
 
 - O número do dono é digitado no cadastro e no aviso de contas antigas, sem código de confirmação, e pode repetir entre contas (mesmo dono com dois restaurantes). Um número digitado errado pode receber dicas até a pessoa responder SAIR, e a conversa fica ligada à primeira conta encontrada com aquele número. SAIR para todas as contas do número. Avaliar confirmação por código quando o volume crescer.
+
+## Dados da nota fiscal na assinatura (2026-11-01)
+
+- O dono preenche CPF/CNPJ, nome e endereço antes de pagar; ficam em `billing_profiles`, um por restaurante, e aparecem na ficha do cliente. A nota ainda é emitida à mão: a emissão automática espera as respostas da contadora.
+- Quem já assinou antes disso não tem esses dados e não é avisado; hoje isso não afeta ninguém, mas conferir antes da primeira nota.

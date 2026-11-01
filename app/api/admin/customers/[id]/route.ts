@@ -19,7 +19,7 @@ export async function GET(
     const details = await getCustomerDetails(params.id);
     if (!details) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
     // Profile and notes always fresh (the details above are cached for a short while)
-    const [profiles, notes, agentActions] = await Promise.all([
+    const [profiles, notes, agentActions, billingProfile] = await Promise.all([
       clientProfiles([params.id]),
       prisma.platformClientNote.findMany({ where: { restaurantId: params.id }, orderBy: { createdAt: 'desc' }, take: 100 }),
       // What the activation agent drafted, sent or flagged for this client (spec 2026-10-27)
@@ -29,9 +29,10 @@ export async function GET(
         take: 30,
         select: { id: true, trigger: true, channel: true, status: true, createdAt: true, sentAt: true, decidedBy: true },
       }),
+      prisma.billingProfile.findUnique({ where: { restaurantId: params.id } }),
     ]);
     return NextResponse.json(
-      { ...details, profile: profiles.get(params.id) ?? null, notes, agentActions },
+      { ...details, profile: profiles.get(params.id) ?? null, notes, agentActions, billingProfile },
       { headers: { 'Cache-Control': 'private, no-store' } },
     );
   } catch (err: any) {
