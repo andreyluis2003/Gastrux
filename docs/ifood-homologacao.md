@@ -33,7 +33,7 @@ No Portal do Desenvolvedor: **Homologação > Nova homologação**.
 
 ## As cinco etapas (e os prints)
 
-**Faça tudo em seguida.** Na tentativa de 01/11/2026, os pedidos de teste ainda não usados passaram sozinhos para Entregue cerca de 30 minutos depois de gerados, e o pedido indicado na etapa 4 não pôde mais ser despachado (causa provável: conclusão automática do iFood, não confirmada). Deixe cadastrados, antes de gerar os pedidos, os produtos "PRODUTO 1 - NÃO ENTREGAR - Primeiro Nível" e "PRODUTO 2 (COMBO) - NÃO ENTREGAR - Primeiro Nível": sem eles o pedido é confirmado e não vai para a cozinha.
+**Faça tudo em seguida.** O iFood conclui sozinho os pedidos de envio imediato (confirmado em 01/11/2026: o pedido virou Entregue com o evento de conclusão, e na primeira tentativa o pedido da etapa 4 foi concluído antes do despacho, cerca de 30 minutos depois de gerado). Na etapa final, não marque Entregue à mão: o status chega sozinho. Antes de gerar os pedidos, deixe cadastrados os produtos "PRODUTO 1 - NÃO ENTREGAR - Primeiro Nível" e "PRODUTO 2 (COMBO) - NÃO ENTREGAR - Primeiro Nível": sem eles o Gastrux não confirma o pedido sozinho.
 
 1. **Conexão:** clique em "Testar conexão".
    - Print: a tela do iFood no Gastrux com "Conectada".
