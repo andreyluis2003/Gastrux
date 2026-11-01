@@ -10,15 +10,13 @@ teste (conferido em 01/11/2026, na página "Critérios de homologação"). O app
 não listado) já existe. O aviso "abra um ticket" na página dele não vale para Pedidos e Eventos: esses dois usam o fluxo
 automático de Homologação > Nova homologação.
 
-1. **Credenciais de teste no homolog:** copie as do app "HELP FLOW LTDA - Teste (C)" para as variáveis do serviço
-   `homolog` no Easypanel:
+1. **Credenciais de teste no homolog:** o Testar conexão exige o app **distribuído** de teste (erro de 01/11/2026 com o Teste (C): "Esperado: client containing help-flow-ltda-teste-d"). Copie as do app "HELP FLOW LTDA - Teste (D)" para as variáveis do serviço `homolog` no Easypanel:
    - `IFOOD_CLIENT_ID` e `IFOOD_CLIENT_SECRET`;
-   - `IFOOD_APP_MODE=centralized`;
+   - `IFOOD_APP_MODE=distributed`;
    - `IFOOD_POLLING=on`.
 
    Depois, Deploy do homolog. Não coloque nada disso no `app` (produção) nesta fase.
-2. **Ligar a loja de teste:** no modo de teste quem liga é a equipe Gastrux, pela rota
-   `POST /api/admin/platform/ifood-link` com `restaurantId` e `merchantId` (o Merchant UUID da loja em Pedidos de teste).
+2. **Ligar a loja de teste:** em Configurações > iFood, clique em Conectar iFood, digite o código no Portal do Parceiro e cole de volta o código de autorização.
 3. **Conferir:** a tela do iFood no homolog deve mostrar **Conectada**, e a loja de teste deve aparecer aberta no iFood.
 
 Depois da aprovação e da análise do iFood: as credenciais do app Gastrux vão para o serviço `app`, com
