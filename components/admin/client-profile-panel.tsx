@@ -20,10 +20,11 @@ const STATUS_LABELS = { DRAFT: 'Na fila', SENT: 'Enviada', DISCARDED: 'Descartad
  * The client's file for the Gastrux team (2026-10-07): who to talk to, what they said at sign-up,
  * how far they got, what is wrong, and the team's own notes.
  */
-export function ClientProfilePanel({ restaurantId, profile, notes, agentActions = [], billingProfile, onChange }: {
+export function ClientProfilePanel({ restaurantId, profile, notes, agentActions = [], billingProfile, termsAcceptance, onChange }: {
   restaurantId: string;
   profile: ClientProfile;
   billingProfile?: BillingProfileData | null;
+  termsAcceptance?: { termsVersion: string; tier: string; billingCycle: string; createdAt: string } | null;
   notes: ClientNote[];
   agentActions?: ClientAgentAction[];
   onChange: () => void;
@@ -112,6 +113,7 @@ export function ClientProfilePanel({ restaurantId, profile, notes, agentActions 
             <p className="text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {c.phone || 'Sem telefone cadastrado'}</p>
             {c.addressMissing && <p className="text-amber-700 text-xs">Endereço ainda não preenchido</p>}
             {billingProfile && <p className="text-muted-foreground">Nota fiscal: {billingProfile.name} · {formatDocument(billingProfile.document)} · {billingProfile.street}, {billingProfile.number}{billingProfile.complement ? ` (${billingProfile.complement})` : ''}, {billingProfile.neighborhood}, {billingProfile.city}/{billingProfile.state}, CEP {billingProfile.zipCode}</p>}
+            {termsAcceptance && <p className="text-muted-foreground">Termos aceitos em {new Date(termsAcceptance.createdAt).toLocaleString('pt-BR')} (versão {termsAcceptance.termsVersion}, plano {termsAcceptance.tier}, {termsAcceptance.billingCycle === 'annual' ? 'anual' : 'mensal'})</p>}
             <div className="flex gap-2 pt-2">
               {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="outline" className="gap-1"><MessageCircle className="h-4 w-4" /> WhatsApp</Button></a>}
               {mail && <a href={`mailto:${mail}`}><Button size="sm" variant="outline" className="gap-1"><Mail className="h-4 w-4" /> E-mail</Button></a>}

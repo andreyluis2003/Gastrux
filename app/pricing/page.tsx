@@ -111,29 +111,6 @@ export default function PricingPage() {
       });
   }, []);
 
-  const startStripeCheckout = async (tierId: string) => {
-    setLoading(tierId);
-    try {
-      const response = await fetch('/api/billing/checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tierId, billing }),
-      });
-
-      const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast.error(data.error || 'Erro ao criar sessão de checkout');
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error('Erro ao processar checkout');
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const handleUpgrade = async (tier: { id: string; name: string }) => {
     const tierId = tier.id;
 
@@ -153,19 +130,13 @@ export default function PricingPage() {
   };
 
   const continueToPayment = async (tier: { id: string; name: string }) => {
-    const tierId = tier.id;
-
-    if (mercadoPagoEnabled) {
-      setGatewayDialogTier(tier);
-      return;
-    }
-
-    if (!stripeEnabled) {
+    if (!mercadoPagoEnabled && !stripeEnabled) {
       toast.error('A assinatura online está indisponível no momento. Fale com a gente: contato@gastrux.com');
       return;
     }
 
-    await startStripeCheckout(tierId);
+    // The Terms are accepted in this dialog, whichever gateway is on
+    setGatewayDialogTier(tier);
   };
 
   const annualSavings = (tier: any) => {

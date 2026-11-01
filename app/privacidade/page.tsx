@@ -33,6 +33,7 @@ export default function PrivacidadePage() {
               <li><strong>Dados do restaurante:</strong> nome, CNPJ, endereço, telefone, horário de funcionamento</li>
               <li><strong>Dados de uso:</strong> registros de acesso, ações realizadas, preferências</li>
               <li><strong>Dados para a nota fiscal:</strong> CPF ou CNPJ, nome ou razão social e endereço, informados ao assinar, usados para emitir a nota fiscal da assinatura e cumprir obrigações fiscais</li>
+              <li><strong>Registro do aceite dos Termos:</strong> data, IP, navegador, plano e versão dos Termos, guardados ao assinar como prova do aceite, inclusive depois do encerramento da conta, enquanto necessário para cumprir obrigações legais ou defender direitos</li>
               <li><strong>Dados de pagamento:</strong> processados pelo Stripe (não armazenamos dados de cartão)</li>
               <li><strong>Dados de clientes do restaurante:</strong> nome, telefone, e-mail, histórico de pedidos (inseridos por você)</li>
               <li><strong>Cookies e tecnologias similares:</strong> para analytics (Google Analytics 4), medição de anúncios (Pixel da Meta) e funcionamento da sessão</li>

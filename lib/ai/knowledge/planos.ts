@@ -9,6 +9,7 @@ Minha assinatura: no rodapé do menu lateral, abaixo de "Enviar sugestão" (só 
 - Enterprise: sob consulta; vendas, lojas, usuários e estações de cozinha ilimitados.
 - Plano anual: 11 meses pelo preço de 12.
 - Dados da nota fiscal: ao assinar, o dono informa CPF ou CNPJ, nome ou razão social e endereço, antes do pagamento. Para corrigir: tela Cobrança e assinatura.
+- Aceite: para assinar, o dono marca que leu os Termos de Uso na janela de pagamento. Não há contrato separado.
 - Passar do limite de vendas não bloqueia nenhuma venda; o Gastrux avisa para mudar de plano.
 - "Análise detalhada" da IA a partir do Pro. Uso em Configurações > Uso da IA.
 - Cancelar: Minha assinatura > Gerenciar assinatura > Cancelar assinatura. O plano segue até o fim do período pago; depois a conta fica só para consulta.

@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { remainingTrialDays } from '@/lib/billing/plan-access';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { findPayingSubscription } from '@/lib/billing/cancel';
+import { recordSubscriptionAcceptance } from '@/lib/billing/subscription-acceptance';
 import { getTierById } from '@/lib/stripe-config';
 import { createPreApproval, getMPAutoRecurringForBillingCycle } from '@/lib/mercado-pago';
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    const { tierId, billing } = await request.json();
+    const { tierId, billing, acceptedTerms } = await request.json();
     if (!tierId) {
       return NextResponse.json({ error: 'Escolha um plano' }, { status: 400 });
     }
@@ -62,6 +63,9 @@ export async function POST(request: NextRequest) {
     if (!(await prisma.billingProfile.findUnique({ where: { restaurantId: member.restaurantId }, select: { restaurantId: true } }))) {
       return NextResponse.json({ error: 'Preencha os dados da nota fiscal antes de assinar.', code: 'BILLING_PROFILE_REQUIRED' }, { status: 400 });
     }
+    if (acceptedTerms !== true) {
+      return NextResponse.json({ error: 'Aceite os Termos de Uso para assinar.', code: 'TERMS_REQUIRED' }, { status: 400 });
+    }
     // One free trial per owner: cancel-and-subscribe-again must not restart it
     const hadTrial = (await prisma.subscription.count({
       where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },
@@ -82,6 +86,7 @@ export async function POST(request: NextRequest) {
 
     const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'https://gastrux.com';
     const billingCycle: 'monthly' | 'annual' = isAnnual ? 'annual' : 'monthly';
+    await recordSubscriptionAcceptance(request, { userId: user.id, restaurantId: member.restaurantId, tier: tier.id, billingCycle, amount, gateway: 'MERCADO_PAGO' });
 
     const subscription = await prisma.subscription.create({
       data: {

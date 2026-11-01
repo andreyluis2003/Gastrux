@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { CreditCard, Wallet, ArrowRight } from 'lucide-react';
 import {
@@ -28,7 +29,7 @@ async function startCheckout(endpoint: string, tierId: string, billing: string) 
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tierId, billing }),
+    body: JSON.stringify({ tierId, billing, acceptedTerms: true }),
   });
   const data = await response.json();
   if (!response.ok || !data.url) {
@@ -47,6 +48,8 @@ export function GatewayChoiceDialog({
   stripeEnabled,
 }: GatewayChoiceDialogProps) {
   const [loading, setLoading] = useState<'stripe' | 'mercadopago' | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const blocked = loading !== null || !accepted;
 
   const handleChoice = async (gateway: 'stripe' | 'mercadopago') => {
     setLoading(gateway);
@@ -72,12 +75,20 @@ export function GatewayChoiceDialog({
             Escolha a forma de pagamento para continuar.
           </DialogDescription>
         </DialogHeader>
+        <label className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+          <input type="checkbox" className="mt-0.5 h-4 w-4" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+          <span>
+            Li e aceito os{' '}
+            <Link href="/termos" target="_blank" className="text-brand-green hover:underline">Termos de Uso</Link>
+            {' '}para assinar o plano {tierName} ({billing === 'annual' ? 'anual' : 'mensal'}).
+          </span>
+        </label>
         <div className="space-y-3 mt-2">
           {mercadoPagoEnabled && (
             <button
               type="button"
               onClick={() => handleChoice('mercadopago')}
-              disabled={loading !== null}
+              disabled={blocked}
               className={cn(
                 'w-full flex items-center gap-4 p-4 rounded-xl border-2 border-primary bg-primary/5 dark:bg-brand-ink text-left transition hover:bg-primary/10 dark:hover:bg-brand-ink disabled:opacity-60'
               )}
@@ -102,7 +113,7 @@ export function GatewayChoiceDialog({
           <button
             type="button"
             onClick={() => handleChoice('stripe')}
-            disabled={loading !== null}
+            disabled={blocked}
             className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
           >
             <CreditCard className="w-6 h-6 text-slate-500 flex-shrink-0" />

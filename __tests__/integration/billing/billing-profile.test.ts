@@ -20,7 +20,7 @@ const tag = crypto.randomBytes(4).toString('hex');
 const details = { document: '529.982.247-25', name: 'Maria Dona', zipCode: '78550-000', street: 'Rua A', number: '10', neighborhood: 'Centro', city: 'Sinop', state: 'MT' };
 const json = (url: string, method: string, body: any) => new NextRequest(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const save = (body: any) => PUT(json('http://x/api/billing/profile', 'PUT', body));
-const plan = { tierId: 'business', billing: 'monthly' };
+const plan = { tierId: 'business', billing: 'monthly', acceptedTerms: true };
 
 describe('invoice details before subscribing', () => {
   let owner, cook, restaurant;
@@ -74,9 +74,26 @@ describe('invoice details before subscribing', () => {
     expect((await (await GET()).json()).profile).toMatchObject({ document: '11222333000181', name: 'Maria Dona Ltda' });
   });
 
-  it('with the details saved, the gate lets the checkout through', async () => {
+  it('with the details saved, the Terms are still required', async () => {
     as(owner);
-    const res = await mpCheckout(json('http://x/checkout', 'POST', plan));
+    for (const route of [mpCheckout, stripeCheckout]) {
+      const res = await route(json('http://x/checkout', 'POST', { ...plan, acceptedTerms: undefined }));
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe('TERMS_REQUIRED');
+    }
+    expect(await prisma.subscriptionAcceptance.count({ where: { restaurantId: restaurant.id } })).toBe(0);
+  });
+
+  it('the accepted Terms pass and leave proof with version, plan, IP and browser', async () => {
+    as(owner);
+    const res = await mpCheckout(new NextRequest('http://x/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.9, 10.0.0.1', 'user-agent': 'Teste' },
+      body: JSON.stringify(plan),
+    }));
     expect((await res.json()).code).toBeUndefined();
+    const proof = await prisma.subscriptionAcceptance.findFirst({ where: { restaurantId: restaurant.id } });
+    expect(proof).toMatchObject({ userId: owner.id, tier: 'business', billingCycle: 'monthly', gateway: 'MERCADO_PAGO', termsVersion: '2026-10-18', ip: '203.0.113.9', userAgent: 'Teste' });
+    await prisma.subscriptionAcceptance.deleteMany({ where: { restaurantId: restaurant.id } });
   });
 });

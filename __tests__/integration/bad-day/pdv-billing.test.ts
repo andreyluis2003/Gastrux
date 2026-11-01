@@ -193,7 +193,7 @@ describe('PDV and billing screens', () => {
   describe('billing', () => {
     const tierOf = async (restaurantId: string) =>
       (await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { subscriptionTier: true } })).subscriptionTier;
-    const checkout = () => mpCheckout(req('http://localhost/api/billing/mp/checkout-session', 'POST', { tierId: 'business', billing: 'monthly' }));
+    const checkout = () => mpCheckout(req('http://localhost/api/billing/mp/checkout-session', 'POST', { tierId: 'business', billing: 'monthly', acceptedTerms: true }));
     const mpEvent = (sub: any, status: any, extra: any = {}) =>
       upsertSubscriptionFromGatewayEvent({
         gateway: 'MERCADO_PAGO', gatewaySubscriptionId: sub.gatewaySubscriptionId, userId: sub.userId, restaurantId: sub.restaurantId,

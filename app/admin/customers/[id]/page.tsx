@@ -69,6 +69,7 @@ interface UserRow {
 interface CustomerDetail {
   profile: ClientProfile | null;
   billingProfile?: BillingProfileData | null;
+  termsAcceptance?: { termsVersion: string; tier: string; billingCycle: string; createdAt: string } | null;
   notes: ClientNote[];
   agentActions?: ClientAgentAction[];
   restaurant: {
@@ -263,7 +264,7 @@ export default function CustomerDetailPage() {
       </div>
 
       {detail.profile && (
-        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} agentActions={detail.agentActions || []} billingProfile={detail.billingProfile} onChange={fetchDetail} />
+        <ClientProfilePanel restaurantId={restaurant.id} profile={detail.profile} notes={detail.notes || []} agentActions={detail.agentActions || []} billingProfile={detail.billingProfile} termsAcceptance={detail.termsAcceptance} onChange={fetchDetail} />
       )}
 
       {/* Summary cards */}

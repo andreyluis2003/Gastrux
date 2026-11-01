@@ -5057,3 +5057,21 @@ model BillingProfile {
 
   @@map("billing_profiles")
 }
+
+/// Proof of the Terms accepted when subscribing, see lib/billing/subscription-acceptance.ts
+model SubscriptionAcceptance {
+  id           String   @id @default(cuid())
+  userId       String
+  restaurantId String
+  tier         String
+  billingCycle String
+  amount       Decimal  @db.Decimal(10, 2)
+  gateway      String
+  termsVersion String
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@map("subscription_acceptances")
+}

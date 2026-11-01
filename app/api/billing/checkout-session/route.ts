@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { remainingTrialDays } from '@/lib/billing/plan-access';
 import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { findPayingSubscription } from '@/lib/billing/cancel';
+import { recordSubscriptionAcceptance } from '@/lib/billing/subscription-acceptance';
 import { STRIPE_PRICING_TIERS } from '@/lib/stripe-config';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     }
 
-    const { tierId, billing } = await request.json();
+    const { tierId, billing, acceptedTerms } = await request.json();
     if (!tierId) {
       return NextResponse.json({ error: 'Escolha um plano' }, { status: 400 });
     }
@@ -70,6 +71,9 @@ export async function POST(request: NextRequest) {
     if (!(await prisma.billingProfile.findUnique({ where: { restaurantId: member.restaurantId }, select: { restaurantId: true } }))) {
       return NextResponse.json({ error: 'Preencha os dados da nota fiscal antes de assinar.', code: 'BILLING_PROFILE_REQUIRED' }, { status: 400 });
     }
+    if (acceptedTerms !== true) {
+      return NextResponse.json({ error: 'Aceite os Termos de Uso para assinar.', code: 'TERMS_REQUIRED' }, { status: 400 });
+    }
     // One free trial per owner: cancel-and-subscribe-again must not restart it
     const hadTrial = (await prisma.subscription.count({
       where: { userId: member.userId, trialStart: { not: null }, status: { not: 'incomplete' } },
@@ -99,6 +103,11 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    await recordSubscriptionAcceptance(request, {
+      userId: user.id, restaurantId: member.restaurantId, tier: tier.id, billingCycle: isAnnual ? 'annual' : 'monthly',
+      amount: isAnnual ? tier.priceAnnual : tier.priceMonthly, gateway: 'STRIPE',
+    });
 
     let stripeCustomerId = user.stripeCustomerId;
     const stripe = getStripe();

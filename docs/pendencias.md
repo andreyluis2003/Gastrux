@@ -541,3 +541,4 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 
 - O dono preenche CPF/CNPJ, nome e endereço antes de pagar; ficam em `billing_profiles`, um por restaurante, e aparecem na ficha do cliente. A nota ainda é emitida à mão: a emissão automática espera as respostas da contadora.
 - Quem já assinou antes disso não tem esses dados e não é avisado; hoje isso não afeta ninguém, mas conferir antes da primeira nota.
+- Aceite dos Termos ao assinar fica em `subscription_acceptances`, sem ligação com a conta, para sobreviver à exclusão. Ao mudar os Termos, trocar `TERMS_VERSION` junto com a data de `app/termos/page.tsx`.
