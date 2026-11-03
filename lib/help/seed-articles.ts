@@ -14,6 +14,8 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '28c9803ba55e00cc782640f747f4123f7ebfa8301b5ae69d0b91bbefd49928fb', // atalhos-balcao (before the order bell and the keys on the buttons, 2026-11-03)
+  'd06954d932d0404946d8024f6cdafc6cef7e42496f3a27ab456b47798ed07621', // site-de-delivery (before the order bell and the keys on the buttons, 2026-11-03)
   'b638253c63169f3958f8f16ebd73add8f381cba540e9da39d4050e57888599ad', // ligar-ifood (before unknown products stopped being confirmed, 2026-11-01)
   '9aff1d4e659539078a7b7c3facabe87f6f354309432f03413f84fbea74a9d095', // baixar-fatura (before the invoice details, 2026-11-01)
   'e02c0eb23e9c627aca08b3f38492c1b88e1f01b17c3b3fea3cf6b972a16ef4fc', // mensagens de ajuda (before the prompt for older accounts, 2026-11-01)
@@ -386,7 +388,7 @@ Os números só valem fora de um campo de texto: digitando o CPF ou o celular, e
 3. **1** para receber em dinheiro (o valor do total já vem preenchido; mude para calcular o troco).
 4. **Ctrl + Enter** para finalizar.
 
-A lista dos atalhos aparece em cima da busca, em telas de computador.`,
+No computador, cada botão mostra a sua tecla: **F2** na busca, **1** a **4** nas formas de pagamento e **Ctrl+Enter** em Finalizar venda.`,
   },
   {
     categorySlug: 'integracao-delivery',
@@ -695,6 +697,12 @@ Os pedidos chegam em **Vender > Pedidos de delivery**, com a origem de cada um (
 Em **Vender > Pedidos de delivery**, o dono ou o gerente escolhe se os pedidos vão direto para a cozinha (**Aceitar pedidos sozinho**, o padrão) ou se cada um toca o alarme e espera o **Aceitar**. Quem recusa diz o motivo. Os pedidos do site vão sempre direto, porque o pagamento online precisa do pedido criado.
 
 O botão **Lista | Quadro** muda a forma de ver. No **Quadro**, os pedidos ativos ficam em quatro colunas (Novos, Em preparo, Prontos, Em entrega), o mais antigo em cima, com um botão para passar à etapa seguinte e a forma de pagamento (pago online ou o que o entregador cobra na entrega). O aparelho lembra a sua escolha. Cancelar um pedido aceito continua na Lista.
+
+## O sino dos pedidos
+
+Com a tela **Pedidos de delivery** aberta, cada pedido que chega toca um sino e aparece um aviso com o número. Enquanto houver pedido esperando o **Aceitar**, o sino toca de novo a cada 6 segundos, uma faixa laranja mostra quantos esperam e o nome da aba fica "(1) Pedido novo". No pedido do iFood aparece **Expira em** com o tempo que falta: o iFood cancela em 8 minutos o pedido sem resposta.
+
+O navegador só deixa tocar som depois de um toque na tela: ao abrir a tela, toque na faixa **Toque aqui para ligar o sino dos pedidos**. O botão **Som ligado | Som desligado** fica lembrado no aparelho. Deixe esta tela aberta durante o expediente.
 
 ## Pagamento online
 

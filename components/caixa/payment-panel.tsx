@@ -13,8 +13,13 @@ const QUICK: Array<{ method: PanelPayment['method']; label: string }> = [
   { method: 'cartao de credito', label: 'Crédito' }, { method: 'cartao de debito', label: 'Débito' },
 ];
 
-/** Payment of a sale (spec §8.3): quick method buttons, several methods, change from cash. */
-export function PaymentPanel({ totalCents, payments, onChange, disabled }: { totalCents: number; payments: PanelPayment[]; onChange: (p: PanelPayment[]) => void; disabled?: boolean }) {
+/** The key of a shortcut, on the button itself (2026-11-03: nobody found the keys in the legend); desktop only */
+export function KeyHint({ k }: { k: string }) {
+  return <kbd aria-hidden="true" className="hidden md:inline ml-1.5 rounded border border-slate-300 bg-slate-100 px-1 text-[10px] font-mono text-slate-600">{k}</kbd>;
+}
+
+/** Payment of a sale (spec §8.3): quick method buttons, several methods, change from cash. `keys`: show the 1-4 shortcuts (balcão) */
+export function PaymentPanel({ totalCents, payments, onChange, disabled, keys }: { totalCents: number; payments: PanelPayment[]; onChange: (p: PanelPayment[]) => void; disabled?: boolean; keys?: boolean }) {
   const state = panelState(totalCents, payments);
   const fill = (method: PanelPayment['method']) => onChange(addRemaining(totalCents, payments, method));
   return (
@@ -32,7 +37,7 @@ export function PaymentPanel({ totalCents, payments, onChange, disabled }: { tot
         <div>
           <p className="text-sm mb-1">{payments.length ? `Falta ${brl(state.remainingCents)}: adicionar outra forma` : 'Forma de pagamento'}</p>
           <div className="grid grid-cols-4 gap-2">
-            {QUICK.map((q) => <Button key={q.method} type="button" variant="outline" onClick={() => fill(q.method)} disabled={disabled}>{q.label}</Button>)}
+            {QUICK.map((q, i) => <Button key={q.method} type="button" variant="outline" onClick={() => fill(q.method)} disabled={disabled}>{q.label}{keys && <KeyHint k={String(i + 1)} />}</Button>)}
           </div>
           {/* The staff records here what it received itself; a table that paid by phone is already on the bill (2026-10-12) */}
           <p className="text-xs text-slate-500 mt-1">Registre aqui o que você recebeu: crédito e débito na maquininha. O que a mesa pagou pelo celular já entra sozinho na conta.</p>

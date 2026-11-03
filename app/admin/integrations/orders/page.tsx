@@ -9,6 +9,8 @@ import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { formatBRL } from '@/lib/formatters';
 import { boardColumns, paymentHint } from '@/lib/delivery-orders/board';
+import { acceptDeadline, countdown, newArrivals, pendingTitle } from '@/lib/delivery-orders/alert';
+import { ringBell, soundReady, unlockSound } from '@/lib/delivery-orders/bell';
 import {
   RefreshCw, Check, X, ChefHat, Bike, Package, Clock,
   Bell, BellOff, Filter, AlertCircle, Search, Volume2, VolumeX,
@@ -73,6 +75,9 @@ const PLATFORM_CONFIG: Record<string, { label: string; color: string; logo: stri
   ifood: { label: 'iFood', color: 'bg-red-600', logo: '🍔' },
 };
 
+// The board columns in strong colors, readable from across the kitchen (2026-11-03)
+const COLUMN_COLOR: Record<string, string> = { novos: 'bg-orange-600', preparo: 'bg-amber-500', prontos: 'bg-green-600', entrega: 'bg-cyan-600' };
+
 const isIfood = (o: ExternalOrder) => o.integration.platform === 'ifood';
 const orderCode = (o: ExternalOrder) => (isIfood(o) && o.platformData?.displayId ? o.platformData.displayId : o.externalOrderId);
 
@@ -106,20 +111,31 @@ export default function DeliveryOrdersPage() {
     setView(v);
     try { localStorage.setItem('gx-delivery-view', v); } catch {}
   };
-  const prevOrderCountRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Sound notification
+  // The bell (2026-11-03): rings for every order that arrives and again every few seconds while one waits for
+  // "Aceitar". The old beep rang once and only from the second waiting order on, so the first one was silent.
+  const seenRef = useRef<Set<string> | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  const soundEnabledRef = useRef(true);
+  soundEnabledRef.current = soundEnabled;
   useEffect(() => {
-    audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JkpOOh3x1c3V8hoyQj4Z9dXJzdXyEi5GPi4J6c3F0eICIjpCMhHt0cnR4gIiOkIyEe3RydHiAiI6QjIR7dHJ0eICIjpCMhHt0cnR4gIiOkIyEe3RydHiAiI6QjIR7dHJ0eICIjpCMhHt0cnR4gIiOkIyEe3RydHh/');
+    try { if (localStorage.getItem('gx-delivery-sound') === 'off') setSoundEnabled(false); } catch {}
+    // The browser lets the page play sound only after a touch on it
+    const unlock = () => { unlockSound().then(setSoundOn); };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => { window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
   }, []);
-
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try { localStorage.setItem('gx-delivery-sound', next ? 'on' : 'off'); } catch {}
+    if (next) unlockSound().then((ok) => { setSoundOn(ok); if (ok) ringBell(); });
+  };
   const playNotificationSound = useCallback(() => {
-    if (soundEnabled && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    }
-  }, [soundEnabled]);
+    if (soundEnabledRef.current) ringBell();
+  }, []);
+  // A clock for the "Expira em" of the iFood orders
+  const [now, setNow] = useState(() => new Date());
 
   const fetchOrders = useCallback(async (showLoader = false) => {
     try {
@@ -130,13 +146,16 @@ export default function DeliveryOrdersPage() {
       const fetched = data.orders || [];
       setAutoAccept(data.autoAccept !== false);
       setCanChangeSettings(!!data.canChangeSettings);
-      // New order notification
-      const pendingCount = fetched.filter((o: ExternalOrder) => o.status === 'PENDING').length;
-      if (pendingCount > prevOrderCountRef.current && prevOrderCountRef.current > 0) {
+      // Every order that arrives rings, accepted by itself or not (an iFood order is confirmed at once)
+      const arrived = newArrivals(seenRef.current, fetched);
+      seenRef.current = new Set([...(seenRef.current ?? []), ...fetched.map((o: ExternalOrder) => o.id)]);
+      if (arrived.length > 0) {
         playNotificationSound();
-        toast.success('🔔 Novo pedido recebido!', { duration: 5000 });
+        for (const o of arrived) {
+          const plat = PLATFORM_CONFIG[o.integration.platform]?.label ?? o.integration.platform;
+          toast.success(`🔔 Pedido novo #${orderCode(o)} (${plat})`, { duration: 8000 });
+        }
       }
-      prevOrderCountRef.current = pendingCount;
       setOrders(fetched);
     } catch {
       if (showLoader) toast.error('Erro ao carregar pedidos');
@@ -146,6 +165,32 @@ export default function DeliveryOrdersPage() {
   }, [playNotificationSound]);
 
   useEffect(() => { fetchOrders(true); }, [fetchOrders]);
+
+  const pendingCount = orders.filter((o) => o.status === 'PENDING').length;
+  // While an order waits for "Aceitar": the bell again every 6 s, the count in the tab title and a clock for "Expira em"
+  useEffect(() => {
+    if (pendingCount === 0) return;
+    const bell = setInterval(() => playNotificationSound(), 6000);
+    const clock = setInterval(() => setNow(new Date()), 1000);
+    return () => { clearInterval(bell); clearInterval(clock); };
+  }, [pendingCount, playNotificationSound]);
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\) Pedidos? novos? · /, '');
+    document.title = pendingTitle(base, pendingCount);
+    return () => { document.title = base; };
+  }, [pendingCount]);
+
+  /** "Expira em 07:42" on an iFood order waiting for "Aceitar" */
+  const expiry = (order: ExternalOrder) => {
+    const deadline = acceptDeadline(order);
+    if (!deadline) return null;
+    const c = countdown(deadline, now);
+    return (
+      <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${c.urgent ? 'bg-red-600 text-white' : 'bg-amber-100 text-amber-900'}`}>
+        <Clock className="h-3 w-3" /> {c.over ? 'Prazo do iFood acabou' : `Expira em ${c.label}`}
+      </span>
+    );
+  };
 
   // Auto-refresh every 10s
   useEffect(() => {
@@ -296,8 +341,9 @@ export default function DeliveryOrdersPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setSoundEnabled(!soundEnabled)}>
+            <Button variant="outline" size="sm" onClick={toggleSound} aria-label={soundEnabled ? 'Desligar o som dos pedidos' : 'Ligar o som dos pedidos'}>
               {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              <span className="ml-1">{soundEnabled ? 'Som ligado' : 'Som desligado'}</span>
             </Button>
             <Button variant="outline" size="sm" onClick={() => setAutoRefresh(!autoRefresh)}
               className={autoRefresh ? 'border-green-500 text-green-600' : ''}>
@@ -309,6 +355,31 @@ export default function DeliveryOrdersPage() {
             </Button>
           </div>
         </div>
+
+        {soundEnabled && !soundOn && (
+          <button
+            type="button"
+            onClick={() => unlockSound().then((ok) => { setSoundOn(ok); if (ok) ringBell(); })}
+            className="w-full rounded-lg border-2 border-dashed border-amber-400 bg-amber-50 p-3 text-left text-sm text-amber-900"
+          >
+            <Bell className="inline h-4 w-4 mr-1" />
+            <strong>Toque aqui para ligar o sino dos pedidos.</strong> O navegador só deixa tocar som depois de um toque na tela. Deixe esta tela aberta durante o expediente.
+          </button>
+        )}
+
+        {pendingCount > 0 && (
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('active'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            className="sticky top-2 z-40 w-full rounded-lg bg-amber-500 px-4 py-3 text-left text-white shadow-lg animate-pulse"
+          >
+            <span className="text-lg font-bold">
+              <Bell className="inline h-5 w-5 mr-2" />
+              {pendingCount === 1 ? '1 pedido esperando o "Aceitar"' : `${pendingCount} pedidos esperando o "Aceitar"`}
+            </span>
+            {orders.some((o) => acceptDeadline(o)) && <span className="block text-sm">Pedido do iFood sem resposta é cancelado pelo iFood em 8 minutos.</span>}
+          </button>
+        )}
 
         {autoAccept !== null && (
           <Card className="p-3 flex items-center justify-between gap-3 flex-wrap">
@@ -396,8 +467,8 @@ export default function DeliveryOrdersPage() {
               return o.customerName.toLowerCase().includes(q) || o.externalOrderId.toLowerCase().includes(q) || o.deliveryAddress.toLowerCase().includes(q);
             })).map((col) => (
               <section key={col.key} aria-label={col.label} className="snap-start shrink-0 w-[80vw] sm:w-72 lg:w-auto rounded-lg bg-gray-100 dark:bg-gray-800 p-2 space-y-2">
-                <h2 className="text-sm font-semibold px-1 flex items-center justify-between">
-                  {col.label} <span className="text-xs font-normal text-muted-foreground">{col.orders.length}</span>
+                <h2 className={`text-base font-bold px-3 py-2 rounded-md text-white flex items-center justify-between ${COLUMN_COLOR[col.key] ?? 'bg-gray-600'}`}>
+                  {col.label} <span className="text-lg">{col.orders.length}</span>
                 </h2>
                 {col.orders.length === 0 && <p className="text-xs text-muted-foreground px-1 py-4 text-center">Nada aqui</p>}
                 {col.orders.map((order) => {
@@ -412,6 +483,7 @@ export default function DeliveryOrdersPage() {
                         <span title={platCfg.label}>{platCfg.logo} <span className="font-bold text-sm">#{orderCode(order)}</span></span>
                         <span className="text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />{timeSince(order.orderReceivedAt)}</span>
                       </div>
+                      {expiry(order)}
                       <div className="flex items-center justify-between gap-2 text-sm">
                         <span className="truncate">{order.customerName}</span>
                         <span className="font-semibold shrink-0">{formatBRL(order.totalAmount)}</span>
@@ -490,6 +562,7 @@ export default function DeliveryOrdersPage() {
                             <Clock className="h-3 w-3" />
                             {timeSince(order.orderReceivedAt)}
                           </span>
+                          {expiry(order)}
                         </div>
                         <div className="mt-1.5 flex items-center gap-3">
                           <span className="font-bold text-sm truncate max-w-[16rem]" title={order.externalOrderId}>#{orderCode(order)}</span>

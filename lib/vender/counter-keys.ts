@@ -27,4 +27,5 @@ export function counterKeyAction(e: { key: string; ctrlKey?: boolean; metaKey?: 
   return null;
 }
 
-export const COUNTER_KEYS_LEGEND = 'Teclado: F2 busca · ↑ ↓ e Enter adicionam o item · Esc sai da busca · 1 Dinheiro · 2 PIX · 3 Crédito · 4 Débito · Ctrl+Enter finaliza';
+// The keys of each button are on the button itself (KeyHint, 2026-11-03); the legend keeps the ones with no button
+export const COUNTER_KEYS_LEGEND = 'Na busca: ↑ ↓ escolhem o item, Enter adiciona, Esc sai';

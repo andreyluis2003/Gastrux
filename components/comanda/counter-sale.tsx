@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useOutbox } from '@/components/offline/outbox-provider';
 import { printInHiddenFrame } from '@/lib/print/print-frame';
-import { PaymentPanel, panelState, type PanelPayment } from '@/components/caixa/payment-panel';
+import { KeyHint, PaymentPanel, panelState, type PanelPayment } from '@/components/caixa/payment-panel';
 import { addRemaining, finishHint, toApiAmount } from '@/components/caixa/panel-state';
 import { COUNTER_KEYS_LEGEND, counterKeyAction } from '@/lib/vender/counter-keys';
 import { OpenShiftCard } from '@/components/caixa/open-shift-card';
@@ -208,16 +208,19 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         <p className="text-sm text-amber-700 mb-3">Sem internet: a venda fica guardada neste aparelho e é enviada quando a conexão voltar.</p>
       )}
       <p className="hidden md:block text-xs text-slate-500 mb-2">{COUNTER_KEYS_LEGEND}</p>
-      <Input
-        ref={searchRef}
-        placeholder="Buscar item... (F2)"
-        aria-label="Buscar item"
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setHighlight(0); }}
-        onFocus={() => setSearchFocused(true)}
-        onBlur={() => setSearchFocused(false)}
-        className="mb-3"
-      />
+      <div className="relative mb-3">
+        <Input
+          ref={searchRef}
+          placeholder="Buscar item..."
+          aria-label="Buscar item (F2)"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setHighlight(0); }}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          className="pr-12"
+        />
+        <span className="absolute right-2 top-1/2 -translate-y-1/2"><KeyHint k="F2" /></span>
+      </div>
       <div className="grid sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto mb-4">
         {visible.map((entry) => (
           <div key={entry.id} data-counter-picked={searchFocused && entry === picked ? 'true' : undefined} className={`flex items-center justify-between gap-2 border rounded-md p-2 ${searchFocused && entry === picked ? 'ring-2 ring-green-600 bg-green-50' : ''}`}>
@@ -292,7 +295,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
             <OpenShiftCard registerId={shift.register.id} registerName={shift.register.name} onOpened={() => shift.refresh()} />
           </div>
         ) : (
-          itemCount > 0 && <PaymentPanel totalCents={Math.round(total * 100)} payments={payments} onChange={setPayments} disabled={saving} />
+          itemCount > 0 && <PaymentPanel totalCents={Math.round(total * 100)} payments={payments} onChange={setPayments} disabled={saving} keys />
         )}
       </div>
       {/* Why the button is still grey (2026-10-12: it stayed disabled with no reason on screen) */}
@@ -302,7 +305,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       <div className="flex items-center justify-between mt-4">
         <span className="text-2xl font-bold text-green-700">{brl(Math.round(total * 100))}</span>
         <Button onClick={finish} disabled={saving || itemCount === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
-          {saving ? 'Registrando...' : 'Finalizar venda'}
+          {saving ? 'Registrando...' : <>Finalizar venda<KeyHint k="Ctrl+Enter" /></>}
         </Button>
       </div>
     </Card>
