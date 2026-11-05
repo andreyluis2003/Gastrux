@@ -10,6 +10,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { Printer, Download, RefreshCw, QrCode, ExternalLink } from 'lucide-react';
 import QRCode from 'qrcode';
+import { markGuideStep } from '@/lib/onboarding/guide-client';
 
 interface Table {
   id: string;
@@ -117,6 +118,8 @@ export default function QRCodesPage() {
   };
 
   const handlePrintAll = () => {
+    // Primeiro acesso guiado: "Imprimir os QR Codes das mesas" is done (spec 2026-11-05)
+    void markGuideStep('qrcodes');
     window.print();
   };
 

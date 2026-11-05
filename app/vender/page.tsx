@@ -81,12 +81,13 @@ export default function VenderPage() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button size="lg" onClick={() => setByName((v) => !v)} className="gap-2"><Plus className="h-5 w-5" /> Comanda por nome</Button>
+        <Button size="lg" data-tour="comanda-nome" onClick={() => setByName((v) => !v)} className="gap-2"><Plus className="h-5 w-5" /> Comanda por nome</Button>
         <Button size="lg" variant="outline" onClick={() => setCounter((v) => !v)} className="gap-2"><ShoppingBag className="h-5 w-5" /> Venda balcão</Button>
       </div>
 
       {byName && (
         <form
+          data-tour="comanda-nome-form"
           className="flex gap-2"
           onSubmit={(e) => { e.preventDefault(); if (name.trim()) openSession({ customerName: name.trim() }); }}
         >

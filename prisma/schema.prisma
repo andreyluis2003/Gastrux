@@ -2922,6 +2922,8 @@ model Restaurant {
   serviceChargePercent    Int                       @default(10)
   /// Delivery orders go to the kitchen without the "Aceitar" (owner decision 2026-10-23: on by default)
   deliveryAutoAccept      Boolean                   @default(true)
+  /// Primeiro acesso guiado (spec 2026-11-05): {channels, marks}; null = channels from the business type
+  onboardingGuide         Json?
   orderApiKeys            OrderApiKey[]
   subscriptionStatus      String                    @default("active")
   billingCycleStart       DateTime?

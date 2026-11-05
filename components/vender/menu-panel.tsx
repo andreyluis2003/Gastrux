@@ -64,6 +64,7 @@ export function MenuPanel({ groups, disabled, onTap, onDetails }: {
             {g.items.map((entry) => (
               <div key={entry.id} className="relative">
                 <button
+                  data-tour="produto"
                   disabled={disabled}
                   onPointerDown={() => press(entry)}
                   onPointerUp={() => release(entry)}

@@ -10,6 +10,8 @@ import { NotificationCenter } from '@/components/notification-center';
 import { openFeedback } from '@/components/feedback/feedback-widget';
 import { PlanBanner } from '@/components/billing/plan-banner';
 import { WhatsappPrompt } from '@/components/onboarding/whatsapp-prompt';
+import { GuideLauncher } from '@/components/onboarding/guide-launcher';
+import { GuidedTour } from '@/components/onboarding/guided-tour';
 import { signOutSafely } from '@/lib/offline/sign-out';
 import { activeHref, navFor, shellMode, type NavGroup } from '@/lib/navigation/app-nav';
 import { cn } from '@/lib/utils';
@@ -48,6 +50,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const screenVideo = tutorialForPath(pathname, user?.role);
   // The videos area only shows once this person has a published video
   const hasVideos = tutorialsFor(user?.role).length > 0;
+  // Primeiro acesso guiado (spec 2026-11-05): for who sets the restaurant up (an empty role counts as owner, like navFor)
+  const setsUp = !user?.role || ['OWNER', 'MANAGER', 'ADMIN'].includes(user.role);
 
   return (
     <>
@@ -83,6 +87,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <PlanBanner />
       {sidebar && <WhatsappPrompt />}
+      {status === 'authenticated' && setsUp && <GuideLauncher withSidebar={sidebar} />}
+      {status === 'authenticated' && setsUp && <GuidedTour />}
 
       {open && <div className={cn('fixed inset-0 z-50 bg-black/50', sidebar && 'md:hidden')} onClick={() => setOpen(false)} aria-hidden />}
 

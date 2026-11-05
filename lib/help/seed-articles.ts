@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  'b4427f86d8d9b9876e2f993c3f0d59a66cd200ba8e633e7a5f6adc2c47b0e6f8', // como-criar-restaurante (before the guided first access, 2026-11-05)
   '28c9803ba55e00cc782640f747f4123f7ebfa8301b5ae69d0b91bbefd49928fb', // atalhos-balcao (before the order bell and the keys on the buttons, 2026-11-03)
   'd06954d932d0404946d8024f6cdafc6cef7e42496f3a27ab456b47798ed07621', // site-de-delivery (before the order bell and the keys on the buttons, 2026-11-03)
   'b638253c63169f3958f8f16ebd73add8f381cba540e9da39d4050e57888599ad', // ligar-ifood (before unknown products stopped being confirmed, 2026-11-01)
@@ -96,7 +97,7 @@ Cada tela do Gastrux tem um vídeo curto com o passo a passo. Você aprende no s
 - **Vídeos tutoriais**, no rodapé do menu lateral: todos os vídeos, separados pelos mesmos grupos do menu, com busca por nome.
 - **Comece por aqui**: a trilha com os vídeos essenciais para começar, na ordem certa. O Gastrux marca os que você já assistiu.
 - **Vídeo desta tela**: no topo do menu (no celular, o ícone de play na barra de cima). Abre o vídeo da tela em que você está, sem sair dela.
-- **Ver vídeo**: no cartão "Primeiros passos" do Início, ao lado de cada etapa.
+- **Ver vídeo**: no "Comece por aqui" e no cartão "Primeiros passos" do Início, ao lado de cada etapa.
 
 Cada vídeo tem embaixo o passo a passo escrito e o botão **Abrir esta tela**. Cada pessoa da equipe vê só os vídeos das telas que pode abrir.`,
   },
@@ -104,23 +105,31 @@ Cada vídeo tem embaixo o passo a passo escrito e o botão **Abrir esta tela**. 
     categorySlug: 'primeiros-passos',
     slug: 'como-criar-restaurante',
     title: 'Como configuro meu restaurante pela primeira vez?',
-    summary: 'O cartão "Primeiros passos" do Início mostra o que falta, na ordem, até a primeira venda.',
+    summary: 'O "Comece por aqui" mostra o que falta, com os minutos de cada passo, e faz um pedido de teste guiado com você.',
     keywords: 'cadastro, setup, configuração, inicial, começar, novo, dados do restaurante, primeiros passos',
     featured: true,
     order: 1,
-    content: `## Siga o cartão "Primeiros passos"
+    content: `## Siga o "Comece por aqui"
 
-Ao entrar no Gastrux, o **Início** mostra o cartão **Primeiros passos** com o que falta para começar a vender:
+Nos primeiros 30 dias, o botão **Comece por aqui** fica no canto de baixo, à esquerda, em todas as telas (no Início, a mesma lista aparece no cartão **Primeiros passos**). Ele mostra o que falta, com os minutos de cada passo. Primeiro, marque **Como você vende?**: Balcão, Mesas e Delivery. Os passos mudam conforme a resposta.
 
-1. **Abrir o caixa**: Caixa e pagamentos > Caixa, com o troco inicial
-2. **Fazer a primeira venda**: Vender > Mesas e balcão
-3. **Cadastrar seus produtos e preços**: Cardápio e produtos > Cardápio digital
-4. **Cadastrar as mesas**: Vender > Mesas
-5. **Cadastrar a equipe** (opcional para quem trabalha sozinho): Equipe > Equipe e acessos
-6. **Completar o endereço**: Configurações > Configurações do restaurante
-7. **Configurar a nota fiscal (NFC-e)**: Fiscal > Notas fiscais (NFC-e)
+**Comece por aqui** (todos)
+1. **Fazer o pedido de teste guiado** (3 min): veja abaixo
+2. **Cadastrar seus produtos e preços** (10 min): Cardápio e produtos > Cardápio digital
+3. **Abrir o caixa** (1 min): Vender, com o troco inicial
+4. **Fazer a primeira venda** (2 min): Vender
+5. **Completar o endereço** (1 min): Configurações > Configurações do restaurante
+6. **Configurar a nota fiscal (NFC-e)** (15 min): Fiscal > Notas fiscais (NFC-e)
 
-Cada etapa fica marcada quando está pronta.
+**Mesas**: cadastrar as mesas, imprimir os QR Codes das mesas e cadastrar a equipe (opcional).
+
+**Delivery**: copiar o link do seu site de delivery e fazer um pedido de teste pelo site.
+
+Cada passo fica marcado quando está pronto. "Esconder o guia" tira o botão deste aparelho; ele volta pelo cartão do Início.
+
+## O pedido de teste guiado
+
+Toque em **Começar** no primeiro passo. O Gastrux abre o **Vender** e mostra, com um destaque piscando, onde tocar: abrir o caixa, abrir uma comanda com o nome "Pedido de teste", lançar um produto, enviar para a cozinha, ver o pedido chegar na **Cozinha** e abrir a **Conta**. No fim, **Cancelar o pedido de teste** tira o teste do faturamento e dos relatórios. Dá para sair a qualquer momento pelo X. Precisa de pelo menos um produto no cardápio.
 
 ## Faça o cadastro pesado com a IA
 

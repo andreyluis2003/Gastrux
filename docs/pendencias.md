@@ -547,3 +547,18 @@ Da revisão final de 2026-10-16 (sessão 118ba5cf), com a numeração dela. O re
 - O dono preenche CPF/CNPJ, nome e endereço antes de pagar; ficam em `billing_profiles`, um por restaurante, e aparecem na ficha do cliente. A nota ainda é emitida à mão: a emissão automática espera as respostas da contadora.
 - Quem já assinou antes disso não tem esses dados e não é avisado; hoje isso não afeta ninguém, mas conferir antes da primeira nota.
 - Aceite dos Termos ao assinar fica em `subscription_acceptances`, sem ligação com a conta, para sobreviver à exclusão. Ao mudar os Termos, trocar `TERMS_VERSION` junto com a data de `app/termos/page.tsx`.
+
+## Primeiro acesso guiado (2026-11-05)
+
+Spec `docs/superpowers/specs/2026-11-05-primeiro-acesso-guiado-design.md`. Ficou de fora, de propósito:
+
+- Tour com setas nas outras telas (estoque, ficha técnica, fiscal); hoje os vídeos tutoriais cobrem. Fazer depois de ver
+  se o do pedido de teste é usado.
+- Pedido de teste do site de delivery guiado com setas (o passo só leva à tela do site).
+- Passo "Conectar o iFood" no grupo Delivery: entra junto com a troca dos textos do iFood (homologação aprovada em
+  05/11/2026).
+- Medir o uso do tour (eventos de analytics).
+- Os passos "Imprimir os QR Codes" e "Copiar o link do site" ficam feitos ao tocar no botão, mesmo que a pessoa não
+  imprima ou não divulgue de fato.
+- O andamento do tour fica no aparelho (localStorage): começar no computador e continuar no celular recomeça.
+- `onboardingStatus` (a IA e o agente de ativação) continua contando os 6 passos antigos, não os do guia.

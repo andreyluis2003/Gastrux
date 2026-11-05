@@ -198,9 +198,9 @@ export default function ComandaRapidaPage() {
           <div className="text-xs text-slate-500 flex items-center gap-1">{c.lines.length} {c.lines.length === 1 ? 'item' : 'itens'} <ChevronUp className="h-3 w-3" /></div>
           <div className="text-lg font-bold">{brl(c.totalCents)}</div>
         </button>
-        <Button disabled={c.newCount === 0 || c.isClosed} onClick={onSend}>Enviar{c.newCount ? ` (${c.newCount})` : ''}</Button>
+        <Button data-tour="enviar" disabled={c.newCount === 0 || c.isClosed} onClick={onSend}>Enviar{c.newCount ? ` (${c.newCount})` : ''}</Button>
         {/* Conta straight from the bar (2026-10-12: it took "Ver comanda" first); the left side opens the list */}
-        <Button variant="outline" disabled={c.lines.length === 0} onClick={() => setShowConta(true)}>Conta</Button>
+        <Button data-tour="conta" variant="outline" disabled={c.lines.length === 0} onClick={() => setShowConta(true)}>Conta</Button>
       </div>
 
       {showList && (

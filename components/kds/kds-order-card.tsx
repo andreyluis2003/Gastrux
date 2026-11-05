@@ -134,6 +134,7 @@ export function KDSOrderCard({
 
   return (
     <Card
+      data-tour="kds-card"
       className={cn(
         'p-4 border-l-4 hover:shadow-lg transition-shadow',
         getPriorityColor(order.priority)

@@ -19,13 +19,13 @@ export function CashBar() {
   if (shift.shiftId) {
     const since = shift.shiftOpenedAt ? new Date(shift.shiftOpenedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
     return (
-      <Link href="/caixa" className="block rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm text-emerald-800">
+      <Link href="/caixa" data-tour="caixa-aberto" className="block rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm text-emerald-800">
         Caixa aberto · {shift.register.name}{since ? ` · desde ${since}` : ''}
       </Link>
     );
   }
   return (
-    <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900 space-y-2">
+    <div data-tour="caixa-bar" className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span>Caixa fechado{canOpen ? '' : ': peça para abrir o caixa antes de receber'}</span>
         {canOpen && !opening && <Button size="sm" onClick={() => setOpening(true)}>Abrir caixa</Button>}

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { PaymentSettingsCard } from '@/components/delivery/payment-settings-card';
 import { WhatsAppMenuCard } from '@/components/delivery/whatsapp-menu-card';
+import { markGuideStep } from '@/lib/onboarding/guide-client';
 
 /**
  * Site de delivery of the store selected in the menu (app/admin/delivery-site/page.tsx passes it). It used to take
@@ -22,6 +23,8 @@ export function DeliverySiteClient({ restaurantId, restaurantName, deliveryUrl }
       navigator.clipboard.writeText(deliveryUrl);
       setCopied(true);
       toast.success('Link copiado!');
+      // Primeiro acesso guiado: "Copiar o link do seu site de delivery" is done (spec 2026-11-05)
+      void markGuideStep('deliveryLink');
       setTimeout(() => setCopied(false), 3000);
     }
   }

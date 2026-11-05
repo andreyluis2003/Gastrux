@@ -49,10 +49,10 @@ export function ComandaPanel({ lines, totalCents, newCount, isClosed, onLine, on
         <span className="font-semibold">Total</span>
         <span className="text-2xl font-bold text-emerald-700">{brl(totalCents)}</span>
       </div>
-      <Button size="lg" className="gap-2" disabled={newCount === 0 || isClosed} onClick={onSend}>
+      <Button size="lg" data-tour="enviar" className="gap-2" disabled={newCount === 0 || isClosed} onClick={onSend}>
         <Send className="h-5 w-5" /> Enviar para cozinha{newCount ? ` (${newCount})` : ''}
       </Button>
-      <Button size="lg" variant="outline" className="gap-2" disabled={lines.length === 0} onClick={onConta}>
+      <Button size="lg" data-tour="conta" variant="outline" className="gap-2" disabled={lines.length === 0} onClick={onConta}>
         <Receipt className="h-5 w-5" /> Conta
       </Button>
     </div>

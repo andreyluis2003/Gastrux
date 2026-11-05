@@ -6,7 +6,7 @@ import { DashboardAlertsLoadingSkeleton } from '@/components/dashboard/dashboard
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { FirstSteps } from '@/components/dashboard/first-steps';
 import { TodayPanel } from '@/components/dashboard/today-panel';
-import { firstSteps } from '@/lib/onboarding/first-steps';
+import { loadGuide } from '@/lib/onboarding/guide';
 import { todayData } from '@/lib/dashboard/today';
 import { panelTiles } from '@/lib/dashboard/today-tiles';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
@@ -31,14 +31,14 @@ export default async function DashboardPage() {
 
   // Primeiros passos (the address left for later is one of them) for who can do them; "Vender" for everyone
   const canEditRestaurant = ['OWNER', 'MANAGER', 'ADMIN'].includes(String(user.role));
-  const steps = restaurantId && canEditRestaurant ? await firstSteps(restaurantId) : null;
+  const guide = restaurantId && canEditRestaurant ? await loadGuide(restaurantId) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50">
       <DashboardHeader userName={user.name || user.email || ''} />
       <main className="mx-auto max-w-6xl px-4 py-8 space-y-8">
         {/* The Vender button and what is left to set up (it can be closed), then the day */}
-        <FirstSteps steps={steps} canSell={canSeeModule('/vender', user.role)} />
+        <FirstSteps guide={guide} canSell={canSeeModule('/vender', user.role)} />
         {restaurantId && (
           <Suspense fallback={<DashboardAlertsLoadingSkeleton />}>
             <Today restaurantId={restaurantId} role={user.role} />
