@@ -133,6 +133,11 @@ Plano `docs/superpowers/plans/2026-10-24-indicacao.md`.
 - **Rotina diária no servidor (dono):** linha no crontab `0 11 * * * /root/gastrux-cron.sh /api/referrals/daily`.
 - **Contador:** como emitir a NFS-e de uma mensalidade com o mês grátis (Stripe: desconto na fatura) antes do primeiro
   mês grátis real.
+- **NFS-e automática da mensalidade (04/11/2026):** decidido esperar ~10 clientes pagando. Plano: no pagamento
+  confirmado (Stripe/Mercado Pago), emitir a NFS-e da Help Flow pelo Focus NFe (Emissor Nacional), código 01.05.01 /
+  complementar 01.05.01.001, tomador do billing profile, enviar por e-mail. Precisa: certificado A1 da Help Flow (já existe, confirmado 04/11),
+  Help Flow como empresa no Focus, conferir suporte a Jundiaí, e copiar valores/impostos da primeira nota manual
+  conferida pela contadora.
 - **Cadastro pelo Google:** usa o cookie do link (lido no servidor); não tem teste automático (os eventos do NextAuth).
 - **Colunas antigas** `users.referral*` e a tabela `referral_history` continuam no banco, sem uso.
 - **Revisão final (24/10/2026), itens menores que ficaram:**
