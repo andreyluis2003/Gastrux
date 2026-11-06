@@ -89,6 +89,7 @@ export const TUTORIALS: Tutorial[] = [
   t('configuracoes-do-restaurante', 'Configurações do restaurante', 'config', ['/admin/settings'], 'Dados do restaurante, taxa de serviço e impressão.'),
   t('minha-assinatura', 'Minha assinatura', 'config', ['/dashboard/billing'], 'Seu plano, pagamento e indicações.'),
   t('whatsapp', 'WhatsApp', 'config', ['/admin/integrations/whatsapp'], 'Ligar o WhatsApp do restaurante.'),
+  t('conectando-o-ifood', 'Conectando o iFood', 'config', ['/admin/integrations/ifood'], 'Ligar a loja do iFood para os pedidos chegarem sozinhos.'),
   t('api-de-pedidos', 'API de pedidos', 'config', ['/admin/integrations/api'], 'Receber pedidos de outros sistemas.'),
   t('varias-lojas', 'Várias lojas', 'config', ['/admin/multi-location'], 'Acompanhar mais de uma loja.'),
   t('uso-da-ia', 'Uso da IA', 'config', ['/admin/settings/ia'], 'Quanto o assistente foi usado no mês.'),
@@ -156,6 +157,7 @@ const FIRST_STEP_VIDEO: Record<string, string> = {
   equipe: 'equipe-e-acessos',
   endereco: 'configuracoes-do-restaurante',
   nfce: 'nfce',
+  ifood: 'conectando-o-ifood',
 };
 
 export function tutorialForFirstStep(key: string): Tutorial | null {

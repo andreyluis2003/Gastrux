@@ -63,8 +63,7 @@ Spec `docs/superpowers/specs/2026-10-25-venda-por-peso-design.md`. Ficou de fora
 
 ## Vídeos tutoriais, a área no sistema (2026-10-25)
 
-- Vídeo "Conectando o iFood" (Configurações > iFood): fica para quando o iFood aprovar a homologação e a conexão
-  funcionar de verdade; hoje a tela só diz "em homologação" (pedido do dono em 2026-10-26).
+- Vídeo "Conectando o iFood" feito em 2026-11-06 (49 s, conexão simulada no navegador da gravação, sem credencial real).
 - O vídeo "nfce" foi refeito em 2026-10-26 com a configuração guiada (69 s). Os de CMV, Contagem de estoque,
   Desperdício e Engenharia de cardápio ainda mostram o "Início > Início" antigo.
 

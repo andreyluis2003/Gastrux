@@ -19,8 +19,8 @@ describe('tutorial videos catalog', () => {
   beforeAll(() => TUTORIALS.forEach((t) => (t.published = true)));
   afterAll(() => TUTORIALS.forEach((t) => (t.published = published.get(t.slug)!)));
 
-  it('has the 46 videos of the spec, unique slugs, each in a menu group', () => {
-    expect(TUTORIALS).toHaveLength(46);
+  it('has the 46 videos of the spec plus Conectando o iFood, unique slugs, each in a menu group', () => {
+    expect(TUTORIALS).toHaveLength(47);
     expect(new Set(TUTORIALS.map((t) => t.slug)).size).toBe(TUTORIALS.length);
     for (const t of TUTORIALS) expect(NAV_GROUPS.some((g) => g.id === t.group)).toBe(true);
   });
@@ -162,6 +162,8 @@ describe('the published videos (lote 1, 2026-10-25)', () => {
     'clientes-crm', 'cashback', 'campanhas', 'site-de-delivery',
     'planejamento-de-producao', 'escalonar-receita', 'etiquetas-e-validades', 'engenharia-de-cardapio', 'dre', 'turnos', 'comissoes',
     'configuracoes-do-restaurante', 'minha-assinatura', 'whatsapp', 'api-de-pedidos', 'varias-lojas', 'uso-da-ia',
+    // 2026-11-06, after the iFood approved the integration
+    'conectando-o-ifood',
   ];
 
   it('publishes lote 4 with its steps, length and files', () => {

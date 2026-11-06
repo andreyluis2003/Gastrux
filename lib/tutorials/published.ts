@@ -436,4 +436,15 @@ export const PUBLISHED: Record<string, { durationSec: number; steps: string[] }>
       "Abaixo fica a lista das perguntas, com quem perguntou e quando.",
     ],
   },
+  'conectando-o-ifood': {
+    durationSec: 49,
+    steps: [
+      "Com o iFood conectado, os pedidos do iFood chegam sozinhos no Gastrux e vão para a cozinha. A conexão é do plano Business e fica em Configurações, iFood.",
+      "Clique em Conectar iFood. O Gastrux mostra um código.",
+      "Clique em Abrir o Portal do Parceiro, entre com a conta da sua loja no iFood e digite esse código.",
+      "O Portal mostra um código de autorização. Cole aqui e clique em Concluir.",
+      "Pronto: a loja aparece como Conectada. Os pedidos chegam em Vender, Pedidos de delivery. Pausar fecha a loja no iFood até você retomar.",
+      "Dica: use no iFood o mesmo código PDV do código do produto no Cardápio digital. Assim o Gastrux reconhece cada item do pedido.",
+    ],
+  },
 };
