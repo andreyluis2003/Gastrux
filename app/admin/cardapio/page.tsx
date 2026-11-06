@@ -12,6 +12,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { toast } from 'sonner';
 import { brl } from '@/components/caixa/money';
 import { isProductRecipe } from '@/lib/cardapio/is-product-recipe';
+import { ImportFromLink } from '@/components/cardapio/import-from-link';
 import { Plus, Trash2, Edit2, Eye, EyeOff, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { RecipeCostPanel } from '@/components/cardapio/recipe-cost-panel';
@@ -249,7 +250,8 @@ export default function AdminCardapioPage() {
             {categories.length} categorias • {totalItems} itens
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <ImportFromLink onImported={fetchCategories} />
           <Button variant="outline" asChild>
             <Link href="/admin/tables" className="gap-2">
               <ImageIcon className="w-4 h-4" /> Ver QR Codes

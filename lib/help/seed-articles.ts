@@ -802,6 +802,34 @@ O cliente ainda não faz encomenda pelo site nem recebe aviso de "pronta" por Wh
   },
   {
     categorySlug: 'cardapio-e-receitas',
+    slug: 'importar-cardapio-por-link',
+    title: 'Como trago o meu cardápio de outro site de pedidos?',
+    summary: 'Em Cardápio digital > Importar de um link: cole o link da sua loja, revise e importe produtos, preços, fotos e adicionais.',
+    keywords: 'importar, cardápio, link, zé pediu, outro sistema, migrar, copiar cardápio, fotos, adicionais, ifood, anota ai',
+    order: 4,
+    content: `## Importando
+
+1. Em **Cardápio e produtos > Cardápio digital**, clique em **Importar de um link** (dono ou gerente)
+2. Cole o link da página de pedidos da sua loja e clique em **Ler cardápio**
+3. Confira a prévia: desmarque o que não quer trazer. Produto indisponível lá já vem desmarcado
+4. Se quiser, use **Ajustar os preços em %**: -10 deixa tudo 10% mais barato que no aplicativo
+5. Marque **Este cardápio é do meu restaurante** e clique em **Importar**
+
+Cada produto ganha a ficha simples, como os que você cadastra na mão. Produto com o mesmo nome de um que já existe não é importado de novo.
+
+## O que vem
+
+- Categorias, nomes, descrições e o **preço cheio** (a promoção da outra plataforma não vira preço)
+- As **fotos**, que ficam no endereço original: se a outra plataforma apagar uma foto, ela some aqui também
+- O **código PDV**, que vira o Código do produto e ajuda o iFood a reconhecer cada item
+- Os **adicionais**, na lista de **Adicionais**, agrupados pelo nome do grupo. Escolhas obrigatórias e limites como "escolha até 3" não passam para o Gastrux
+
+## De onde dá
+
+Funciona com o **Zé Pediu** e com sites que publicam o cardápio no padrão de buscadores (schema.org). O **iFood** e o **Anota AI** não deixam outros sistemas lerem o cardápio pelo link: mande um print ou o PDF do cardápio para a IA, no botão **Pergunte ao Gastrux**, que ela monta o cardápio para você.`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
     slug: 'venda-por-peso',
     title: 'Como vendo por peso (pão, frios, doces por kg)?',
     summary: 'Marque "Vendido por peso" no produto, com o preço por kg. No caixa, digite o peso que a balança mostra.',

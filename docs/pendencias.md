@@ -3,6 +3,19 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Importar o cardápio por link (2026-11-06)
+
+Spec `docs/superpowers/specs/2026-11-06-importar-cardapio-por-link-design.md`.
+
+- **Fotos no endereço original:** o Gastrux não tem armazenamento de arquivos; a foto importada aponta para o CDN da
+  outra plataforma (muitas no CDN do iFood). Se lá apagarem, some aqui. Quando houver armazenamento, baixar as fotos.
+- **iFood e Anota AI por link:** fora. O iFood responde 403 com desafio anti-robô (não contornar); o Anota AI carrega o
+  cardápio por API privada. Caminho oficial para o iFood: módulo Catalog da API do iFood (outra homologação).
+- **Adicionais:** entram na lista única do restaurante (grupo = nome do grupo), sem ligação com o produto, sem
+  obrigatório e sem limite de escolha (o Gastrux não tem esse modelo).
+- **Limite de leituras** (20 por hora por restaurante) fica na memória do processo: um Deploy zera.
+- Horários, taxa de entrega e promoções da outra plataforma não vêm.
+
 ## Acerto com o entregador (2026-10-26)
 
 Spec `docs/superpowers/specs/2026-10-26-acerto-entregador-design.md`. Ficou de fora, de propósito:
