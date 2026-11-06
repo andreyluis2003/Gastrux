@@ -13,7 +13,7 @@ export const MARKS = ['testOrder', 'qrcodes', 'deliveryLink'] as const;
 export type GuideMark = (typeof MARKS)[number];
 export interface GuideState { channels?: Channel[]; marks?: Partial<Record<GuideMark, string>> }
 
-export type GuideStepKey = FirstStep['key'] | 'teste' | 'qrcodes' | 'deliveryLink' | 'deliveryOrder';
+export type GuideStepKey = FirstStep['key'] | 'teste' | 'qrcodes' | 'deliveryLink' | 'deliveryOrder' | 'ifood';
 export interface GuideStep { key: GuideStepKey; label: string; href: string; minutes: number; done: boolean; optional?: boolean }
 export type GuideGroupId = 'inicio' | 'mesas' | 'delivery';
 export interface GuideGroup { id: GuideGroupId; title: string; steps: GuideStep[] }
@@ -49,10 +49,10 @@ export function parseGuideState(raw: unknown): GuideState {
 
 /** Minutes each step takes (spec §2; my estimates) */
 const MINUTES: Record<GuideStepKey, number> = {
-  teste: 3, cardapio: 10, caixa: 1, venda: 2, endereco: 1, nfce: 15, mesas: 2, qrcodes: 3, equipe: 3, deliveryLink: 1, deliveryOrder: 3,
+  teste: 3, cardapio: 10, caixa: 1, venda: 2, endereco: 1, nfce: 15, mesas: 2, qrcodes: 3, equipe: 3, deliveryLink: 1, deliveryOrder: 3, ifood: 5,
 };
 
-export function buildGuide(input: { steps: FirstStep[]; state: GuideState; businessType: string | null | undefined; deliveryOrders: number }): Guide {
+export function buildGuide(input: { steps: FirstStep[]; state: GuideState; businessType: string | null | undefined; deliveryOrders: number; ifoodConnected?: boolean }): Guide {
   const { state } = input;
   const channelsChosen = Array.isArray(state.channels);
   const channels = channelsChosen ? state.channels! : defaultChannels(input.businessType);
@@ -89,6 +89,8 @@ export function buildGuide(input: { steps: FirstStep[]; state: GuideState; busin
       steps: [
         { key: 'deliveryLink', label: 'Copiar o link do seu site de delivery', href: '/admin/delivery-site', minutes: MINUTES.deliveryLink, done: !!marks.deliveryLink },
         { key: 'deliveryOrder', label: 'Fazer um pedido de teste pelo site', href: '/admin/delivery-site', minutes: MINUTES.deliveryOrder, done: input.deliveryOrders > 0 },
+        // Optional: not every delivery sells on the iFood, and it is a Business plan feature (the screen says so)
+        { key: 'ifood', label: 'Conectar o iFood', href: '/admin/integrations/ifood', minutes: MINUTES.ifood, done: !!input.ifoodConnected, optional: true },
       ],
     });
   }
@@ -104,13 +106,14 @@ export async function loadGuide(restaurantId: string, now = new Date()): Promise
     where: { id: restaurantId },
     select: { createdAt: true, onboardingGuide: true, ownerId: true },
   });
-  const [steps, owner, deliveryOrders, products] = await Promise.all([
+  const [steps, owner, deliveryOrders, products, ifood] = await Promise.all([
     firstSteps(restaurantId),
     restaurant ? prisma.user.findUnique({ where: { id: restaurant.ownerId }, select: { businessType: true } }) : null,
     prisma.externalOrder.count({ where: { restaurantId, integration: { platform: 'delivery_site' } } }),
     prisma.menuItem.count({ where: { restaurantId } }),
+    prisma.deliveryIntegration.count({ where: { restaurantId, platform: 'ifood', storeId: { not: null } } }),
   ]);
-  const guide = buildGuide({ steps, state: parseGuideState(restaurant?.onboardingGuide), businessType: owner?.businessType, deliveryOrders });
+  const guide = buildGuide({ steps, state: parseGuideState(restaurant?.onboardingGuide), businessType: owner?.businessType, deliveryOrders, ifoodConnected: ifood > 0 });
   const days = Math.floor((now.getTime() - (restaurant?.createdAt ?? now).getTime()) / 86_400_000);
   return { ...guide, active: days <= ONBOARDING_DAYS && guide.done < guide.total, hasProducts: products > 0 };
 }

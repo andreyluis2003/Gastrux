@@ -32,6 +32,7 @@ const FEATURES_COMPARISON = [
   { category: 'Analytics', name: 'Dashboard Analítico' },
   { category: 'Analytics', name: 'Relatórios Executivos' },
   { category: 'Integrações', name: 'API de pedidos (site, bot ou outro sistema)' },
+  { category: 'Integrações', name: 'Pedidos do iFood direto na Gastrux' },
   { category: 'Integrações', name: 'Multi-loja' },
   { category: 'Suporte', name: 'Suporte Email' },
   { category: 'Suporte', name: 'Suporte pelo WhatsApp' },
@@ -63,6 +64,8 @@ const getTierFeatureValue = (tierId: string, featureName: string) => {
     'Relatórios Executivos': ['business', 'enterprise'].includes(tierId),
     // Owner decision 2026-10-23: the Gastrux order API on Pro and Business (lib/tier-guard.ts orderApi)
     'API de pedidos (site, bot ou outro sistema)': true,
+    // iFood approved the integration 2026-11-05 (lib/tier-guard.ts deliveryPlatforms)
+    'Pedidos do iFood direto na Gastrux': ['business', 'enterprise'].includes(tierId),
     'Multi-loja':
       tier.limits.locations && tier.limits.locations > 0
         ? (tier.limits.locations === 999999 ? 'Ilimitado' : `${tier.limits.locations} lojas`)

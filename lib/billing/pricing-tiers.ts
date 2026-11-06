@@ -56,6 +56,7 @@ export const BASE_PRICING_TIERS = {
       'Indicadores das contas de consumo e aviso de diferença na contagem',
       'Contas a pagar com avisos, repetição automática e boletos da nota de compra',
       'Cashback para seus clientes e campanhas',
+      'Pedidos do iFood direto na Gastrux',
       'Relatórios avançados',
       'Até 2 lojas',
       'Assistente com IA: 350 perguntas por mês',

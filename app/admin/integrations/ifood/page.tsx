@@ -131,8 +131,8 @@ export default function IfoodPage() {
 
       {state && !state.configured && !state.connected && (
         <Card className="p-4 text-sm">
-          A conexão com o iFood está pronta no Gastrux e em homologação no iFood. Quando o iFood aprovar, você conecta a sua
-          loja por esta tela. Enquanto isso, os pedidos do iFood continuam no Gestor de Pedidos do iFood.
+          A conexão com o iFood não está ligada neste servidor. Fale com o suporte do Gastrux pelo chat. Enquanto isso, os
+          pedidos do iFood continuam no Gestor de Pedidos do iFood.
         </Card>
       )}
 

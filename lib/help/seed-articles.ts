@@ -61,6 +61,9 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
   'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
   'a8bbe2c80766c08e1febbca29251bc627b1131b95280b2f266715da13e4cbaf9', // site-de-delivery (before the board view)
+  'b493e89f74353933033fcf2a23ce20fe23ff045d312daa488d7ddc71c0b9ab83', // site-de-delivery (before the iFood went live)
+  '4d463f11a7f8a4c14fc6a1d7fa5ceb7656dacd490f7db9b235dc952c6cc2e377', // ligar-ifood (before the iFood went live)
+  '28e38d1d448bbf845afd78b6c83609bb648da81268589871a7bcb4a5b882fa0a', // como-criar-restaurante (before the iFood step)
 ]);
 
 /** Articles that described features Gastrux does not have; removed while nobody rewrote them */
@@ -123,7 +126,7 @@ Nos primeiros 30 dias, o botão **Comece por aqui** fica no canto de baixo, à e
 
 **Mesas**: cadastrar as mesas, imprimir os QR Codes das mesas e cadastrar a equipe (opcional).
 
-**Delivery**: copiar o link do seu site de delivery e fazer um pedido de teste pelo site.
+**Delivery**: copiar o link do seu site de delivery, fazer um pedido de teste pelo site e, se você vende no iFood, conectar o iFood (opcional, plano Business).
 
 Cada passo fica marcado quando está pronto. "Esconder o guia" tira o botão deste aparelho; ele volta pelo cartão do Início.
 
@@ -719,18 +722,18 @@ Com a conta do Mercado Pago do restaurante conectada, o cliente pode pagar pelo 
 
 ## Outros sistemas e aplicativos
 
-O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". A conexão direta com o iFood está em homologação no iFood (veja "Como ligo o iFood?"). Keeta e 99Food ainda não estão conectados.`,
+O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". No plano **Business**, os pedidos do **iFood** chegam direto aqui (veja "Como ligo o iFood?"). Keeta e 99Food ainda não estão conectados.`,
   },
   {
     categorySlug: 'integracao-delivery',
     slug: 'ligar-ifood',
     title: 'Como ligo o iFood?',
     summary: 'Em Configurações > iFood (plano Business): os pedidos do iFood chegam em Pedidos de delivery e o status volta para o iFood.',
-    keywords: 'ifood, delivery, integração, portal do parceiro, gestor de pedidos, cancelamento, homologação',
+    keywords: 'ifood, delivery, integração, portal do parceiro, gestor de pedidos, cancelamento, conectar ifood',
     order: 4,
     content: `## Situação
 
-A conexão com o iFood está pronta no Gastrux e **em homologação no iFood**. Até o iFood aprovar, a tela **Configurações > iFood** mostra "em homologação" e os pedidos do iFood continuam no Gestor de Pedidos do iFood. É do plano **Business**.
+A conexão com o iFood está **liberada**: o iFood aprovou a integração do Gastrux. É do plano **Business**.
 
 ## Conectando a loja
 

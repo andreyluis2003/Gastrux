@@ -47,7 +47,7 @@ describe('primeiro acesso guiado: the guide', () => {
     expect(keys(g)).toEqual([
       ['inicio', ['teste', 'cardapio', 'caixa', 'venda', 'endereco', 'nfce']],
       ['mesas', ['mesas', 'qrcodes', 'equipe']],
-      ['delivery', ['deliveryLink', 'deliveryOrder']],
+      ['delivery', ['deliveryLink', 'deliveryOrder', 'ifood']],
     ]);
     expect(g.groups[1].steps[2]).toMatchObject({ optional: true, done: true });
     expect(g).toMatchObject({ done: 1, total: 10 });

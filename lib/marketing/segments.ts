@@ -63,7 +63,7 @@ export const SEGMENTS: Segment[] = [
     metaTitle: 'Sistema para Delivery | Gastrux',
     metaDescription: 'Gerencie pedidos de delivery, estoque e margem por prato. KDS para a cozinha e pedidos pelo WhatsApp.',
     heroHeadline: 'Seu delivery organizado e lucrativo',
-    heroDescription: 'Organize os pedidos do delivery, a cozinha e o estoque, e saiba a margem de cada prato. Ainda não há conexão pronta com iFood, Keeta ou 99Food.',
+    heroDescription: 'Organize os pedidos do delivery, a cozinha e o estoque, e saiba a margem de cada prato. No plano Business, os pedidos do iFood chegam direto na Gastrux.',
     painPoints: [
       'Pedidos chegando de vários apps sem controle',
       'Sem saber qual plataforma dá mais lucro',
@@ -160,7 +160,7 @@ export const SEGMENTS: Segment[] = [
     benefits: [
       { icon: 'Utensils', title: 'Ficha Técnica por Blend', description: 'Custo de cada blend e de cada lanche pela ficha técnica.' },
       { icon: 'Layers', title: 'Adicionais', description: 'Bacon extra, queijo, ponto da carne: o garçom escolhe na conta e a cozinha vê no pedido.' },
-      { icon: 'Truck', title: 'Pedidos pelo WhatsApp', description: 'Pedidos pelo WhatsApp com cardápio; ainda sem conexão pronta com apps de delivery.' },
+      { icon: 'Truck', title: 'Pedidos pelo WhatsApp', description: 'Pedidos pelo WhatsApp com cardápio e, no plano Business, os pedidos do iFood chegando direto.' },
       { icon: 'Thermometer', title: 'Controle de Carnes', description: 'Estoque de carnes com baixa pelas vendas e alerta de estoque baixo.' },
       { icon: 'Timer', title: 'Tela da Cozinha', description: 'Pedidos na tela da chapa na ordem de chegada, com o tempo de espera de cada um.' },
       { icon: 'TrendingUp', title: 'Menu Engineering', description: 'Descubra quais burgers são estrelas e quais precisam sair do cardápio.' },

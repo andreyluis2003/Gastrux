@@ -30,7 +30,7 @@ const features = [
   {
     icon: Truck,
     title: 'API de pedidos',
-    description: 'Seu site, bot ou sistema manda pedidos direto para a Gastrux, com retirada no local. Ainda não há conexão pronta com iFood, Keeta ou 99Food.',
+    description: 'Seu site, bot ou sistema manda pedidos direto para a Gastrux, com retirada no local. No plano Business, os pedidos do iFood também chegam direto. Keeta e 99Food ainda não estão conectados.',
     color: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400',
   },
   {

@@ -27,7 +27,7 @@ const DEFAULT_FAQS: FAQ[] = [
   },
   {
     q: 'Integra com iFood e outros apps de delivery?',
-    a: 'Ainda não há conexão pronta com iFood, Keeta ou 99Food. Nos planos Pro e Business, o seu site, um bot ou outro sistema podem mandar pedidos pela API de pedidos da Gastrux, explicada em gastrux.com/desenvolvedores.',
+    a: 'Com o iFood, sim: no plano Business você conecta a sua loja do iFood e os pedidos chegam direto na Gastrux e vão para a cozinha. Keeta e 99Food ainda não estão conectados. Nos planos Pro e Business, o seu site, um bot ou outro sistema podem mandar pedidos pela API de pedidos da Gastrux, explicada em gastrux.com/desenvolvedores.',
   },
   {
     q: 'A Gastrux mostra o lucro do restaurante?',
