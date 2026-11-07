@@ -347,7 +347,7 @@ export default function AdminCardapioPage() {
         <div className="space-y-4">
           {categories.map((cat) => (
             <Card key={cat.id} className="p-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 className="text-lg font-bold flex items-center gap-2">
                   {cat.items.length > 0 && (
                     <input
@@ -460,7 +460,7 @@ export default function AdminCardapioPage() {
                   {cat.items.map((item) => (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-3 p-2 rounded-lg border ${
+                      className={`flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 p-2 rounded-lg border ${
                         item.available ? 'bg-white' : 'bg-gray-50'
                       } ${selected.has(item.id) ? 'ring-2 ring-primary/40' : ''}`}
                     >
@@ -486,8 +486,8 @@ export default function AdminCardapioPage() {
                           <ImageIcon className="w-5 h-5 text-gray-300" />
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm line-clamp-2 break-words">{item.name}</p>
+                      <div className="flex-1 min-w-[9rem]">
+                        <p className="font-semibold text-sm line-clamp-2">{item.name}</p>
                         {item.description && (
                           <p className="text-xs text-gray-500 truncate">{item.description}</p>
                         )}
@@ -527,7 +527,7 @@ export default function AdminCardapioPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-1">
+                      <div className="ml-auto flex gap-1">
                         <Button
                           size="sm"
                           variant={item.available ? 'ghost' : 'outline'}
