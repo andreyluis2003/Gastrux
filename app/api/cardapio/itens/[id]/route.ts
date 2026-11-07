@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { ensureMenuItemRecipes, isProductRecipe, retireProductRecipe, syncProductRecipe } from '@/lib/cardapio/product-recipe';
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { normalizeDays } from '@/lib/cardapio/days';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +75,15 @@ export async function PUT(
     const { name, description, price, available, position, displayOnQR, displayOnWeb, recipeId, categoryId } = body;
     const code = parseProductCode(body.code);
     if (!code.ok) return NextResponse.json({ error: code.error }, { status: 400 });
+    // A price that is not a number used to reach the database as NaN (spec 2026-11-06 cardapio-rapido)
+    const priceNum = price !== undefined ? Number(String(price).replace(',', '.')) : undefined;
+    if (priceNum !== undefined && (!Number.isFinite(priceNum) || priceNum < 0.01 || priceNum > 99999)) {
+      return NextResponse.json({ error: 'Preço entre R$ 0,01 e R$ 99.999' }, { status: 400 });
+    }
+    const days = body.availableDays !== undefined ? normalizeDays(body.availableDays) : undefined;
+    if (days === null) {
+      return NextResponse.json({ error: 'Dias da semana inválidos' }, { status: 400 });
+    }
 
     if (recipeId) {
       const recipe = await prisma.recipe.findFirst({ where: { id: recipeId, restaurantId }, select: { id: true } });
@@ -96,7 +106,8 @@ export async function PUT(
         ...(code.code !== undefined && { code: code.code }),
         ...(name && { name }),
         ...(description !== undefined && { description }),
-        ...(price !== undefined && { price: parseFloat(price) }),
+        ...(priceNum !== undefined && { price: Math.round(priceNum * 100) / 100 }),
+        ...(days !== undefined && { availableDays: days }),
         ...(available !== undefined && { available }),
         ...(position !== undefined && { position }),
         ...(displayOnQR !== undefined && { displayOnQR }),

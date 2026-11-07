@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { brl } from '@/components/caixa/money';
 import { toCents } from '@/lib/comanda/line-total';
 import type { MenuEntry, MenuGroup } from '@/lib/vender/rules';
+import { sellsOn } from '@/lib/cardapio/days';
 
 const HOLD_MS = 500;
 
@@ -26,6 +27,9 @@ export function MenuPanel({ groups, disabled, onTap, onDetails }: {
   const shown = query
     ? groups.map((g) => ({ ...g, items: g.items.filter((i) => i.name.toLowerCase().includes(query)) })).filter((g) => g.items.length)
     : groups.filter((g) => g.id === current);
+
+  // The device's weekday: the Vender screen runs at the restaurant
+  const today = new Date().getDay();
 
   const press = (entry: MenuEntry) => {
     held.current = false;
@@ -77,6 +81,7 @@ export function MenuPanel({ groups, disabled, onTap, onDetails }: {
                 >
                   <div className="font-semibold text-sm leading-tight line-clamp-2">{entry.name}</div>
                   <div className="text-sm text-emerald-700 mt-1">{brl(toCents(entry.price))}{entry.soldByWeight ? '/kg' : ''}</div>
+                  {!sellsOn(entry.availableDays, today) && <div className="mt-1 text-[11px] font-medium text-blue-700">Hoje não (fora dos dias)</div>}
                 </button>
                 <button
                   aria-label={`Detalhes de ${entry.name}`}

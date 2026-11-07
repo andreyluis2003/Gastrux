@@ -3,6 +3,7 @@
 // Sprint 2: includes menu engineering badges (Star/Puzzle highlights)
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { offeredToday } from '@/lib/cardapio/days-server';
 import { tablePaymentEnabled } from '@/lib/mercadopago-connect/table-payment-access';
 
 export const dynamic = 'force-dynamic';
@@ -32,11 +33,13 @@ export async function GET(
     }
 
     // Fetch menu categories + active items for QR display (scoped to this restaurant)
+    // Items offered today only (spec 2026-11-06 cardapio-rapido)
+    const today = await offeredToday(table.restaurant.id);
     const categories = await prisma.menuCategory.findMany({
       where: { active: true, restaurantId: table.restaurant.id },
       include: {
         items: {
-          where: { active: true, available: true, displayOnQR: true, soldByWeight: false },
+          where: { active: true, available: true, displayOnQR: true, soldByWeight: false, ...today },
           include: {
             images: { where: { isPublic: true }, take: 1 },
           },

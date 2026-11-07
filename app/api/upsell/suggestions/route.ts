@@ -2,6 +2,7 @@
 // GET /api/upsell/suggestions?menuItemId=xxx
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { offeredToday } from '@/lib/cardapio/days-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,9 +44,13 @@ export async function GET(req: NextRequest) {
 
     const pairedRecipeIds = frequentPairs.map((p: any) => p.recipeId).filter(Boolean);
 
+    // Offered today only (spec 2026-11-06 cardapio-rapido)
+    const today = currentItem.restaurantId ? await offeredToday(currentItem.restaurantId) : {};
+
     // Strategy 2: Complementary categories (different category, lower price - side dishes / drinks)
     const complementaryItems = await prisma.menuItem.findMany({
       where: {
+        ...today,
         id: { not: menuItemId },
         categoryId: { not: currentItem.categoryId },
         restaurantId: currentItem.restaurantId,
@@ -62,6 +67,7 @@ export async function GET(req: NextRequest) {
     // Strategy 3: Same category popular items (different item, for upgrade upsell)
     const sameCategoryItems = await prisma.menuItem.findMany({
       where: {
+        ...today,
         id: { not: menuItemId },
         categoryId: currentItem.categoryId,
         restaurantId: currentItem.restaurantId,
@@ -82,7 +88,7 @@ export async function GET(req: NextRequest) {
     // First: paired items from order history
     if (pairedRecipeIds.length > 0) {
       const pairedMenuItems = await prisma.menuItem.findMany({
-        where: { recipeId: { in: pairedRecipeIds }, restaurantId: currentItem.restaurantId, active: true, available: true, soldByWeight: false },
+        where: { recipeId: { in: pairedRecipeIds }, restaurantId: currentItem.restaurantId, active: true, available: true, soldByWeight: false, ...today },
         include: { category: true, images: { take: 1, where: { isPublic: true } } },
       });
       for (const item of pairedMenuItems) {

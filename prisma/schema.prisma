@@ -2095,27 +2095,29 @@ model MenuCategory {
 }
 
 model MenuItem {
-  id           String          @id @default(cuid())
-  restaurantId String?
-  categoryId   String
-  name         String
-  description  String?
-  price        Decimal
-  recipeId     String?
-  available    Boolean         @default(true)
-  active       Boolean         @default(true)
-  position     Int             @default(0)
-  displayOnQR  Boolean         @default(true)
-  displayOnWeb Boolean         @default(true)
+  id            String          @id @default(cuid())
+  restaurantId  String?
+  categoryId    String
+  name          String
+  description   String?
+  price         Decimal
+  recipeId      String?
+  available     Boolean         @default(true)
+  active        Boolean         @default(true)
+  position      Int             @default(0)
+  displayOnQR   Boolean         @default(true)
+  displayOnWeb  Boolean         @default(true)
   /// Product code other systems send in the Gastrux order API (unique per restaurant)
-  code         String?
+  code          String?
   /// Sold by weight (spec 2026-10-25 venda-por-peso): price is per kg and its ficha describes 1 kg
-  soldByWeight Boolean         @default(false)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  images       MenuItemImage[]
-  category     MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  recipe       Recipe?         @relation("MenuItemRecipe", fields: [recipeId], references: [id], onDelete: SetNull)
+  soldByWeight  Boolean         @default(false)
+  /// Weekdays the customer channels offer it (0 = Sunday ... 6 = Saturday); empty = every day (spec 2026-11-06 cardapio-rapido)
+  availableDays Int[]           @default([])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  images        MenuItemImage[]
+  category      MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  recipe        Recipe?         @relation("MenuItemRecipe", fields: [recipeId], references: [id], onDelete: SetNull)
 
   @@unique([restaurantId, code])
   @@index([categoryId])

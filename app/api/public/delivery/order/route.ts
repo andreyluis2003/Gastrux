@@ -1,6 +1,7 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { offeredToday } from '@/lib/cardapio/days-server';
 import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest) {
     // Items without a ficha técnica get their ficha simples first (2026-10-12)
     await ensureMenuItemRecipes(prisma, restaurantId, menuItemIds.filter((id: unknown) => typeof id === 'string'), { onSaleOnly: true });
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds }, restaurantId, active: true, available: true, soldByWeight: false },
+      // An old cart cannot buy an item out of its weekdays (spec 2026-11-06 cardapio-rapido)
+      where: { id: { in: menuItemIds }, restaurantId, active: true, available: true, soldByWeight: false, ...(await offeredToday(restaurantId)) },
       include: { images: { take: 1 } },
     });
 

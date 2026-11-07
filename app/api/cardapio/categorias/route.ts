@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
       include: {
         items: {
           where: { active: true },
-          orderBy: { position: 'asc' },
+          // Same position: the older first, so a change never reorders the list (spec 2026-11-06 cardapio-rapido)
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
         },
       },
       orderBy: { position: 'asc' },

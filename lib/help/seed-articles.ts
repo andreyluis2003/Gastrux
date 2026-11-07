@@ -802,6 +802,37 @@ O cliente ainda não faz encomenda pelo site nem recebe aviso de "pronta" por Wh
   },
   {
     categorySlug: 'cardapio-e-receitas',
+    slug: 'esgotar-e-editar-o-cardapio',
+    title: 'Como esgoto um item ou mudo vários preços de uma vez?',
+    summary: 'No Cardápio digital: Esgotar em cada item, preço editável na lista, seleção em massa e dias da semana.',
+    keywords: 'esgotar, esgotado, acabou, indisponível, preço, reajuste, aumento, porcentagem, em massa, vários itens, dias da semana, só sábado, feijoada',
+    order: 3,
+    content: `## Esgotar
+
+Em **Cardápio e produtos > Cardápio digital**, toque em **Esgotar** no item: ele sai do Vender, do QR Code, do site de delivery e do WhatsApp na hora, com a etiqueta **Esgotado**. Para voltar, **Voltar a vender**. No título da categoria, **Esgotar todos** faz a categoria inteira.
+
+O iFood não é avisado: pause o item também no Gestor de Pedidos do iFood.
+
+## Mudar um preço
+
+Toque no preço do item, na própria lista, digite o novo valor e aperte **Enter** (ou toque fora). **Esc** cancela.
+
+## Vários itens de uma vez
+
+Marque a caixa de cada item, ou a caixa da categoria para marcar todos. Embaixo aparece uma barra com:
+
+- **Esgotar** e **Voltar a vender**
+- **Ajustar preço**: em %, de -50 a +50 (10 sobe 10%, -10 baixa 10%)
+- **Mover** para outra categoria
+- **Dias da semana**
+- **Ocultar no QR e site** e **Mostrar no QR e site**
+
+## Dias da semana
+
+Para um prato que só sai em alguns dias (a feijoada de sábado, por exemplo), escolha os dias no editar do produto ou pela barra. Fora desses dias o item some do QR Code, do site de delivery e do WhatsApp. No **Vender** ele continua aparecendo, com o aviso "Hoje não", porque a equipe decide. Na lista do cardápio aparece, por exemplo, "Só sáb e dom".`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
     slug: 'importar-cardapio-por-link',
     title: 'Como trago o meu cardápio de outro site de pedidos?',
     summary: 'Em Cardápio digital > Importar de um link: cole o link da sua loja, revise e importe produtos, preços, fotos e adicionais.',

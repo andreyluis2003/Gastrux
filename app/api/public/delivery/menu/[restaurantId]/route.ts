@@ -1,6 +1,7 @@
 // Public delivery menu endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { offeredToday } from '@/lib/cardapio/days-server';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ export async function GET(
         name: true,
         emoji: true,
         items: {
-          where: { active: true, available: true, displayOnWeb: true, soldByWeight: false },
+          where: { active: true, available: true, displayOnWeb: true, soldByWeight: false, ...(await offeredToday(params.restaurantId)) },
           select: {
             id: true,
             name: true,

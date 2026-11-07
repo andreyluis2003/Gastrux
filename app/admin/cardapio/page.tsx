@@ -13,7 +13,10 @@ import { toast } from 'sonner';
 import { brl } from '@/components/caixa/money';
 import { isProductRecipe } from '@/lib/cardapio/is-product-recipe';
 import { ImportFromLink } from '@/components/cardapio/import-from-link';
-import { Plus, Trash2, Edit2, Eye, EyeOff, ChefHat, Image as ImageIcon } from 'lucide-react';
+import { BulkBar } from '@/components/cardapio/bulk-bar';
+import { DayPicker } from '@/components/cardapio/day-picker';
+import { daysLabel } from '@/lib/cardapio/days';
+import { Plus, Trash2, Edit2, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { RecipeCostPanel } from '@/components/cardapio/recipe-cost-panel';
 import Image from 'next/image';
@@ -41,6 +44,8 @@ interface MenuItem {
   displayOnQR: boolean;
   /** Sold by weight: the price is per kg (spec 2026-10-25 venda-por-peso) */
   soldByWeight?: boolean;
+  /** Weekdays shown to customers, 0 = Sunday; empty = every day (spec 2026-11-06 cardapio-rapido) */
+  availableDays?: number[];
   categoryId: string;
   images: { id: string; imageUrl: string }[];
 }
@@ -58,6 +63,10 @@ export default function AdminCardapioPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  // Cardápio rápido (spec 2026-11-06): ticked items, the price being typed on the list, a bulk call running
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [priceEdit, setPriceEdit] = useState<{ id: string; value: string } | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', emoji: '', description: '' });
@@ -186,6 +195,7 @@ export default function AdminCardapioPage() {
           soldByWeight: !!editingItem.soldByWeight,
           categoryId: editingItem.categoryId,
           code: editingItem.code || null,
+          availableDays: editingItem.availableDays ?? [],
         }),
       });
       if (!res.ok) {
@@ -213,20 +223,41 @@ export default function AdminCardapioPage() {
     }
   };
 
-  const handleToggleAvailable = async (item: MenuItem) => {
+  /** One POST /api/cardapio/itens/lote; true when it worked */
+  const runBulk = async (ids: string[], body: Record<string, unknown>, okMessage?: string) => {
+    setBulkBusy(true);
     try {
-      const res = await fetch(`/api/cardapio/itens/${item.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ available: !item.available }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      toast.success(item.available ? 'Item desativado' : 'Item ativado');
-      fetchCategories();
-    } catch (err) {
-      toast.error('Erro ao alterar status');
+      const res = await fetch('/api/cardapio/itens/lote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids, ...body }) });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(out.error || 'Não foi possível salvar'); return false; }
+      toast.success(okMessage ?? (ids.length === 1 ? 'Item atualizado' : `${ids.length} itens atualizados`));
+      await fetchCategories();
+      return true;
+    } catch {
+      toast.error('Não foi possível salvar');
+      return false;
+    } finally {
+      setBulkBusy(false);
     }
   };
+
+  const handleToggleAvailable = (item: MenuItem) =>
+    runBulk([item.id], { acao: item.available ? 'esgotar' : 'voltar' }, item.available ? `${item.name}: esgotado` : `${item.name}: voltou a vender`);
+
+  /** "34,90", "1.234,50" or "34.90" */
+  const parsePrice = (s: string) => Number((s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s).replace(/[^\d.]/g, ''));
+
+  const savePrice = async () => {
+    if (!priceEdit) return;
+    const item = categories.flatMap((c) => c.items).find((i) => i.id === priceEdit.id);
+    const value = parsePrice(priceEdit.value);
+    if (!item || Math.round(value * 100) === Math.round(Number(item.price) * 100)) { setPriceEdit(null); return; }
+    if (!Number.isFinite(value) || value < 0.01) { toast.error('Preço inválido'); return; }
+    if (await runBulk([item.id], { acao: 'preco', preco: value }, `${item.name}: preço salvo`)) setPriceEdit(null);
+  };
+
+  const toggleSelected = (ids: string[], on: boolean) =>
+    setSelected((s) => { const n = new Set(s); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
 
   if (status === 'loading' || loading) {
     return <div className="p-8 text-center">Carregando...</div>;
@@ -235,7 +266,7 @@ export default function AdminCardapioPage() {
   const totalItems = categories.reduce((sum, c) => sum + c.items.length, 0);
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className={`p-4 sm:p-6 space-y-6 ${selected.size ? 'pb-40' : ''}`}>
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -318,20 +349,44 @@ export default function AdminCardapioPage() {
             <Card key={cat.id} className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-bold flex items-center gap-2">
+                  {cat.items.length > 0 && (
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      aria-label={`Marcar ${cat.name}`}
+                      checked={cat.items.every((i) => selected.has(i.id))}
+                      onChange={(e) => toggleSelected(cat.items.map((i) => i.id), e.target.checked)}
+                    />
+                  )}
                   {cat.emoji && <span>{cat.emoji}</span>}
                   {cat.name}
                   <span className="text-sm font-normal text-gray-500">
                     ({cat.items.length})
                   </span>
                 </h3>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowNewItem(showNewItem === cat.id ? null : cat.id)}
-                  className="gap-2"
-                >
-                  <Plus className="w-3 h-3" /> Item
-                </Button>
+                <div className="flex gap-2">
+                  {cat.items.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={bulkBusy}
+                      onClick={() => {
+                        const allOut = cat.items.every((i) => !i.available);
+                        runBulk(cat.items.map((i) => i.id), { acao: allOut ? 'voltar' : 'esgotar' }, allOut ? `${cat.name}: voltou a vender` : `${cat.name}: esgotada`);
+                      }}
+                    >
+                      {cat.items.every((i) => !i.available) ? 'Voltar todos' : 'Esgotar todos'}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowNewItem(showNewItem === cat.id ? null : cat.id)}
+                    className="gap-2"
+                  >
+                    <Plus className="w-3 h-3" /> Item
+                  </Button>
+                </div>
               </div>
 
               {/* New item form */}
@@ -406,9 +461,16 @@ export default function AdminCardapioPage() {
                     <div
                       key={item.id}
                       className={`flex items-center gap-3 p-2 rounded-lg border ${
-                        item.available ? 'bg-white' : 'bg-gray-50 opacity-60'
-                      }`}
+                        item.available ? 'bg-white' : 'bg-gray-50'
+                      } ${selected.has(item.id) ? 'ring-2 ring-primary/40' : ''}`}
                     >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 shrink-0"
+                        aria-label={`Marcar ${item.name}`}
+                        checked={selected.has(item.id)}
+                        onChange={(e) => toggleSelected([item.id], e.target.checked)}
+                      />
                       {item.images?.[0]?.imageUrl ? (
                         <div className="relative w-12 h-12 shrink-0 rounded overflow-hidden bg-gray-100">
                           <Image
@@ -425,14 +487,39 @@ export default function AdminCardapioPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{item.name}</p>
+                        <p className="font-semibold text-sm line-clamp-2 break-words">{item.name}</p>
                         {item.description && (
                           <p className="text-xs text-gray-500 truncate">{item.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-1 text-xs">
-                          <span className="font-bold text-amber-700">
-                            {brl(Math.round(Number(item.price) * 100))}{item.soldByWeight ? '/kg' : ''}
-                          </span>
+                          {priceEdit?.id === item.id ? (
+                            <input
+                              autoFocus
+                              inputMode="decimal"
+                              aria-label={`Preço de ${item.name}`}
+                              className="h-7 w-24 rounded border px-2 text-sm"
+                              value={priceEdit.value}
+                              disabled={bulkBusy}
+                              onChange={(e) => setPriceEdit({ id: item.id, value: e.target.value })}
+                              onKeyDown={(e) => { if (e.key === 'Enter') savePrice(); if (e.key === 'Escape') setPriceEdit(null); }}
+                              onBlur={savePrice}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              title="Tocar para mudar o preço"
+                              className="font-bold text-amber-700 underline decoration-dotted underline-offset-2"
+                              onClick={() => setPriceEdit({ id: item.id, value: Number(item.price).toFixed(2).replace('.', ',') })}
+                            >
+                              {brl(Math.round(Number(item.price) * 100))}{item.soldByWeight ? '/kg' : ''}
+                            </button>
+                          )}
+                          {!item.available && (
+                            <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">Esgotado</span>
+                          )}
+                          {daysLabel(item.availableDays) && (
+                            <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{daysLabel(item.availableDays)}</span>
+                          )}
                           {!item.displayOnQR && (
                             <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
                               Oculto no QR
@@ -443,12 +530,13 @@ export default function AdminCardapioPage() {
                       <div className="flex gap-1">
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant={item.available ? 'ghost' : 'outline'}
+                          disabled={bulkBusy}
                           onClick={() => handleToggleAvailable(item)}
-                          className="h-8 w-8 p-0"
-                          title={item.available ? 'Desativar' : 'Ativar'}
+                          className="h-8 px-2 text-xs"
+                          title={item.available ? 'Tira o item de todos os canais até voltar' : 'Volta a aparecer em todos os canais'}
                         >
-                          {item.available ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                          {item.available ? 'Esgotar' : 'Voltar a vender'}
                         </Button>
                         <Button
                           size="sm"
@@ -550,7 +638,7 @@ export default function AdminCardapioPage() {
                   checked={editingItem.available}
                   onChange={(e) => setEditingItem({ ...editingItem, available: e.target.checked })}
                 />
-                Disponível
+                À venda
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
@@ -569,6 +657,13 @@ export default function AdminCardapioPage() {
                 Vendido por peso
               </label>
             </div>
+            <div>
+              <Label>Dias em que aparece para o cliente</Label>
+              <div className="mt-1">
+                <DayPicker value={editingItem.availableDays ?? []} onChange={(d) => setEditingItem({ ...editingItem, availableDays: d })} />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Fora desses dias o item some do QR Code, do site e do WhatsApp. No Vender continua aparecendo.</p>
+            </div>
             {editingItem.soldByWeight && (
               <p className="text-xs text-gray-500">
                 O preço é por kg e a ficha técnica descreve 1 kg. No caixa, digite o peso (ex.: 0,350). Não aparece no QR, no site de delivery nem no WhatsApp: o cliente não tem como pesar.
@@ -584,6 +679,15 @@ export default function AdminCardapioPage() {
             </div>
           </Card>
         </div>
+      )}
+      {selected.size > 0 && (
+        <BulkBar
+          count={selected.size}
+          categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+          busy={bulkBusy}
+          run={async (body) => { const ok = await runBulk([...selected], body); if (ok) setSelected(new Set()); return ok; }}
+          clear={() => setSelected(new Set())}
+        />
       )}
     </div>
   );

@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { offeredToday } from '@/lib/cardapio/days-server';
 import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { MetaCloudClient, normalizePhone } from './meta-client';
@@ -247,8 +248,10 @@ async function handleGreeting(ctx: BotContext) {
 }
 
 async function handleShowCategories(ctx: BotContext) {
+  // Only this restaurant's menu (it listed every restaurant's categories), offered today (spec 2026-11-06 cardapio-rapido)
+  const today = await offeredToday(ctx.restaurantId);
   const categories = await prisma.menuCategory.findMany({
-    where: { active: true, items: { some: { active: true, available: true, soldByWeight: false } } },
+    where: { active: true, restaurantId: ctx.restaurantId, items: { some: { active: true, available: true, soldByWeight: false, ...today } } },
     orderBy: { position: 'asc' },
     take: 10,
   });
@@ -285,7 +288,7 @@ async function handleShowCategories(ctx: BotContext) {
 
 async function handleShowCategoryItems(ctx: BotContext, categoryId: string) {
   const items = await prisma.menuItem.findMany({
-    where: { categoryId, active: true, available: true, soldByWeight: false },
+    where: { categoryId, restaurantId: ctx.restaurantId, active: true, available: true, soldByWeight: false, ...(await offeredToday(ctx.restaurantId)) },
     orderBy: { position: 'asc' },
     take: 10,
     include: { category: true },
@@ -326,7 +329,7 @@ async function handleShowCategoryItems(ctx: BotContext, categoryId: string) {
 
 async function handleAddItem(ctx: BotContext, menuItemId: string) {
   const item = await prisma.menuItem.findFirst({
-    where: { id: menuItemId, active: true, available: true, soldByWeight: false },
+    where: { id: menuItemId, restaurantId: ctx.restaurantId, active: true, available: true, soldByWeight: false, ...(await offeredToday(ctx.restaurantId)) },
   });
   if (!item) {
     return safeSendText(ctx, 'Item não encontrado. Digite *menu* para ver o cardápio novamente.');

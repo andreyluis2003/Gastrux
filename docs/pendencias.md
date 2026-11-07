@@ -3,6 +3,21 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Cardápio rápido (2026-11-06)
+
+Spec `docs/superpowers/specs/2026-11-06-cardapio-rapido-design.md`.
+
+- **Esgotar não avisa o iFood:** sem o módulo de catálogo do iFood, o item esgotado continua à venda lá. A ajuda manda
+  pausar também no Gestor de Pedidos do iFood.
+- **Dias da semana só por dia**, não por horário (almoço/jantar).
+- **Vender:** a etiqueta "Hoje não" usa o dia do aparelho, não o fuso do restaurante (iguais quando o aparelho está
+  no restaurante).
+- **Pedido de WhatsApp na confirmação** (lib/whatsapp/bot.ts, criação do pedido) não reconfere os dias: um item
+  posto no carrinho antes da meia-noite e confirmado depois passa.
+- **Sem desfazer** a ação em massa.
+- Corrigido junto: o robô do WhatsApp listava as categorias de todos os restaurantes e abria categoria/item de outro
+  restaurante pelo id (o pedido final já conferia o restaurante).
+
 ## Importar o cardápio por link (2026-11-06)
 
 Spec `docs/superpowers/specs/2026-11-06-importar-cardapio-por-link-design.md`.

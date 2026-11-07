@@ -12,6 +12,8 @@ export interface MenuEntry {
   available?: boolean;
   /** Price per kg; the cashier types the weight (spec 2026-10-25 venda-por-peso) */
   soldByWeight?: boolean;
+  /** Weekdays customers see it (0 = Sunday); the team still sells it any day (spec 2026-11-06 cardapio-rapido) */
+  availableDays?: number[];
   category?: { id: string; name: string; position: number; emoji?: string | null } | null;
 }
 

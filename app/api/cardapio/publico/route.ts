@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { offeredToday } from '@/lib/cardapio/days-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,8 @@ export async function GET(req: NextRequest) {
           where: {
             active: true,
             displayOnQR: true,
+            // Offered today only (spec 2026-11-06 cardapio-rapido)
+            ...(await offeredToday(restaurantId)),
           },
           select: {
             id: true,
