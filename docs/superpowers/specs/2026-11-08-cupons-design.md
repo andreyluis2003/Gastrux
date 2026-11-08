@@ -27,7 +27,7 @@ desconto é o cashback na conta da mesa.
    qualquer caixa.
 5. **Tela:** Clientes e marketing > **Cupons** (dono e gerente): criar, ver usos e total de desconto dado,
    pausar/reativar. Não apaga cupom usado (o histórico fica).
-6. **Plano:** todos os planos (**decisão minha, o dono confere**): o cupom ajuda o site próprio a pegar tração
+6. **Plano:** todos os planos (decisão minha, **confirmada pelo dono em 2026-11-08**): o cupom ajuda o site próprio a pegar tração
    e o cashback continua sendo do Business.
 7. **Uso contado com segurança:** o uso é reservado numa transação (o limite total não estoura com dois pedidos
    ao mesmo tempo) e desfeito se o pedido não for criado. Pedido cancelado depois **não** devolve o uso (v1).

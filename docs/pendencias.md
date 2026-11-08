@@ -10,7 +10,7 @@ Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
 - **Só no site de delivery:** WhatsApp, Vender, QR da mesa e API de pedidos ainda não aceitam cupom.
 - **Cancelamento não devolve o uso** (nem o limite por cliente): um cliente que teve o pedido cancelado não usa o
   cupom de novo se o limite for 1.
-- **Plano:** cupons em todos os planos (decisão minha; o dono confere). Cashback continua só no Business.
+- **Plano:** cupons em todos os planos (confirmado pelo dono em 2026-11-08). Cashback continua só no Business.
 - **"Só no primeiro pedido"** olha pedidos do site deste restaurante pelo celular (cliente do CRM); quem já comprou
   no salão ou no iFood ainda conta como primeiro pedido no site.
 - **Celular não conferido:** o limite por cliente e o "só no primeiro pedido" contam pelo celular digitado (sem código
