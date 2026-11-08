@@ -1,6 +1,7 @@
 // Public delivery order endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { CLOSED_MESSAGE, isStoreClosed } from '@/lib/orders/store-open';
 import { offeredToday } from '@/lib/cardapio/days-server';
 import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest) {
     }
     // Plans of 2026-10-18: no new customer orders while the plan is locked
     if (!(await restaurantAcceptsOrders(restaurantId))) return NextResponse.json(ORDER_REFUSAL, { status: 403 });
+    // Loja fechada (spec 2026-11-07 quadro-de-pedidos)
+    if (await isStoreClosed(restaurantId)) return NextResponse.json({ error: CLOSED_MESSAGE, code: 'STORE_CLOSED' }, { status: 409 });
 
 
     // Resolve menu items and compute totals (scoped to this restaurant - a

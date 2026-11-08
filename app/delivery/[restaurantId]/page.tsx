@@ -48,6 +48,8 @@ interface RestaurantInfo {
   businessHours?: any;
   acceptsOnlinePayment?: boolean;
   paymentOptions?: DeliveryPaymentOptions;
+  /** Loja fechada: no new orders (spec 2026-11-07 quadro-de-pedidos) */
+  closed?: boolean;
 }
 
 interface CartItem {
@@ -767,6 +769,9 @@ export default function DeliveryPage() {
             )}
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-lg truncate">{restaurant.name}</h1>
+              {restaurant.closed && (
+                <p className="text-xs font-semibold text-red-600">Fechado agora: não estamos recebendo pedidos. Você pode olhar o cardápio.</p>
+              )}
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <Bike className="h-3 w-3" />
                 <span>Delivery</span>
@@ -922,8 +927,8 @@ export default function DeliveryPage() {
                 <p className="text-xs text-gray-500">Subtotal + entrega</p>
                 <p className="font-bold text-orange-600">{formatBRL(grandTotal)}</p>
               </div>
-              <Button className="bg-orange-600 hover:bg-orange-700 text-white font-bold" onClick={() => setStep('checkout')}>
-                Finalizar Pedido
+              <Button className="bg-orange-600 hover:bg-orange-700 text-white font-bold" disabled={!!restaurant.closed} onClick={() => setStep('checkout')}>
+                {restaurant.closed ? 'Fechado agora' : 'Finalizar Pedido'}
               </Button>
             </div>
           </div>

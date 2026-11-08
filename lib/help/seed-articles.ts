@@ -726,6 +726,34 @@ O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API 
   },
   {
     categorySlug: 'integracao-delivery',
+    slug: 'todos-os-pedidos-e-loja-fechada',
+    title: 'Como vejo todos os pedidos numa tela e fecho a loja?',
+    summary: 'Vender > Todos os pedidos: salão, balcão, site, WhatsApp, iFood e API num quadro, e o botão Loja aberta/fechada.',
+    keywords: 'todos os pedidos, quadro, painel, gestor de pedidos, fechar loja, loja fechada, pausar, parar de receber pedidos, abrir loja',
+    order: 5,
+    content: `## Todos os pedidos
+
+Em **Vender > Todos os pedidos** ficam todos os pedidos abertos, de todos os canais: mesas, balcão, site de delivery, WhatsApp, iFood e API de pedidos. São quatro colunas: **Novos** (esperando o Aceitar), **Em preparo**, **Prontos** e **Em entrega**.
+
+- Os botões do topo filtram por canal e mostram quantos pedidos cada um tem
+- Cada pedido mostra de onde veio, o número, os itens, o total e há quanto tempo chegou (com 30 minutos ou mais, o tempo fica vermelho)
+- Toque no pedido para abrir a tela dele: a comanda no Vender ou Pedidos de delivery. Aceitar, recusar e mudar a etapa continuam lá
+
+A tela se atualiza sozinha a cada 15 segundos.
+
+## Loja aberta e fechada
+
+No topo de **Todos os pedidos** e de **Pedidos de delivery** há o botão **Loja aberta**. Toque para fechar. Com a loja fechada:
+
+- O **site de delivery** mostra "Fechado agora" e não deixa finalizar o pedido
+- O **WhatsApp** avisa o cliente que está fechado (pedido de uma mesa pelo WhatsApp continua)
+- A **API de pedidos** recusa pedidos novos
+- O **iFood** é pausado e volta quando você abrir (se ele já estava pausado antes, continua pausado)
+
+O salão continua normal: Vender e o QR Code das mesas. A loja não abre nem fecha sozinha pelo horário: toque no botão para abrir de novo.`,
+  },
+  {
+    categorySlug: 'integracao-delivery',
     slug: 'ligar-ifood',
     title: 'Como ligo o iFood?',
     summary: 'Em Configurações > iFood (plano Business): os pedidos do iFood chegam em Pedidos de delivery e o status volta para o iFood.',

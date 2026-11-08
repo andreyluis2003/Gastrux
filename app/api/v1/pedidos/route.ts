@@ -6,6 +6,7 @@ import { parseOrderApiInput } from '@/lib/delivery-orders/input';
 import { DeliveryOrderError, ingestDeliveryOrder } from '@/lib/delivery-orders/ingest';
 import { publicStatus } from '@/lib/delivery-orders/status';
 import { prisma } from '@/lib/prisma';
+import { CLOSED_MESSAGE, isStoreClosed } from '@/lib/orders/store-open';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,10 @@ export async function POST(req: NextRequest) {
   }
   if (!(await restaurantAcceptsOrders(auth.restaurantId))) {
     return NextResponse.json({ erro: 'Este restaurante não está recebendo pedidos agora.', code: 'RESTAURANT_UNAVAILABLE' }, { status: 403 });
+  }
+  // Loja fechada (spec 2026-11-07 quadro-de-pedidos)
+  if (await isStoreClosed(auth.restaurantId)) {
+    return NextResponse.json({ erro: CLOSED_MESSAGE, code: 'STORE_CLOSED' }, { status: 409 });
   }
   const declared = Number(req.headers.get('content-length') ?? 0);
   if (declared > MAX_BYTES) return NextResponse.json({ erro: 'O pedido passa de 256 KB' }, { status: 413 });

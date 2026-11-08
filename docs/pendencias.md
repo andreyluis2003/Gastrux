@@ -3,6 +3,18 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Todos os pedidos e loja aberta/fechada (2026-11-07)
+
+Spec `docs/superpowers/specs/2026-11-07-quadro-de-pedidos-design.md`.
+
+- **Sem abrir/fechar pelo horário:** `Restaurant.businessHours` continua sem uso; abrir e fechar é manual.
+- **Quadro só de leitura:** aceitar, recusar e mudar etapa continuam nas telas de origem; sem som nesta tela.
+- **Canal WhatsApp** vem do texto "Pedido via WhatsApp" que o robô grava nas observações da comanda: se esse texto
+  mudar no robô, o pedido passa a aparecer como Balcão.
+- **Pedido de QR da mesa** aparece como Salão (é uma comanda de mesa), sem separar do lançado pelo garçom.
+- **Loja fechada e iFood:** o iFood fecha a loja alguns minutos depois que o Gastrux para de conversar; um pedido
+  que já estava a caminho ainda entra.
+
 ## Cardápio rápido (2026-11-06)
 
 Spec `docs/superpowers/specs/2026-11-06-cardapio-rapido-design.md`.

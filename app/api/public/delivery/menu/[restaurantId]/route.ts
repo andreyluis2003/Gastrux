@@ -22,6 +22,7 @@ export async function GET(
         state: true,
         phone: true,
         businessHours: true,
+        ordersClosedAt: true,
       },
     });
 
@@ -54,13 +55,15 @@ export async function GET(
     });
 
     const filteredCategories = categories.filter((c) => c.items.length > 0);
+    const { ordersClosedAt, ...publicInfo } = restaurant;
     const paymentOptions = await getDeliveryPaymentOptions(params.restaurantId);
     // Kept for older clients: true when the restaurant can take PIX/card online.
     const acceptsOnlinePayment = paymentOptions.online.pix;
 
     return NextResponse.json(
-      { restaurant: { ...restaurant, acceptsOnlinePayment, paymentOptions }, categories: filteredCategories },
-      { headers: { 'Cache-Control': 'public, max-age=60' } }
+      // Loja fechada shows on the page (spec 2026-11-07 quadro-de-pedidos); a short cache so closing shows soon
+      { restaurant: { ...publicInfo, closed: !!ordersClosedAt, acceptsOnlinePayment, paymentOptions }, categories: filteredCategories },
+      { headers: { 'Cache-Control': 'public, max-age=15' } }
     );
   } catch (error) {
     console.error('Error fetching delivery menu:', error);

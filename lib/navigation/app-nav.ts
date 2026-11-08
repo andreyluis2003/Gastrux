@@ -39,6 +39,8 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Vender',
     links: [
       { label: 'Mesas e balcão', href: '/vender', roles: FRONT },
+      // Spec 2026-11-07 quadro-de-pedidos: every open order of every channel, and Loja aberta/fechada
+      { label: 'Todos os pedidos', href: '/pedidos', roles: FRONT },
       // Spec 2026-10-26 encomendas: orders for later (cakes, salgados), with the pickup time and the deposit
       { label: 'Encomendas', href: '/encomendas', roles: FRONT },
       { label: 'Mesas', href: '/admin/tables', roles: MANAGERS },

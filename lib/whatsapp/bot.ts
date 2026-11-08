@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { CLOSED_MESSAGE, isStoreClosed } from '@/lib/orders/store-open';
 import { offeredToday } from '@/lib/cardapio/days-server';
 import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate';
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
@@ -551,6 +552,10 @@ async function handleConfirmOrder(ctx: BotContext) {
   }
   // Plans of 2026-10-18: no new customer orders while the plan is locked
   if (!(await restaurantAcceptsOrders(ctx.restaurantId))) return safeSendText(ctx, ORDER_REFUSAL.error);
+  // Loja fechada: no delivery or pickup order; an order from a table inside the restaurant goes on (spec 2026-11-07)
+  if (!ctx.conversation.tableNumber && (await isStoreClosed(ctx.restaurantId))) {
+    return safeSendText(ctx, `😴 ${CLOSED_MESSAGE} Seu carrinho fica guardado: confirme quando a loja abrir.`);
+  }
 
   // Obter owner do restaurante para userId
   const restaurant = await prisma.restaurant.findUnique({

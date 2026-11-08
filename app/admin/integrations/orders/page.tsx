@@ -3,6 +3,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { StoreToggle } from '@/components/orders/store-toggle';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BackButton } from '@/components/ui/back-button';
@@ -341,6 +342,8 @@ export default function DeliveryOrdersPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Loja aberta/fechada (spec 2026-11-07 quadro-de-pedidos) */}
+            <StoreToggle />
             <Button variant="outline" size="sm" onClick={toggleSound} aria-label={soundEnabled ? 'Desligar o som dos pedidos' : 'Ligar o som dos pedidos'}>
               {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               <span className="ml-1">{soundEnabled ? 'Som ligado' : 'Som desligado'}</span>

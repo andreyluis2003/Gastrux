@@ -2914,6 +2914,10 @@ model Restaurant {
   country                 String                    @default("BR")
   zipCode                 String?
   timezone                String                    @default("America/Sao_Paulo")
+  /// Loja fechada: no new orders from the delivery site, WhatsApp, the order API or iFood; null = open (spec 2026-11-07 quadro-de-pedidos)
+  ordersClosedAt          DateTime?
+  /// The close paused iFood, so opening resumes it (an iFood paused by hand stays paused)
+  ordersClosedPausedIfood Boolean                   @default(false)
   currency                String                    @default("BRL")
   language                String                    @default("pt-BR")
   status                  RestaurantStatus          @default(ACTIVE)
