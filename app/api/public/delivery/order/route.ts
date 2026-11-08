@@ -12,6 +12,7 @@ import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/deliv
 import { formatPhone, normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
 import { attachRedemption, checkCoupon, releaseRedemption, reserveCoupon } from '@/lib/coupons/service';
+import { clientAddress, takeCouponTry } from '@/lib/coupons/attempts';
 import { ownIntegration } from '@/lib/delivery-orders/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -129,6 +130,10 @@ export async function POST(req: NextRequest) {
     const couponPhone = normalizePhone(customerPhone) || '';
     let couponDiscount = 0;
     if (hasCoupon) {
+      // The same limit as the preview: the order route must not be a way to try codes (security review 2026-11-08)
+      if (!takeCouponTry(clientAddress(req.headers), restaurantId)) {
+        return NextResponse.json({ error: 'Muitas tentativas de cupom. Espere um minuto.', code: 'COUPON_REFUSED' }, { status: 429 });
+      }
       const preview = await checkCoupon(restaurantId, couponCode, couponPhone, Math.round(subtotal * 100), Math.round(safeDeliveryFee * 100));
       if (!preview.ok) return NextResponse.json({ error: preview.error, code: 'COUPON_REFUSED' }, { status: 400 });
       couponDiscount = preview.discountCents / 100;

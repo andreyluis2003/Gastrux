@@ -25,7 +25,7 @@ describe('coupon rules', () => {
 
   it('says why a coupon cannot be used', () => {
     expect(refusal(base, order)).toBeNull();
-    expect(refusal({ ...base, active: false }, order)).toMatch(/ativo/);
+    expect(refusal({ ...base, active: false }, order)).toMatch(/inválido ou fora do ar/);
     expect(refusal({ ...base, validUntil: new Date('2026-11-01') }, order)).toMatch(/venceu/);
     expect(refusal({ ...base, validFrom: new Date('2026-12-01') }, order)).toMatch(/começou/);
     expect(refusal({ ...base, maxUses: 3, usedCount: 3 }, order)).toMatch(/máximo/);

@@ -755,7 +755,9 @@ Cada cupom mostra quantas vezes foi usado e quanto de desconto já deu. **Pausar
 
 ## O que ainda não tem
 
-O cupom vale só no **site de delivery**: ainda não no WhatsApp, no Vender, no QR Code da mesa nem na API de pedidos. Um pedido cancelado não devolve o uso do cupom.`,
+O cupom vale só no **site de delivery**: ainda não no WhatsApp, no Vender, no QR Code da mesa nem na API de pedidos. Um pedido cancelado não devolve o uso do cupom.
+
+O limite por cliente e o "só no primeiro pedido" contam pelo celular digitado, que não é conferido: quem digitar outro número consegue usar de novo. Para um cupom de valor alto, use também o **limite de usos no total**.`,
   },
   {
     categorySlug: 'integracao-delivery',

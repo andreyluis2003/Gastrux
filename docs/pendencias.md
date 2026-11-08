@@ -13,7 +13,10 @@ Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
 - **Plano:** cupons em todos os planos (decisão minha; o dono confere). Cashback continua só no Business.
 - **"Só no primeiro pedido"** olha pedidos do site deste restaurante pelo celular (cliente do CRM); quem já comprou
   no salão ou no iFood ainda conta como primeiro pedido no site.
-- **Limite de tentativas** do campo de cupom (20 por minuto por endereço) fica na memória do processo.
+- **Celular não conferido:** o limite por cliente e o "só no primeiro pedido" contam pelo celular digitado (sem código
+  por SMS); quem digita outro número usa de novo. A tela e a ajuda avisam e indicam o limite de usos no total.
+- **Limite de tentativas** de cupom (20 por minuto por endereço e 300 por minuto por restaurante, no site e na criação
+  do pedido) fica na memória do processo: um Deploy zera, e com mais de um servidor cada um conta o seu.
 - Cupom por produto ou categoria, cupons em lote e cupom na campanha: não feitos.
 
 ## Todos os pedidos e loja aberta/fechada (2026-11-07)

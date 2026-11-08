@@ -74,7 +74,7 @@ export function refusal(
   c: CouponRules,
   o: { subtotalCents: number; deliveryFeeCents: number; now: Date; usesByCustomer: number; customerOrdered: boolean },
 ): string | null {
-  if (!c.active) return 'Este cupom não está ativo.';
+  if (!c.active) return 'Cupom inválido ou fora do ar.';
   if (c.validFrom && o.now < c.validFrom) return 'Este cupom ainda não começou a valer.';
   if (c.validUntil && o.now > c.validUntil) return 'Este cupom venceu.';
   if (c.maxUses !== null && c.usedCount >= c.maxUses) return 'Este cupom já foi usado o número máximo de vezes.';

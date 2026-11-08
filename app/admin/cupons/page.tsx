@@ -135,6 +135,10 @@ export default function CuponsPage() {
             Só no primeiro pedido do cliente
           </label>
         </div>
+        <p className="text-xs text-muted-foreground">
+          O limite por cliente e o "só no primeiro pedido" contam pelo celular digitado, que não é conferido: quem digitar outro
+          número consegue usar de novo. Para um cupom de valor alto, use também o limite de usos no total.
+        </p>
         <Button disabled={busy || form.code.length < 3} onClick={create}>Criar cupom</Button>
       </Card>
 

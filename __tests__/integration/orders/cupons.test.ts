@@ -86,7 +86,7 @@ describe('cupons', () => {
     expect((await order({ couponCode: 'UMAVEZ', customerPhone: fixed })).status).toBe(200);
     const again = await order({ couponCode: 'UMAVEZ', customerPhone: fixed });
     expect(again.status).toBe(400);
-    expect(await again.json()).toMatchObject({ code: 'COUPON_REFUSED', error: 'Você já usou este cupom.' });
+    expect(await again.json()).toMatchObject({ code: 'COUPON_REFUSED', error: 'Este cupom não vale para este celular.' });
   });
 
   it('free delivery, first order only, minimum order', async () => {
@@ -98,6 +98,10 @@ describe('cupons', () => {
     // The same phone already ordered: not the first order any more
     const second = await order({ couponCode: 'FRETE', customerPhone: '66911112222' });
     expect(second.status).toBe(400);
+    expect(await second.json()).toMatchObject({ error: 'Este cupom não vale para este celular.' });
+    // The preview never tells that this phone already ordered
+    const p = await PREVIEW(json('http://x/api/public/delivery/coupon', { restaurantId: rid, code: 'FRETE', customerPhone: '66911112222', items: [{ menuItemId: item.id, quantity: 2 }], deliveryFee: 7 }));
+    expect(p.status).toBe(200);
   });
 
   it('the last use goes to one order only, even with two at once', async () => {
@@ -115,6 +119,6 @@ describe('cupons', () => {
     expect(dez).toMatchObject({ usedCount: 1, discountGivenCents: 400 });
     expect((await PATCH(new NextRequest('http://x', { method: 'PATCH', body: JSON.stringify({ active: false }) }), { params: { id: dez.id } })).status).toBe(200);
     const res = await order({ couponCode: 'DEZPORCENTO' });
-    expect(await res.json()).toMatchObject({ error: 'Este cupom não está ativo.' });
+    expect(await res.json()).toMatchObject({ error: 'Cupom inválido ou fora do ar.' });
   });
 });
