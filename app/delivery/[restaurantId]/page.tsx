@@ -220,7 +220,32 @@ export default function DeliveryPage() {
 
   const cartTotal = useMemo(() => cart.reduce((sum, i) => sum + i.price * i.quantity, 0), [cart]);
   const cartCount = useMemo(() => cart.reduce((sum, i) => sum + i.quantity, 0), [cart]);
-  const grandTotal = cartTotal + deliveryFee;
+  // Cupom (spec 2026-11-08 cupons): the server checks it again when the order is created
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<{ code: string; label: string; discountCents: number } | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  // A change in the cart or in pickup changes the discount: the customer applies the coupon again
+  useEffect(() => { setCoupon(null); }, [cartTotal, pickup]);
+  const couponDiscount = coupon ? coupon.discountCents / 100 : 0;
+  const grandTotal = Math.round((cartTotal + deliveryFee - couponDiscount) * 100) / 100;
+
+  async function applyCoupon() {
+    if (!couponInput.trim()) return;
+    setCouponBusy(true);
+    try {
+      const res = await fetch('/api/public/delivery/coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId, code: couponInput, customerPhone, deliveryFee, pickup, items: cart.map((c) => ({ menuItemId: c.menuItemId, quantity: c.quantity })) }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) { toast.error(data?.error || 'Cupom não aceito'); return; }
+      setCoupon(data);
+      toast.success(`Cupom ${data.code} aplicado`);
+    } finally {
+      setCouponBusy(false);
+    }
+  }
 
   const filteredCategories = useMemo(() => {
     if (!search.trim()) return categories;
@@ -316,6 +341,7 @@ export default function DeliveryPage() {
         : specialInstructions,
       deliveryFee,
       pickup,
+      couponCode: coupon?.code,
       ...payment.payload,
     };
     // The signature is the whole request (cart, customer, address, notes, payment choice). If an online order
@@ -346,6 +372,7 @@ export default function DeliveryPage() {
         // Any refusal (for example the restaurant just changed its payment settings): show the
         // server's message, keep the cart and reload what the restaurant offers.
         void refreshMenu();
+        if (data?.code === 'COUPON_REFUSED') setCoupon(null);
         throw new Error(typeof data?.error === 'string' && data.error ? data.error : 'Erro ao enviar pedido');
       }
       const method: string = data.order?.paymentMethod ?? payment.payload.paymentMethod;
@@ -623,9 +650,30 @@ export default function DeliveryPage() {
               <div className="border-t pt-2 mt-2 space-y-1">
                 <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatBRL(cartTotal)}</span></div>
                 {!pickup && <div className="flex justify-between text-sm"><span>Taxa de entrega</span><span>{formatBRL(deliveryFee)}</span></div>}
+                {coupon && (
+                  <div className="flex justify-between text-sm text-green-700">
+                    <span>Cupom {coupon.code} ({coupon.label}) <button type="button" className="ml-1 underline text-gray-500" onClick={() => setCoupon(null)}>remover</button></span>
+                    <span>-{formatBRL(couponDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-lg"><span>Total</span><span className="text-orange-600">{formatBRL(grandTotal)}</span></div>
               </div>
             </div>
+            {!coupon && (
+              <div className="mt-3 flex gap-2">
+                <Input
+                  placeholder="Tem cupom? Digite aqui"
+                  value={couponInput}
+                  maxLength={30}
+                  onChange={(e) => setCouponInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCoupon(); } }}
+                  aria-label="Código do cupom"
+                />
+                <Button type="button" variant="outline" disabled={couponBusy || !couponInput.trim()} onClick={applyCoupon}>
+                  {couponBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
+                </Button>
+              </div>
+            )}
           </Card>
 
           {/* Customer info */}

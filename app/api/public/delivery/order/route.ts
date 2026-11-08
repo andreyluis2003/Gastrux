@@ -11,6 +11,7 @@ import { validatePaymentChoice, describePaymentForKitchen } from '@/lib/delivery
 import { normalizeQuantity, sanitizeCustomerNote, singleLine } from '@/lib/delivery-payments/order-input';
 import { formatPhone, normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
+import { attachRedemption, checkCoupon, releaseRedemption, reserveCoupon } from '@/lib/coupons/service';
 import { ownIntegration } from '@/lib/delivery-orders/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       changeFor,
       voucherBrand,
       pickup,
+      couponCode,
     } = body;
     // "Retirar no local" (owner request 2026-10-23): the customer picks the order up, no address and no delivery fee
     const isPickup = pickup === true;
@@ -122,7 +124,16 @@ export async function POST(req: NextRequest) {
     // (no delivery zone/fee config exists yet) - clamp it to non-negative
     // so a client can't submit a negative value to reduce the order total.
     const safeDeliveryFee = isPickup ? 0 : Math.max(0, Number(deliveryFee) || 0);
-    const total = subtotal + safeDeliveryFee;
+    // Cupom (spec 2026-11-08 cupons): checked here, reserved right before the order is written
+    const hasCoupon = typeof couponCode === 'string' && couponCode.trim() !== '';
+    const couponPhone = normalizePhone(customerPhone) || '';
+    let couponDiscount = 0;
+    if (hasCoupon) {
+      const preview = await checkCoupon(restaurantId, couponCode, couponPhone, Math.round(subtotal * 100), Math.round(safeDeliveryFee * 100));
+      if (!preview.ok) return NextResponse.json({ error: preview.error, code: 'COUPON_REFUSED' }, { status: 400 });
+      couponDiscount = preview.discountCents / 100;
+    }
+    let total = Math.round((subtotal + safeDeliveryFee - couponDiscount) * 100) / 100;
 
     // The payment choice is validated on the server against what this restaurant
     // offers (its settings and its Mercado Pago connection) and against the
@@ -137,6 +148,17 @@ export async function POST(req: NextRequest) {
     const paymentNote = isPickup ? deliveryNote.replace(/^Pagamento na entrega:/, 'Pagamento na retirada:') : deliveryNote;
 
     const orderNumber = generateOrderNumber();
+
+    // One use of the coupon, reserved under a lock (the limits are counted again); released below if no order comes out
+    let coupon: { redemptionId: string; code: string; discountCents: number } | null = null;
+    if (hasCoupon) {
+      const r = await reserveCoupon(restaurantId, couponCode, couponPhone, Math.round(subtotal * 100), Math.round(safeDeliveryFee * 100));
+      if (!r.ok) return NextResponse.json({ error: r.error, code: 'COUPON_REFUSED' }, { status: 409 });
+      coupon = r;
+      couponDiscount = r.discountCents / 100;
+      total = Math.round((subtotal + safeDeliveryFee - couponDiscount) * 100) / 100;
+    }
+    try {
 
     // The customer of this restaurant by phone (cashback and CRM, spec 2026-10-23 §7.3); the e-mail is optional
     // and globally unique, so it is saved only when no other customer has it. Without a valid phone, by e-mail.
@@ -179,6 +201,7 @@ export async function POST(req: NextRequest) {
       !isPickup && noteZipCode ? `CEP: ${noteZipCode}` : '',
       !isPickup && noteReference ? `Referência: ${noteReference}` : '',
       paymentNote,
+      coupon ? `Cupom ${coupon.code}: -${(coupon.discountCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : '',
       `Cliente: ${singleLine(customerName)} - ${singleLine(customerPhone)}`,
     ].filter(Boolean).join('\n');
 
@@ -189,7 +212,7 @@ export async function POST(req: NextRequest) {
     const externalOrder = await prisma.externalOrder.create({
       data: {
         restaurantId, integrationId: site.id, externalOrderId: orderNumber, status: 'CONFIRMED',
-        totalAmount: total, subtotal, deliveryFee: safeDeliveryFee, discount: 0, platformFee: 0,
+        totalAmount: total, subtotal, deliveryFee: safeDeliveryFee, discount: couponDiscount, platformFee: 0,
         paymentMethod: choice.paymentMethod, paidOnline: false, customerId: customer?.id ?? null,
         customerName: singleLine(customerName), customerPhone: phoneDigits ? formatPhone(phoneDigits) : singleLine(customerPhone),
         customerEmail: customerEmail || null,
@@ -212,6 +235,7 @@ export async function POST(req: NextRequest) {
           totalItems: orderItems.reduce((acc, i) => acc + i.quantity, 0),
           subtotal,
           fees: safeDeliveryFee,
+          discount: couponDiscount,
           total,
           paymentMethod: choice.paymentMethod,
           cashChangeFor: choice.changeFor,
@@ -237,6 +261,7 @@ export async function POST(req: NextRequest) {
       throw error;
     }
     await prisma.externalOrder.update({ where: { id: externalOrder.id }, data: { internalOrderId: order.id } });
+    if (coupon) await attachRedemption(coupon.redemptionId, externalOrder.id);
 
     // The plan counts sales per month and only warns (owner decision 2026-10-09)
     await noteSalesThresholds(restaurantId);
@@ -253,8 +278,15 @@ export async function POST(req: NextRequest) {
         itemCount: order.totalItems,
         paymentMethod: choice.paymentMethod,
         paymentSummary: paymentNote,
+        discount: couponDiscount,
+        coupon: coupon?.code ?? null,
       },
     });
+    } catch (error) {
+      // No order came out: the coupon use goes back
+      if (coupon) await releaseRedemption(coupon.redemptionId).catch(() => {});
+      throw error;
+    }
   } catch (error: any) {
     console.error('Error creating delivery order:', error);
     if (error?.code === 'P2002') {

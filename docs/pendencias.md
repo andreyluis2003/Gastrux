@@ -3,6 +3,19 @@
 Tudo o que uma revisão deixou para depois fica aqui, por extenso (o quê, onde, por quê), e sai daqui com o
 commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e se perdem: não servem para isso.
 
+## Cupons (2026-11-08)
+
+Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
+
+- **Só no site de delivery:** WhatsApp, Vender, QR da mesa e API de pedidos ainda não aceitam cupom.
+- **Cancelamento não devolve o uso** (nem o limite por cliente): um cliente que teve o pedido cancelado não usa o
+  cupom de novo se o limite for 1.
+- **Plano:** cupons em todos os planos (decisão minha; o dono confere). Cashback continua só no Business.
+- **"Só no primeiro pedido"** olha pedidos do site deste restaurante pelo celular (cliente do CRM); quem já comprou
+  no salão ou no iFood ainda conta como primeiro pedido no site.
+- **Limite de tentativas** do campo de cupom (20 por minuto por endereço) fica na memória do processo.
+- Cupom por produto ou categoria, cupons em lote e cupom na campanha: não feitos.
+
 ## Todos os pedidos e loja aberta/fechada (2026-11-07)
 
 Spec `docs/superpowers/specs/2026-11-07-quadro-de-pedidos-design.md`.

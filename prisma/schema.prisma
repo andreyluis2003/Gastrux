@@ -2964,6 +2964,7 @@ model Restaurant {
   demandForecasts         DemandForecast[]
   expenseCategories       ExpenseCategory[]
   externalOrders          ExternalOrder[]
+  coupons                 Coupon[]
   feedbackEntries         Feedback[]                @relation("RestaurantFeedback")
   guestProfiles           GuestProfile[]
   incomeCategories        IncomeCategory[]
@@ -5082,4 +5083,49 @@ model SubscriptionAcceptance {
 
   @@index([restaurantId, createdAt])
   @@map("subscription_acceptances")
+}
+
+/// Cupons de desconto do site de delivery (spec 2026-11-08 cupons)
+model Coupon {
+  id                 String             @id @default(cuid())
+  restaurantId       String
+  /// Upper case letters and digits, 3 to 20; unique per restaurant
+  code               String
+  /// PERCENT (value = %), FIXED (value = cents) or FREE_DELIVERY (value unused)
+  kind               String
+  value              Int                @default(0)
+  minOrderCents      Int                @default(0)
+  validFrom          DateTime?
+  validUntil         DateTime?
+  /// Total uses allowed; null = no limit
+  maxUses            Int?
+  /// Uses per customer phone; null = no limit
+  maxPerCustomer     Int?               @default(1)
+  firstOrderOnly     Boolean            @default(false)
+  active             Boolean            @default(true)
+  usedCount          Int                @default(0)
+  createdById        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  restaurant         Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  redemptions        CouponRedemption[]
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id              String   @id @default(cuid())
+  couponId        String
+  restaurantId    String
+  phoneDigits     String
+  externalOrderId String?
+  discountCents   Int
+  createdAt       DateTime @default(now())
+  coupon          Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@index([couponId, phoneDigits])
+  @@index([restaurantId])
+  @@map("coupon_redemptions")
 }

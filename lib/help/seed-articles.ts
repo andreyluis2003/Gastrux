@@ -726,6 +726,39 @@ O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API 
   },
   {
     categorySlug: 'integracao-delivery',
+    slug: 'cupons-de-desconto',
+    title: 'Como crio um cupom de desconto para o site de delivery?',
+    summary: 'Clientes e marketing > Cupons: % de desconto, valor fixo ou entrega grátis, com pedido mínimo, validade e limites.',
+    keywords: 'cupom, cupons, desconto, código, promoção, entrega grátis, frete grátis, primeiro pedido, primeira compra',
+    order: 6,
+    content: `## Criando
+
+Em **Clientes e marketing > Cupons** (dono ou gerente), preencha:
+
+- **Código**: letras e números, como PRIMEIRA10. O cliente pode digitar em maiúsculas ou minúsculas
+- **Tipo**: % de desconto, valor em reais ou **entrega grátis**
+- **Pedido mínimo**, **vale até** e **limite de usos no total**: opcionais
+- **Usos por cliente**: pelo celular do cliente; o padrão é 1
+- **Só no primeiro pedido do cliente**: para quem nunca pediu pelo seu site
+
+Clique em **Criar cupom** e divulgue o código (Instagram, panfleto, WhatsApp).
+
+## O cliente usando
+
+No site de delivery, ao **Finalizar pedido**, o cliente digita o código em **Tem cupom?** e toca em **Aplicar**. O desconto aparece no resumo e no total, inclusive no pagamento online. Se mudar o carrinho, ele aplica o cupom de novo.
+
+O pedido chega em Pedidos de delivery e na cozinha com a linha "Cupom CÓDIGO: -R$ x".
+
+## Acompanhando
+
+Cada cupom mostra quantas vezes foi usado e quanto de desconto já deu. **Pausar** desliga o cupom sem apagar o histórico; **Ativar** liga de novo.
+
+## O que ainda não tem
+
+O cupom vale só no **site de delivery**: ainda não no WhatsApp, no Vender, no QR Code da mesa nem na API de pedidos. Um pedido cancelado não devolve o uso do cupom.`,
+  },
+  {
+    categorySlug: 'integracao-delivery',
     slug: 'todos-os-pedidos-e-loja-fechada',
     title: 'Como vejo todos os pedidos numa tela e fecho a loja?',
     summary: 'Vender > Todos os pedidos: salão, balcão, site, WhatsApp, iFood e API num quadro, e o botão Loja aberta/fechada.',

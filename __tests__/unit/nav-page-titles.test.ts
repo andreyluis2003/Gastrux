@@ -59,6 +59,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/admin/settings/ia': ['app/admin/settings/ia/page.tsx'],
   '/encomendas': ['app/encomendas/page.tsx'],
   '/pedidos': ['app/pedidos/page.tsx'],
+  '/admin/cupons': ['app/admin/cupons/page.tsx'],
 };
 // Titles that are not a fixed text: the Início header, the sales screen (no title), the night count (from its board),
 // the kitchen screen (its own header)

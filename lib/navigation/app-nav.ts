@@ -116,6 +116,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Clientes (CRM)', href: '/dashboard/crm', roles: MANAGERS },
       { label: 'Cashback', href: '/admin/cashback', roles: MANAGERS },
       { label: 'Campanhas', href: '/admin/messaging/campaigns', roles: MANAGERS },
+      // Spec 2026-11-08 cupons: discount codes for the delivery site (every plan)
+      { label: 'Cupons', href: '/admin/cupons', roles: MANAGERS },
       { label: 'Site de delivery', href: '/admin/delivery-site', roles: MANAGERS },
     ],
   },
