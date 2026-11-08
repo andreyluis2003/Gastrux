@@ -61,6 +61,7 @@ const LEGACY_DEFAULT_HASHES = new Set([
   '9a72ad5c85768d59664452ddd83aca7e0ba2dfb308562db863dc2c922d916489', // site-de-delivery (before pickup, Aceitar and the order API)
   'a68c8f7c384e367fdcf4092a0c961786b6acd43038edc5093266598433a9e8a7', // site-de-delivery (before the iFood homologation note)
   'a8bbe2c80766c08e1febbca29251bc627b1131b95280b2f266715da13e4cbaf9', // site-de-delivery (before the board view)
+  '210bf2c840073a46dc6e9f771f44557aae09b87b16eba37e49325955efd23f83', // todos-os-pedidos-e-loja-fechada (before the business hours)
   'b493e89f74353933033fcf2a23ce20fe23ff045d312daa488d7ddc71c0b9ab83', // site-de-delivery (before the iFood went live)
   '4d463f11a7f8a4c14fc6a1d7fa5ceb7656dacd490f7db9b235dc952c6cc2e377', // ligar-ifood (before the iFood went live)
   '28e38d1d448bbf845afd78b6c83609bb648da81268589871a7bcb4a5b882fa0a', // como-criar-restaurante (before the iFood step)
@@ -764,7 +765,7 @@ O limite por cliente e o "só no primeiro pedido" contam pelo celular digitado, 
     slug: 'todos-os-pedidos-e-loja-fechada',
     title: 'Como vejo todos os pedidos numa tela e fecho a loja?',
     summary: 'Vender > Todos os pedidos: salão, balcão, site, WhatsApp, iFood e API num quadro, e o botão Loja aberta/fechada.',
-    keywords: 'todos os pedidos, quadro, painel, gestor de pedidos, fechar loja, loja fechada, pausar, parar de receber pedidos, abrir loja',
+    keywords: 'todos os pedidos, quadro, painel, gestor de pedidos, fechar loja, loja fechada, pausar, parar de receber pedidos, abrir loja, horário de funcionamento, fechar sozinho, horário automático',
     order: 5,
     content: `## Todos os pedidos
 
@@ -785,7 +786,16 @@ No topo de **Todos os pedidos** e de **Pedidos de delivery** há o botão **Loja
 - A **API de pedidos** recusa pedidos novos
 - O **iFood** é pausado e volta quando você abrir (se ele já estava pausado antes, continua pausado)
 
-O salão continua normal: Vender e o QR Code das mesas. A loja não abre nem fecha sozinha pelo horário: toque no botão para abrir de novo.`,
+O salão continua normal: Vender e o QR Code das mesas. Fechada à mão, toque no botão para abrir de novo.
+
+## Abrir e fechar sozinha pelo horário
+
+Em **Configurações do restaurante > Horário de funcionamento**, confira o horário de cada dia e marque **Abrir e fechar a loja sozinha por este horário**. Fora do horário, o site, o WhatsApp e a API de pedidos não recebem pedidos novos, e o site mostra quando abre ("Fechado agora · abre hoje às 18:00").
+
+- Fecha depois da meia-noite? Use, por exemplo, **18:00 às 02:00**: vale até as 2h do dia seguinte
+- Fora do horário, o botão mostra **Fechada pelo horário** e não abre à mão. Para abrir antes, mude o horário ou desmarque a opção
+- Fechar à mão continua valendo a qualquer hora
+- O **iFood** segue o horário cadastrado no próprio iFood`,
   },
   {
     categorySlug: 'integracao-delivery',

@@ -1,6 +1,7 @@
 // Public delivery menu endpoint - no auth required
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { stateOf } from '@/lib/orders/store-open';
 import { offeredToday } from '@/lib/cardapio/days-server';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
 
@@ -23,6 +24,7 @@ export async function GET(
         phone: true,
         businessHours: true,
         ordersClosedAt: true,
+        timezone: true,
       },
     });
 
@@ -55,14 +57,16 @@ export async function GET(
     });
 
     const filteredCategories = categories.filter((c) => c.items.length > 0);
-    const { ordersClosedAt, ...publicInfo } = restaurant;
+    const { ordersClosedAt, timezone, ...publicInfo } = restaurant;
+    // Closed by hand or by the hours (spec 2026-11-08 loja-pelo-horario)
+    const store = stateOf({ ordersClosedAt, businessHours: restaurant.businessHours, timezone });
     const paymentOptions = await getDeliveryPaymentOptions(params.restaurantId);
     // Kept for older clients: true when the restaurant can take PIX/card online.
     const acceptsOnlinePayment = paymentOptions.online.pix;
 
     return NextResponse.json(
       // Loja fechada shows on the page (spec 2026-11-07 quadro-de-pedidos); a short cache so closing shows soon
-      { restaurant: { ...publicInfo, closed: !!ordersClosedAt, acceptsOnlinePayment, paymentOptions }, categories: filteredCategories },
+      { restaurant: { ...publicInfo, closed: store.closed, opens: store.opens, acceptsOnlinePayment, paymentOptions }, categories: filteredCategories },
       { headers: { 'Cache-Control': 'public, max-age=15' } }
     );
   } catch (error) {

@@ -64,7 +64,7 @@ describe('loja aberta/fechada e todos os pedidos', () => {
   it('closing pauses the running iFood and refuses API and site orders; opening resumes iFood', async () => {
     as(owner);
     expect((await setLoja('sim')).status).toBe(400);
-    expect(await (await setLoja(true)).json()).toEqual({ closed: true, ifood: 'paused' });
+    expect(await (await setLoja(true)).json()).toMatchObject({ closed: true, ifood: 'paused' });
     expect(await (await LOJA()).json()).toMatchObject({ closed: true });
     expect((await prisma.deliveryIntegration.findUnique({ where: { id: ifood.id } })).isActive).toBe(false);
 
@@ -74,8 +74,8 @@ describe('loja aberta/fechada e todos os pedidos', () => {
     const site = await SITE_ORDER(new NextRequest('http://x/api/public/delivery/order', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ restaurantId: rid, items: [{ menuItemId: 'x', quantity: 1 }], customerName: 'Bia', customerPhone: '11999999999', deliveryAddress: 'Rua A, 1', paymentMethod: 'CASH_ON_DELIVERY' }) }));
     expect(site.status).toBe(409);
 
-    expect(await (await setLoja(true)).json()).toEqual({ closed: true, ifood: null });
-    expect(await (await setLoja(false)).json()).toEqual({ closed: false, ifood: 'resumed' });
+    expect(await (await setLoja(true)).json()).toMatchObject({ closed: true, ifood: null });
+    expect(await (await setLoja(false)).json()).toMatchObject({ closed: false, ifood: 'resumed' });
     expect((await prisma.deliveryIntegration.findUnique({ where: { id: ifood.id } })).isActive).toBe(true);
     const ok = await API_ORDER(new NextRequest('http://x/api/v1/pedidos', { method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...JSON.parse(JSON.stringify(EXAMPLE_ORDER)), codigo: `O-${tag}` }) }));
     expect(ok.status).toBe(201);
@@ -84,11 +84,25 @@ describe('loja aberta/fechada e todos os pedidos', () => {
   it('an iFood paused by hand stays paused when the store opens', async () => {
     as(owner);
     await prisma.deliveryIntegration.update({ where: { id: ifood.id }, data: { isActive: false } });
-    expect(await (await setLoja(true)).json()).toEqual({ closed: true, ifood: null });
-    expect(await (await setLoja(false)).json()).toEqual({ closed: false, ifood: null });
+    expect(await (await setLoja(true)).json()).toMatchObject({ closed: true, ifood: null });
+    expect(await (await setLoja(false)).json()).toMatchObject({ closed: false, ifood: null });
     expect((await prisma.deliveryIntegration.findUnique({ where: { id: ifood.id } })).isActive).toBe(false);
   });
 
+  it('by the hours: outside them the API refuses, the button does not open by hand, and turning it off opens', async () => {
+    as(owner);
+    const allClosed = Object.fromEntries(['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'].map((d) => [d, { open: '11:00', close: '23:00', closed: true }]));
+    await prisma.restaurant.update({ where: { id: rid }, data: { businessHours: { ...allClosed, auto: true } } });
+    expect(await (await LOJA()).json()).toMatchObject({ closed: true, reason: 'horario', opens: null, auto: true });
+    const api = await API_ORDER(new NextRequest('http://x/api/v1/pedidos', { method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...JSON.parse(JSON.stringify(EXAMPLE_ORDER)), codigo: `H-${tag}` }) }));
+    expect(api.status).toBe(409);
+    const opened = await (await setLoja(false)).json();
+    expect(opened.state).toMatchObject({ closed: true, reason: 'horario' });
+    // The iFood is not paused by the hours
+    expect((await prisma.deliveryIntegration.findUnique({ where: { id: ifood.id } })).isActive).toBe(false);
+    await prisma.restaurant.update({ where: { id: rid }, data: { businessHours: { ...allClosed, auto: false } } });
+    expect(await (await LOJA()).json()).toMatchObject({ closed: false, reason: null });
+  });
   it('the board shows the API order once, a table order and a counter order with their channels', async () => {
     as(owner);
     const section = await prisma.tableSection.create({ data: { restaurantId: rid, name: 'Salão', capacity: 4 } });

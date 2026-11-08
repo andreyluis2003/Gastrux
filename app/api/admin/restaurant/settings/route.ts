@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sanitizeHours } from '@/lib/orders/hours';
 import { getCurrentRestaurantId, requireAdminSession } from '@/lib/whatsapp/get-restaurant';
 
 export const dynamic = 'force-dynamic';
@@ -93,6 +94,8 @@ export async function PATCH(request: NextRequest) {
       if (typeof value === 'string' && value.trim() === '') {
         value = null;
       }
+      // Business hours: only known days with HH:MM times and the auto flag (spec 2026-11-08 loja-pelo-horario)
+      if (field === 'businessHours' && value !== null) value = sanitizeHours(value);
       updateData[field] = value;
     }
   }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { BackButton } from '@/components/ui/back-button';
-import { StoreToggle } from '@/components/orders/store-toggle';
+import { StoreToggle, type ToggleState } from '@/components/orders/store-toggle';
 import { brl } from '@/components/caixa/money';
 import { cn } from '@/lib/utils';
 import { CHANNEL_LABEL, STAGES, type BoardCard, type Channel } from '@/lib/orders/board-shared';
@@ -28,7 +28,7 @@ const minutesSince = (iso: string, now: number) => Math.max(0, Math.floor((now -
  */
 export default function TodosOsPedidosPage() {
   const [cards, setCards] = useState<BoardCard[] | null>(null);
-  const [store, setStore] = useState<{ closed: boolean } | null>(null);
+  const [store, setStore] = useState<ToggleState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Channel | 'todos'>('todos');
   const [now, setNow] = useState(() => Date.now());
@@ -71,12 +71,14 @@ export default function TodosOsPedidosPage() {
             <p className="text-sm text-muted-foreground">Salão, balcão, site, WhatsApp, iFood e API numa tela. Toque num pedido para abrir.</p>
           </div>
         </div>
-        <StoreToggle state={store} onChange={(closed) => setStore({ closed })} />
+        <StoreToggle state={store} onChange={setStore} />
       </div>
 
       {store?.closed && (
         <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          Loja fechada: o site, o WhatsApp, a API de pedidos e o iFood não recebem pedidos novos. O salão continua normal.
+          {store.reason === 'horario'
+            ? `Fechada pelo horário de funcionamento${store.opens ? ` (abre ${store.opens})` : ''}: o site, o WhatsApp e a API de pedidos não recebem pedidos novos. O salão continua normal.`
+            : 'Loja fechada: o site, o WhatsApp, a API de pedidos e o iFood não recebem pedidos novos. O salão continua normal.'}
         </p>
       )}
 

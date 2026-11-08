@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
+import { hoursState } from '@/lib/orders/hours';
 
 /**
  * Loja aberta / fechada (spec 2026-11-07 quadro-de-pedidos §A). Closed: no new orders from customers outside the
@@ -7,14 +8,36 @@ import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
  */
 export const CLOSED_MESSAGE = 'A loja está fechada agora e não está recebendo pedidos.';
 
-export async function isStoreClosed(restaurantId: string): Promise<boolean> {
-  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { ordersClosedAt: true } });
-  return !!r?.ordersClosedAt;
+export interface StoreState {
+  closed: boolean;
+  /** 'manual' (closed by the button), 'horario' (automatic mode, outside the business hours) or null when open */
+  reason: 'manual' | 'horario' | null;
+  closedAt: Date | null;
+  /** "hoje às 18:00" when closed by the hours */
+  opens: string | null;
+  /** The automatic mode is on (spec 2026-11-08 loja-pelo-horario) */
+  auto: boolean;
 }
 
-export async function storeState(restaurantId: string) {
-  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { ordersClosedAt: true } });
-  return { closed: !!r?.ordersClosedAt, closedAt: r?.ordersClosedAt ?? null };
+/** Open or closed now: closed by hand always wins; with the automatic mode on, outside the hours is closed too */
+export function stateOf(r: { ordersClosedAt: Date | null; businessHours: unknown; timezone: string } | null, now = new Date()): StoreState {
+  if (!r) return { closed: false, reason: null, closedAt: null, opens: null, auto: false };
+  const hours = hoursState(r.businessHours, r.timezone, now);
+  const auto = !!(r.businessHours && typeof r.businessHours === 'object' && (r.businessHours as any).auto === true);
+  if (r.ordersClosedAt) return { closed: true, reason: 'manual', closedAt: r.ordersClosedAt, opens: null, auto };
+  if (hours.closedByHours) return { closed: true, reason: 'horario', closedAt: null, opens: hours.opens, auto };
+  return { closed: false, reason: null, closedAt: null, opens: null, auto };
+}
+
+const STATE_SELECT = { ordersClosedAt: true, businessHours: true, timezone: true } as const;
+
+export async function storeState(restaurantId: string, now = new Date()): Promise<StoreState> {
+  const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: STATE_SELECT });
+  return stateOf(r, now);
+}
+
+export async function isStoreClosed(restaurantId: string, now = new Date()): Promise<boolean> {
+  return (await storeState(restaurantId, now)).closed;
 }
 
 /**

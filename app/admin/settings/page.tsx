@@ -52,6 +52,8 @@ export default function SettingsPage() {
     labelSize: '60x40',
   });
   const [hours, setHours] = useState(DEFAULT_HOURS);
+  // Abrir e fechar a loja sozinha pelo horário (spec 2026-11-08 loja-pelo-horario); off until the owner turns it on
+  const [autoHours, setAutoHours] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -81,7 +83,9 @@ export default function SettingsPage() {
         labelSize: r.labelSize || '60x40',
       });
       if (r.businessHours && typeof r.businessHours === 'object') {
-        setHours({ ...DEFAULT_HOURS, ...r.businessHours });
+        const { auto, ...days } = r.businessHours;
+        setHours({ ...DEFAULT_HOURS, ...days });
+        setAutoHours(auto === true);
       }
     } catch {
       toast.error('Erro ao carregar configurações');
@@ -111,7 +115,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/admin/restaurant/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, serviceChargePercent: Number(form.serviceChargePercent), businessHours: hours }),
+        body: JSON.stringify({ ...form, serviceChargePercent: Number(form.serviceChargePercent), businessHours: { ...hours, auto: autoHours } }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -281,6 +285,17 @@ export default function SettingsPage() {
           <Clock className="h-5 w-5 text-amber-600" />
           <h2 className="text-lg font-semibold">Horário de Funcionamento</h2>
         </div>
+        <label className="mb-4 flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={autoHours} onChange={(e) => setAutoHours(e.target.checked)} />
+          <span>
+            <span className="font-medium">Abrir e fechar a loja sozinha por este horário</span>
+            <span className="block text-xs text-gray-600">
+              Fora do horário, o site de delivery, o WhatsApp e a API de pedidos não recebem pedidos novos. O salão continua normal e
+              o iFood segue o horário cadastrado no próprio iFood. Confira o horário de cada dia antes de ligar. Fecha depois da
+              meia-noite? Use, por exemplo, 18:00 às 02:00.
+            </span>
+          </span>
+        </label>
         <div className="space-y-3">
           {DAYS.map(day => {
             const h = hours[day.key] || { open: '11:00', close: '23:00', closed: false };

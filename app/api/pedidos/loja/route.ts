@@ -21,5 +21,6 @@ export async function POST(req: NextRequest) {
   if (typeof body?.fechada !== 'boolean') return NextResponse.json({ error: 'Diga se a loja fica aberta ou fechada' }, { status: 400 });
   const result = await setStoreClosed(auth.member, body.fechada);
   if (!result) return NextResponse.json({ error: 'Restaurante não encontrado' }, { status: 404 });
-  return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } });
+  // The state after it: opening by hand outside the hours still leaves it closed by the hours (spec 2026-11-08)
+  return NextResponse.json({ ...result, state: await storeState(auth.member.restaurantId) }, { headers: { 'Cache-Control': 'no-store' } });
 }

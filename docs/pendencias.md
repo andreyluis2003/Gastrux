@@ -23,7 +23,9 @@ Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
 
 Spec `docs/superpowers/specs/2026-11-07-quadro-de-pedidos-design.md`.
 
-- **Sem abrir/fechar pelo horário:** `Restaurant.businessHours` continua sem uso; abrir e fechar é manual.
+- **Abrir/fechar pelo horário** feito em 2026-11-08 (spec `docs/superpowers/specs/2026-11-08-loja-pelo-horario-design.md`):
+  um turno por dia (sem pausa entre almoço e jantar), sem feriados; o iFood não é pausado pelo horário; fora do
+  horário não há "abrir agora" à mão (mudar o horário ou desligar a opção).
 - **Quadro só de leitura:** aceitar, recusar e mudar etapa continuam nas telas de origem; sem som nesta tela.
 - **Canal WhatsApp** vem do texto "Pedido via WhatsApp" que o robô grava nas observações da comanda: se esse texto
   mudar no robô, o pedido passa a aparecer como Balcão.
