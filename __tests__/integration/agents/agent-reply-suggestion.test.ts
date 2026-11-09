@@ -8,6 +8,11 @@ import { PrismaClient } from '@prisma/client';
 
 jest.mock('../../../lib/ai/client', () => ({ getAnthropic: jest.fn() }));
 import { getAnthropic } from '../../../lib/ai/client';
+jest.mock('../../../lib/agents/activation/signals', () => {
+  const actual = jest.requireActual('../../../lib/agents/activation/signals');
+  return { ...actual, loadActivationSignals: jest.fn(actual.loadActivationSignals) };
+});
+import { loadActivationSignals } from '../../../lib/agents/activation/signals';
 import { getOrCreateSuggestion, discardSuggestion, settleSuggestion, suggestionStats } from '../../../lib/agents/whatsapp/suggest';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -114,6 +119,39 @@ describe('suggested replies', () => {
     const prev = await prisma.agentReplySuggestion.findUnique({ where: { id: a.id } });
     expect(prev.outcome).toBe('discarded');
     expect(prev.decidedBy).toBe('equipe@gastrux.test');
+  });
+
+  it('reopening after Descartar stays empty; regenerate makes a new one', async () => {
+    await clientIn('oi', HOUR);
+    const create = mockReply(sugestao('Olá!'));
+    const a = await getOrCreateSuggestion(key, { now });
+    await discardSuggestion(key, a.id, 'equipe');
+    expect(await getOrCreateSuggestion(key, { now })).toEqual({ state: 'none' });
+    expect(create).toHaveBeenCalledTimes(1);
+    const b = await getOrCreateSuggestion(key, { now, regenerate: true, by: 'equipe' });
+    expect(b.state).toBe('ready');
+    expect(b.id).not.toBe(a.id);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failure loading the account signals → unavailable, nothing stored', async () => {
+    await clientIn('oi', HOUR);
+    const create = mockReply(sugestao('x'));
+    (loadActivationSignals as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect(await getOrCreateSuggestion(key, { now })).toEqual({ state: 'unavailable' });
+    spy.mockRestore();
+    expect(create).not.toHaveBeenCalled();
+    expect(await prisma.agentReplySuggestion.count({ where: { phone: key } })).toBe(0);
+  });
+
+  it('regenerate without an AI client keeps the current draft', async () => {
+    await clientIn('oi', HOUR);
+    mockReply(sugestao('Olá!'));
+    const a = await getOrCreateSuggestion(key, { now });
+    (getAnthropic as jest.Mock).mockReturnValue(null);
+    expect(await getOrCreateSuggestion(key, { now, regenerate: true, by: 'equipe' })).toEqual({ state: 'unavailable' });
+    expect((await prisma.agentReplySuggestion.findUnique({ where: { id: a.id } })).outcome).toBe('pending');
   });
 
   it('last message from the team → none', async () => {

@@ -42,13 +42,18 @@ export async function getOrCreateSuggestion(
   if (now.getTime() - last.createdAt.getTime() >= WINDOW_MS) return { state: 'none' };
 
   const stored = await prisma.agentReplySuggestion.findFirst({ where: { phone: key, forMessageId: last.id }, orderBy: { createdAt: 'desc' } });
-  if (stored && !opts.regenerate) return view(stored);
-  if (opts.regenerate) {
-    await prisma.agentReplySuggestion.updateMany({
-      where: { phone: key, forMessageId: last.id, kind: 'SUGGESTION', outcome: 'pending' },
-      data: { outcome: 'discarded', decidedBy: opts.by ?? null },
-    });
+  if (stored && !opts.regenerate) {
+    // The team chose "Descartar": reopening must not bring the draft back
+    if (stored.kind === 'SUGGESTION' && stored.outcome === 'discarded') return { state: 'none' };
+    return view(stored);
   }
+  // Regenerating replaces the pending draft, but only once a new one can actually be made
+  const discardPrevious = () => opts.regenerate
+    ? prisma.agentReplySuggestion.updateMany({
+        where: { phone: key, forMessageId: last.id, kind: 'SUGGESTION', outcome: 'pending' },
+        data: { outcome: 'discarded', decidedBy: opts.by ?? null },
+      })
+    : Promise.resolve();
 
   const messages: ReplyMessage[] = rows.map((m) => ({
     id: m.id, direction: m.direction as 'IN' | 'OUT', text: m.text, messageType: m.messageType, createdAt: m.createdAt,
@@ -56,14 +61,27 @@ export async function getOrCreateSuggestion(
   const base = { phone: key, forMessageId: last.id, forMessageAt: last.createdAt };
 
   const nonText = nonTextReason(pendingClientMessages(messages));
-  if (nonText) return view(await prisma.agentReplySuggestion.create({ data: { ...base, kind: 'TEAM', reason: nonText, outcome: 'team', costUsd: 0 } }));
+  if (nonText) {
+    await discardPrevious();
+    return view(await prisma.agentReplySuggestion.create({ data: { ...base, kind: 'TEAM', reason: nonText, outcome: 'team', costUsd: 0 } }));
+  }
 
   const client = getAnthropic();
   if (!client) return { state: 'unavailable' };
 
   const restaurantId = [...rows].reverse().find((m) => m.restaurantId)?.restaurantId;
-  const signals = restaurantId ? await loadActivationSignals(restaurantId, now) : null;
-  const ctx: ClientContext = restaurantId && signals ? { kind: 'client', signals, tier: await restaurantTier(restaurantId) } : { kind: 'visitor' };
+  let ctx: ClientContext = { kind: 'visitor' };
+  if (restaurantId) {
+    try {
+      const signals = await loadActivationSignals(restaurantId, now);
+      if (signals) ctx = { kind: 'client', signals, tier: await restaurantTier(restaurantId) };
+    } catch (e) {
+      // A visitor prompt would pitch the product to a real client, so make no suggestion at all
+      console.error('[agent-suggest] signals failed:', e instanceof Error ? e.message : e);
+      return { state: 'unavailable' };
+    }
+  }
+  await discardPrevious();
 
   const model = aiModels().default;
   let costUsd = 0;
