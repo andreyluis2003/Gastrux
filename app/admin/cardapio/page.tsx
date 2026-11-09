@@ -20,6 +20,7 @@ import { Plus, Trash2, Edit2, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { RecipeCostPanel } from '@/components/cardapio/recipe-cost-panel';
 import Image from 'next/image';
+import { ProductPhotoField } from '@/components/cardapio/product-photo-field';
 
 interface MenuCategory {
   id: string;
@@ -72,6 +73,9 @@ export default function AdminCardapioPage() {
   const [newCategory, setNewCategory] = useState({ name: '', emoji: '', description: '' });
   const [showNewItem, setShowNewItem] = useState<string | null>(null); // categoryId when open
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [photosEnabled, setPhotosEnabled] = useState(false);
+  const [pendingPhoto, setPendingPhoto] = useState<Blob | null>(null);
+  const [photoFieldKey, setPhotoFieldKey] = useState(0);
   const [newItem, setNewItem] = useState({
     name: '',
     description: '',
@@ -88,6 +92,19 @@ export default function AdminCardapioPage() {
   useEffect(() => {
     Promise.all([fetchCategories(), fetchRecipes()]);
   }, []);
+
+  useEffect(() => {
+    fetch('/api/cardapio/fotos')
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => setPhotosEnabled(!!d.enabled))
+      .catch(() => setPhotosEnabled(false));
+  }, []);
+
+  // Closing or switching the new-item form drops any picked photo.
+  useEffect(() => {
+    setPendingPhoto(null);
+    setPhotoFieldKey((k) => k + 1);
+  }, [showNewItem]);
 
   const fetchCategories = async () => {
     try {
@@ -170,7 +187,22 @@ export default function AdminCardapioPage() {
         toast.error(body.error || 'Erro ao criar item');
         return;
       }
-      toast.success('Item criado');
+      const created = await res.json().catch(() => null);
+      if (pendingPhoto && created?.id) {
+        try {
+          const fd = new FormData();
+          fd.append('foto', pendingPhoto, 'foto.jpg');
+          const up = await fetch(`/api/cardapio/itens/${created.id}/foto`, { method: 'POST', body: fd });
+          if (!up.ok) throw new Error('upload failed');
+          toast.success('Item criado');
+        } catch {
+          toast.error('Item criado, mas a foto não foi salva. Abra o item e tente de novo.');
+        }
+      } else {
+        toast.success('Item criado');
+      }
+      setPendingPhoto(null);
+      setPhotoFieldKey((k) => k + 1);
       setNewItem({ name: '', description: '', price: '', recipeId: '', code: '', soldByWeight: false });
       setShowNewItem(null);
       fetchCategories();
@@ -441,6 +473,12 @@ export default function AdminCardapioPage() {
                     </select>
                     <RecipeCostPanel recipeId={newItem.recipeId} price={newItem.price} />
                   </div>
+                  <ProductPhotoField
+                    key={photoFieldKey}
+                    enabled={photosEnabled}
+                    imageUrl={null}
+                    onPick={setPendingPhoto}
+                  />
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleCreateItem(cat.id)}>
                       Criar Item
@@ -576,6 +614,17 @@ export default function AdminCardapioPage() {
                 onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
               />
             </div>
+            <ProductPhotoField
+              enabled={photosEnabled}
+              imageUrl={editingItem.images?.[0]?.imageUrl ?? null}
+              menuItemId={editingItem.id}
+              onChange={(url) => {
+                setEditingItem((prev) =>
+                  prev ? { ...prev, images: url ? [{ id: prev.images?.[0]?.id ?? 'new', imageUrl: url }] : [] } : prev
+                );
+                fetchCategories();
+              }}
+            />
             <div>
               <Label>Descrição</Label>
               <Input
