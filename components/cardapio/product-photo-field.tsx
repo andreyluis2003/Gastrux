@@ -22,6 +22,14 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
+  // Async work (resize/upload) can finish after unmount; never report it to a different form.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Revoke the preview object URL on change/unmount.
   useEffect(() => {
@@ -40,6 +48,7 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
     setBusy(true);
     try {
       const blob = await resizePhoto(file);
+      if (!mountedRef.current) return;
       if (!menuItemId) {
         setLocalUrl(URL.createObjectURL(blob));
         onPick?.(blob);
@@ -49,6 +58,7 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
       fd.append('foto', blob, 'foto.jpg');
       const res = await fetch(`/api/cardapio/itens/${menuItemId}/foto`, { method: 'POST', body: fd });
       const body = await res.json().catch(() => ({}));
+      if (!mountedRef.current) return;
       if (!res.ok) {
         toast.error(body.error || 'Erro ao enviar a foto');
         return;
@@ -62,7 +72,7 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
         toast.error('Erro ao enviar a foto');
       }
     } finally {
-      setBusy(false);
+      if (mountedRef.current) setBusy(false);
     }
   };
 
@@ -75,6 +85,7 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
     setBusy(true);
     try {
       const res = await fetch(`/api/cardapio/itens/${menuItemId}/foto`, { method: 'DELETE' });
+      if (!mountedRef.current) return;
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         toast.error(body.error || 'Erro ao remover a foto');
@@ -84,7 +95,7 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
     } catch {
       toast.error('Erro ao remover a foto');
     } finally {
-      setBusy(false);
+      if (mountedRef.current) setBusy(false);
     }
   };
 

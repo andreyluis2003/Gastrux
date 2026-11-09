@@ -92,6 +92,6 @@ export async function deletePhoto(cfg: StorageConfig, key: string): Promise<void
   try {
     await clientFor(cfg).send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }))
   } catch (err) {
-    console.error('[storage] delete failed:', err instanceof Error ? err.message : 'unknown error')
+    console.error('[storage] delete failed:', key, err instanceof Error ? err.message : 'unknown error')
   }
 }

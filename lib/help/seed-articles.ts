@@ -941,7 +941,7 @@ Funciona com o **Zé Pediu** e com sites que publicam o cardápio no padrão de 
     order: 6,
     content: `## Colocando a foto
 
-1. Em **Cardápio e produtos > Cardápio digital**, crie um produto novo ou clique em **Editar** no produto
+1. Em **Cardápio e produtos > Cardápio digital**, crie um produto novo ou toque no lápis do produto (editar)
 2. Na área **Foto**, clique em **Escolher foto**. No celular, o aparelho abre a câmera ou a galeria
 3. Ao **editar** um produto que já existe, a foto é salva na hora: não precisa clicar em Salvar
 4. Ao **criar** um produto novo, a foto é enviada logo depois de você clicar em **Criar Item**

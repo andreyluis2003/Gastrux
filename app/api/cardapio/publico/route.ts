@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
             position: true,
             images: {
               where: { isPublic: true },
+              select: { id: true, imageUrl: true },
             },
           },
           orderBy: { position: 'asc' },

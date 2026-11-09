@@ -41,7 +41,7 @@ export async function GET(
         items: {
           where: { active: true, available: true, displayOnQR: true, soldByWeight: false, ...today },
           include: {
-            images: { where: { isPublic: true }, take: 1 },
+            images: { where: { isPublic: true }, take: 1, select: { id: true, imageUrl: true } },
           },
           orderBy: { position: 'asc' },
         },

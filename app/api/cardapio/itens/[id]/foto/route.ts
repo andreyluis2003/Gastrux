@@ -11,7 +11,7 @@ function fail(error: unknown) {
   if (error instanceof PhotoError) {
     switch (error.code) {
       case 'not_found':
-        return NextResponse.json({ error: 'Menu item not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
       case 'bad_type':
         return NextResponse.json({ error: BAD_FILE }, { status: 400 });
       case 'too_big':
