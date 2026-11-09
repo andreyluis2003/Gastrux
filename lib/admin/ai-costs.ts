@@ -41,7 +41,11 @@ export async function aiCostsByMonth(ym: string) {
     prisma.aiQuestion.groupBy({ by: ['restaurantId'], where: { ...where, NOT: { attachments: { equals: null as any } } }, _count: { _all: true } }),
     // Platform agents (not tied to a restaurant plan): activation drafts and suggested WhatsApp replies
     prisma.agentAction.aggregate({ _sum: { costUsd: true }, where }),
-    prisma.agentReplySuggestion.aggregate({ _sum: { costUsd: true }, where }),
+    // Tolerate the table missing before its migration runs
+    prisma.agentReplySuggestion.aggregate({ _sum: { costUsd: true }, where }).catch((e) => {
+      console.error('[ai-costs] replies cost failed:', e instanceof Error ? e.message : e);
+      return { _sum: { costUsd: 0 } };
+    }),
   ]);
   const countOf = (rows: { restaurantId: string; _count: { _all: number } }[]) => new Map(rows.map((r) => [r.restaurantId, r._count._all]));
   const [c, e, d, f] = [countOf(counted), countOf(errors), countOf(detailed), countOf(files)];

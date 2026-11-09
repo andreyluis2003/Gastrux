@@ -18,3 +18,20 @@ export function shouldApplyResponse(
 ): boolean {
   return callSeq === currentSeq && requestedFor !== null && requestedFor === latestInId;
 }
+
+/**
+ * Whether the agent's old draft must be removed from the box: the response is for a different client message
+ * than the draft belongs to, it carries no new suggestion, and the box still holds the draft untouched.
+ * A failed regenerate for the same message keeps the draft.
+ */
+export function shouldClearStaleDraft(
+  box: string,
+  lastDraft: string | null,
+  draftFor: string | null,
+  responseFor: string | null,
+  responseIsSuggestion: boolean,
+): boolean {
+  if (responseIsSuggestion || lastDraft === null || draftFor === null) return false;
+  if (responseFor === draftFor) return false;
+  return shouldPrefill(box, lastDraft);
+}

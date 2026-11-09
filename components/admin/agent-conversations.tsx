@@ -5,7 +5,7 @@ import { ArrowLeft, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { shouldApplyResponse, shouldPrefill } from '@/lib/agents/whatsapp/draft-box';
+import { shouldApplyResponse, shouldClearStaleDraft, shouldPrefill } from '@/lib/agents/whatsapp/draft-box';
 
 export interface Conversation {
   phone: string;
@@ -56,6 +56,10 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
   const requestedFor = useRef<string | null>(null);
   // Text the agent last put in the box, and the box's current value (readable from async callbacks)
   const lastDraft = useRef<string | null>(null);
+  // Client message (IN id) the draft in the box answers
+  const lastDraftFor = useRef<string | null>(null);
+  // Id of the suggestion whose text went into the box (drives the badge and what is sent as suggestionId)
+  const [prefilledId, setPrefilledId] = useState<string | null>(null);
   // Bumped on every suggestion call, send and discard: a response from an older one is dropped
   const reqSeq = useRef(0);
   // Id of the last message when it is a client message (null when the last one is ours)
@@ -78,12 +82,22 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
     }
   };
 
-  function apply(out: Suggestion) {
+  function apply(out: Suggestion, forId: string | null) {
     // A suggestion without text is a failure for the screen: no badge, no id sent
     if (out.state === 'ready' && out.kind === 'SUGGESTION' && !out.text?.trim()) out = { ...out, kind: 'FAILED' };
     setSuggestion(out);
+    const isSuggestion = out.state === 'ready' && out.kind === 'SUGGESTION' && !!out.text;
+    // A new client message without a new suggestion: the untouched old draft must not stay next to it
+    if (shouldClearStaleDraft(textRef.current, lastDraft.current, lastDraftFor.current, forId, isSuggestion)) {
+      setText('');
+      lastDraft.current = null;
+      lastDraftFor.current = null;
+      setPrefilledId(null);
+    }
     if (out.state === 'ready' && out.kind === 'SUGGESTION' && out.text && shouldPrefill(textRef.current, lastDraft.current)) {
       lastDraft.current = out.text;
+      lastDraftFor.current = forId;
+      setPrefilledId(out.id);
       setText(out.text);
     }
   }
@@ -106,7 +120,15 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
     // Only the latest call may touch the screen; older ones were superseded by a newer call, a send or a discard
     if (seq !== reqSeq.current) return;
     setSuggesting(false);
-    if (shouldApplyResponse(seq, reqSeq.current, forId, latestInId.current)) apply(out);
+    if (shouldApplyResponse(seq, reqSeq.current, forId, latestInId.current)) apply(out, forId);
+  }
+
+  function useSuggestion() {
+    if (suggestion?.state !== 'ready' || suggestion.kind !== 'SUGGESTION' || !suggestion.text) return;
+    lastDraft.current = suggestion.text;
+    lastDraftFor.current = requestedFor.current;
+    setPrefilledId(suggestion.id);
+    setText(suggestion.text);
   }
 
   async function discard() {
@@ -119,6 +141,8 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
       setSuggesting(false);
       if (shouldPrefill(textRef.current, lastDraft.current)) setText('');
       lastDraft.current = null;
+      lastDraftFor.current = null;
+      setPrefilledId(null);
       setSuggestion({ state: 'none' });
     } catch {
       toast.error('Não foi possível descartar');
@@ -141,12 +165,14 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
     reqSeq.current++;
     setSuggesting(false);
     try {
-      const suggestionId = suggestion?.state === 'ready' && suggestion.kind === 'SUGGESTION' ? suggestion.id : undefined;
+      const suggestionId = suggestion?.state === 'ready' && suggestion.kind === 'SUGGESTION' && suggestion.id === prefilledId ? suggestion.id : undefined;
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, suggestionId }) });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(out.error || 'Não foi possível enviar');
       setText('');
       lastDraft.current = null;
+      lastDraftFor.current = null;
+      setPrefilledId(null);
       setSuggestion(null);
       await load();
     } catch (e: any) {
@@ -186,12 +212,18 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
       </Card>
       {open ? (
         <div className="space-y-2">
-          {!suggesting && suggestion?.state === 'ready' && suggestion.kind === 'SUGGESTION' && (
+          {!suggesting && suggestion?.state === 'ready' && suggestion.kind === 'SUGGESTION' && suggestion.id === prefilledId && (
             <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">
               <Sparkles className="h-3.5 w-3.5" /> Sugestão do agente
             </span>
           )}
           <textarea aria-label="Resposta" className="w-full min-h-[90px] rounded-md border p-2 text-sm" value={text} onChange={(e) => setText(e.target.value)} />
+          {!suggesting && suggestion?.state === 'ready' && suggestion.kind === 'SUGGESTION' && suggestion.id !== prefilledId && (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              Há uma sugestão do agente
+              <Button size="sm" variant="outline" disabled={busy} onClick={useSuggestion}>Usar sugestão</Button>
+            </p>
+          )}
           {suggesting && <p className="text-xs text-muted-foreground">Preparando sugestão…</p>}
           {!suggesting && suggestion?.state === 'ready' && suggestion.kind === 'TEAM' && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 break-words">Responda você: {suggestion.reason}</p>

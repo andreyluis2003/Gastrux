@@ -91,7 +91,7 @@ export async function getOrCreateSuggestion(
       max_tokens: 700,
       system: [{ type: 'text', text: replySystemPrompt(KNOWLEDGE), cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: replyUserPrompt(ctx, messages, now) }],
-    });
+    }, { timeout: 30_000 });
     if (res.usage) costUsd = estimateCostUsd(model, res.usage);
     const raw = res.content.map((c) => (c.type === 'text' ? c.text : '')).join('');
     const parsed = parseReply(raw);

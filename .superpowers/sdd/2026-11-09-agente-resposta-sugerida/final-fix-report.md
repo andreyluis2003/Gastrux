@@ -1,0 +1,4 @@
+# Final fix report
+Changes: (1) shouldClearStaleDraft in draft-box.ts + lastDraftFor ref in agent-conversations.tsx apply(out, forId); (2) reply-rules.ts: injection rule line in system prompt, newlines flattened to " / " in replyUserPrompt; (3) validReplyText detects scheme-less domains (BARE_DOMAIN, 2+ letter TLD), gastrux-only host rule, shared one-link count, scheme link blanked before bare scan; (4) ai-costs.ts reply aggregate .catch -> 0 with log; (5) prefilledId state: badge and suggestionId only when prefilled, else "Há uma sugestão do agente" + "Usar sugestão"; (6) suggest.ts timeout 30_000 in request options.
+Commands/outputs: unit agent-draft-box 14 passed; unit agent-reply-rules 23 passed; integration ai-costs 3 passed; integration agent-reply-suggestion 28 passed; npx tsc --noEmit -p . clean (no output).
+Known limit: a missing space after a period ("Oi.Tudo") reads as a domain and makes the suggestion invalid (falls to FAILED).
