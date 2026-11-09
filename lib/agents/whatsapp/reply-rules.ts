@@ -50,14 +50,21 @@ export function parseReply(raw: string): ParsedReply {
   return null;
 }
 
+/** True when the last non-empty line is the signature, ignoring case, trailing punctuation and emoji. */
+function endsWithSignature(t: string): boolean {
+  const last = t.split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? '';
+  return last.replace(/[^\p{L}\p{N}]+$/u, '').toLowerCase() === SIGNATURE.toLowerCase();
+}
+
 /** Non-empty, within the WhatsApp limit, at most one link (to gastrux.com or a subdomain), no signature. */
 export function validReplyText(text: string): boolean {
   const t = text.trim();
   if (!t || t.length > WHATSAPP_MAX) return false;
-  if (t.endsWith(SIGNATURE)) return false;
+  if (endsWithSignature(t)) return false;
   const links = t.match(/https?:\/\/[^\s]+/gi) ?? [];
   if (links.length > 1) return false;
-  for (const link of links) {
+  for (const raw of links) {
+    const link = raw.replace(/[.,;:!?)\]}"'”]+$/, '');
     const host = link.match(/^https?:\/\/([^/\s?#:]+)/i)?.[1].toLowerCase().replace(/\.$/, '');
     if (!host || !(host === 'gastrux.com' || host.endsWith('.gastrux.com'))) return false;
   }

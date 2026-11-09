@@ -64,6 +64,18 @@ describe('validReplyText', () => {
     expect(validReplyText('Veja https://App.Gastrux.com/pricing')).toBe(true);
     expect(validReplyText('Acesse gastrux.com e veja')).toBe(true);
   });
+  it('accepts a link followed by punctuation, any case', () => {
+    expect(validReplyText('Cadastre em https://gastrux.com, é rápido')).toBe(true);
+    expect(validReplyText('Veja (https://gastrux.com)')).toBe(true);
+    expect(validReplyText('Cadastre em https://gastrux.com!')).toBe(true);
+    expect(validReplyText('Cadastre em HTTPS://GASTRUX.COM')).toBe(true);
+  });
+  it('rejects lookalike hosts and tolerant signatures', () => {
+    expect(validReplyText('veja https://gastrux.com.evil.io')).toBe(false);
+    expect(validReplyText('veja https://gastrux.com@evil.io')).toBe(false);
+    expect(validReplyText('Oi!\n\nEquipe Gastrux.')).toBe(false);
+    expect(validReplyText('Oi!\n\nequipe gastrux 🍕')).toBe(false);
+  });
   it('rejects >700, two links, other hosts, http other host, signature, empty', () => {
     expect(validReplyText('a'.repeat(701))).toBe(false);
     expect(validReplyText('https://gastrux.com e https://gastrux.com/pricing')).toBe(false);
@@ -79,6 +91,10 @@ describe('sameEnough', () => {
   it('spaces/case only, or a corrected name, is the same', () => {
     expect(sameEnough('Oi, Maria!  O Pro custa R$ 99.', 'oi, maria! o pro custa r$ 99.')).toBe(true);
     expect(sameEnough('Oi, Maria! O Pro custa R$ 99.', 'Oi, Mariana! O Pro custa R$ 99.')).toBe(true);
+  });
+  it('boundary: 10 edits is the same, 11 is not', () => {
+    expect(sameEnough('a'.repeat(10), 'b'.repeat(10))).toBe(true);
+    expect(sameEnough('a'.repeat(11), 'b'.repeat(11))).toBe(false);
   });
   it('a rewritten sentence is an edit', () => expect(sameEnough('O Pro custa R$ 99 por mês.', 'Te mando os planos agora, um momento.')).toBe(false));
 });
