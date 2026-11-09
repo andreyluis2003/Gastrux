@@ -87,6 +87,31 @@ async function kitchenOrderOf(externalOrderId: string): Promise<string | null> {
  * numbering their orders the same way must not swallow each other's orders), and an accepted order whose kitchen order
  * failed gets it now, so a resend recovers it.
  */
+const NO_ITEMS_ALERT: Partial<Record<DeliveryPlatform, (code: string) => { kind: string; title: string; message: string }>> = {
+  ifood: (code) => ({
+    kind: 'ifood-no-items', title: 'Pedido do iFood não foi confirmado',
+    message: `O pedido ${code} não tem nenhum produto reconhecido, e o iFood cancela em 8 minutos. Em Pedidos de delivery, aceite e prepare pela lista, ou recuse. Depois confira o Código PDV dos produtos no iFood.`,
+  }),
+  ninety_nine_food: (code) => ({
+    kind: 'ninetynine-no-items', title: 'Pedido da 99Food não foi confirmado',
+    message: `O pedido ${code} não tem nenhum produto reconhecido, e a 99Food cancela em 5 minutos. Em Pedidos de delivery, aceite e prepare pela lista, ou recuse. Depois confira o código dos produtos na 99Food.`,
+  }),
+};
+
+/** The order's items as ExternalOrder.items stores them (also used when a platform takes items out) */
+export function externalItemsJson(itens: OrderApiInput['itens']): string {
+  return JSON.stringify(itens.map((it) => ({
+    externalItemId: it.codigo, name: it.nome, quantity: it.quantidade, price: it.precoUnitario,
+    specialInstructions: [...(it.adicionais ?? []).map((ad) => `+ ${ad.nome}`), sanitizeCustomerNote(it.observacao)].filter(Boolean).join(' · ') || undefined,
+  })));
+}
+
+/** Items + their options, rounded to cents */
+export function itemsSubtotal(itens: OrderApiInput['itens']): number {
+  const sum = itens.reduce((acc, it) => acc + (it.precoUnitario + (it.adicionais ?? []).reduce((a, ad) => a + ad.preco, 0)) * it.quantidade, 0);
+  return Math.round(sum * 100) / 100;
+}
+
 async function answerResend(existing: ExternalOrder, restaurantId: string, integrationId: string) {
   if (existing.integrationId !== integrationId) throw new DeliveryOrderError('Este código já é de outro pedido do restaurante: mande um código diferente', 409);
   let kitchenOrderId = await kitchenOrderOf(existing.id);
@@ -112,21 +137,18 @@ export async function ingestDeliveryOrder(args: {
 
   const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { deliveryAutoAccept: true } });
   const customerId = OWN_CUSTOMERS.includes(args.platform) ? await customerFor(restaurantId, input) : null;
-  const subtotal = input.itens.reduce((sum, it) => sum + (it.precoUnitario + (it.adicionais ?? []).reduce((a, ad) => a + ad.preco, 0)) * it.quantidade, 0);
+  const subtotal = itemsSubtotal(input.itens);
   let externalOrder: ExternalOrder;
   try {
     externalOrder = await prisma.externalOrder.create({
       data: {
         restaurantId, integrationId, apiKeyId: args.apiKeyId, externalOrderId: input.codigo, status: 'PENDING',
-        totalAmount: input.total, subtotal: Math.round(subtotal * 100) / 100, deliveryFee: input.taxaEntrega, discount: input.desconto, platformFee: 0,
+        totalAmount: input.total, subtotal, deliveryFee: input.taxaEntrega, discount: input.desconto, platformFee: 0,
         paymentMethod: paymentMethodOf(input.pagamento), paidOnline: input.pagamento.pago, scheduledFor: input.agendadoPara,
         customerId, customerName: input.cliente.nome, customerPhone: formatPhone(input.cliente.celular), customerEmail: input.cliente.email,
         deliveryAddress: input.retirada ? 'Retirada no local' : [input.entrega?.endereco, input.entrega?.numero].filter(Boolean).join(', '),
         deliveryCity: input.entrega?.cidade, deliveryZipcode: input.entrega?.cep,
-        items: JSON.stringify(input.itens.map((it) => ({
-          externalItemId: it.codigo, name: it.nome, quantity: it.quantidade, price: it.precoUnitario,
-          specialInstructions: [...(it.adicionais ?? []).map((ad) => `+ ${ad.nome}`), sanitizeCustomerNote(it.observacao)].filter(Boolean).join(' · ') || undefined,
-        }))),
+        items: externalItemsJson(input.itens),
         specialInstructions: [kitchenNote(input), args.extraNote].filter(Boolean).join('\n'),
         platformData: args.platformData as any, externalCustomerId: args.externalCustomerId ?? undefined,
       },
@@ -139,12 +161,10 @@ export async function ingestDeliveryOrder(args: {
     return answerResend(winner, restaurantId, integrationId);
   }
 
-  // iFood hears "confirmed" and charges the customer: with nothing the kitchen knows, a person decides (owner, 2026-11-01)
-  if (args.platform === 'ifood' && !(await orderHasKitchenItem(externalOrder))) {
-    await alertDeliveryProblem(externalOrder, {
-      kind: 'ifood-no-items', severity: 'CRITICAL', title: 'Pedido do iFood não foi confirmado',
-      message: `O pedido ${input.codigo} não tem nenhum produto reconhecido, e o iFood cancela em 8 minutos. Em Pedidos de delivery, aceite e prepare pela lista, ou recuse. Depois confira o Código PDV dos produtos no iFood.`,
-    });
+  // iFood / 99Food hear "confirmed" and charge the customer: with nothing the kitchen knows, a person decides (owner, 2026-11-01)
+  const noItems = NO_ITEMS_ALERT[args.platform];
+  if (noItems && !(await orderHasKitchenItem(externalOrder))) {
+    await alertDeliveryProblem(externalOrder, { ...noItems(input.codigo), severity: 'CRITICAL' });
     return { externalOrder, kitchenOrderId: null, duplicate: false };
   }
 

@@ -5160,16 +5160,19 @@ model CouponRedemption {
 
 /// 99Food webhook events, stored before processing. The id is a deterministic key, so a resend collapses into the same row
 model NinetynineEvent {
-  id          String    @id
-  type        String
-  appShopId   String?
-  orderId     String?
-  payload     Json
-  receivedAt  DateTime  @default(now())
-  processedAt DateTime?
-  attempts    Int       @default(0)
-  error       String?
+  id            String    @id
+  type          String
+  appShopId     String?
+  orderId       String?
+  payload       Json
+  receivedAt    DateTime  @default(now())
+  processedAt   DateTime?
+  attempts      Int       @default(0)
+  error         String?
+  /// A failed event waits until then (backoff); null = due now
+  nextAttemptAt DateTime?
 
   @@index([processedAt, receivedAt])
+  @@index([processedAt, nextAttemptAt])
   @@map("ninetynine_events")
 }

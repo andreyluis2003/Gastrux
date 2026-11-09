@@ -9,9 +9,13 @@ CREATE TABLE "ninetynine_events" (
     "processedAt" TIMESTAMP(3),
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "error" TEXT,
+    "nextAttemptAt" TIMESTAMP(3),
 
     CONSTRAINT "ninetynine_events_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
 CREATE INDEX "ninetynine_events_processedAt_receivedAt_idx" ON "ninetynine_events"("processedAt", "receivedAt");
+
+-- CreateIndex
+CREATE INDEX "ninetynine_events_processedAt_nextAttemptAt_idx" ON "ninetynine_events"("processedAt", "nextAttemptAt");

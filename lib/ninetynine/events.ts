@@ -5,27 +5,39 @@ import { isTierFeatureEnabled, restaurantTier } from '@/lib/tier-guard';
 import { canMoveExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
 import { alertDeliveryProblem } from '@/lib/kds-integration';
 import { cancelOrder } from '@/lib/kds-cancel-order';
-import { DeliveryOrderError, acceptDeliveryOrder, ingestDeliveryOrder } from '@/lib/delivery-orders/ingest';
+import { DeliveryOrderError, acceptDeliveryOrder, externalItemsJson, ingestDeliveryOrder, itemsSubtotal } from '@/lib/delivery-orders/ingest';
 import { confirmOrder, getOrderDetail } from './client';
 import { mapNinetynineOrder } from './order-map';
 
 /**
  * The stored 99Food webhook events become delivery orders and status changes (plan 2026-11-09 99food, Task 4). The
- * webhook only stores (lib/ninetynine/events-store.ts); this processes the oldest unprocessed rows, one server process
- * at a time (lease), retrying a failure up to 10 times. 99Food cancels an order not confirmed in 5 minutes.
+ * webhook only stores (lib/ninetynine/events-store.ts); this processes the oldest due rows, one server process at a time
+ * (lease). A failure is retried with backoff until it no longer matters: an orderNew gives up at 4.5 minutes (99Food
+ * cancels an order not confirmed in 5), any other event at 30 minutes.
  */
 const PLATFORM = 'ninety_nine_food' as const;
 const BATCH = 50;
-const MAX_ATTEMPTS = 10;
+const MAX_BATCHES = 20;
 const CONFIRM_WINDOW_MS = 5 * 60_000;
 const SECOND_ALERT_MS = 3 * 60_000;
 const CANCEL_APPLY_MS = 5 * 60_000;
 const REFUND_APPLY_MS = 25 * 3600_000;
 const KEEP_MS = 30 * 86400_000;
 const CLEANUP_EVERY_MS = 24 * 3600_000;
+const AFTER_RUN_EVERY_MS = 30_000;
+const BACKOFF_BASE_MS = 5_000;
+const BACKOFF_MAX_MS = 60_000;
+const GIVE_UP_ORDER_NEW_MS = 4.5 * 60_000;
+const GIVE_UP_OTHER_MS = 30 * 60_000;
+/** A run stops taking rows after this, well inside the 120 s lease */
+const RUN_BUDGET_MS = 90_000;
+const LEASE_WHILE_RUNNING_MS = 120_000;
+/** The note of an order event that came before its orderNew: re-queued when the orderNew lands */
+const NOT_IN_YET = 'pedido ainda não está no Gastrux';
+const ORDER_EVENTS = ['orderConfirm', 'orderReady', 'orderFinish', 'orderCancel', 'orderPartialCancel', 'orderCancelApply', 'orderRefundApply'];
 
 type Linked = { id: string; restaurantId: string; storeId: string };
-type Ext = { id: string; restaurantId: string; externalOrderId: string; status: any; platformData: unknown; integrationId: string; disputeId: string | null; internalOrder: { id: string; status: string } | null };
+type Ext = { id: string; restaurantId: string; externalOrderId: string; status: any; platformData: unknown; integrationId: string; disputeId: string | null; specialInstructions: string | null; internalOrder: { id: string; status: string; specialInstructions: string | null } | null };
 
 /** The event was handled with nothing to do: kept as processed with this note */
 class Skip extends Error {}
@@ -53,15 +65,6 @@ async function integrationOf(appShopId: string | null) {
   });
 }
 
-/** The store's integration for an order event: none / off / plan locked → Skip (never an order in another restaurant) */
-async function orderIntegration(appShopId: string | null): Promise<Linked> {
-  const row = await integrationOf(appShopId);
-  if (!row) throw new Skip('loja da 99Food não ligada a nenhum restaurante');
-  if (!row.isActive) throw new Skip('integração da 99Food desligada');
-  if (!(await eligible(row.restaurantId))) throw new Skip('o plano do restaurante não recebe pedidos de plataformas');
-  return row as Linked;
-}
-
 const displayOf = (ext: { platformData: unknown; externalOrderId: string }) => {
   const idx = ((ext.platformData ?? {}) as { orderIndex?: number }).orderIndex;
   return idx ? String(idx) : ext.externalOrderId.slice(-6);
@@ -73,9 +76,11 @@ const tsOf = (payload: any): number => {
   return t < 1e12 ? t * 1000 : t;
 };
 
+const CONFIRM_FAILED = '99Food não recebeu "confirm"';
+
 /**
  * Confirms on 99Food and records it (plan ledger: Task 5 swaps this for pushPlatformStatus). Never throws: a confirm
- * that fails is logged on the order and retried by the next run while the 5 minutes last.
+ * that fails is logged on the order once and retried by the next sweep while the 5 minutes last.
  */
 async function confirmNow(ext: { id: string; externalOrderId: string; status: any; integrationId: string }): Promise<boolean> {
   try {
@@ -83,13 +88,16 @@ async function confirmNow(ext: { id: string; externalOrderId: string; status: an
     await prisma.externalOrder.update({ where: { id: ext.id }, data: { platformConfirmedAt: new Date() } });
     return true;
   } catch (e: any) {
-    console.error('[99food] confirm failed:', e?.message ?? e);
-    await prisma.deliveryLog.create({
-      data: {
-        externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(),
-        message: `99Food não recebeu "confirm": ${String(e?.message ?? e).slice(0, 300)}`,
-      },
-    }).catch(() => {});
+    const logged = await prisma.deliveryLog.findFirst({ where: { externalOrderId: ext.id, message: { startsWith: CONFIRM_FAILED } }, select: { id: true } }).catch(() => null);
+    if (!logged) {
+      console.error('[99food] confirm failed:', e?.message ?? e);
+      await prisma.deliveryLog.create({
+        data: {
+          externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(),
+          message: `${CONFIRM_FAILED}: ${String(e?.message ?? e).slice(0, 300)}`,
+        },
+      }).catch(() => {});
+    }
     return false;
   }
 }
@@ -103,11 +111,11 @@ async function moveForward(ext: { id: string; status: any }, target: any, messag
 }
 
 const EXT_SELECT = {
-  id: true, restaurantId: true, externalOrderId: true, status: true, platformData: true, integrationId: true, disputeId: true,
-  internalOrder: { select: { id: true, status: true } },
+  id: true, restaurantId: true, externalOrderId: true, status: true, platformData: true, integrationId: true, disputeId: true, specialInstructions: true,
+  internalOrder: { select: { id: true, status: true, specialInstructions: true } },
 } as const;
 
-async function findExt(integration: Linked, orderId: string): Promise<Ext | null> {
+async function findExt(integration: { id: string; restaurantId: string }, orderId: string): Promise<Ext | null> {
   const ext = await prisma.externalOrder.findUnique({
     where: { restaurantId_externalOrderId: { restaurantId: integration.restaurantId, externalOrderId: orderId } },
     select: EXT_SELECT,
@@ -115,11 +123,18 @@ async function findExt(integration: Linked, orderId: string): Promise<Ext | null
   return ext && ext.integrationId === integration.id ? (ext as Ext) : null;
 }
 
-async function orderNew(row: NinetynineEvent, integration: Linked, orderId: string) {
+async function orderNew(row: NinetynineEvent, appShopId: string | null, orderId: string) {
+  // The plan gate applies to new orders only: later events of an order already in Gastrux are always followed
+  const found = await integrationOf(appShopId);
+  if (!found) throw new Skip('loja da 99Food não ligada a nenhum restaurante');
+  if (!found.isActive) throw new Skip('integração da 99Food desligada');
+  if (!(await eligible(found.restaurantId))) throw new Skip('o plano do restaurante não recebe pedidos de plataformas');
+  const integration = found as Linked;
+
   const data = (row.payload as any)?.data ?? {};
   let info = data.order_info;
   if (!info || typeof info !== 'object') info = (await getOrderDetail(integration.id, orderId)).order_info;
-  const m = mapNinetynineOrder({ ...info, order_id: String(info?.order_id ?? orderId) });
+  const m = mapNinetynineOrder({ ...info, order_id: orderId });
   let duplicate = true;
   try {
     const res = await ingestDeliveryOrder({
@@ -136,14 +151,16 @@ async function orderNew(row: NinetynineEvent, integration: Linked, orderId: stri
     await prisma.deliveryIntegration.update({ where: { id: integration.id }, data: { lastOrderAt: new Date(), totalOrdersSynced: { increment: 1 } } }).catch(() => {});
   }
   const ext = await prisma.externalOrder.findUnique({
-    where: { restaurantId_externalOrderId: { restaurantId: integration.restaurantId, externalOrderId: m.input.codigo } },
+    where: { restaurantId_externalOrderId: { restaurantId: integration.restaurantId, externalOrderId: orderId } },
     select: { id: true, externalOrderId: true, status: true, integrationId: true, platformConfirmedAt: true },
   });
   // Accepted at once (auto-accept): 99Food hears "confirmed" now
   if (ext && ext.status === 'CONFIRMED' && !ext.platformConfirmedAt) await confirmNow(ext);
-  // Its cancellation came first and found no order: apply it now
-  const cancelled = await prisma.ninetynineEvent.findFirst({ where: { orderId, type: 'orderCancel', id: { not: row.id }, processedAt: { not: null } } });
-  if (cancelled) await handle(cancelled);
+  // Events of this order that came first and found nothing go back to the queue (the run picks them up next)
+  await prisma.ninetynineEvent.updateMany({
+    where: { orderId, type: { in: ORDER_EVENTS }, processedAt: { not: null }, error: { startsWith: NOT_IN_YET } },
+    data: { processedAt: null, error: null, nextAttemptAt: null },
+  });
 }
 
 async function orderCancelled(ext: Ext) {
@@ -194,18 +211,33 @@ async function applyDispute(row: NinetynineEvent, ext: Ext, kind: 'cancel' | 're
     : { kind: `ninetynine-dispute-${applyId}`, severity: 'HIGH', title: 'Pedido de devolução na 99Food', message: `O cliente pediu devolução do pedido 99Food #${displayOf(ext)}: responda em Pedidos de delivery.` });
 }
 
-async function partialCancel(ext: Ext, integration: Linked) {
-  const detail = await getOrderDetail(integration.id, ext.externalOrderId);
+const withLine = (text: string | null, line: string) => (text?.split('\n').includes(line) ? text : [text, line].filter(Boolean).join('\n'));
+
+/** 99Food took items out: the order's items and values follow the new detail; the kitchen ticket gets the note */
+async function partialCancel(row: NinetynineEvent, ext: Ext) {
+  const detail = await getOrderDetail(ext.integrationId, ext.externalOrderId);
   const m = mapNinetynineOrder({ ...detail.order_info, order_id: ext.externalOrderId });
-  const now = m.input.itens.map((it) => `${it.quantidade}x ${it.nome}`).join(', ') || 'nenhum item';
-  const current = await prisma.externalOrder.findUnique({ where: { id: ext.id }, select: { specialInstructions: true } });
+  const left = m.input.itens.map((it) => `${it.quantidade}x ${it.nome}`).join(', ') || 'nenhum item';
+  const line = `A 99Food tirou itens: ficou ${left}`;
+  const subtotal = itemsSubtotal(m.input.itens);
   await prisma.externalOrder.update({
     where: { id: ext.id },
-    data: { specialInstructions: [current?.specialInstructions, `A 99Food tirou itens: ficou ${now}`].filter(Boolean).join('\n') },
+    data: {
+      items: externalItemsJson(m.input.itens), subtotal, totalAmount: m.input.total, deliveryFee: m.input.taxaEntrega, discount: m.input.desconto,
+      specialInstructions: withLine(ext.specialInstructions, line),
+    },
   });
+  const kitchen = ext.internalOrder;
+  if (kitchen && kitchen.status !== 'COMPLETED' && kitchen.status !== 'CANCELLED') {
+    // Same convention as the kitchen order's creation: total = items + delivery fee, the discount apart
+    await prisma.order.update({
+      where: { id: kitchen.id },
+      data: { subtotal, fees: m.input.taxaEntrega, discount: m.input.desconto, total: subtotal + m.input.taxaEntrega, specialInstructions: withLine(kitchen.specialInstructions, line) },
+    });
+  }
   await alertDeliveryProblem(ext, {
-    kind: `ninetynine-partial-${Date.now()}`, severity: 'HIGH', title: 'A 99Food tirou itens de um pedido',
-    message: `A 99Food tirou itens do pedido #${displayOf(ext)}`,
+    kind: `ninetynine-partial-${ext.externalOrderId}-${String((row.payload as any)?.timestamp ?? row.id)}`, severity: 'HIGH',
+    title: 'A 99Food tirou itens de um pedido', message: `A 99Food tirou itens do pedido #${displayOf(ext)}`,
   });
 }
 
@@ -240,23 +272,30 @@ async function shopStatus(row: NinetynineEvent) {
   await prisma.deliveryIntegration.update({ where: { id: integ.id }, data: { syncStatus: s.status, syncError: s.text } });
 }
 
+const orderIdOf = (row: NinetynineEvent) => {
+  if (row.orderId) return row.orderId;
+  const id = (row.payload as any)?.data?.order_id;
+  return id != null ? String(id) : null;
+};
+
 /** Does the work of one event; throws Skip (nothing to do) or any other error (retry) */
 async function handle(row: NinetynineEvent): Promise<void> {
   const type = row.type;
   if (type === 'shopBindStatus') return shopBind(row);
   if (type === 'shopStatus') return shopStatus(row);
 
-  const orderId = row.orderId ?? ((row.payload as any)?.data?.order_id != null ? String((row.payload as any).data.order_id) : null);
+  const orderId = orderIdOf(row);
   if (!orderId) throw new Skip(`evento ${type} sem order_id`);
-  const integration = await orderIntegration(row.appShopId);
-  if (type === 'orderNew') return orderNew(row, integration, orderId);
+  if (type === 'orderNew') return orderNew(row, row.appShopId, orderId);
 
+  const integration = await integrationOf(row.appShopId);
+  if (!integration) throw new Skip('loja da 99Food não ligada a nenhum restaurante');
   const ext = await findExt(integration, orderId);
   if (!ext) {
     // Its orderNew has not been processed yet (failed or still queued): wait for it
     const waiting = await prisma.ninetynineEvent.findFirst({ where: { orderId, type: 'orderNew', processedAt: null }, select: { id: true } });
     if (waiting) throw new Error(`pedido ${orderId} ainda não entrou: o evento ${type} espera o orderNew`);
-    throw new Skip(`pedido ${orderId} não está no Gastrux`);
+    throw new Skip(NOT_IN_YET);
   }
 
   switch (type) {
@@ -272,7 +311,7 @@ async function handle(row: NinetynineEvent): Promise<void> {
     case 'orderCancel':
       return orderCancelled(ext);
     case 'orderPartialCancel':
-      return partialCancel(ext, integration);
+      return partialCancel(row, ext);
     case 'orderCancelApply':
       return applyDispute(row, ext, 'cancel');
     case 'orderRefundApply':
@@ -291,19 +330,33 @@ export async function processNinetynineEvent(row: NinetynineEvent): Promise<void
     if (!(e instanceof Skip)) throw e;
     note = e.message.slice(0, 300);
   }
-  await prisma.ninetynineEvent.update({ where: { id: row.id }, data: { processedAt: new Date(), error: note } });
+  await prisma.ninetynineEvent.update({ where: { id: row.id }, data: { processedAt: new Date(), error: note, nextAttemptAt: null } });
 }
 
 async function failed(row: NinetynineEvent, e: any) {
   const message = String(e?.message ?? e).slice(0, 300);
-  const attempts = row.attempts + 1;
-  const giveUp = attempts >= MAX_ATTEMPTS;
-  console.error(`[99food] event ${row.type} ${row.id} failed (${attempts}):`, message);
-  await prisma.ninetynineEvent.update({ where: { id: row.id }, data: { attempts, error: message, ...(giveUp ? { processedAt: new Date() } : {}) } }).catch(() => {});
+  const now = Date.now();
+  const limit = row.receivedAt.getTime() + (row.type === 'orderNew' ? GIVE_UP_ORDER_NEW_MS : GIVE_UP_OTHER_MS);
+  const giveUp = now >= limit;
+  // Backoff 5 s, 10 s, 20 s ... up to 60 s; the last try lands on the give-up moment, never after it
+  const next = Math.min(now + Math.min(BACKOFF_BASE_MS * 2 ** row.attempts, BACKOFF_MAX_MS), limit);
+  console.error(`[99food] event ${row.type} ${row.id} failed (${row.attempts + 1}):`, message);
+  await prisma.ninetynineEvent.update({
+    where: { id: row.id },
+    data: { attempts: { increment: 1 }, error: message, ...(giveUp ? { processedAt: new Date(), nextAttemptAt: null } : { nextAttemptAt: new Date(next) }) },
+  }).catch(() => {});
   if (!giveUp) return;
   const integ = await integrationOf(row.appShopId).catch(() => null);
   if (!integ) return;
-  await alertDeliveryProblem({ id: `event:${row.id}`, restaurantId: integ.restaurantId, externalOrderId: row.orderId ?? '-' }, {
+  const pseudo = { id: `event:${row.id}`, restaurantId: integ.restaurantId, externalOrderId: row.orderId ?? '-' };
+  if (row.type === 'orderNew') {
+    await alertDeliveryProblem(pseudo, {
+      kind: 'ninetynine-order-not-in', severity: 'CRITICAL', title: 'Pedido da 99Food não entrou no Gastrux',
+      message: `Não conseguimos receber o pedido ${row.orderId ?? ''} da 99Food. Confirme no app da 99Food para não perder o pedido.`,
+    });
+    return;
+  }
+  await alertDeliveryProblem(pseudo, {
     kind: 'ninetynine-event-failed', severity: 'CRITICAL', title: 'Um aviso da 99Food não foi processado',
     message: row.orderId
       ? `Não conseguimos processar um aviso da 99Food (${row.type}) do pedido ${row.orderId}. Confira o pedido no app da 99Food.`
@@ -311,7 +364,7 @@ async function failed(row: NinetynineEvent, e: any) {
   });
 }
 
-/** After each run: a confirm that did not reach 99Food is retried while it matters; a waiting order rings again at 3 min */
+/** A confirm that did not reach 99Food is retried while it matters; a waiting order rings again at 3 min */
 async function afterRun() {
   const rows = await prisma.deliveryIntegration.findMany({ where: { platform: PLATFORM, isActive: true, storeId: { not: null } }, select: { id: true, restaurantId: true } });
   const ids: string[] = [];
@@ -337,6 +390,7 @@ async function afterRun() {
 }
 
 let lastCleanupAt = 0;
+let lastAfterRunAt = 0;
 
 async function cleanup() {
   if (Date.now() - lastCleanupAt < CLEANUP_EVERY_MS) return;
@@ -347,41 +401,58 @@ async function cleanup() {
 }
 
 const LEASE = 'ninetynine-events';
-/** Held while a run goes: longer than a batch of 50 events (15 s per 99Food call) */
-const LEASE_WHILE_RUNNING_MS = 120_000;
 
-/** Only one server process processes at a time */
-async function takeLease(): Promise<boolean> {
-  const rows = await prisma.$queryRaw<Array<{ name: string }>>`
+/** Only one server process processes at a time; the lease's own expiry is the owner's mark for the release */
+async function takeLease(): Promise<string | null> {
+  const rows = await prisma.$queryRaw<Array<{ until: string }>>`
     INSERT INTO "poll_leases" ("name", "leaseUntil") VALUES (${LEASE}, now() + ${LEASE_WHILE_RUNNING_MS} * interval '1 millisecond')
     ON CONFLICT ("name") DO UPDATE SET "leaseUntil" = EXCLUDED."leaseUntil"
     WHERE "poll_leases"."leaseUntil" < now()
-    RETURNING "name"`;
-  return rows.length > 0;
+    RETURNING "leaseUntil"::text AS until`;
+  return rows[0]?.until ?? null;
 }
 
-async function releaseLease(holdMs: number) {
-  await prisma.$executeRaw`UPDATE "poll_leases" SET "leaseUntil" = now() + ${holdMs} * interval '1 millisecond' WHERE "name" = ${LEASE}`.catch(() => {});
+/** Released only while still ours: a run that overran its lease never cuts another process's lease short */
+async function releaseLease(ours: string, holdMs: number) {
+  await prisma.$executeRaw`UPDATE "poll_leases" SET "leaseUntil" = now() + ${holdMs} * interval '1 millisecond'
+    WHERE "name" = ${LEASE} AND "leaseUntil"::text = ${ours}`.catch(() => {});
 }
 
-export async function processPendingOnce(opts: { holdMs?: number } = {}): Promise<{ processed: number; failed: number }> {
-  if (!(await takeLease())) return { processed: 0, failed: 0 };
+/**
+ * One run: the due events oldest first (batches of 50 until none is due or 90 s pass), then (every 30 s, or always with
+ * `sweep`) the confirm retry and the 3-minute alert. `holdMs`: how long the lease is kept after the run.
+ */
+export async function processPendingOnce(opts: { holdMs?: number; sweep?: boolean } = {}): Promise<{ processed: number; failed: number }> {
+  const ours = await takeLease();
+  if (!ours) return { processed: 0, failed: 0 };
+  const started = Date.now();
   try {
     await cleanup();
     const result = { processed: 0, failed: 0 };
-    const rows = await prisma.ninetynineEvent.findMany({ where: { processedAt: null }, orderBy: { receivedAt: 'asc' }, take: BATCH });
-    for (const row of rows) {
-      try {
-        await processNinetynineEvent(row);
-        result.processed++;
-      } catch (e) {
-        result.failed++;
-        await failed(row, e);
+    for (let batch = 0; batch < MAX_BATCHES && Date.now() - started < RUN_BUDGET_MS; batch++) {
+      const rows = await prisma.ninetynineEvent.findMany({
+        where: { processedAt: null, OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }] },
+        orderBy: { receivedAt: 'asc' },
+        take: BATCH,
+      });
+      if (!rows.length) break;
+      for (const row of rows) {
+        if (Date.now() - started >= RUN_BUDGET_MS) break;
+        try {
+          await processNinetynineEvent(row);
+          result.processed++;
+        } catch (e) {
+          result.failed++;
+          await failed(row, e);
+        }
       }
     }
-    await afterRun();
+    if (opts.sweep || Date.now() - lastAfterRunAt >= AFTER_RUN_EVERY_MS) {
+      lastAfterRunAt = Date.now();
+      await afterRun();
+    }
     return result;
   } finally {
-    await releaseLease(opts.holdMs ?? 0);
+    await releaseLease(ours, opts.holdMs ?? 0);
   }
 }

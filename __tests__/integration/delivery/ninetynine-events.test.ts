@@ -56,6 +56,8 @@ describe('99Food events', () => {
   const extOf = (orderId) => prisma.externalOrder.findFirst({ where: { externalOrderId: orderId } });
   const rowOf = (id) => prisma.ninetynineEvent.findUnique({ where: { id } });
 
+  // A lease left by an earlier, interrupted run would skip every run here
+  beforeAll(() => prisma.pollLease.deleteMany({ where: { name: 'ninetynine-events' } }));
   beforeEach(() => {
     getOrderDetail.mockReset();
     confirmOrder.mockReset();
@@ -121,9 +123,9 @@ describe('99Food events', () => {
     expect(await prisma.notification.count({ where: { restaurantId: r.rid, title: 'Novo pedido de delivery' } })).toBe(1);
 
     await prisma.externalOrder.update({ where: { id: ext.id }, data: { orderReceivedAt: new Date(Date.now() - 3.5 * 60e3) } });
-    await processPendingOnce();
-    await processPendingOnce();
-    const second = await prisma.notification.findMany({ where: { restaurantId: r.rid, data: { path: ['problem'], equals: 'ninetynine-waiting-2' } } });
+    await processPendingOnce({ sweep: true });
+    await processPendingOnce({ sweep: true });
+    const second =await prisma.notification.findMany({ where: { restaurantId: r.rid, data: { path: ['problem'], equals: 'ninetynine-waiting-2' } } });
     expect(second).toHaveLength(1);
     expect(second[0].message).toBe('Pedido da 99Food #42 esperando há 3 min — confirme antes de 5 min');
   });
@@ -219,23 +221,158 @@ describe('99Food events', () => {
     expect(confirmOrder).not.toHaveBeenCalled();
   });
 
-  it('a failing event retries and alerts after 10 attempts', async () => {
+  it('a failing orderNew backs off, then gives up at 4.5 min with "Confirme no app da 99Food"', async () => {
     const r = await restaurant();
     const orderId = bigId();
     getOrderDetail.mockRejectedValue(new Error('99Food fora do ar'));
     const ev = await event('orderNew', r.appShopId, { order_id: orderId });
-    for (let i = 0; i < 9; i++) await processPendingOnce();
+    await processPendingOnce();
     let row = await rowOf(ev.id);
-    expect(row.attempts).toBe(9);
+    expect(row.attempts).toBe(1);
     expect(row.processedAt).toBeNull();
     expect(row.error).toContain('99Food fora do ar');
+    const wait = row.nextAttemptAt.getTime() - Date.now();
+    expect(wait).toBeGreaterThan(2_000);
+    expect(wait).toBeLessThanOrEqual(5_000);
+    // not due yet: not tried again
+    await processPendingOnce();
+    expect(getOrderDetail).toHaveBeenCalledTimes(1);
+    // due again, second failure: 10 s
+    await prisma.ninetynineEvent.update({ where: { id: ev.id }, data: { nextAttemptAt: new Date(Date.now() - 1) } });
     await processPendingOnce();
     row = await rowOf(ev.id);
-    expect(row.attempts).toBe(10);
-    expect(row.processedAt).not.toBeNull();
-    expect(await prisma.notification.count({ where: { restaurantId: r.rid, data: { path: ['problem'], equals: 'ninetynine-event-failed' } } })).toBe(1);
+    expect(row.attempts).toBe(2);
+    expect(row.nextAttemptAt.getTime() - Date.now()).toBeGreaterThan(7_000);
+    // 4.5 minutes after it arrived: given up, a person confirms in the 99Food app
+    await prisma.ninetynineEvent.update({ where: { id: ev.id }, data: { nextAttemptAt: null, receivedAt: new Date(Date.now() - 4.6 * 60e3) } });
     await processPendingOnce();
-    expect(getOrderDetail).toHaveBeenCalledTimes(10);
+    row = await rowOf(ev.id);
+    expect(row.attempts).toBe(3);
+    expect(row.processedAt).not.toBeNull();
+    const alert = await prisma.notification.findFirst({ where: { restaurantId: r.rid, data: { path: ['problem'], equals: 'ninetynine-order-not-in' } } });
+    expect(alert.severity).toBe('CRITICAL');
+    expect(alert.message).toContain('Confirme no app da 99Food');
+    await processPendingOnce();
+    expect(getOrderDetail).toHaveBeenCalledTimes(3);
+  });
+
+  it('a failing order event retries until 30 min, then alerts', async () => {
+    const r = await restaurant();
+    const orderId = bigId();
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce();
+    getOrderDetail.mockRejectedValue(new Error('99Food fora do ar'));
+    const ev = await event('orderPartialCancel', r.appShopId, { order_id: orderId });
+    await prisma.ninetynineEvent.update({ where: { id: ev.id }, data: { receivedAt: new Date(Date.now() - 20 * 60e3) } });
+    await processPendingOnce();
+    expect((await rowOf(ev.id)).processedAt).toBeNull();
+    await prisma.ninetynineEvent.update({ where: { id: ev.id }, data: { nextAttemptAt: null, receivedAt: new Date(Date.now() - 31 * 60e3) } });
+    await processPendingOnce();
+    expect((await rowOf(ev.id)).processedAt).not.toBeNull();
+    expect(await prisma.notification.count({ where: { restaurantId: r.rid, data: { path: ['problem'], equals: 'ninetynine-event-failed' } } })).toBe(1);
+  });
+
+  it('nothing the kitchen knows: not accepted nor confirmed, a person decides', async () => {
+    const r = await restaurant();
+    await prisma.recipe.deleteMany({ where: { restaurantId: r.rid } });
+    const orderId = bigId();
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce();
+    expect((await extOf(orderId)).status).toBe('PENDING');
+    expect(confirmOrder).not.toHaveBeenCalled();
+    const alert = await prisma.notification.findFirst({ where: { restaurantId: r.rid, severity: 'CRITICAL' } });
+    expect(alert.title).toBe('Pedido da 99Food não foi confirmado');
+    expect(alert.message).toContain('a 99Food cancela em 5 minutos');
+  });
+
+  it('partial cancel updates the items and values (order and kitchen), one note and one alert per event', async () => {
+    const r = await restaurant();
+    const orderId = bigId();
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce();
+    const after = orderInfo(orderId, { price: { order_price: 3000, delivery_price: 900, others_fees: {} }, order_items: [{ name: 'Pizza', amount: 1, sku_price: 3000, total_price: 3000, app_item_id: 'PZ1' }] });
+    getOrderDetail.mockResolvedValue({ order_id: orderId, order_info: after });
+    const t = Math.floor(Date.now() / 1000);
+    await event('orderPartialCancel', r.appShopId, { order_id: orderId }, { timestamp: t });
+    await processPendingOnce();
+    // the same 99Food event delivered again (another row): no second note, no second alert
+    await event('orderPartialCancel', r.appShopId, { order_id: orderId }, { timestamp: t });
+    await processPendingOnce();
+    const ext = await extOf(orderId);
+    expect(ext.subtotal).toBe(30);
+    expect(ext.totalAmount).toBe(30);
+    expect(JSON.parse(ext.items)).toEqual([expect.objectContaining({ name: 'Pizza', quantity: 1, price: 30 })]);
+    expect(ext.specialInstructions.match(/A 99Food tirou itens: ficou 1x Pizza/g)).toHaveLength(1);
+    const kitchen = await prisma.order.findUnique({ where: { externalOrderId: ext.id } });
+    expect(Number(kitchen.subtotal)).toBe(30);
+    expect(Number(kitchen.total)).toBe(30);
+    expect(kitchen.specialInstructions).toContain('A 99Food tirou itens: ficou 1x Pizza');
+    const alerts = await prisma.notification.findMany({ where: { restaurantId: r.rid, title: 'A 99Food tirou itens de um pedido' } });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].message).toBe('A 99Food tirou itens do pedido #42');
+  });
+
+  it('events of an order already in Gastrux are followed even after the store is paused', async () => {
+    const r = await restaurant();
+    const orderId = bigId();
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce();
+    await prisma.deliveryIntegration.update({ where: { id: r.integ.id }, data: { isActive: false } });
+    await event('orderCancel', r.appShopId, { order_id: orderId });
+    await processPendingOnce();
+    expect((await extOf(orderId)).status).toBe('CANCELLED');
+  });
+
+  it('orderConfirm and orderFinish that came before their orderNew are applied when it lands', async () => {
+    const r = await restaurant({ deliveryAutoAccept: false });
+    const orderId = bigId();
+    const c = await event('orderConfirm', r.appShopId, { order_id: orderId });
+    await processPendingOnce();
+    expect((await rowOf(c.id)).error).toBe('pedido ainda não está no Gastrux');
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce();
+    const ext = await extOf(orderId);
+    expect(ext.status).toBe('CONFIRMED');
+    expect(ext.platformConfirmedAt).not.toBeNull();
+    expect(confirmOrder).not.toHaveBeenCalled();
+    const row = await rowOf(c.id);
+    expect(row.processedAt).not.toBeNull();
+    expect(row.error).toBeNull();
+
+    const other = bigId();
+    const f = await event('orderFinish', r.appShopId, { order_id: other });
+    await processPendingOnce();
+    await event('orderNew', r.appShopId, { order_id: other, order_info: orderInfo(other) });
+    await processPendingOnce();
+    expect((await extOf(other)).status).toBe('DELIVERED');
+    expect((await rowOf(f.id)).error).toBeNull();
+  });
+
+  it('a confirm that fails is logged once and retried by the sweep', async () => {
+    const r = await restaurant();
+    const orderId = bigId();
+    confirmOrder.mockRejectedValue(new Error('99Food fora do ar'));
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce({ sweep: true });
+    await processPendingOnce({ sweep: true });
+    const ext = await extOf(orderId);
+    expect(ext.platformConfirmedAt).toBeNull();
+    expect(confirmOrder.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(await prisma.deliveryLog.count({ where: { externalOrderId: ext.id, message: { startsWith: '99Food não recebeu "confirm"' } } })).toBe(1);
+    confirmOrder.mockResolvedValue({ requestId: 'r' });
+    await processPendingOnce({ sweep: true });
+    expect((await extOf(orderId)).platformConfirmedAt).not.toBeNull();
+  });
+
+  it('the sweep runs at most every 30 s without sweep', async () => {
+    const r = await restaurant();
+    const orderId = bigId();
+    confirmOrder.mockRejectedValue(new Error('fora'));
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce({ sweep: true });
+    const n = confirmOrder.mock.calls.length;
+    await processPendingOnce();
+    expect(confirmOrder.mock.calls.length).toBe(n);
   });
 
   it('shopStatus updates the integration status; unbind disconnects the store', async () => {
