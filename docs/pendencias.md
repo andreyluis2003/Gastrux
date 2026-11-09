@@ -619,3 +619,25 @@ Spec `docs/superpowers/specs/2026-11-05-primeiro-acesso-guiado-design.md`. Ficou
   imprima ou não divulgue de fato.
 - O andamento do tour fica no aparelho (localStorage): começar no computador e continuar no celular recomeça.
 - `onboardingStatus` (a IA e o agente de ativação) continua contando os 6 passos antigos, não os do guia.
+
+## Agente: resposta sugerida nas Conversas (etapa 1, no ar com 51ef8c7) — sobras das revisões
+
+Nenhuma bloqueia; a revisão final classificou todas como "não precisa antes do merge".
+- Teste do prompt de sistema: conferir uma palavra distinta por assunto da equipe e a regra "se não souber".
+- Teste do prompt de quem não tem conta: conferir o texto "não tem conta".
+- `pendingClientMessages` tem um filtro de IN redundante.
+- A assinatura na mesma linha do texto ("Obrigado, Equipe Gastrux") passa na validação.
+- Duas pessoas abrindo a conversa ao mesmo tempo podem gerar duas sugestões (sem chave única); a mais velha vira
+  "expirada" e infla o total de sugestões.
+- O teste dos números de 14 dias compara antes/depois no banco inteiro (pode oscilar com testes em paralelo).
+- "Nova sugestão" descarta a sugestão atual antes de chamar a IA; se a chamada falhar, fica "Sem sugestão desta vez".
+- O "Descartar" sem try/catch na rota: erro de banco vira 500 sem mensagem amigável.
+- Falta teste de que uma falha ao registrar o resultado não muda a resposta do Responder.
+- Erro de rede no recarregamento de 15 s da conversa vira rejeição não tratada (já existia).
+- Um envio que falha descarta a sugestão que estava chegando (a pessoa clica Nova sugestão).
+- Corrida no Descartar: uma sugestão que chega durante o descarte pode ser apagada.
+- A checagem de domínios sem https recusa textos como "joao.silva@gmail.com", "Next.js", "Sr.Silva" e "Oi.Tudo"
+  (a sugestão vira "Sem sugestão desta vez", o que é seguro).
+- Tempo limite da IA é 30 s, mas o cliente tenta 1 vez de novo: até ~60 s antes de "Sem sugestão desta vez".
+- Para ler os números: cada "Nova sugestão" conta como descartada; o cache do prompt quase nunca é aproveitado
+  (custo extra irrelevante, ~US$ 0,016 por chamada).
