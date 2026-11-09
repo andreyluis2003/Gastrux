@@ -9,7 +9,7 @@ import { platformTeam } from '../platform-team';
 import { sendPlatformText } from './client';
 import { phoneKey, phoneVariants } from './numbers';
 
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+export const WINDOW_MS = 24 * 60 * 60 * 1000;
 const STOP_WORDS = new Set(['SAIR', 'PARAR', 'STOP']);
 const STOP_REPLY = 'Pronto, não vamos mais mandar dicas por aqui. Se precisar de ajuda, é só escrever.';
 
