@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/guard';
+import { settleSuggestion } from '@/lib/agents/whatsapp/suggest';
 import { WindowClosedError, openConversation, reply, windowOpen } from '@/lib/agents/whatsapp/conversation';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,13 @@ export async function POST(req: NextRequest, { params }: { params: { phone: stri
   if (!text || text.length > MAX_TEXT) return NextResponse.json({ error: 'Escreva a mensagem' }, { status: 400 });
 
   try {
-    const message = await reply(params.phone, text, String(user.email || user.id || 'equipe'));
+    const sentBy = String(user.email || user.id || 'equipe');
+    const message = await reply(params.phone, text, sentBy);
+    try {
+      await settleSuggestion(params.phone, typeof body.suggestionId === 'string' ? body.suggestionId : undefined, text, message.id, sentBy);
+    } catch (err: any) {
+      console.error('[agent-suggest] settle failed:', err?.message);
+    }
     return NextResponse.json({ message });
   } catch (err: any) {
     if (err instanceof WindowClosedError) return NextResponse.json({ error: err.message, code: 'WINDOW_CLOSED' }, { status: 409 });

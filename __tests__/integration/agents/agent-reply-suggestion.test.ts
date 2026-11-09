@@ -6,6 +6,11 @@
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 
+jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
+import { getServerSession } from 'next-auth';
+import { GET as listAll } from '../../../app/api/admin/agent-conversations/route';
+import { POST as answer } from '../../../app/api/admin/agent-conversations/[phone]/route';
+import { GET as getSuggestion, POST as postSuggestion } from '../../../app/api/admin/agent-conversations/[phone]/suggestion/route';
 jest.mock('../../../lib/ai/client', () => ({ getAnthropic: jest.fn() }));
 import { getAnthropic } from '../../../lib/ai/client';
 jest.mock('../../../lib/agents/activation/signals', () => {
@@ -275,5 +280,93 @@ describe('suggested replies', () => {
     expect(s.discarded - before.discarded).toBe(1);
     expect(s.team - before.team).toBe(1);
     expect(s.made - before.made).toBe(5); // as-is x2, edited, discarded, expired (the stale pending is 25 h old, within 14 days)
+  });
+
+  describe('routes', () => {
+    const ADMIN = { user: { id: 'admin-x', email: 'equipe@gastrux.test', role: 'ADMIN' } };
+    const realFetch = global.fetch;
+    const jsonReq = (body: any) => new Request('http://x/x', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) as any;
+    const ctx = (phone: string) => ({ params: { phone } });
+    const getReq = () => new Request('http://x/x') as any;
+
+    beforeEach(() => {
+      process.env.WHATSAPP_PLATFORM_ACCESS_TOKEN = 'tok';
+      process.env.WHATSAPP_PLATFORM_PHONE_NUMBER_ID = 'platform-phone-id';
+      (getServerSession as jest.Mock).mockResolvedValue(ADMIN);
+      global.fetch = jest.fn(async () => new Response(JSON.stringify({ messages: [{ id: `wamid.out.${crypto.randomBytes(5).toString('hex')}` }] }), { status: 200 }));
+    });
+    afterEach(() => {
+      global.fetch = realFetch;
+      delete process.env.WHATSAPP_PLATFORM_ACCESS_TOKEN;
+      delete process.env.WHATSAPP_PLATFORM_PHONE_NUMBER_ID;
+    });
+
+    it('non-admin gets 401/403 on the suggestion route', async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(null);
+      expect([401, 403]).toContain((await getSuggestion(getReq(), ctx(key))).status);
+      expect([401, 403]).toContain((await postSuggestion(jsonReq({ action: 'regenerate' }), ctx(key))).status);
+      (getServerSession as jest.Mock).mockResolvedValue({ user: { id: 'u', email: 'u@x.test', role: 'OWNER' } });
+      expect([401, 403]).toContain((await getSuggestion(getReq(), ctx(key))).status);
+    });
+
+    it('GET suggestion then answer with suggestionId marks sent_as_is', async () => {
+      await clientIn('oi', HOUR);
+      mockReply(sugestao('Olá, tudo bem? Posso ajudar.'));
+      const res = await getSuggestion(getReq(), ctx(key));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store');
+      const v = await res.json();
+      expect(v).toMatchObject({ state: 'ready', kind: 'SUGGESTION' });
+      const r = await answer(jsonReq({ text: 'Olá, tudo bem? Posso ajudar.', suggestionId: v.id }), ctx(key));
+      expect(r.status).toBe(200);
+      const row = await prisma.agentReplySuggestion.findUnique({ where: { id: v.id } });
+      expect(row.outcome).toBe('sent_as_is');
+      expect(row.sentMessageId).toBe((await r.json()).message.id);
+    });
+
+    it('a non-string suggestionId is ignored and the reply still succeeds', async () => {
+      await clientIn('oi', HOUR);
+      const r = await answer(jsonReq({ text: 'Olá!', suggestionId: 12345 }), ctx(key));
+      expect(r.status).toBe(200);
+    });
+
+    it('GET suggestion never fails the screen', async () => {
+      await clientIn('oi', HOUR);
+      (getAnthropic as jest.Mock).mockImplementation(() => { throw new Error('boom'); });
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await getSuggestion(getReq(), ctx(key));
+      spy.mockRestore();
+      expect(res.status).toBe(200);
+      expect(['unavailable', 'ready']).toContain((await res.json()).state);
+    });
+
+    it('discard via POST marks discarded; bad input is 400', async () => {
+      await clientIn('oi', HOUR);
+      mockReply(sugestao('Olá!'));
+      const v = await (await getSuggestion(getReq(), ctx(key))).json();
+      const bad = await postSuggestion(jsonReq({ action: 'discard' }), ctx(key));
+      expect(bad.status).toBe(400);
+      expect(await bad.json()).toEqual({ error: 'Sugestão inválida' });
+      const unk = await postSuggestion(jsonReq({ action: 'nope' }), ctx(key));
+      expect(unk.status).toBe(400);
+      expect(await unk.json()).toEqual({ error: 'Ação inválida' });
+      const ok = await postSuggestion(jsonReq({ action: 'discard', id: v.id }), ctx(key));
+      expect(await ok.json()).toEqual({ ok: true });
+      expect((await prisma.agentReplySuggestion.findUnique({ where: { id: v.id } })).outcome).toBe('discarded');
+    });
+
+    it('regenerate via POST returns a new view', async () => {
+      await clientIn('oi', HOUR);
+      mockReply(sugestao('Olá!'));
+      const a = await (await getSuggestion(getReq(), ctx(key))).json();
+      const b = await (await postSuggestion(jsonReq({ action: 'regenerate' }), ctx(key))).json();
+      expect(b.state).toBe('ready');
+      expect(b.id).not.toBe(a.id);
+    });
+
+    it('list GET returns suggestionStats', async () => {
+      const body = await (await listAll()).json();
+      expect(body.suggestionStats).toEqual(expect.objectContaining({ made: expect.any(Number), asIs: expect.any(Number), edited: expect.any(Number), discarded: expect.any(Number), team: expect.any(Number) }));
+    });
   });
 });
