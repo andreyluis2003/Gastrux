@@ -95,7 +95,7 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
   const storeFee = has(price.store_charged_delivery_price)
     ? cents(price.store_charged_delivery_price)
     : round2(cents(price.delivery_price) + cents(price.delivery_discount));
-  const taxaEntrega = storeDelivery ? storeFee : 0;
+  const taxaEntrega = storeDelivery && !retirada ? storeFee : 0;
 
   const promos: Array<{ discount: number; store: number }> = (Array.isArray(order?.promotions)
     ? order.promotions
@@ -104,7 +104,7 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     .filter((p: { discount: number; store: number }) => p.discount > 0 || p.store > 0);
   const storeShare = round2(promos.reduce((s, p) => s + p.store, 0));
   // real_price = what the store receives (incl. delivery) without the promotions 99Food subsidises; absent on 99Food delivery
-  const target = Math.max(0, has(price.real_price) ? cents(price.real_price) : round2(subtotal - storeShare));
+  const target = Math.max(0, has(price.real_price) ? cents(price.real_price) : round2((has(price.order_price) ? cents(price.order_price) : subtotal) + taxaEntrega - storeShare));
   const desconto = Math.max(0, round2(subtotal + taxaEntrega - target));
   const total = Math.max(0, round2(subtotal + taxaEntrega - desconto));
 

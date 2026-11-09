@@ -152,6 +152,21 @@ describe('mapNinetynineOrder', () => {
     expect(extraNote).toContain('Troco para R$ 50,00 (levar R$ 20,00)');
   });
 
+  it('keeps the delivery fee in the sale when real_price is absent', () => {
+    const { real_price, ...price } = storeDelivery.price;
+    const { input } = mapNinetynineOrder({ ...storeDelivery, price });
+    expect(input.taxaEntrega).toBe(7);
+    expect(input.desconto).toBe(10400);
+    expect(input.total).toBe(46807);
+  });
+
+  it('never charges a fee on a pickup order even if delivery_type says store delivery', () => {
+    const { input } = mapNinetynineOrder({ ...storeDelivery, fulfillment_mode: 1, price: { ...storeDelivery.price, real_price: 4680000 } });
+    expect(input.retirada).toBe(true);
+    expect(input.taxaEntrega).toBe(0);
+    expect(input.total).toBe(46800);
+  });
+
   it('never returns a negative total', () => {
     const o = { ...platformDelivery, promotions: [{ shop_subside_price: 99999 }] };
     expect(mapNinetynineOrder(o).input.total).toBe(0);
