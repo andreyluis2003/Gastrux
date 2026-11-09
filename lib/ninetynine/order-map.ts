@@ -19,11 +19,11 @@ const PRIVATE = 'privacy protection';
 const open = (v: unknown, max = 200) => { const s = str(v, max); return s && s.toLowerCase() !== PRIVATE ? s : ''; };
 
 const CHANNEL_FORM: Record<number, OrderApiPaymentForm> = {
-  212: 'PIX', 280: 'PIX', 262: 'CREDITO', 263: 'DEBITO', 264: 'VALE_REFEICAO',
+  150: 'CREDITO', 212: 'PIX', 280: 'PIX', 262: 'CREDITO', 263: 'DEBITO', 264: 'VALE_REFEICAO',
   257: 'VALE_REFEICAO', 258: 'VALE_REFEICAO', 259: 'VALE_REFEICAO', 260: 'VALE_REFEICAO', 153: 'DINHEIRO',
 };
 const CHANNEL_LABEL: Record<number, string> = {
-  110: 'Cupom', 150: 'Cartão de crédito/débito', 153: 'Dinheiro', 154: 'Maquininha', 190: '99Pay', 120: 'Carteira',
+  110: 'Cupom', 150: 'Cartão (crédito/débito)', 153: 'Dinheiro', 154: 'Maquininha', 190: '99Pay', 120: 'Carteira',
   212: 'PIX', 280: 'PIX', 229: 'NuPay', 234: 'Apple Pay', 235: 'Apple Pay', 257: 'Vale-refeição Pluxee', 258: 'Vale-refeição Ticket',
   259: 'Vale-refeição VR', 260: 'Vale-refeição Alelo', 262: 'Maquininha crédito', 263: 'Maquininha débito', 264: 'Maquininha vale-refeição',
   272: 'Google Pay', 273: 'Google Pay',
@@ -42,6 +42,13 @@ export interface NinetyninePlatformData {
   shopPaidMoney: number | null;
   /** Cash the store's own courier collects from the customer (store delivery, cash order). */
   cashToCollect: number | null;
+}
+
+function weightText(w: number, unit: string): string {
+  const u = unit.toLowerCase();
+  if (u === 'kg' || u === 'kilogram') return `${String(round2(w)).replace('.', ',')} kg`;
+  if (u === 'gram' || u === 'g' || u === '') return `${Math.round(w)} g`;
+  return `${String(round2(w)).replace('.', ',')} ${unit}`;
 }
 
 function flattenSubs(list: unknown, prefix: string, out: Array<{ nome: string; preco: number }>) {
@@ -72,7 +79,7 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     const total = cents(it?.total_price) || cents(it?.sku_price) * quantidade;
     const adicionais: Array<{ nome: string; preco: number }> = [];
     flattenSubs(it?.sub_item_list, '', adicionais);
-    const weight = num(it?.weight) > 0 && str(it?.sales_type) === 'weight' ? ` (${Math.round(num(it.weight))} g)` : '';
+    const weight = num(it?.weight) > 0 && str(it?.sales_type) === 'weight' ? ` (${weightText(num(it.weight), str(it?.weight_unit))})` : '';
     return {
       codigo: opt(it?.app_item_id, 60),
       nome: `${str(it?.name, 120 - weight.length) || 'Item da 99Food'}${weight}`,
@@ -84,27 +91,28 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     };
   });
   const subtotal = round2(itens.reduce((s, it) => s + it.precoUnitario * it.quantidade, 0));
-  const taxaEntrega = storeDelivery ? cents(price.delivery_price) : 0;
+  const has = (v: unknown) => v !== undefined && v !== null && v !== '';
+  const storeFee = has(price.store_charged_delivery_price)
+    ? cents(price.store_charged_delivery_price)
+    : round2(cents(price.delivery_price) + cents(price.delivery_discount));
+  const taxaEntrega = storeDelivery ? storeFee : 0;
 
   const promos: Array<{ discount: number; store: number }> = (Array.isArray(order?.promotions)
     ? order.promotions
     : (Array.isArray(order?.order_items) ? order.order_items : []).flatMap((it: any) => (Array.isArray(it?.promo_list) ? it.promo_list : [])))
     .map((p: any) => ({ discount: cents(p?.promo_discount), store: cents(p?.shop_subside_price) }))
     .filter((p: { discount: number; store: number }) => p.discount > 0 || p.store > 0);
-  const descontoRaw = round2(promos.reduce((s, p) => s + p.store, 0));
-  // never discount more than the order, so the total stays consistent and not negative
-  const desconto = Math.min(descontoRaw, round2(subtotal + taxaEntrega));
+  const storeShare = round2(promos.reduce((s, p) => s + p.store, 0));
+  // real_price = what the store receives (incl. delivery) without the promotions 99Food subsidises; absent on 99Food delivery
+  const target = Math.max(0, has(price.real_price) ? cents(price.real_price) : round2(subtotal - storeShare));
+  const desconto = Math.max(0, round2(subtotal + taxaEntrega - target));
   const total = Math.max(0, round2(subtotal + taxaEntrega - desconto));
 
   const cash = payType === 2;
-  const changeFor = cents(order?.change_for);
   const form: OrderApiPaymentForm = cash ? 'DINHEIRO' : CHANNEL_FORM[payChannel] ?? 'OUTRO';
   const pago = payMethod === 1 && payType !== 2 && payType !== 3;
-  const pagamento: OrderApiInput['pagamento'] = {
-    forma: form,
-    pago,
-    ...(cash && changeFor > 0 ? { trocoPara: changeFor } : {}),
-  };
+  // no trocoPara: the kitchen note would compute the change from the store's sale, not from what the customer pays
+  const pagamento: OrderApiInput['pagamento'] = { forma: form, pago };
 
   const a = order?.receive_address ?? {};
   const street = open(a.street_name);
@@ -134,17 +142,24 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
   const handoverCode = str(order?.handover_code, 20) || null;
   const takeawayCode = str(order?.takeaway_code, 20) || null;
   const shopPaid = price.shop_paid_money;
-  const shopPaidMoney = cash && deliveryType === 1 && shopPaid !== undefined && shopPaid !== null && shopPaid !== '' ? cents(shopPaid) : null;
-  const cashToCollect = cash && storeDelivery ? cents(price.customer_need_paying_money) : null;
+  const shopPaidMoney = cash && deliveryType === 1 && has(shopPaid) ? cents(shopPaid) : null;
+  const needPay = has(price.customer_need_paying_money) ? cents(price.customer_need_paying_money) : has(price.real_pay_price) ? cents(price.real_pay_price) : null;
+  const cashToCollect = cash && storeDelivery ? needPay : null;
+  const collect = cashToCollect ?? total;
+  const changeFor = cents(order?.change_for);
+  const cashLines = !cash ? [] : storeDelivery ? [
+    `Cobrar ${brl(collect)} do cliente`,
+    changeFor > 0 ? (changeFor >= collect ? `Troco para ${brl(changeFor)} (levar ${brl(round2(changeFor - collect))})` : `Cliente informou troco para ${brl(changeFor)}`) : '',
+  ] : deliveryType === 1 ? [
+    shopPaidMoney !== null ? `Receber ${brl(shopPaidMoney)} do entregador` : 'Dinheiro: a 99Food informa o valor quando o entregador for designado',
+  ] : [];
 
   const payLabel = CHANNEL_LABEL[payChannel] ?? (cash ? 'Dinheiro' : 'Outro');
   const lines = [
     `99Food #${orderIndex} · código ${orderId}`,
     retirada ? 'Retirada' : storeDelivery ? 'Entrega própria' : 'Entrega 99Food',
     `Pagamento: ${payLabel} (${pago ? 'pago na 99Food' : 'a cobrar'})`,
-    cash && changeFor > 0 ? `Troco para ${brl(changeFor)}` : '',
-    cashToCollect ? `Cobrar ${brl(cashToCollect)} do cliente` : '',
-    shopPaidMoney ? `Receber ${brl(shopPaidMoney)} do entregador` : '',
+    ...cashLines,
     ...promos.map((p) => {
       const parts = [p.store > 0 ? `${brl(p.store)} pago pela loja` : '', round2(p.discount - p.store) > 0 ? `${brl(round2(p.discount - p.store))} pago pela 99Food` : ''].filter(Boolean);
       return `Promoção ${brl(p.discount)} (${parts.join(', ') || 'pago pela 99Food'})`;

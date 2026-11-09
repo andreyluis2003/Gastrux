@@ -2,22 +2,23 @@ import { mapNinetynineOrder } from '@/lib/ninetynine/order-map';
 
 const storeDelivery = {
   order_id: '5764625173055605123', order_index: 2, status: 100, delivery_type: 2, fulfillment_mode: 0,
-  pay_type: 2, pay_method: 2, pay_channel: 153, change_for: 10000, need_cutlery: true, remark: 'Sem cebola',
-  price: { order_price: 5000, items_discount: 0, delivery_discount: 0, delivery_price: 700, real_price: 5700, customer_need_paying_money: 5700, others_fees: {} },
+  pay_type: 2, pay_method: 2, pay_channel: 153, change_for: 5000000, need_cutlery: true, remark: 'Sem cebola',
+  price: { order_price: 5720000, items_discount: 2540000, delivery_discount: 0, delivery_price: 700, store_charged_delivery_price: 700, real_price: 4680700, customer_need_paying_money: 4680700, others_fees: { coupon_discount: 1040000 } },
+  promotions: [{ promo_type: 2, promo_discount: 1040000, shop_subside_price: 1040000 }, { promo_type: 11, promo_discount: 1500000, shop_subside_price: 0 }],
   receive_address: {
     name: 'Maria Souza', first_name: 'Maria', last_name: 'Souza', calling_code: '55', phone: '11988887777',
     street_name: 'Rua das Flores', street_number: '10', complement: 'Ap 3', district: 'Centro', city: 'Sinop', state: 'MT', postal_code: '78550000',
   },
   order_items: [
-    { name: 'Pizza', amount: 2, sku_price: 2000, total_price: 5000, app_item_id: 'PZ1', remark: 'bem passada',
-      sub_item_list: [{ name: 'Borda', amount: 1, total_price: 500, sub_item_list: [{ name: 'Catupiry', amount: 2, total_price: 0 }] }] },
+    { name: 'Pizza', amount: 2, sku_price: 2800000, total_price: 5720000, app_item_id: 'PZ1', remark: 'bem passada',
+      sub_item_list: [{ name: 'Borda', amount: 1, total_price: 60000, sub_item_list: [{ name: 'Catupiry', amount: 2, total_price: 0 }] }] },
   ],
 };
 
 const platformDelivery = {
   order_id: '5764625173055605456', order_index: 7, delivery_type: 1, fulfillment_mode: 0,
   pay_type: 1, pay_method: 1, pay_channel: 212,
-  price: { order_price: 6000, delivery_price: 900, real_price: 5000, shop_paid_money: 1500, others_fees: {} },
+  price: { order_price: 6000, delivery_price: 900, shop_paid_money: 1500, others_fees: {} },
   promotions: [
     { promo_type: 1, promo_discount: 1000, shop_subside_price: 400 },
     { promo_type: 2, promo_discount: 500, shop_subside_price: 0 },
@@ -44,20 +45,22 @@ describe('mapNinetynineOrder', () => {
     expect(input.codigo).toBe('5764625173055605123');
     expect(input.retirada).toBe(false);
     expect(input.taxaEntrega).toBe(7);
-    expect(input.desconto).toBe(0);
-    expect(input.total).toBe(57);
-    expect(input.itens[0]).toMatchObject({ codigo: 'PZ1', nome: 'Pizza', quantidade: 2, precoUnitario: 25, observacao: 'bem passada' });
+    expect(input.desconto).toBe(10400);
+    expect(input.total).toBe(46807);
+    expect(input.itens[0]).toMatchObject({ codigo: 'PZ1', nome: 'Pizza', quantidade: 2, precoUnitario: 28600, observacao: 'bem passada' });
     expect(input.itens[0].adicionais).toEqual([{ nome: '1x Borda', preco: 0 }, { nome: '1x Borda > 2x Catupiry', preco: 0 }]);
     expect(input.entrega).toMatchObject({ endereco: 'Rua das Flores', numero: '10', complemento: 'Ap 3', bairro: 'Centro', cidade: 'Sinop', cep: '78550000' });
     expect(input.cliente).toMatchObject({ nome: 'Maria', celular: '11988887777' });
-    expect(input.pagamento).toEqual({ forma: 'DINHEIRO', pago: false, trocoPara: 100 });
+    expect(input.pagamento).toEqual({ forma: 'DINHEIRO', pago: false });
     expect(extraNote).toContain('99Food #2');
     expect(extraNote).toContain('5764625173055605123');
     expect(extraNote).toContain('Entrega própria');
-    expect(extraNote).toContain('Troco para');
+    expect(extraNote).toContain('Cobrar R$ 46.807,00 do cliente');
+    expect(extraNote).toContain('Troco para R$ 50.000,00 (levar R$ 3.193,00)');
+    expect(extraNote.match(/Troco/g)).toHaveLength(1);
     expect(extraNote).toContain('Talheres: sim');
     expect(extraNote).toContain('Sem cebola');
-    expect(platformData).toMatchObject({ orderIndex: 2, orderId: '5764625173055605123', deliveryType: 2, cashToCollect: 57, shopPaidMoney: null });
+    expect(platformData).toMatchObject({ orderIndex: 2, orderId: '5764625173055605123', deliveryType: 2, cashToCollect: 46807, shopPaidMoney: null });
   });
 
   it('maps a 99Food-delivery masked order with promotions', () => {
@@ -65,6 +68,7 @@ describe('mapNinetynineOrder', () => {
     expect(input.taxaEntrega).toBe(0);
     expect(input.desconto).toBe(4);
     expect(input.total).toBe(56);
+    expect(input.itens.reduce((a, i) => a + i.precoUnitario * i.quantidade, 0) + input.taxaEntrega - input.desconto).toBe(56);
     expect(input.pagamento).toEqual({ forma: 'PIX', pago: true });
     expect(input.entrega?.endereco).toBe('Endereço protegido pela 99Food');
     expect(input.entrega?.numero).toBeUndefined();
@@ -86,7 +90,42 @@ describe('mapNinetynineOrder', () => {
     expect(platformData.shopPaidMoney).toBe(15);
     expect(extraNote).toContain('Receber R$');
     expect(extraNote).toContain('do entregador');
-    expect(input.pagamento.forma).toBe('DINHEIRO');
+    expect(input.pagamento).toEqual({ forma: 'DINHEIRO', pago: false });
+    expect(extraNote).not.toContain('Cobrar');
+    expect(extraNote).not.toContain('Troco');
+  });
+
+  it('tells the kitchen to wait for the amount when the courier is not assigned yet', () => {
+    const o = { ...platformDelivery, pay_type: 2, pay_method: 2, pay_channel: 153, price: { order_price: 6000 } };
+    const { extraNote, platformData } = mapNinetynineOrder(o);
+    expect(platformData.shopPaidMoney).toBeNull();
+    expect(extraNote).toContain('Dinheiro: a 99Food informa o valor quando o entregador for designado');
+  });
+
+  it('keeps a 99Food-subsidised promotion from lowering the sale', () => {
+    const o = { ...platformDelivery, promotions: [{ promo_discount: 2000, shop_subside_price: 0 }] };
+    const { input } = mapNinetynineOrder(o);
+    expect(input.desconto).toBe(0);
+    expect(input.total).toBe(60);
+  });
+
+  it('handles change_for smaller than what the customer pays', () => {
+    const { extraNote } = mapNinetynineOrder({ ...storeDelivery, change_for: 1000 });
+    expect(extraNote).toContain('Cliente informou troco para R$ 10,00');
+    expect(extraNote).not.toContain('levar');
+  });
+
+  it('honours weight_unit and leaves cashToCollect null without an amount', () => {
+    const kg = { ...platformDelivery, order_items: [{ name: 'Queijo', amount: 1, total_price: 3000, sales_type: 'weight', weight: 0.5, weight_unit: 'kg' }] };
+    expect(mapNinetynineOrder(kg).input.itens[0].nome).toBe('Queijo (0,5 kg)');
+    const o = { ...storeDelivery, price: { order_price: 5720000, delivery_price: 700 } };
+    expect(mapNinetynineOrder(o).platformData.cashToCollect).toBeNull();
+  });
+
+  it('maps online credit/debit card (150) as CREDITO paid', () => {
+    const { input, extraNote } = mapNinetynineOrder({ ...platformDelivery, pay_channel: 150 });
+    expect(input.pagamento).toEqual({ forma: 'CREDITO', pago: true });
+    expect(extraNote).toContain('Cartão (crédito/débito)');
   });
 
   it('maps a self-pickup order without delivery fee or address', () => {
@@ -95,6 +134,7 @@ describe('mapNinetynineOrder', () => {
     expect(input.entrega).toBeUndefined();
     expect(input.taxaEntrega).toBe(0);
     expect(input.total).toBe(30);
+    expect(input.desconto).toBe(0);
     expect(input.cliente.celular).toBe('00011112222');
     expect(extraNote).toContain('Retirada');
     expect(extraNote).toContain('Código de retirada 1234');
