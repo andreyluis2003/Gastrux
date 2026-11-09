@@ -8,6 +8,7 @@ import { ensureMenuItemRecipes, isProductRecipe, retireProductRecipe, syncProduc
 import { getCurrentRestaurantId } from '@/lib/whatsapp/get-restaurant';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { normalizeDays } from '@/lib/cardapio/days';
+import { removeProductPhoto } from '@/lib/cardapio/product-photo';
 
 export const dynamic = 'force-dynamic';
 
@@ -166,6 +167,12 @@ export async function DELETE(
     });
     // Its ficha simples, if no other item uses it, leaves the Fichas técnicas list and the reports
     await retireProductRecipe(prisma, restaurantId, existingItem.recipeId);
+    // Its photo goes too; a storage hiccup must not fail the delete
+    try {
+      await removeProductPhoto(restaurantId, params.id);
+    } catch (e) {
+      console.error('[cardapio] photo remove failed:', e);
+    }
 
     return NextResponse.json({ message: 'Menu item deleted' });
   } catch (error) {
