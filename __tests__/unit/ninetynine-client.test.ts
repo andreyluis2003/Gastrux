@@ -133,6 +133,45 @@ describe('calls', () => {
     expect(last.init.body).toContain('"auth_token":"tok2"');
   });
 
+  it('two concurrent calls hitting 10102 share one refresh and one get', async () => {
+    let n = 0;
+    answer = (u, init) => {
+      if (isToken(u)) return tok(++n);
+      if (isRefresh(u)) return resp({ errno: 0, data: true });
+      return String(init.body).includes('"auth_token":"tok1"') ? resp({ errno: 10102, errmsg: 'expired', requestId: 'r1' }) : resp({ errno: 0, requestId: 'ok1', data: { done: true } });
+    };
+    const [a, b] = await Promise.all([storeCall('i1', 'v1/order/order/confirm', { order_id: '1' }), storeCall('i1', 'v1/order/order/ready', { order_id: '2' })]);
+    expect(a).toEqual({ done: true });
+    expect(b).toEqual({ done: true });
+    expect(calls.filter((c) => isRefresh(c.url))).toHaveLength(1);
+    expect(calls.filter((c) => isToken(c.url))).toHaveLength(2);
+  });
+
+  it('still gets a token when the refresh is refused', async () => {
+    let orderCalls = 0;
+    let n = 0;
+    answer = (u) => {
+      if (isToken(u)) return tok(++n);
+      if (isRefresh(u)) return resp({ errno: 10103, errmsg: 'cooldown' });
+      return ++orderCalls === 1 ? resp({ errno: 10102 }) : resp({ errno: 0, data: true });
+    };
+    await expect(storeCall('i1', 'v1/order/order/confirm', { order_id: '1' })).resolves.toBe(true);
+    expect(calls.filter((c) => isToken(c.url))).toHaveLength(2);
+  });
+
+  it('state-changing helpers return the requestId; network failure is wrapped without the URL', async () => {
+    answer = (u) => (isToken(u) ? tok(1) : resp({ errno: 0, requestId: 'req-9', data: true }));
+    expect(await cancelOrder('i1', '77', 1010)).toEqual({ requestId: 'req-9' });
+    answer = (u) => {
+      if (isToken(u)) return tok(1);
+      throw new Error('boom https://x?auth_token=secret');
+    };
+    const err = await storeCall('i1', 'v1/order/order/ready', { order_id: '1' }).catch((e) => e);
+    expect(err).toBeInstanceOf(NinetynineError);
+    expect(err.errno).toBe(-1);
+    expect(err.message).toBe('timeout/rede em v1/order/order/ready');
+  });
+
   it('does not loop on a second 10102', async () => {
     let orderCalls = 0;
     answer = (u) => {

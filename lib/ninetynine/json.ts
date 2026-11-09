@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import JSONbig from 'json-bigint';
 
 /**
@@ -10,17 +11,17 @@ export function parseBig(raw: string): any {
   return parser.parse(raw);
 }
 
-const MARK = '__99BIG__';
-const MARK_RE = new RegExp(`"${MARK}(\\d+)${MARK}"`, 'g');
-
 /** JSON.stringify that writes the listed keys (any depth) as raw number literals, so a 64-bit id is sent without rounding */
 export function stringifyBig(value: unknown, bigKeys: string[]): string {
   const keys = new Set(bigKeys);
+  // A random marker per call, so no payload text can collide with it
+  const mark = `__99BIG${randomBytes(8).toString('hex')}__`;
+  const markRe = new RegExp(`"${mark}(\\d+)${mark}"`, 'g');
   const text = JSON.stringify(value, (key: string, v: unknown) => {
     if (!keys.has(key) || v === undefined || v === null) return v;
-    if (typeof v === 'number' && Number.isSafeInteger(v)) return `${MARK}${v}${MARK}`;
-    if (typeof v === 'string' && /^\d+$/.test(v)) return `${MARK}${v}${MARK}`;
+    if (typeof v === 'number' && Number.isSafeInteger(v)) return `${mark}${v}${mark}`;
+    if (typeof v === 'string' && /^\d+$/.test(v)) return `${mark}${v}${mark}`;
     throw new Error(`99Food: o campo ${key} precisa ser um número inteiro`);
   });
-  return text.replace(MARK_RE, '$1');
+  return text.replace(markRe, '$1');
 }
