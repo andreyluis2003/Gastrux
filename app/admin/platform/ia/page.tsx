@@ -9,7 +9,7 @@ interface Row {
   inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number;
   errors: number; detailed: number; withFiles: number; lastAt: string | null;
 }
-interface Data { month: string; totals: { questions: number; costUsd: number; errors: number }; restaurants: Row[] }
+interface Data { month: string; totals: { questions: number; costUsd: number; errors: number }; agents: { activationUsd: number; repliesUsd: number }; restaurants: Row[] }
 
 const TIER: Record<string, string> = { starter: 'Sem plano', pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
 const usd = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -65,7 +65,11 @@ export default function AiCostsPage() {
       {data && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card className="p-4"><p className="text-xs text-muted-foreground">Custo no mês</p><p className="text-2xl font-bold">{usd(data.totals.costUsd)}</p></Card>
+            <Card className="p-4"><p className="text-xs text-muted-foreground">Custo no mês</p><p className="text-2xl font-bold">{usd(data.totals.costUsd)}</p>
+              {(data.agents.activationUsd > 0 || data.agents.repliesUsd > 0) && (
+                <p className="text-xs text-muted-foreground mt-1">Agentes: ativação {usd(data.agents.activationUsd)} · respostas {usd(data.agents.repliesUsd)}</p>
+              )}
+            </Card>
             <Card className="p-4"><p className="text-xs text-muted-foreground">Perguntas contadas</p><p className="text-2xl font-bold">{num(data.totals.questions)}</p></Card>
             <Card className="p-4"><p className="text-xs text-muted-foreground">Com erro</p><p className="text-2xl font-bold">{num(data.totals.errors)}</p></Card>
           </div>

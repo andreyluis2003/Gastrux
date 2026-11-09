@@ -50,6 +50,23 @@ describe('AI cost per restaurant', () => {
     expect((await aiCostsByMonth('2026-09')).restaurants.find((r) => r.restaurantId === a)).toMatchObject({ questions: 1 });
   });
 
+  it('agent costs (activation drafts and suggested replies) are in the month total', async () => {
+    const before = await aiCostsByMonth('2026-10');
+    const act = await prisma.agentAction.create({ data: { restaurantId: a, userId: ownerId, trigger: `aic-${tag}`, channel: 'EMAIL', status: 'DRAFT', text: 'Oi', costUsd: 0.01, createdAt: new Date('2026-10-10T15:00:00Z') } });
+    const sug = await prisma.agentReplySuggestion.create({ data: { phone: `55${tag}`, forMessageId: `m-${tag}`, forMessageAt: new Date('2026-10-10T15:00:00Z'), kind: 'SUGGESTION', costUsd: 0.002, createdAt: new Date('2026-10-10T15:00:00Z') } });
+    try {
+      const after = await aiCostsByMonth('2026-10');
+      expect(after.agents.activationUsd - before.agents.activationUsd).toBeCloseTo(0.01, 6);
+      expect(after.agents.repliesUsd - before.agents.repliesUsd).toBeCloseTo(0.002, 6);
+      expect(after.totals.costUsd - before.totals.costUsd).toBeCloseTo(0.012, 6);
+      expect(after.totals.questions).toBe(before.totals.questions);
+      expect(after.totals.errors).toBe(before.totals.errors);
+    } finally {
+      await prisma.agentAction.delete({ where: { id: act.id } });
+      await prisma.agentReplySuggestion.delete({ where: { id: sug.id } });
+    }
+  });
+
   it('platform admins only; a bad month is refused', async () => {
     getServerSession.mockResolvedValue({ user: { id: ownerId, email: `aic-${tag}@gastrux.test`, role: 'OWNER' }, expires: '2099-01-01' });
     expect((await COSTS(new NextRequest('http://x/api/admin/platform/ai-costs?month=2026-10'))).status).toBe(401);

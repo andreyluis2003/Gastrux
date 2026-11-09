@@ -29,7 +29,7 @@ export interface AiCostRow {
 export async function aiCostsByMonth(ym: string) {
   const range = { gte: brtDayStart(`${ym}-01`), lt: brtDayStart(`${addMonths(ym, 1)}-01`) };
   const where = { createdAt: range };
-  const [all, counted, errors, detailed, files] = await Promise.all([
+  const [all, counted, errors, detailed, files, activation, replies] = await Promise.all([
     prisma.aiQuestion.groupBy({
       by: ['restaurantId'], where,
       _sum: { costUsd: true, inputTokens: true, outputTokens: true, cacheReadTokens: true, cacheWriteTokens: true },
@@ -39,6 +39,9 @@ export async function aiCostsByMonth(ym: string) {
     prisma.aiQuestion.groupBy({ by: ['restaurantId'], where: { ...where, error: { not: null } }, _count: { _all: true } }),
     prisma.aiQuestion.groupBy({ by: ['restaurantId'], where: { ...where, detailed: true }, _count: { _all: true } }),
     prisma.aiQuestion.groupBy({ by: ['restaurantId'], where: { ...where, NOT: { attachments: { equals: null as any } } }, _count: { _all: true } }),
+    // Platform agents (not tied to a restaurant plan): activation drafts and suggested WhatsApp replies
+    prisma.agentAction.aggregate({ _sum: { costUsd: true }, where }),
+    prisma.agentReplySuggestion.aggregate({ _sum: { costUsd: true }, where }),
   ]);
   const countOf = (rows: { restaurantId: string; _count: { _all: number } }[]) => new Map(rows.map((r) => [r.restaurantId, r._count._all]));
   const [c, e, d, f] = [countOf(counted), countOf(errors), countOf(detailed), countOf(files)];
@@ -63,6 +66,7 @@ export async function aiCostsByMonth(ym: string) {
     };
   }));
   restaurants.sort((x, y) => y.costUsd - x.costUsd);
-  const totals = restaurants.reduce((t, r) => ({ questions: t.questions + r.questions, costUsd: t.costUsd + r.costUsd, errors: t.errors + r.errors }), { questions: 0, costUsd: 0, errors: 0 });
-  return { month: ym, totals, restaurants };
+  const agents = { activationUsd: activation._sum.costUsd ?? 0, repliesUsd: replies._sum.costUsd ?? 0 };
+  const totals = restaurants.reduce((t, r) => ({ questions: t.questions + r.questions, costUsd: t.costUsd + r.costUsd, errors: t.errors + r.errors }), { questions: 0, costUsd: agents.activationUsd + agents.repliesUsd, errors: 0 });
+  return { month: ym, totals, agents, restaurants };
 }
