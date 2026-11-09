@@ -132,6 +132,14 @@ describe('iFood connection', () => {
     })).rejects.toThrow();
   });
 
+  it('the old delivery route cannot point a restaurant at a 99Food store either (plan 2026-11-09 99food)', async () => {
+    as(a.owner);
+    const shop = `5764${String(Date.now()).slice(-8)}${String(seq++).padStart(7, '0')}`;
+    const res = await LEGACY_POST(req('POST', { platform: 'ninety_nine_food', apiKey: 'k', webhookSecret: 's', storeId: shop }), {});
+    expect(res.status).toBe(400);
+    expect(await prisma.deliveryIntegration.count({ where: { platform: 'ninety_nine_food', storeId: shop } })).toBe(0);
+  });
+
   it('before the homologation (no credentials) the screen says so and start answers 409', async () => {
     delete process.env.IFOOD_CLIENT_ID;
     as(b.owner);

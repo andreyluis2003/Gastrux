@@ -7,7 +7,7 @@ import { DeliveryPlatform } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
-const MANAGED_PLATFORMS = ['ifood', 'gastrux_api', 'delivery_site'];
+const MANAGED_PLATFORMS = ['ifood', 'ninety_nine_food', 'gastrux_api', 'delivery_site'];
 /** Never the secrets or the tokens back (final review 2026-10-24 I4) */
 const PUBLIC_FIELDS = {
   id: true, platform: true, isActive: true, storeId: true, storeName: true, storePhone: true, storeAddress: true,
