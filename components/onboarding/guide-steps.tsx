@@ -67,14 +67,16 @@ export function GuideSteps({ guide, onChannels, onNavigate }: { guide: GuideStat
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{g.title}</h3>
           <ul className="divide-y">
             {g.steps.map((s) => (
-              <li key={s.key} className="flex flex-wrap items-center gap-2 py-2">
+              <li key={s.key} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2">
+                {/* The label keeps a minimum width: in the narrow panel the time and buttons drop to a second
+                    line instead of squeezing the label until its words spill under them. */}
                 {s.key === 'teste' && !s.done ? (
-                  <button type="button" onClick={guide.hasProducts ? beginTour : undefined} disabled={!guide.hasProducts} className="flex min-w-0 flex-1 items-center gap-3 text-left text-sm disabled:cursor-not-allowed">
+                  <button type="button" onClick={guide.hasProducts ? beginTour : undefined} disabled={!guide.hasProducts} className="flex min-w-[12rem] flex-1 items-center gap-3 text-left text-sm disabled:cursor-not-allowed">
                     <Circle className="h-5 w-5 shrink-0 text-slate-300" aria-label="A fazer" />
                     <span className="font-medium text-slate-800">{s.label}</span>
                   </button>
                 ) : (
-                  <Link href={s.href} onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-3 text-sm hover:bg-slate-50">
+                  <Link href={s.href} onClick={onNavigate} className="flex min-w-[12rem] flex-1 items-center gap-3 text-sm hover:bg-slate-50">
                     {s.done
                       ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-label="Concluído" />
                       : <Circle className="h-5 w-5 shrink-0 text-slate-300" aria-label="A fazer" />}
@@ -84,29 +86,31 @@ export function GuideSteps({ guide, onChannels, onNavigate }: { guide: GuideStat
                   </Link>
                 )}
                 {!s.done && (
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-500">
-                    <Clock className="h-3.5 w-3.5" /> {s.minutes} min
-                  </span>
-                )}
-                {s.key === 'teste' && !s.done && guide.hasProducts && (
-                  <button type="button" onClick={beginTour} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
-                    <Wand2 className="h-3.5 w-3.5" /> Começar
-                  </button>
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                      <Clock className="h-3.5 w-3.5" /> {s.minutes} min
+                    </span>
+                    {s.key === 'teste' && guide.hasProducts && (
+                      <button type="button" onClick={beginTour} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+                        <Wand2 className="h-3.5 w-3.5" /> Começar
+                      </button>
+                    )}
+                    {AI_ASK[s.key] && (
+                      <button type="button" onClick={() => askAi(AI_ASK[s.key]!)} className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-primary hover:bg-slate-50">
+                        <Sparkles className="h-3.5 w-3.5" /> Fazer com a IA
+                      </button>
+                    )}
+                    {tutorialForFirstStep(s.key) && (
+                      <button type="button" onClick={() => setVideo(tutorialForFirstStep(s.key))} className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-primary hover:bg-slate-50">
+                        <PlayCircle className="h-3.5 w-3.5" /> Ver vídeo
+                      </button>
+                    )}
+                  </div>
                 )}
                 {s.key === 'teste' && !s.done && !guide.hasProducts && (
                   <Link href="/admin/cardapio" onClick={onNavigate} className="w-full pl-8 text-xs text-amber-700 underline">
                     Cadastre um produto antes
                   </Link>
-                )}
-                {!s.done && AI_ASK[s.key] && (
-                  <button type="button" onClick={() => askAi(AI_ASK[s.key]!)} className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-primary hover:bg-slate-50">
-                    <Sparkles className="h-3.5 w-3.5" /> Fazer com a IA
-                  </button>
-                )}
-                {!s.done && tutorialForFirstStep(s.key) && (
-                  <button type="button" onClick={() => setVideo(tutorialForFirstStep(s.key))} className="inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium text-primary hover:bg-slate-50">
-                    <PlayCircle className="h-3.5 w-3.5" /> Ver vídeo
-                  </button>
                 )}
               </li>
             ))}
