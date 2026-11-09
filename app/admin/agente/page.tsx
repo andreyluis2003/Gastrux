@@ -8,7 +8,7 @@ import { Bot, Mail, MessageCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { STAGES } from '@/lib/admin/client-health';
 import { TRIGGER_LABELS, type ActivationTrigger } from '@/lib/agents/activation/rules';
-import { AgentConversations, type Conversation } from '@/components/admin/agent-conversations';
+import { AgentConversations, type Conversation, type SuggestionStats } from '@/components/admin/agent-conversations';
 
 interface QueueItem {
   id: string;
@@ -118,6 +118,7 @@ function QueueCard({ item, official, onDone }: { item: QueueItem; official: bool
 export default function AgentQueuePage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [stats, setStats] = useState<SuggestionStats | null>(null);
   const [official, setOfficial] = useState(false);
   const [tab, setTab] = useState<'queue' | 'conversations'>('queue');
   const [loading, setLoading] = useState(true);
@@ -131,7 +132,9 @@ export default function AgentQueuePage() {
       const out = await queue.json();
       setItems(out.actions);
       setOfficial(out.official);
-      setConversations((await talks.json()).conversations);
+      const talksOut = await talks.json();
+      setConversations(talksOut.conversations);
+      setStats(talksOut.suggestionStats ?? null);
     } catch {
       toast.error('Não foi possível carregar a fila');
     } finally {
@@ -163,7 +166,7 @@ export default function AgentQueuePage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Carregando...</p>
       ) : tab === 'conversations' ? (
-        <AgentConversations items={conversations} onChange={load} />
+        <AgentConversations items={conversations} onChange={load} stats={stats} />
       ) : items.length === 0 ? (
         <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Nada para aprovar agora</CardContent></Card>
       ) : (
