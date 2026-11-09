@@ -7,5 +7,8 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { startIfoodPollingIfEnabled } = await import('./lib/ifood/poller');
     startIfoodPollingIfEnabled();
+    // The stored 99Food webhook events, every 5 seconds, only with NINETYNINE_FOOD_EVENTS=on (plan 2026-11-09 99food)
+    const { startNinetynineWorkerIfEnabled } = await import('./lib/ninetynine/worker');
+    startNinetynineWorkerIfEnabled();
   }
 }
