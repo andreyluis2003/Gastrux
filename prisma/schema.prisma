@@ -5157,3 +5157,19 @@ model CouponRedemption {
   @@index([restaurantId])
   @@map("coupon_redemptions")
 }
+
+/// 99Food webhook events, stored before processing. The id is a deterministic key, so a resend collapses into the same row
+model NinetynineEvent {
+  id          String    @id
+  type        String
+  appShopId   String?
+  orderId     String?
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+  attempts    Int       @default(0)
+  error       String?
+
+  @@index([processedAt, receivedAt])
+  @@map("ninetynine_events")
+}
