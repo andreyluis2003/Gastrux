@@ -641,3 +641,18 @@ Nenhuma bloqueia; a revisão final classificou todas como "não precisa antes do
 - Tempo limite da IA é 30 s, mas o cliente tenta 1 vez de novo: até ~60 s antes de "Sem sugestão desta vez".
 - Para ler os números: cada "Nova sugestão" conta como descartada; o cache do prompt quase nunca é aproveitado
   (custo extra irrelevante, ~US$ 0,016 por chamada).
+
+## Foto do produto (no ar com 60f74be) — sobras das revisões
+
+Nenhuma bloqueia (revisão final: "não precisa antes do merge").
+- O cliente S3 em cache guarda o segredo antigo se só o segredo mudar (troca de variável no Easypanel reinicia o app).
+- `menuPhotoKey` não recusa "/" ou ".." (os ids vêm do banco e o nome aleatório do servidor).
+- Dois envios ao mesmo tempo no mesmo produto podem deixar um arquivo órfão no armazenamento.
+- Remover a foto com o armazenamento desligado apaga a linha e deixa o arquivo.
+- Limite de tamanho do proxy do Easypanel desconhecido (conferir no teste do homolog; fotos diminuídas têm 0,2 a 0,6 MB).
+- Navegadores muito antigos (sem orientação EXIF) podem deixar foto de celular deitada.
+- Se a resposta do "Criar Item" não for JSON, a foto escolhida se perde em silêncio.
+- "Enviando…" aparece também enquanto a foto é só diminuída no aparelho.
+- Os cardápios públicos ficam em cache (QR 60 s, publico 300 s): logo depois de trocar a foto, a antiga pode aparecer quebrada por até 5 min.
+- Ordem 6 do artigo "Como coloco foto nos produtos?" repete outras ordens da categoria (já acontecia).
+- O 404 da rota antiga de item continua em inglês ("Menu item not found").
