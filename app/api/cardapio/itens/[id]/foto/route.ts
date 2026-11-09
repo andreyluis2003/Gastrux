@@ -26,14 +26,52 @@ function fail(error: unknown) {
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
 
+const BODY_CAP = MAX_PHOTO_BYTES + 64 * 1024;
+
+// A body without Content-Length (chunked): count the bytes as they arrive and stop past the cap.
+// Returns the collected bytes, or null when the body is over the cap.
+async function readCapped(body: ReadableStream<Uint8Array>): Promise<Uint8Array | null> {
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > BODY_CAP) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const check = await requireRestaurantRole(MANAGER_ROLES, 'Alterar o cardápio exige um gerente');
     if (!check.ok) return check.response;
 
+    // Refuse an oversized body before formData() buffers all of it
+    const TOO_BIG = { error: 'A foto ficou grande demais. Tente outra foto.' };
+    const declared = req.headers.get('content-length');
+    if (Number(declared) > BODY_CAP) return NextResponse.json(TOO_BIG, { status: 413 });
+    let source: Request = req;
+    if (declared === null && req.body) {
+      const collected = await readCapped(req.body);
+      if (!collected) return NextResponse.json(TOO_BIG, { status: 413 });
+      source = new Request(req.url, { method: 'POST', headers: req.headers, body: collected });
+    }
+
     let file: unknown = null;
     try {
-      file = (await req.formData()).get('foto');
+      file = (await source.formData()).get('foto');
     } catch {
       file = null;
     }

@@ -32,7 +32,7 @@ export async function setProductPhoto(
   const cfg = storageConfig();
   if (!cfg) throw new PhotoError('disabled');
 
-  const item = await prisma.menuItem.findFirst({ where: { id: menuItemId, restaurantId }, select: { id: true } });
+  const item = await prisma.menuItem.findFirst({ where: { id: menuItemId, restaurantId, active: true }, select: { id: true } });
   if (!item) throw new PhotoError('not_found');
 
   const type = sniffImageType(bytes);

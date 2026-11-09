@@ -102,6 +102,69 @@ describe('product photo', () => {
     expect(putPhoto).not.toHaveBeenCalled();
   });
 
+  it('content-length above the limit → 413 before reading the body', async () => {
+    const fd = new FormData();
+    fd.append('foto', new Blob([JPEG()], { type: 'image/jpeg' }), 'x.jpg');
+    const r = new NextRequest('http://localhost/x', { method: 'POST', body: fd, headers: { 'content-length': String(MAX_PHOTO_BYTES + 64 * 1024 + 1) } });
+    const res = await POST(r, ctx(item.id));
+    expect(res.status).toBe(413);
+    expect(putPhoto).not.toHaveBeenCalled();
+  });
+
+  const streamed = async (bytes: Uint8Array) => {
+    const fd = new FormData();
+    fd.append('foto', new Blob([bytes], { type: 'image/jpeg' }), 'x.jpg');
+    const r = new Response(fd);
+    const raw = new Uint8Array(await r.arrayBuffer());
+    const stream = new ReadableStream({
+      start(c) {
+        for (let i = 0; i < raw.length; i += 65536) c.enqueue(raw.slice(i, i + 65536));
+        c.close();
+      },
+    });
+    return new NextRequest(`http://localhost/api/cardapio/itens/${item.id}/foto`, {
+      method: 'POST',
+      body: stream,
+      headers: { 'content-type': r.headers.get('content-type') },
+      duplex: 'half',
+    });
+  };
+
+  it('streamed body without content-length: over the cap → 413, small one uploads', async () => {
+    const big = await POST(await streamed(JPEG(MAX_PHOTO_BYTES + 64 * 1024 + 10)), ctx(item.id));
+    expect(big.status).toBe(413);
+    expect(putPhoto).not.toHaveBeenCalled();
+    const ok = await POST(await streamed(JPEG()), ctx(item.id));
+    expect(ok.status).toBe(200);
+    expect(putPhoto).toHaveBeenCalledTimes(1);
+  });
+
+  it('inactive product → 404', async () => {
+    const off = await prisma.menuItem.create({ data: { restaurantId: rid, categoryId: item.categoryId, name: 'Off', price: 5, position: 2, active: false } });
+    expect((await upload(off.id, JPEG())).status).toBe(404);
+    expect(putPhoto).not.toHaveBeenCalled();
+  });
+
+  it('missing or string foto field → 400 with the copy', async () => {
+    const copy = 'Não deu para abrir esta foto. Tente uma foto em JPG ou PNG.';
+    const empty = new FormData();
+    const r1 = await POST(new NextRequest('http://localhost/x', { method: 'POST', body: empty }), ctx(item.id));
+    expect(r1.status).toBe(400);
+    expect((await r1.json()).error).toBe(copy);
+    const str = new FormData();
+    str.append('foto', 'not a file');
+    const r2 = await POST(new NextRequest('http://localhost/x', { method: 'POST', body: str }), ctx(item.id));
+    expect(r2.status).toBe(400);
+    expect((await r2.json()).error).toBe(copy);
+  });
+
+  it('DELETE photo: cook → 403, other restaurant product → 404', async () => {
+    as(cook);
+    expect((await DEL_PHOTO(req('DELETE'), ctx(item.id))).status).toBe(403);
+    as(owner);
+    expect((await DEL_PHOTO(req('DELETE'), ctx(foreign.id))).status).toBe(404);
+  });
+
   it('cook (non-manager) → 403', async () => {
     as(cook);
     expect((await upload(item.id, JPEG())).status).toBe(403);
