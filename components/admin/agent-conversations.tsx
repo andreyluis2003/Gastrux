@@ -5,7 +5,7 @@ import { ArrowLeft, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { shouldPrefill } from '@/lib/agents/whatsapp/draft-box';
+import { shouldApplyResponse, shouldPrefill } from '@/lib/agents/whatsapp/draft-box';
 
 export interface Conversation {
   phone: string;
@@ -56,6 +56,10 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
   const requestedFor = useRef<string | null>(null);
   // Text the agent last put in the box, and the box's current value (readable from async callbacks)
   const lastDraft = useRef<string | null>(null);
+  // Bumped on every suggestion call, send and discard: a response from an older one is dropped
+  const reqSeq = useRef(0);
+  // Id of the last message when it is a client message (null when the last one is ours)
+  const latestInId = useRef<string | null>(null);
   const textRef = useRef('');
   textRef.current = text;
   const url = `/api/admin/agent-conversations/${conversation.phone}`;
@@ -67,6 +71,7 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
     setMessages(out.messages);
     setOpen(out.windowOpen);
     const last = out.messages[out.messages.length - 1];
+    latestInId.current = last?.direction === 'IN' ? last.id : null;
     if (out.windowOpen && last?.direction === 'IN' && last.id !== requestedFor.current) {
       requestedFor.current = last.id;
       suggestionCall();
@@ -74,6 +79,8 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
   };
 
   function apply(out: Suggestion) {
+    // A suggestion without text is a failure for the screen: no badge, no id sent
+    if (out.state === 'ready' && out.kind === 'SUGGESTION' && !out.text?.trim()) out = { ...out, kind: 'FAILED' };
     setSuggestion(out);
     if (out.state === 'ready' && out.kind === 'SUGGESTION' && out.text && shouldPrefill(textRef.current, lastDraft.current)) {
       lastDraft.current = out.text;
@@ -83,25 +90,33 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
 
   /** GET the current suggestion, or POST regenerate for a fresh one */
   async function suggestionCall(regenerate = false) {
+    const seq = ++reqSeq.current;
+    const forId = requestedFor.current;
     setSuggesting(true);
+    let out: Suggestion;
     try {
       const res = await fetch(
         `${url}/suggestion`,
         regenerate ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'regenerate' }) } : undefined,
       );
-      apply(res.ok ? await res.json() : { state: 'unavailable' });
+      out = res.ok ? await res.json() : { state: 'unavailable' };
     } catch {
-      apply({ state: 'unavailable' });
-    } finally {
-      setSuggesting(false);
+      out = { state: 'unavailable' };
     }
+    // Only the latest call may touch the screen; older ones were superseded by a newer call, a send or a discard
+    if (seq !== reqSeq.current) return;
+    setSuggesting(false);
+    if (shouldApplyResponse(seq, reqSeq.current, forId, latestInId.current)) apply(out);
   }
 
   async function discard() {
     if (suggestion?.state !== 'ready') return;
+    const id = suggestion.id;
     try {
-      const res = await fetch(`${url}/suggestion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'discard', id: suggestion.id }) });
+      const res = await fetch(`${url}/suggestion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'discard', id }) });
       if (!res.ok) throw new Error();
+      reqSeq.current++;
+      setSuggesting(false);
       if (shouldPrefill(textRef.current, lastDraft.current)) setText('');
       lastDraft.current = null;
       setSuggestion({ state: 'none' });
@@ -123,6 +138,8 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
 
   async function send() {
     setBusy(true);
+    reqSeq.current++;
+    setSuggesting(false);
     try {
       const suggestionId = suggestion?.state === 'ready' && suggestion.kind === 'SUGGESTION' ? suggestion.id : undefined;
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, suggestionId }) });
