@@ -934,6 +934,35 @@ Funciona com o **Zé Pediu** e com sites que publicam o cardápio no padrão de 
   },
   {
     categorySlug: 'cardapio-e-receitas',
+    slug: 'foto-do-produto',
+    title: 'Como coloco foto nos produtos?',
+    summary: 'No Cardápio digital, ao criar ou editar um produto, use Escolher foto. A foto aparece no QR Code, no site de delivery e na lista do cardápio.',
+    keywords: 'foto, imagem, câmera, galeria, cardápio digital, qr code, produto, trocar foto, remover foto',
+    order: 6,
+    content: `## Colocando a foto
+
+1. Em **Cardápio e produtos > Cardápio digital**, crie um produto novo ou clique em **Editar** no produto
+2. Na área **Foto**, clique em **Escolher foto**. No celular, o aparelho abre a câmera ou a galeria
+3. Ao **editar** um produto que já existe, a foto é salva na hora: não precisa clicar em Salvar
+4. Ao **criar** um produto novo, a foto é enviada logo depois de você clicar em **Criar Item**
+
+Para tirar a foto, clique em **Remover**. Para trocar, clique em **Escolher foto** de novo.
+
+## O que vale saber
+
+- É uma foto por produto, e só o dono e o gerente podem colocar ou trocar
+- Você não precisa se preocupar com o tamanho: o Gastrux diminui a foto antes de enviar
+- A foto aparece no cardápio do QR Code, no site de delivery e na lista do Cardápio digital
+- Insumos não têm foto
+- Foto trazida pelo **Importar de um link** continua no endereço original até você trocar por uma sua
+
+## Se der erro
+
+- **Não deu para abrir esta foto. Tente uma foto em JPG ou PNG.** Escolha outra foto, de preferência em JPG ou PNG
+- **Envio de fotos ainda não está disponível**: o envio ainda não foi ligado na sua conta. Fale com o suporte`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
     slug: 'venda-por-peso',
     title: 'Como vendo por peso (pão, frios, doces por kg)?',
     summary: 'Marque "Vendido por peso" no produto, com o preço por kg. No caixa, digite o peso que a balança mostra.',
