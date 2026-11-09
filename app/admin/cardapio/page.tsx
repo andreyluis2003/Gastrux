@@ -73,7 +73,9 @@ export default function AdminCardapioPage() {
   const [newCategory, setNewCategory] = useState({ name: '', emoji: '', description: '' });
   const [showNewItem, setShowNewItem] = useState<string | null>(null); // categoryId when open
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [photosEnabled, setPhotosEnabled] = useState(false);
+  const [photosEnabled, setPhotosEnabled] = useState<boolean | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState<Blob | null>(null);
   const [photoFieldKey, setPhotoFieldKey] = useState(0);
   const [newItem, setNewItem] = useState({
@@ -103,6 +105,7 @@ export default function AdminCardapioPage() {
   // Closing or switching the new-item form drops any picked photo.
   useEffect(() => {
     setPendingPhoto(null);
+    setPhotoBusy(false);
     setPhotoFieldKey((k) => k + 1);
   }, [showNewItem]);
 
@@ -163,10 +166,12 @@ export default function AdminCardapioPage() {
   };
 
   const handleCreateItem = async (categoryId: string) => {
+    if (creating || photoBusy) return;
     if (!newItem.name.trim() || !newItem.price) {
       toast.error('Nome e preço obrigatórios');
       return;
     }
+    setCreating(true);
     try {
       const res = await fetch('/api/cardapio/itens', {
         method: 'POST',
@@ -208,6 +213,8 @@ export default function AdminCardapioPage() {
       fetchCategories();
     } catch (err) {
       toast.error('Erro ao criar item');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -478,9 +485,10 @@ export default function AdminCardapioPage() {
                     enabled={photosEnabled}
                     imageUrl={null}
                     onPick={setPendingPhoto}
+                    onBusyChange={setPhotoBusy}
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleCreateItem(cat.id)}>
+                    <Button size="sm" disabled={creating || photoBusy} onClick={() => handleCreateItem(cat.id)}>
                       Criar Item
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setShowNewItem(null)}>

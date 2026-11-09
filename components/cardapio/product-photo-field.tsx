@@ -8,15 +8,17 @@ import { Label } from '@/components/ui/label';
 import { resizePhoto, PhotoDecodeError } from '@/lib/cardapio/photo-resize';
 
 interface ProductPhotoFieldProps {
-  enabled: boolean;
+  /** null while the availability check is still loading. */
+  enabled: boolean | null;
   imageUrl: string | null;
   /** With an id the photo is uploaded/removed at once; without it only previews and calls onPick. */
   menuItemId?: string;
   onChange?: (imageUrl: string | null) => void;
   onPick?: (blob: Blob | null) => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
-export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onPick }: ProductPhotoFieldProps) {
+export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onPick, onBusyChange }: ProductPhotoFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
@@ -27,6 +29,10 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
       if (localUrl) URL.revokeObjectURL(localUrl);
     };
   }, [localUrl]);
+
+  useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
 
   const shown = menuItemId ? imageUrl : localUrl ?? imageUrl;
 
@@ -100,7 +106,7 @@ export function ProductPhotoField({ enabled, imageUrl, menuItemId, onChange, onP
             </div>
           )}
         </div>
-        {enabled ? (
+        {enabled === null ? null : enabled ? (
           <div className="flex flex-wrap gap-2">
             <input
               ref={inputRef}
