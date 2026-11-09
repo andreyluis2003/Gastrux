@@ -143,6 +143,15 @@ describe('mapNinetynineOrder', () => {
     expect(platformData.fulfillmentMode).toBe(1);
   });
 
+  it('collects cash at the counter on a self-pickup order', () => {
+    const o = { ...pickup, pay_type: 2, pay_method: 2, pay_channel: 153, change_for: 5000, price: { order_price: 3000, customer_need_paying_money: 3000 } };
+    const { input, extraNote, platformData } = mapNinetynineOrder(o);
+    expect(input.pagamento).toEqual({ forma: 'DINHEIRO', pago: false });
+    expect(platformData.cashToCollect).toBe(30);
+    expect(extraNote).toContain('Cobrar R$ 30,00 do cliente');
+    expect(extraNote).toContain('Troco para R$ 50,00 (levar R$ 20,00)');
+  });
+
   it('never returns a negative total', () => {
     const o = { ...platformDelivery, promotions: [{ shop_subside_price: 99999 }] };
     expect(mapNinetynineOrder(o).input.total).toBe(0);

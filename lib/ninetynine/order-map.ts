@@ -144,10 +144,12 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
   const shopPaid = price.shop_paid_money;
   const shopPaidMoney = cash && deliveryType === 1 && has(shopPaid) ? cents(shopPaid) : null;
   const needPay = has(price.customer_need_paying_money) ? cents(price.customer_need_paying_money) : has(price.real_pay_price) ? cents(price.real_pay_price) : null;
-  const cashToCollect = cash && storeDelivery ? needPay : null;
+  // store delivery and self-pickup are both paid to the store (at the door or at the counter)
+  const storePaid = storeDelivery || retirada;
+  const cashToCollect = cash && storePaid ? needPay : null;
   const collect = cashToCollect ?? total;
   const changeFor = cents(order?.change_for);
-  const cashLines = !cash ? [] : storeDelivery ? [
+  const cashLines = !cash ? [] : storePaid ? [
     `Cobrar ${brl(collect)} do cliente`,
     changeFor > 0 ? (changeFor >= collect ? `Troco para ${brl(changeFor)} (levar ${brl(round2(changeFor - collect))})` : `Cliente informou troco para ${brl(changeFor)}`) : '',
   ] : deliveryType === 1 ? [
