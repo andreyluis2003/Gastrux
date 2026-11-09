@@ -18,6 +18,10 @@ jest.mock('../../../lib/agents/activation/signals', () => {
   return { ...actual, loadActivationSignals: jest.fn(actual.loadActivationSignals) };
 });
 import { loadActivationSignals } from '../../../lib/agents/activation/signals';
+jest.mock('../../../lib/agents/whatsapp/suggest', () => {
+  const actual = jest.requireActual('../../../lib/agents/whatsapp/suggest');
+  return { ...actual, getOrCreateSuggestion: jest.fn(actual.getOrCreateSuggestion), suggestionStats: jest.fn(actual.suggestionStats) };
+});
 import { getOrCreateSuggestion, discardSuggestion, settleSuggestion, suggestionStats } from '../../../lib/agents/whatsapp/suggest';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -362,6 +366,30 @@ describe('suggested replies', () => {
       const b = await (await postSuggestion(jsonReq({ action: 'regenerate' }), ctx(key))).json();
       expect(b.state).toBe('ready');
       expect(b.id).not.toBe(a.id);
+    });
+
+    it('suggestion routes answer unavailable when getOrCreateSuggestion throws', async () => {
+      (getOrCreateSuggestion as jest.Mock).mockRejectedValueOnce(new Error('relation does not exist'));
+      (getOrCreateSuggestion as jest.Mock).mockRejectedValueOnce(new Error('relation does not exist'));
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const g = await getSuggestion(getReq(), ctx(key));
+      const p = await postSuggestion(jsonReq({ action: 'regenerate' }), ctx(key));
+      spy.mockRestore();
+      expect(g.status).toBe(200);
+      expect(await g.json()).toEqual({ state: 'unavailable' });
+      expect(p.status).toBe(200);
+      expect(await p.json()).toEqual({ state: 'unavailable' });
+    });
+
+    it('list GET survives a stats failure with suggestionStats null', async () => {
+      (suggestionStats as jest.Mock).mockRejectedValueOnce(new Error('relation does not exist'));
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await listAll();
+      spy.mockRestore();
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.suggestionStats).toBeNull();
+      expect(Array.isArray(body.conversations)).toBe(true);
     });
 
     it('list GET returns suggestionStats', async () => {
