@@ -87,4 +87,36 @@ describe('99Food webhook route', () => {
     expect((await call(orderBody(ts()))).status).toBe(503);
     expect(await prisma.ninetynineEvent.count()).toBe(before);
   });
+
+  describe('body size cap', () => {
+    const url = 'http://localhost/api/integrations/99food/webhook';
+    const streamOf = (raw: string, size = 1000) =>
+      new ReadableStream({
+        start(c) {
+          const b = Buffer.from(raw);
+          for (let i = 0; i < b.length; i += size) c.enqueue(new Uint8Array(b.subarray(i, i + size)));
+          c.close();
+        },
+      });
+    it('413 when content-length is over 1 MB, nothing stored', async () => {
+      const before = await prisma.ninetynineEvent.count();
+      const raw = orderBody(ts());
+      const res = await POST(new Request(url, { method: 'POST', headers: { 'content-length': '1048577', 'didi-header-sign': md5(raw + SECRET) }, body: raw }) as any);
+      expect(res.status).toBe(413);
+      expect(await res.json()).toEqual({ errno: 1, errmsg: 'too large' });
+      expect(await prisma.ninetynineEvent.count()).toBe(before);
+    });
+    it('413 when a streamed body without content-length passes 1 MB', async () => {
+      const raw = 'x'.repeat(1_048_577);
+      const res = await POST(new Request(url, { method: 'POST', headers: { 'didi-header-sign': md5(raw + SECRET) }, body: streamOf(raw, 65536), duplex: 'half' } as any) as any);
+      expect(res.status).toBe(413);
+    });
+    it('200 and stored for a small streamed signed body', async () => {
+      const t = ts();
+      const raw = orderBody(t);
+      const res = await POST(new Request(url, { method: 'POST', headers: { 'didi-header-sign': md5(raw + SECRET) }, body: streamOf(raw, 30), duplex: 'half' } as any) as any);
+      expect(res.status).toBe(200);
+      expect(await prisma.ninetynineEvent.count({ where: { id: `orderCancel:${BIG}:${t}` } })).toBe(1);
+    });
+  });
 });
