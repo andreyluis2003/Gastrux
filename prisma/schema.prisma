@@ -5029,6 +5029,34 @@ model AgentWhatsAppMessage {
   @@map("agent_whatsapp_messages")
 }
 
+/// A reply the agent suggests for an incoming WhatsApp message (or a team handoff / failure note)
+model AgentReplySuggestion {
+  id            String   @id @default(cuid())
+  phone         String
+  /// Id of the last IN AgentWhatsAppMessage the suggestion answers
+  forMessageId  String
+  /// createdAt of that message, used to expire the suggestion
+  forMessageAt  DateTime
+  /// SUGGESTION, TEAM or FAILED
+  kind          String
+  text          String?
+  reason        String?
+  model         String?
+  costUsd       Float    @default(0)
+  /// pending, sent_as_is, sent_edited, discarded, expired, team or failed
+  outcome       String   @default("pending")
+  /// Id of the AgentWhatsAppMessage created when the suggestion was sent
+  sentMessageId String?
+  /// E-mail of the team member who decided on the suggestion
+  decidedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([phone, createdAt])
+  @@index([createdAt])
+  @@map("agent_reply_suggestions")
+}
+
 enum AgentMessageDirection {
   IN
   OUT
