@@ -54,6 +54,9 @@ const SHOP_STATUS: Record<number, { status: 'SUCCESS' | 'PARTIAL' | 'FAILED'; te
   7: { status: 'PARTIAL', text: 'Sem entregadores da 99Food agora' },
 };
 
+/** shopStatus sub_biz_status values where the 99Food sends no order: the restaurant is rung */
+const SHOP_DOWN: Record<number, string> = { 3: 'fechada', 4: 'desconectada', 6: 'bloqueada' };
+
 async function eligible(restaurantId: string): Promise<boolean> {
   if (!(await restaurantAcceptsOrders(restaurantId))) return false;
   return isTierFeatureEnabled(await restaurantTier(restaurantId), 'deliveryPlatforms');
@@ -247,8 +250,17 @@ async function shopStatus(row: NinetynineEvent) {
   const sub = Number((row.payload as any)?.data?.sub_biz_status);
   const s = SHOP_STATUS[sub];
   if (!s) throw new Skip(`sub_biz_status desconhecido: ${sub}`);
+  const before = await prisma.deliveryIntegration.findUnique({ where: { id: integ.id }, select: { syncError: true } });
   // Online on the 99Food: a pause made from Gastrux is over (resumed in the 99Food app)
   await prisma.deliveryIntegration.update({ where: { id: integ.id }, data: { syncStatus: s.status, syncError: s.text } });
+  // Closed, disconnected or blocked: no order arrives; rung once per change (the same status again rings nothing)
+  const word = SHOP_DOWN[sub];
+  if (word && before?.syncError !== s.text) {
+    await alertDeliveryProblem({ id: integ.id, restaurantId: integ.restaurantId, externalOrderId: row.appShopId ?? '' }, {
+      kind: `ninetynine-shop-${sub}-${row.id}`, severity: 'HIGH', title: `A loja da 99Food está ${word}`,
+      message: `A loja da 99Food está ${word} na 99Food — os pedidos não chegam`,
+    });
+  }
   if (sub === 1) await prisma.ninetynineStoreState.updateMany({ where: { integrationId: integ.id }, data: { pausedUntil: null } });
 }
 

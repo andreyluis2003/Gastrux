@@ -410,6 +410,33 @@ describe('99Food events', () => {
     expect(await prisma.notification.count({ where: { restaurantId: r.rid, message: 'A loja da 99Food foi desligada do Gastrux' } })).toBe(1);
   });
 
+  it('shopStatus rings the restaurant once when the store goes closed, disconnected or blocked', async () => {
+    const r = await restaurant();
+    const rung = (word) => prisma.notification.count({ where: { restaurantId: r.rid, message: `A loja da 99Food está ${word} na 99Food — os pedidos não chegam` } });
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 3 });
+    await processPendingOnce();
+    expect(await rung('fechada')).toBe(1);
+    // the same status again: no second ring
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 3 });
+    await processPendingOnce();
+    expect(await rung('fechada')).toBe(1);
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 4 });
+    await processPendingOnce();
+    expect(await rung('desconectada')).toBe(1);
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 6 });
+    await processPendingOnce();
+    expect(await rung('bloqueada')).toBe(1);
+    // a pause or "no couriers" is not a ring
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 2 });
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 7 });
+    await processPendingOnce();
+    expect(await prisma.notification.count({ where: { restaurantId: r.rid } })).toBe(3);
+    // back to closed after something else: a new change rings again
+    await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 3 });
+    await processPendingOnce();
+    expect(await rung('fechada')).toBe(2);
+  });
+
   it('processNinetynineEvent processes one row directly', async () => {
     const r = await restaurant();
     const orderId = bigId();
