@@ -49,20 +49,35 @@ async function mergePlatformData(externalOrderId: string, patch: Record<string, 
   await prisma.$executeRaw`UPDATE "external_orders" SET "platformData" = COALESCE("platformData", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb WHERE "id" = ${externalOrderId}`;
 }
 
+/** " · requestId=…" for the order's log: 99Food support asks for it */
+const requestIdNote = (requestId: unknown) => (requestId ? ` · requestId=${String(requestId)}` : '');
+
+/** Keeps a 99Food state-changing call (and its requestId) on the order's log */
+async function logNinetynineCall(ext: { id: string; status: PlatformOrder['status'] }, what: string, requestId: unknown): Promise<void> {
+  await prisma.deliveryLog.create({
+    data: {
+      externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(),
+      message: `${what}${requestIdNote(requestId)}`,
+    },
+  }).catch(() => {});
+}
+
 async function callNinetynine(ext: PlatformOrder, change: PlatformChange): Promise<boolean> {
   const id = ext.integration.id;
   const data = (ext.platformData ?? {}) as { deliveryType?: number; deliveredSentAt?: string };
-  if (change === 'confirm') await ninetynine.confirmOrder(id, ext.externalOrderId);
+  let r: { requestId?: string } | undefined;
+  if (change === 'confirm') r = await ninetynine.confirmOrder(id, ext.externalOrderId);
   // 99Food has no "preparing" step
   else if (change === 'preparing') return false;
-  else if (change === 'ready') await ninetynine.orderReady(id, ext.externalOrderId);
+  else if (change === 'ready') r = await ninetynine.orderReady(id, ext.externalOrderId);
   else if (change === 'dispatch') {
     // 99Food's "delivered" means handed to the customer: sent once, when the order reaches Entregue, and only on the
     // store's own delivery (delivery_type 2); 99Food's couriers say it themselves
     if (Number(data.deliveryType) !== 2 || data.deliveredSentAt) return false;
-    await ninetynine.orderDelivered(id, ext.externalOrderId);
+    r = await ninetynine.orderDelivered(id, ext.externalOrderId);
     await mergePlatformData(ext.id, { deliveredSentAt: new Date().toISOString() });
-  } else await ninetynine.cancelOrder(id, ext.externalOrderId, Number(change.cancel.code), change.cancel.reason || undefined);
+  } else r = await ninetynine.cancelOrder(id, ext.externalOrderId, Number(change.cancel.code), change.cancel.reason || undefined);
+  await logNinetynineCall(ext, `99Food recebeu "${changeName(change)}"`, r?.requestId);
   return true;
 }
 
@@ -91,7 +106,7 @@ export async function pushPlatformStatus(externalOrderId: string, change: Platfo
     await prisma.deliveryLog.create({
       data: {
         externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(),
-        message: `${prefix}: ${String(e?.message ?? e).slice(0, 300)}`,
+        message: `${prefix}: ${String(e?.message ?? e).slice(0, 300)}${requestIdNote(e?.requestId)}`,
       },
     }).catch(() => {});
     return false;
@@ -201,10 +216,15 @@ export async function answerDispute(member: RestaurantMember, externalOrderId: s
       call = () => ninetynine.answerCancelApply(ext.integration.id, ext.externalOrderId, disputeId, agree);
     }
   }
+  let sent: unknown;
   try {
-    await call();
+    sent = await call();
   } catch (e: any) {
+    if (ext.platform === 'ninety_nine_food') await logNinetynineCall(ext, `99Food não recebeu a resposta (${answer})`, e?.requestId);
     throw new DeliveryOrderError(`${words.The} não recebeu a resposta: ${String(e?.message ?? e).slice(0, 200)}`, 502);
+  }
+  if (ext.platform === 'ninety_nine_food') {
+    await logNinetynineCall(ext, `99Food recebeu a resposta: ${agree ? 'aceito' : 'recusado'}`, (sent as { requestId?: string } | undefined)?.requestId);
   }
   await prisma.externalOrder.update({ where: { id: ext.id }, data: { disputeId: null, disputeExpiresAt: null } });
   await recordAudit(member, { action: 'UPDATE', entityType: 'ExternalOrder', entityId: ext.id, changes: { dispute: answer, disputeId } });
@@ -224,14 +244,13 @@ export async function confirmCash(member: RestaurantMember, externalOrderId: str
   }
   if (data.cashConfirmedAt) throw new DeliveryOrderError('O dinheiro deste pedido já foi confirmado', 409);
   if (!CASH_STATUSES.includes(ext.status)) throw new DeliveryOrderError('Confirme o dinheiro com o pedido aceito e ainda não entregue', 409);
+  let sent: { requestId?: string };
   try {
-    await ninetynine.confirmCashPayment(ext.integration.id, ext.externalOrderId);
+    sent = await ninetynine.confirmCashPayment(ext.integration.id, ext.externalOrderId);
   } catch (e: any) {
     throw new DeliveryOrderError(`A 99Food não recebeu a confirmação do dinheiro: ${String(e?.message ?? e).slice(0, 200)}`, 502);
   }
   await mergePlatformData(ext.id, { cashConfirmedAt: new Date().toISOString() });
-  await prisma.deliveryLog.create({
-    data: { externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(), message: 'Dinheiro confirmado na 99Food' },
-  }).catch(() => {});
+  await logNinetynineCall(ext, 'Dinheiro confirmado na 99Food', sent?.requestId);
   await recordAudit(member, { action: 'UPDATE', entityType: 'ExternalOrder', entityId: ext.id, changes: { cashConfirmed: true } });
 }

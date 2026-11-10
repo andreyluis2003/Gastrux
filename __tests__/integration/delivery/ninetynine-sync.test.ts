@@ -88,6 +88,8 @@ describe('99Food platform sync', () => {
     expect(nn.confirmOrder).toHaveBeenCalledTimes(1);
     expect(nn.confirmOrder).toHaveBeenCalledWith(r.integ.id, o.orderId);
     expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).platformConfirmedAt).not.toBeNull();
+    // the 99Food requestId stays on the order's log, for 99Food support
+    expect(await prisma.deliveryLog.count({ where: { externalOrderId: o.id, message: '99Food recebeu "confirm" · requestId=req' } })).toBe(1);
   });
 
   it('a failed confirm is logged only once across retries', async () => {
@@ -266,6 +268,7 @@ describe('99Food platform sync', () => {
     expect(res.status).toBe(200);
     expect(nn.confirmCashPayment).toHaveBeenCalledWith(r.integ.id, cash.orderId);
     expect((await prisma.externalOrder.findUnique({ where: { id: cash.id } })).platformData.cashConfirmedAt).toBeTruthy();
+    expect(await prisma.deliveryLog.count({ where: { externalOrderId: cash.id, message: 'Dinheiro confirmado na 99Food · requestId=req' } })).toBe(1);
     await expect(confirmCash(r.member, cash.id)).rejects.toMatchObject({ status: 409 });
 
     const pending = await ingest(await restaurant(false), { delivery_type: 1, pay_type: 2, pay_method: 2 });
