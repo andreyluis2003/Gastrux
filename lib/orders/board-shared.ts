@@ -1,5 +1,5 @@
 /** Types and labels of Todos os pedidos, safe for the browser (spec 2026-11-07 quadro-de-pedidos) */
-export type Channel = 'salao' | 'balcao' | 'site' | 'whatsapp' | 'ifood' | 'api' | 'outros';
+export type Channel = 'salao' | 'balcao' | 'site' | 'whatsapp' | 'ifood' | 'ninetynine' | 'api' | 'outros';
 export type Stage = 'novo' | 'preparo' | 'pronto' | 'entrega';
 export interface BoardCard {
   id: string;
@@ -14,7 +14,7 @@ export interface BoardCard {
 }
 
 export const CHANNEL_LABEL: Record<Channel, string> = {
-  salao: 'Salão', balcao: 'Balcão', site: 'Site', whatsapp: 'WhatsApp', ifood: 'iFood', api: 'API', outros: 'Outros',
+  salao: 'Salão', balcao: 'Balcão', site: 'Site', whatsapp: 'WhatsApp', ifood: 'iFood', ninetynine: '99Food', api: 'API', outros: 'Outros',
 };
 export const STAGES: { id: Stage; title: string }[] = [
   { id: 'novo', title: 'Novos' },
@@ -26,6 +26,7 @@ export const STAGES: { id: Stage; title: string }[] = [
 export function platformChannel(platform: string | null | undefined): Channel {
   if (platform === 'delivery_site') return 'site';
   if (platform === 'ifood') return 'ifood';
+  if (platform === 'ninety_nine_food') return 'ninetynine';
   if (platform === 'gastrux_api') return 'api';
   return 'outros';
 }

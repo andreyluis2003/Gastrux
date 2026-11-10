@@ -13,9 +13,11 @@ export * from './board-shared';
 const WINDOW_MS = 24 * 3600_000;
 const cents = (v: unknown) => (v === null || v === undefined ? null : Math.round(Number(v) * 100));
 
+/** The number the platform shows: iFood displayId, 99Food #orderIndex; else the end of the platform id */
 const extNumber = (e: { externalOrderId: string; platformData: unknown }) => {
-  const d = e.platformData as { displayId?: string } | null;
-  return d?.displayId ? `#${d.displayId}` : `#${e.externalOrderId.slice(-6)}`;
+  const d = e.platformData as { displayId?: string; orderIndex?: number | string } | null;
+  const shown = d?.displayId || d?.orderIndex;
+  return shown ? `#${shown}` : `#${e.externalOrderId.slice(-6)}`;
 };
 
 export async function loadBoard(restaurantId: string, now = new Date()): Promise<BoardCard[]> {
@@ -58,7 +60,7 @@ export async function loadBoard(restaurantId: string, now = new Date()): Promise
       cards.push({
         id: o.id, channel, stage,
         label: `${CHANNEL_LABEL[channel]}: ${ext.customerName}`,
-        number: channel === 'ifood' ? extNumber(ext) : `#${o.orderNumber.slice(-4)}`,
+        number: channel === 'ifood' || channel === 'ninetynine' ? extNumber(ext) : `#${o.orderNumber.slice(-4)}`,
         items: o._count.items, totalCents: cents(o.total ?? ext.totalAmount), createdAt: o.createdAt.toISOString(),
         href: '/admin/integrations/orders',
       });

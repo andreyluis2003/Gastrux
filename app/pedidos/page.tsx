@@ -11,13 +11,13 @@ import { CHANNEL_LABEL, STAGES, type BoardCard, type Channel } from '@/lib/order
 
 const REFRESH_MS = 15_000;
 const FILTER_KEY = 'gx-pedidos-canal';
-const CHANNELS: Channel[] = ['salao', 'balcao', 'site', 'whatsapp', 'ifood', 'api'];
+const CHANNELS: Channel[] = ['salao', 'balcao', 'site', 'whatsapp', 'ifood', 'ninetynine', 'api'];
 const STAGE_COLOR: Record<string, string> = {
   novo: 'bg-amber-500', preparo: 'bg-sky-600', pronto: 'bg-emerald-600', entrega: 'bg-violet-600',
 };
 const CHANNEL_COLOR: Record<Channel, string> = {
   salao: 'bg-slate-100 text-slate-800', balcao: 'bg-slate-100 text-slate-800', site: 'bg-orange-100 text-orange-800',
-  whatsapp: 'bg-green-100 text-green-800', ifood: 'bg-red-100 text-red-700', api: 'bg-indigo-100 text-indigo-800', outros: 'bg-gray-100 text-gray-700',
+  whatsapp: 'bg-green-100 text-green-800', ifood: 'bg-red-100 text-red-700', ninetynine: 'bg-yellow-100 text-yellow-800', api: 'bg-indigo-100 text-indigo-800', outros: 'bg-gray-100 text-gray-700',
 };
 
 const minutesSince = (iso: string, now: number) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000));

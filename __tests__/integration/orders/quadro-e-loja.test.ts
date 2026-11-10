@@ -120,6 +120,19 @@ describe('loja aberta/fechada e todos os pedidos', () => {
     expect(api).toHaveLength(1);
     expect(api[0]).toMatchObject({ href: '/admin/integrations/orders' });
   });
+  it('a 99Food order shows as its own channel with the 99Food order number', async () => {
+    as(owner);
+    const nn = await prisma.deliveryIntegration.create({ data: { restaurantId: rid, platform: 'ninety_nine_food', apiKey: `n${tag}`, webhookSecret: 'y', storeId: `nn-${tag}`, isActive: true } });
+    await prisma.externalOrder.create({
+      data: {
+        restaurantId: rid, integrationId: nn.id, externalOrderId: `5764${tag}9876543`, status: 'PENDING', totalAmount: 60, customerName: 'Maria',
+        customerPhone: '', deliveryAddress: 'Rua A', items: '[]', platformData: { orderIndex: 42 },
+      },
+    });
+    const card = (await (await QUADRO()).json()).cards.find((c) => c.channel === 'ninetynine');
+    expect(card).toMatchObject({ label: '99Food: Maria', number: '#42', stage: 'novo', href: '/admin/integrations/orders' });
+  });
+
   it('WhatsApp: a delivery order waits while closed; an order from a table goes on', async () => {
     as(owner);
     await setLoja(true);
