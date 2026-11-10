@@ -27,6 +27,15 @@ const TAKEN = 'Esta loja da 99Food já está ligada a outro restaurante do Gastr
 const NO_ACCESS = 'A 99Food não liberou o acesso a esta loja: tente de novo em 1 minuto';
 const where = (restaurantId: string) => ({ restaurantId_platform: { restaurantId, platform: PLATFORM } });
 const NO_REQUEST = { linkRequestStoreId: null, linkRequestStoreName: null, linkRequestedAt: null, linkRequestedBy: null };
+type StoreStateData = Partial<{
+  linkRequestStoreId: string | null; linkRequestStoreName: string | null; linkRequestedAt: Date | null; linkRequestedBy: string | null;
+  pausedUntil: Date | null;
+}>;
+
+/** Writes the 99Food-only state (its own table, ninetynine_store_states), creating the row on first use */
+async function saveState(integrationId: string, data: StoreStateData) {
+  await prisma.ninetynineStoreState.upsert({ where: { integrationId }, create: { integrationId, ...data }, update: data });
+}
 
 /** Where the Gastrux staff confirms the link requests */
 export const STAFF_SCREEN = '/admin/platform/99food';
@@ -111,9 +120,10 @@ async function link(integrationId: string, store: Store) {
       where: { id: integrationId },
       data: {
         storeId: store.appShopId, storeName: store.name, isActive: true, syncStatus: 'PENDING', syncError: null,
-        oauthAccessToken: null, oauthExpiresAt: null, pausedUntil: null,
+        oauthAccessToken: null, oauthExpiresAt: null,
       },
     });
+    await saveState(integrationId, { pausedUntil: null });
   } catch (e: any) {
     // Another restaurant took the store between the check and here (unique platform + storeId)
     if (e?.code === 'P2002') throw new NinetynineConnectError(TAKEN, 409);
@@ -128,11 +138,11 @@ async function link(integrationId: string, store: Store) {
     throw new NinetynineConnectError(NO_ACCESS, 502);
   }
   // Linked: a pending request is answered (kept above when the token fails, so the staff can try again)
-  await prisma.deliveryIntegration.update({ where: { id: integrationId }, data: NO_REQUEST });
+  await saveState(integrationId, NO_REQUEST);
 }
 
 /** Paused by hand from Gastrux (until the end of the day, like the 99Food pause) or paused on the 99Food itself */
-function isPaused(row: { pausedUntil: Date | null; syncError: string | null }, now = new Date()) {
+function isPaused(row: { pausedUntil: Date | null | undefined; syncError: string | null }, now = new Date()) {
   return (!!row.pausedUntil && row.pausedUntil > now) || row.syncError === PAUSED_ON_99FOOD;
 }
 
@@ -152,21 +162,22 @@ export async function ninetynineState(restaurantId: string) {
   const row = await prisma.deliveryIntegration.findUnique({
     where: where(restaurantId),
     select: {
-      storeId: true, storeName: true, lastOrderAt: true, syncStatus: true, syncError: true, pausedUntil: true,
-      linkRequestStoreId: true, linkRequestStoreName: true, linkRequestedAt: true,
+      storeId: true, storeName: true, lastOrderAt: true, syncStatus: true, syncError: true,
+      ninetynineState: { select: { pausedUntil: true, linkRequestStoreId: true, linkRequestStoreName: true, linkRequestedAt: true } },
     },
   });
+  const st = row?.ninetynineState;
   const connected = !!row?.storeId;
   return {
     configured: configured(),
     available: isTierFeatureEnabled(await restaurantTier(restaurantId), 'deliveryPlatforms'),
     connected,
     store: connected ? { appShopId: row!.storeId!, name: row!.storeName ?? '' } : null,
-    paused: connected && isPaused(row!),
+    paused: connected && isPaused({ pausedUntil: st?.pausedUntil, syncError: row!.syncError }),
     status: connected ? { syncStatus: row!.syncStatus, syncError: row!.syncError } : null,
     lastOrderAt: row?.lastOrderAt ?? null,
-    request: !connected && row?.linkRequestStoreId
-      ? { appShopId: row.linkRequestStoreId, name: row.linkRequestStoreName ?? '', requestedAt: row.linkRequestedAt }
+    request: !connected && st?.linkRequestStoreId
+      ? { appShopId: st.linkRequestStoreId, name: st.linkRequestStoreName ?? '', requestedAt: st.linkRequestedAt }
       : null,
   };
 }
@@ -219,10 +230,7 @@ export async function selectStore(member: RestaurantMember, appShopId: unknown) 
   await assertFree(member.restaurantId, store.appShopId);
   const integration = await integrationRow(member.restaurantId);
   const requestedAt = new Date();
-  await prisma.deliveryIntegration.update({
-    where: { id: integration.id },
-    data: { linkRequestStoreId: store.appShopId, linkRequestStoreName: store.name, linkRequestedAt: requestedAt, linkRequestedBy: member.userId },
-  });
+  await saveState(integration.id, { linkRequestStoreId: store.appShopId, linkRequestStoreName: store.name, linkRequestedAt: requestedAt, linkRequestedBy: member.userId });
   await recordAudit(member, { action: 'UPDATE', entityType: 'DeliveryIntegration', entityId: integration.id, changes: { ninetynine: 'link_requested', appShopId: store.appShopId } });
   const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { name: true } });
   await tellStaff(
@@ -235,10 +243,11 @@ export async function selectStore(member: RestaurantMember, appShopId: unknown) 
 
 /** The restaurant gives up its pending link request */
 export async function cancelRequest(member: RestaurantMember) {
-  const row = await prisma.deliveryIntegration.findUnique({ where: where(member.restaurantId), select: { id: true, linkRequestStoreId: true } });
-  if (!row?.linkRequestStoreId) return { request: null };
-  await prisma.deliveryIntegration.update({ where: { id: row.id }, data: NO_REQUEST });
-  await recordAudit(member, { action: 'UPDATE', entityType: 'DeliveryIntegration', entityId: row.id, changes: { ninetynine: 'link_request_cancelled', appShopId: row.linkRequestStoreId } });
+  const row = await prisma.deliveryIntegration.findUnique({ where: where(member.restaurantId), select: { id: true, ninetynineState: { select: { linkRequestStoreId: true } } } });
+  const pending = row?.ninetynineState?.linkRequestStoreId;
+  if (!row || !pending) return { request: null };
+  await saveState(row.id, NO_REQUEST);
+  await recordAudit(member, { action: 'UPDATE', entityType: 'DeliveryIntegration', entityId: row.id, changes: { ninetynine: 'link_request_cancelled', appShopId: pending } });
   return { request: null };
 }
 
@@ -257,13 +266,9 @@ export async function setPaused(member: RestaurantMember, paused: boolean) {
     throw new NinetynineConnectError(paused ? 'A 99Food não recebeu a pausa da loja: tente de novo' : 'A 99Food não recebeu a volta da loja: tente de novo', 502);
   }
   const restaurant = await prisma.restaurant.findUnique({ where: { id: member.restaurantId }, select: { timezone: true } });
-  await prisma.deliveryIntegration.update({
-    where: { id: row.id },
-    // resuming also clears what the 99Food last said about a pause; its next shopStatus sets the status again
-    data: paused
-      ? { pausedUntil: endOfLocalDay(restaurant?.timezone || 'America/Sao_Paulo') }
-      : { pausedUntil: null, syncStatus: 'SUCCESS', syncError: null },
-  });
+  await saveState(row.id, { pausedUntil: paused ? endOfLocalDay(restaurant?.timezone || 'America/Sao_Paulo') : null });
+  // resuming also clears what the 99Food last said about a pause; its next shopStatus sets the status again
+  if (!paused) await prisma.deliveryIntegration.update({ where: { id: row.id }, data: { syncStatus: 'SUCCESS', syncError: null } });
   await recordAudit(member, { action: 'UPDATE', entityType: 'DeliveryIntegration', entityId: row.id, changes: { ninetynine: paused ? 'paused' : 'resumed' } });
   return { paused };
 }
@@ -276,9 +281,9 @@ export async function disconnect(member: RestaurantMember) {
     where: { id: row.id },
     data: {
       isActive: false, storeId: null, storeName: null, oauthAccessToken: null, oauthRefreshToken: null, oauthExpiresAt: null, oauthVerifier: null,
-      pausedUntil: null, ...NO_REQUEST,
     },
   });
+  await saveState(row.id, { pausedUntil: null, ...NO_REQUEST });
   await recordAudit(member, { action: 'UPDATE', entityType: 'DeliveryIntegration', entityId: row.id, changes: { ninetynine: 'disconnected', appShopId: row.storeId } });
   return { connected: false };
 }
@@ -307,24 +312,25 @@ async function pushStoreToggle(row: { id: string; storeId: string }, restaurantI
  */
 export async function followStoreToggle(restaurantId: string, closed: boolean): Promise<null | 'pending'> {
   if (!configured()) return null;
-  const row = await prisma.deliveryIntegration.findUnique({ where: where(restaurantId), select: { id: true, storeId: true, isActive: true, pausedUntil: true } });
+  const row = await prisma.deliveryIntegration.findUnique({ where: where(restaurantId), select: { id: true, storeId: true, isActive: true, ninetynineState: { select: { pausedUntil: true } } } });
   if (!row?.storeId || !row.isActive) return null;
-  if (row.pausedUntil && row.pausedUntil > new Date()) return null;
+  const pausedUntil = row.ninetynineState?.pausedUntil;
+  if (pausedUntil && pausedUntil > new Date()) return null;
   void pushStoreToggle({ id: row.id, storeId: row.storeId }, restaurantId, closed).catch((e) => console.error('[99food] store toggle:', e));
   return 'pending';
 }
 
 /** Gastrux staff: the restaurants waiting for their 99Food store to be confirmed, oldest first */
 export async function linkRequests() {
-  const rows = await prisma.deliveryIntegration.findMany({
-    where: { platform: PLATFORM, linkRequestStoreId: { not: null } },
+  const rows = (await prisma.ninetynineStoreState.findMany({
+    where: { linkRequestStoreId: { not: null }, integration: { platform: PLATFORM } },
     orderBy: { linkRequestedAt: 'asc' },
     select: {
-      restaurantId: true, storeId: true, linkRequestStoreId: true, linkRequestStoreName: true, linkRequestedAt: true, linkRequestedBy: true,
-      restaurant: { select: { name: true, phone: true } },
+      linkRequestStoreId: true, linkRequestStoreName: true, linkRequestedAt: true, linkRequestedBy: true,
+      integration: { select: { restaurantId: true, restaurant: { select: { name: true, phone: true } } } },
     },
     take: 200,
-  });
+  })).map((r) => ({ ...r, restaurantId: r.integration.restaurantId, restaurant: r.integration.restaurant }));
   const userIds = rows.map((r) => r.linkRequestedBy).filter((u): u is string => !!u);
   const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true, whatsapp: true } }) : [];
   const byId = new Map(users.map((u) => [u.id, u]));
@@ -341,10 +347,13 @@ export async function linkRequests() {
 /** Gastrux staff: refuses a pending request and tells the restaurant */
 export async function refuseRequest(restaurantId: unknown) {
   if (typeof restaurantId !== 'string' || !restaurantId) throw new NinetynineConnectError('Informe restaurantId');
-  const row = await prisma.deliveryIntegration.findUnique({ where: where(restaurantId), select: { id: true, linkRequestStoreId: true, linkRequestStoreName: true } });
-  if (!row?.linkRequestStoreId) throw new NinetynineConnectError('Este restaurante não tem pedido pendente', 404);
-  await prisma.deliveryIntegration.update({ where: { id: row.id }, data: NO_REQUEST });
-  await alertDeliveryProblem({ id: row.id, restaurantId, externalOrderId: row.linkRequestStoreId }, {
+  const integ = await prisma.deliveryIntegration.findUnique({
+    where: where(restaurantId), select: { id: true, ninetynineState: { select: { linkRequestStoreId: true, linkRequestStoreName: true } } },
+  });
+  const row = integ?.ninetynineState;
+  if (!integ || !row?.linkRequestStoreId) throw new NinetynineConnectError('Este restaurante não tem pedido pendente', 404);
+  await saveState(integ.id, NO_REQUEST);
+  await alertDeliveryProblem({ id: integ.id, restaurantId, externalOrderId: row.linkRequestStoreId }, {
     kind: `ninetynine-link-refused-${Date.now()}`,
     severity: 'HIGH',
     title: 'A equipe Gastrux não confirmou a loja da 99Food: fale com o suporte',

@@ -248,7 +248,8 @@ async function shopStatus(row: NinetynineEvent) {
   const s = SHOP_STATUS[sub];
   if (!s) throw new Skip(`sub_biz_status desconhecido: ${sub}`);
   // Online on the 99Food: a pause made from Gastrux is over (resumed in the 99Food app)
-  await prisma.deliveryIntegration.update({ where: { id: integ.id }, data: { syncStatus: s.status, syncError: s.text, ...(sub === 1 ? { pausedUntil: null } : {}) } });
+  await prisma.deliveryIntegration.update({ where: { id: integ.id }, data: { syncStatus: s.status, syncError: s.text } });
+  if (sub === 1) await prisma.ninetynineStoreState.updateMany({ where: { integrationId: integ.id }, data: { pausedUntil: null } });
 }
 
 const orderIdOf = (row: NinetynineEvent) => {

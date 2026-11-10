@@ -1449,34 +1449,54 @@ model BetaTesterInteraction {
 }
 
 model DeliveryIntegration {
-  id                   String            @id @default(cuid())
-  restaurantId         String
-  platform             DeliveryPlatform
-  isActive             Boolean           @default(true)
-  apiKey               String
-  webhookSecret        String
-  storeId              String?
-  storeName            String?
-  storePhone           String?
-  storeAddress         String?
-  webhookUrl           String?
-  lastWebhookTest      DateTime?
-  webhookActive        Boolean           @default(false)
-  lastSyncedAt         DateTime?
-  syncStatus           SyncStatus        @default(PENDING)
-  syncError            String?
-  totalOrdersSynced    Int               @default(0)
-  lastOrderAt          DateTime?
+  id                String                @id @default(cuid())
+  restaurantId      String
+  platform          DeliveryPlatform
+  isActive          Boolean               @default(true)
+  apiKey            String
+  webhookSecret     String
+  storeId           String?
+  storeName         String?
+  storePhone        String?
+  storeAddress      String?
+  webhookUrl        String?
+  lastWebhookTest   DateTime?
+  webhookActive     Boolean               @default(false)
+  lastSyncedAt      DateTime?
+  syncStatus        SyncStatus            @default(PENDING)
+  syncError         String?
+  totalOrdersSynced Int                   @default(0)
+  lastOrderAt       DateTime?
   /// iFood (plan 2026-10-24 ifood): the store's tokens (distributed app) and the userCode verifier, encrypted
   /// with lib/security/credential-crypto; storeId is the iFood merchantId
-  oauthAccessToken     String?
-  oauthRefreshToken    String?
-  oauthExpiresAt       DateTime?
-  oauthVerifier        String?
+  oauthAccessToken  String?
+  oauthRefreshToken String?
+  oauthExpiresAt    DateTime?
+  oauthVerifier     String?
   /// The last successful poll of the platform's events (the store shows "Desconectada" when it is old)
-  lastPolledAt         DateTime?
+  lastPolledAt      DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  restaurant        Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  externalOrders    ExternalOrder[]
+  menuMappings      MenuItemMapping[]
+  apiKeys           OrderApiKey[]
+  /// 99Food only (link request, hand pause): its own table, so delivery_integrations keeps its columns
+  ninetynineState   NinetynineStoreState?
+
+  @@unique([restaurantId, platform])
+  /// One restaurant per platform store (final review 2026-10-24 I4): storeId routes the iFood events; NULLs never clash
+  @@unique([platform, storeId])
+  @@index([restaurantId])
+  @@map("delivery_integrations")
+}
+
+/// The 99Food side of a DeliveryIntegration (plan 2026-11-09 99food, Task 6 + final review): a table apart, so the
+/// delivery_integrations columns never change (its unselected queries keep working between Deploy and migrate)
+model NinetynineStoreState {
+  integrationId        String              @id
   /// A store the restaurant asked to link, waiting for the Gastrux staff to confirm it (99Food: phones do not prove
-  /// ownership, plan 2026-11-09 99food Task 6); storeId stays null until then
+  /// ownership); the integration's storeId stays null until then
   linkRequestStoreId   String?
   linkRequestStoreName String?
   linkRequestedAt      DateTime?
@@ -1484,18 +1504,10 @@ model DeliveryIntegration {
   linkRequestedBy      String?
   /// Paused by hand on the platform until this moment (99Food pauses until the end of the day); orders keep coming
   pausedUntil          DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  restaurant           Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  externalOrders       ExternalOrder[]
-  menuMappings         MenuItemMapping[]
-  apiKeys              OrderApiKey[]
+  updatedAt            DateTime            @updatedAt
+  integration          DeliveryIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
-  @@unique([restaurantId, platform])
-  /// One restaurant per platform store (final review 2026-10-24 I4): storeId routes the iFood events; NULLs never clash
-  @@unique([platform, storeId])
-  @@index([restaurantId])
-  @@map("delivery_integrations")
+  @@map("ninetynine_store_states")
 }
 
 model ExternalOrder {
@@ -5124,28 +5136,28 @@ model SubscriptionAcceptance {
 
 /// Cupons de desconto do site de delivery (spec 2026-11-08 cupons)
 model Coupon {
-  id                 String             @id @default(cuid())
-  restaurantId       String
+  id             String             @id @default(cuid())
+  restaurantId   String
   /// Upper case letters and digits, 3 to 20; unique per restaurant
-  code               String
+  code           String
   /// PERCENT (value = %), FIXED (value = cents) or FREE_DELIVERY (value unused)
-  kind               String
-  value              Int                @default(0)
-  minOrderCents      Int                @default(0)
-  validFrom          DateTime?
-  validUntil         DateTime?
+  kind           String
+  value          Int                @default(0)
+  minOrderCents  Int                @default(0)
+  validFrom      DateTime?
+  validUntil     DateTime?
   /// Total uses allowed; null = no limit
-  maxUses            Int?
+  maxUses        Int?
   /// Uses per customer phone; null = no limit
-  maxPerCustomer     Int?               @default(1)
-  firstOrderOnly     Boolean            @default(false)
-  active             Boolean            @default(true)
-  usedCount          Int                @default(0)
-  createdById        String?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  restaurant         Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  redemptions        CouponRedemption[]
+  maxPerCustomer Int?               @default(1)
+  firstOrderOnly Boolean            @default(false)
+  active         Boolean            @default(true)
+  usedCount      Int                @default(0)
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  restaurant     Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  redemptions    CouponRedemption[]
 
   @@unique([restaurantId, code])
   @@index([restaurantId])

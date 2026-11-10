@@ -32,11 +32,14 @@ describe('99Food events', () => {
   const made = [];
   const events = [];
 
-  async function restaurant(extra = {}, integ = {}) {
+  async function restaurant(extra = {}, integ: any = {}) {
+    // pausedUntil lives on the 99Food-only state table, not on delivery_integrations
+    const { pausedUntil, ...integFields } = integ;
     const owner = await prisma.user.create({ data: { email: `nne-${seq++}-${tag}@gastrux.test`, name: 'Dona', password: 'x', role: 'OWNER' } });
     const r = await prisma.restaurant.create({ data: { name: `Nne ${seq++} ${tag}`, ownerId: owner.id, status: 'ACTIVE', subscriptionTier: 'business', subscriptionStatus: 'active', isInternal: false, ...extra } });
     const appShopId = bigId();
-    const integration = await prisma.deliveryIntegration.create({ data: { restaurantId: r.id, platform: 'ninety_nine_food', apiKey: 'x', webhookSecret: 'y', storeId: appShopId, ...integ } });
+    const integration = await prisma.deliveryIntegration.create({ data: { restaurantId: r.id, platform: 'ninety_nine_food', apiKey: 'x', webhookSecret: 'y', storeId: appShopId, ...integFields } });
+    if (pausedUntil !== undefined) await prisma.ninetynineStoreState.create({ data: { integrationId: integration.id, pausedUntil } });
     await prisma.recipe.create({ data: { restaurantId: r.id, code: `R${tag}${seq++}`, name: 'Pizza', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 30 } });
     made.push({ rid: r.id, ownerId: owner.id });
     return { rid: r.id, integ: integration, appShopId };
@@ -397,7 +400,7 @@ describe('99Food events', () => {
     expect(integ.syncStatus).toBe('SUCCESS');
     expect(integ.syncError).toBeNull();
     // online on the 99Food: the pause made from Gastrux is over
-    expect(integ.pausedUntil).toBeNull();
+    expect((await prisma.ninetynineStoreState.findUnique({ where: { integrationId: r.integ.id } }))?.pausedUntil).toBeNull();
 
     await event('shopBindStatus', null, { appShopIDList: [r.appShopId], bindStatus: 'unbind' });
     await processPendingOnce();

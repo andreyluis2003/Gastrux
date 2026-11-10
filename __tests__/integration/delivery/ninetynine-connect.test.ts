@@ -35,7 +35,15 @@ const as = (u) => {
   (getServerSessionNext as jest.Mock).mockResolvedValue(s);
 };
 const req = (method, body?) => new NextRequest('http://x', { method, body: body ? JSON.stringify(body) : undefined });
-const integOf = (rid) => prisma.deliveryIntegration.findUnique({ where: { restaurantId_platform: { restaurantId: rid, platform: 'ninety_nine_food' } } });
+// The integration row plus its 99Food-only state (ninetynine_store_states), flattened as the screens read them
+const NO_STATE = { linkRequestStoreId: null, linkRequestStoreName: null, linkRequestedAt: null, linkRequestedBy: null, pausedUntil: null };
+const integOf = async (rid): Promise<any> => {
+  const row = await prisma.deliveryIntegration.findUnique({ where: { restaurantId_platform: { restaurantId: rid, platform: 'ninety_nine_food' } }, include: { ninetynineState: true } });
+  if (!row) return row;
+  const { ninetynineState: st, ...rest } = row;
+  const { integrationId: _i, updatedAt: _u, ...state } = st ?? ({} as any);
+  return { ...rest, ...NO_STATE, ...state };
+};
 const TAKEN = 'Esta loja da 99Food já está ligada a outro restaurante do Gastrux';
 const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
 async function until(check: () => Promise<boolean>, ms = 3000) {
@@ -276,9 +284,9 @@ describe('99Food connection', () => {
     expect((await (await GET()).json()).paused).toBe(true);
     await prisma.deliveryIntegration.update({ where: { id }, data: { syncStatus: 'SUCCESS', syncError: null } });
     // a pause that ended yesterday is not a pause
-    await prisma.deliveryIntegration.update({ where: { id }, data: { pausedUntil: new Date(Date.now() - 60_000) } });
+    await prisma.ninetynineStoreState.update({ where: { integrationId: id }, data: { pausedUntil: new Date(Date.now() - 60_000) } });
     expect((await (await GET()).json()).paused).toBe(false);
-    await prisma.deliveryIntegration.update({ where: { id }, data: { pausedUntil: null } });
+    await prisma.ninetynineStoreState.update({ where: { integrationId: id }, data: { pausedUntil: null } });
     (setStoreStatus as jest.Mock).mockRejectedValue(new NinetynineError('x', 500));
     expect((await POST(req('POST', { action: 'pause' }))).status).toBe(502);
     expect(await integOf(a.rid)).toMatchObject({ isActive: true, pausedUntil: null });
