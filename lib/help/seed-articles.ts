@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  'd1db3d750229161eea903bfafedc41491a25262a0b7eb169e3288168c1b82e89', // article that mentioned Keeta and 99Food as not connected (before the 99Food guide, 2026-11-10)
   'b4427f86d8d9b9876e2f993c3f0d59a66cd200ba8e633e7a5f6adc2c47b0e6f8', // como-criar-restaurante (before the guided first access, 2026-11-05)
   '28c9803ba55e00cc782640f747f4123f7ebfa8301b5ae69d0b91bbefd49928fb', // atalhos-balcao (before the order bell and the keys on the buttons, 2026-11-03)
   'd06954d932d0404946d8024f6cdafc6cef7e42496f3a27ab456b47798ed07621', // site-de-delivery (before the order bell and the keys on the buttons, 2026-11-03)
@@ -723,7 +724,7 @@ Com a conta do Mercado Pago do restaurante conectada, o cliente pode pagar pelo 
 
 ## Outros sistemas e aplicativos
 
-O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". No plano **Business**, os pedidos do **iFood** chegam direto aqui (veja "Como ligo o iFood?"). Keeta e 99Food ainda não estão conectados.`,
+O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API de pedidos** (planos Pro e Business): veja "Como recebo pedidos de outros sistemas?". No plano **Business**, os pedidos do **iFood** chegam direto aqui (veja "Como ligo o iFood?"), e os da **99Food** também (veja "Como ligo a 99Food?"). O Keeta ainda não está conectado.`,
   },
   {
     categorySlug: 'integracao-delivery',
@@ -1366,6 +1367,49 @@ Com 2 lojas, o Gastrux compara os últimos 30 dias e avisa quando o CMV de uma e
 ## Sincronizar Fichas
 
 Copia fichas técnicas de uma loja para a outra: escolha a **Unidade Origem**, a **Unidade Destino** e as fichas, e toque em **Sincronizar**. Os insumos que faltam são criados na loja de destino. Uma ficha que já existe lá (mesmo código) não é copiada de novo. O estoque e o cardápio digital não são copiados.`,
+  },
+  {
+    categorySlug: 'integracao-delivery',
+    slug: 'ligar-a-99food',
+    title: 'Como ligo a 99Food?',
+    summary: 'Em Configurações > Integrações > 99Food (plano Business): os pedidos da 99Food chegam em Pedidos de delivery e o status volta para a 99Food.',
+    keywords: '99food, 99 food, delivery, pedidos, integração, conectar, ligar loja',
+    order: 5,
+    content: `## Antes de começar
+
+É do plano **Business**. A loja precisa já estar **aprovada na 99Food**, e quem autoriza precisa ser o **administrador da loja** na 99Food. O cardápio continua sendo editado no app da 99Food.
+
+## Conectando a loja
+
+1. O dono ou o gerente abre **Configurações > Integrações > 99Food** e clica em **Abrir a 99Food**, para autorizar o Gastrux na loja
+2. Volte ao Gastrux e clique em **Escolher minha loja**. A lista mostra as lojas da 99Food com o mesmo telefone do cadastro do restaurante
+3. Isso vira um pedido que a equipe do Gastrux confirma, o que costuma levar até 1 dia útil
+4. Depois da confirmação a tela mostra **Conectada**
+
+Se a sua loja não aparece na lista, confira o telefone cadastrado ou fale com o suporte.
+
+## Os pedidos
+
+Os pedidos chegam sozinhos em **Vender > Pedidos de delivery** e na cozinha, como "99Food #número", com o código do pedido. A 99Food espera a confirmação em até 5 minutos: se o restaurante aceita pedidos sozinho, é automática; senão o sino toca na chegada e de novo aos 3 minutos. Pedido sem nenhum produto reconhecido não é confirmado sozinho.
+
+**Pronto** na cozinha avisa a 99Food. Na entrega própria, **Entregue** avisa a entrega.
+
+## Dinheiro
+
+- **Entrega da 99Food** com pagamento em dinheiro: o pedido mostra quanto receber do entregador e o botão **Recebi o dinheiro**
+- **Entrega própria ou retirada** em dinheiro: o pedido mostra quanto cobrar e o troco
+
+## Recusar, cancelar e devolução
+
+- **Recusar** ou **Cancelar** um pedido pede um motivo da lista da 99Food (**Outro motivo** pede um texto)
+- Quando o cliente pede para cancelar, o pedido mostra **Aceitar** e **Recusar**, e você responde em até 5 minutos. Sem resposta, a 99Food recusa o cancelamento
+- Quando o cliente pede devolução, também aparecem **Aceitar** e **Recusar** (recusar pede o motivo). Sem resposta, a 99Food devolve
+
+## Pausar e desconectar
+
+**Fechar a loja** no Gastrux pausa a loja na 99Food até o fim do dia: ela volta sozinha no dia seguinte ou quando você reabrir. **Pausar** e **Retomar** também ficam na tela da 99Food.
+
+**Desconectar** faz o Gastrux parar de receber os pedidos. A autorização em si é removida no portal da 99Food.`,
   },
 ];
 
