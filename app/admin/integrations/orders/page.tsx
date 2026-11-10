@@ -117,6 +117,8 @@ const cashToConfirm = (o: ExternalOrder) =>
 const NEEDS_TEXT = '1080';
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'];
+/** A customer's request still waiting for the answer: the order shows under "Ativos" even when delivered (99Food refunds) */
+const openDispute = (o: ExternalOrder) => !!o.disputeId && (!o.disputeExpiresAt || new Date(o.disputeExpiresAt).getTime() > Date.now());
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   PENDING: 'CONFIRMED',
   CONFIRMED: 'PREPARING',
@@ -360,7 +362,7 @@ export default function DeliveryOrdersPage() {
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
-    if (statusFilter === 'active' && !ACTIVE_STATUSES.includes(o.status)) return false;
+    if (statusFilter === 'active' && !ACTIVE_STATUSES.includes(o.status) && !openDispute(o)) return false;
     if (statusFilter !== 'active' && statusFilter !== 'all' && o.status !== statusFilter) return false;
     if (platformFilter !== 'all' && o.integration.platform !== platformFilter) return false;
     if (searchQuery) {

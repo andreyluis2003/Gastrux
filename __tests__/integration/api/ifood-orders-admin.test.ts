@@ -127,6 +127,22 @@ describe('iFood orders in Pedidos de delivery', () => {
     expect(calls.filter((c) => c.path.includes('/disputes/'))).toHaveLength(0);
   });
 
+  it('an order with an open customer request is always on the first page, even delivered and old', async () => {
+    const old = await ingest(true);
+    const expired = await ingest(true);
+    await prisma.externalOrder.update({ where: { id: old }, data: { status: 'DELIVERED', orderReceivedAt: new Date(Date.now() - 20 * 3600e3), disputeId: `r-${tag}`, disputeExpiresAt: new Date(Date.now() + 3600e3) } });
+    await prisma.externalOrder.update({ where: { id: expired }, data: { status: 'DELIVERED', orderReceivedAt: new Date(Date.now() - 20 * 3600e3), disputeId: `r2-${tag}`, disputeExpiresAt: new Date(Date.now() - 1000) } });
+    await ingest(true);
+    as(cashier);
+    const ids = (await (await LIST(new NextRequest('http://x?limit=1'))).json()).orders.map((o) => o.id);
+    expect(ids).toContain(old);
+    expect(ids).not.toContain(expired);
+    expect(ids).toHaveLength(2);
+    // a status filter or a later page is exactly what was asked
+    expect((await (await LIST(new NextRequest('http://x?limit=1&offset=1'))).json()).orders).toHaveLength(1);
+    await prisma.externalOrder.update({ where: { id: old }, data: { disputeId: null, disputeExpiresAt: null } });
+  });
+
   it('a status change by hand: cancel is refused for iFood, Pronto goes to iFood', async () => {
     const id = await ingest(true);
     as(cashier);
