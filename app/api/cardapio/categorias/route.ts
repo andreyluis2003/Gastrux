@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
           where: { active: true },
           // Same position: the older first, so a change never reorders the list (spec 2026-11-06 cardapio-rapido)
           orderBy: [{ position: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+          // The list thumbnail shows the first photo (spec 2026-11-09 foto-do-produto)
+          include: { images: { select: { id: true, imageUrl: true }, orderBy: { createdAt: 'asc' }, take: 1 } },
         },
       },
       orderBy: { position: 'asc' },

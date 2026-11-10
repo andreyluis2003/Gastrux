@@ -19,6 +19,7 @@ import { storageConfig, putPhoto, deletePhoto, MAX_PHOTO_BYTES } from '../../../
 import { POST, DELETE as DEL_PHOTO } from '../../../app/api/cardapio/itens/[id]/foto/route';
 import { DELETE as DEL_ITEM } from '../../../app/api/cardapio/itens/[id]/route';
 import { GET as GET_FOTOS } from '../../../app/api/cardapio/fotos/route';
+import { GET as GET_CATEGORIAS } from '../../../app/api/cardapio/categorias/route';
 import { prisma as libPrisma } from '../../../lib/prisma';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -85,6 +86,14 @@ describe('product photo', () => {
     expect(rows[0].cloudStoragePath).not.toBe('app/old1.jpg');
     expect(deletePhoto).toHaveBeenCalledTimes(1);
     expect(deletePhoto).toHaveBeenCalledWith(CFG, 'app/old1.jpg');
+  });
+
+  it('the admin menu list (GET /api/cardapio/categorias) returns the uploaded photo', async () => {
+    const res = await upload(item.id, JPEG());
+    const { imageUrl } = await res.json();
+    const cats = await (await GET_CATEGORIAS(req('GET'))).json();
+    const listed = cats.flatMap((c) => c.items).find((i) => i.id === item.id);
+    expect(listed.images).toEqual([{ id: expect.any(String), imageUrl }]);
   });
 
   it('remove deletes the row and the file; remove without photo → ok', async () => {
