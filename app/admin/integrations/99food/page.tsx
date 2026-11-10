@@ -14,6 +14,8 @@ interface State {
   paused: boolean;
   status: { syncStatus: string; syncError: string | null } | null;
   lastOrderAt: string | null;
+  /** The store picked here, waiting for the Gastrux staff to confirm it */
+  request: { appShopId: string; name: string; requestedAt: string | null } | null;
 }
 
 type Store = { appShopId: string; name: string };
@@ -78,11 +80,16 @@ export default function NinetynineFoodPage() {
 
   const select = async (s: Store) => {
     const body = await act({ action: 'select', appShopId: s.appShopId });
-    if (body?.store) {
-      toast.success(`Loja "${body.store.name}" conectada`);
+    if (body?.request) {
+      toast.success(`Pedido enviado para a loja "${body.request.name}"`);
       setStores(null); setOpened(false);
       load();
     }
+  };
+
+  const cancelRequest = async () => {
+    if (!window.confirm('Cancelar o pedido de ligação da loja da 99Food?')) return;
+    if (await act({ action: 'cancel' })) load();
   };
 
   const disconnect = async () => {
@@ -114,7 +121,7 @@ export default function NinetynineFoodPage() {
         </Card>
       )}
 
-      {state && b && (
+      {state && state.available && b && (
         <Card className="p-4 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="font-medium">{state.store ? state.store.name : 'Nenhuma loja conectada'}</p>
@@ -147,7 +154,15 @@ export default function NinetynineFoodPage() {
         </Card>
       )}
 
-      {state?.configured && state.available && !state.connected && (
+      {state?.configured && state.available && !state.connected && state.request && (
+        <Card className="p-4 space-y-3">
+          <p className="text-sm font-medium">Loja escolhida: {state.request.name}</p>
+          <p className="text-sm">Aguardando a confirmação da equipe Gastrux. Costuma levar até 1 dia útil.</p>
+          <Button variant="outline" className="w-fit" disabled={busy} onClick={cancelRequest}>Cancelar pedido</Button>
+        </Card>
+      )}
+
+      {state?.configured && state.available && !state.connected && !state.request && (
         <Card className="p-4 space-y-3">
           <p className="text-sm font-medium">Conectar a loja da 99Food</p>
           <ol className="list-none text-sm space-y-1">

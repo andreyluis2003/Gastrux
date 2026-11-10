@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { NinetynineError } from '@/lib/ninetynine/client';
 import {
-  NinetynineConnectError, candidateStores, disconnect, ninetynineState, selectStore, setPaused, startConnection,
+  NinetynineConnectError, cancelRequest, candidateStores, disconnect, ninetynineState, selectStore, setPaused, startConnection,
 } from '@/lib/ninetynine/connect';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export async function GET() {
   return NextResponse.json(await ninetynineState(auth.member.restaurantId), { headers: NO_STORE });
 }
 
-/** POST { action: 'start' | 'stores' | 'select' | 'pause' | 'resume' } */
+/** POST { action: 'start' | 'stores' | 'select' (records a link request for the staff) | 'cancel' (that request) | 'pause' | 'resume' } */
 export async function POST(req: NextRequest) {
   const auth = await requireRestaurantRole(ROLES, DENIED);
   if (!auth.ok) return auth.response;
@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ stores: await candidateStores(auth.member) }, { headers: NO_STORE });
       case 'select':
         return NextResponse.json(await selectStore(auth.member, body.appShopId), { headers: NO_STORE });
+      case 'cancel':
+        return NextResponse.json(await cancelRequest(auth.member), { headers: NO_STORE });
       case 'pause':
       case 'resume':
         return NextResponse.json(await setPaused(auth.member, body.action === 'pause'), { headers: NO_STORE });

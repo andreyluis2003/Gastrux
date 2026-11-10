@@ -170,6 +170,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Usuários', href: '/admin/users' },
       { label: 'Custo da IA', href: '/admin/platform/ia' },
       { label: 'Indicações', href: '/admin/platform/indicacoes' },
+      { label: 'Lojas da 99Food', href: '/admin/platform/99food' },
       { label: 'Feedback dos clientes', href: '/admin/feedback' },
       { label: 'Roadmap', href: '/admin/roadmap' },
       { label: 'Auditoria', href: '/admin/audit-logs' },

@@ -1449,38 +1449,47 @@ model BetaTesterInteraction {
 }
 
 model DeliveryIntegration {
-  id                String            @id @default(cuid())
-  restaurantId      String
-  platform          DeliveryPlatform
-  isActive          Boolean           @default(true)
-  apiKey            String
-  webhookSecret     String
-  storeId           String?
-  storeName         String?
-  storePhone        String?
-  storeAddress      String?
-  webhookUrl        String?
-  lastWebhookTest   DateTime?
-  webhookActive     Boolean           @default(false)
-  lastSyncedAt      DateTime?
-  syncStatus        SyncStatus        @default(PENDING)
-  syncError         String?
-  totalOrdersSynced Int               @default(0)
-  lastOrderAt       DateTime?
+  id                   String            @id @default(cuid())
+  restaurantId         String
+  platform             DeliveryPlatform
+  isActive             Boolean           @default(true)
+  apiKey               String
+  webhookSecret        String
+  storeId              String?
+  storeName            String?
+  storePhone           String?
+  storeAddress         String?
+  webhookUrl           String?
+  lastWebhookTest      DateTime?
+  webhookActive        Boolean           @default(false)
+  lastSyncedAt         DateTime?
+  syncStatus           SyncStatus        @default(PENDING)
+  syncError            String?
+  totalOrdersSynced    Int               @default(0)
+  lastOrderAt          DateTime?
   /// iFood (plan 2026-10-24 ifood): the store's tokens (distributed app) and the userCode verifier, encrypted
   /// with lib/security/credential-crypto; storeId is the iFood merchantId
-  oauthAccessToken  String?
-  oauthRefreshToken String?
-  oauthExpiresAt    DateTime?
-  oauthVerifier     String?
+  oauthAccessToken     String?
+  oauthRefreshToken    String?
+  oauthExpiresAt       DateTime?
+  oauthVerifier        String?
   /// The last successful poll of the platform's events (the store shows "Desconectada" when it is old)
-  lastPolledAt      DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  externalOrders    ExternalOrder[]
-  menuMappings      MenuItemMapping[]
-  apiKeys           OrderApiKey[]
+  lastPolledAt         DateTime?
+  /// A store the restaurant asked to link, waiting for the Gastrux staff to confirm it (99Food: phones do not prove
+  /// ownership, plan 2026-11-09 99food Task 6); storeId stays null until then
+  linkRequestStoreId   String?
+  linkRequestStoreName String?
+  linkRequestedAt      DateTime?
+  /// The user who asked
+  linkRequestedBy      String?
+  /// Paused by hand on the platform until this moment (99Food pauses until the end of the day); orders keep coming
+  pausedUntil          DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  restaurant           Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  externalOrders       ExternalOrder[]
+  menuMappings         MenuItemMapping[]
+  apiKeys              OrderApiKey[]
 
   @@unique([restaurantId, platform])
   /// One restaurant per platform store (final review 2026-10-24 I4): storeId routes the iFood events; NULLs never clash

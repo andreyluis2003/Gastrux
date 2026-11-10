@@ -49,9 +49,9 @@ export function StoreToggle({ state, onChange }: { state?: ToggleState | null; o
       setS(after);
       onChange?.(after);
       const ifood = body.ifood === 'paused' ? ' O iFood foi pausado.' : body.ifood === 'resumed' ? ' O iFood voltou.' : '';
-      const ninetynine = body.ninetynine === 'paused' ? ' A 99Food foi pausada.' : body.ninetynine === 'resumed' ? ' A 99Food voltou.' : '';
+      // The 99Food is told in the background; a failure comes in the sino
+      const ninetynine = body.ninetynine === 'pending' ? (next ? ' Pausando a 99Food.' : ' Reabrindo a 99Food.') : '';
       toast.success((after.closed ? (after.reason === 'horario' ? `Loja fechada pelo horário${after.opens ? ` (abre ${after.opens})` : ''}.` : 'Loja fechada.') : 'Loja aberta.') + ifood + ninetynine);
-      if (body.ninetynine === 'failed') toast.warning(after.closed ? 'A 99Food não recebeu a pausa da loja. Pause pela tela da 99Food.' : 'A 99Food não recebeu a abertura da loja. Retome pela tela da 99Food.');
     } finally {
       setBusy(false);
     }

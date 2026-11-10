@@ -45,6 +45,7 @@ class Skip extends Error {}
 
 const SHOP_STATUS: Record<number, { status: 'SUCCESS' | 'PARTIAL' | 'FAILED'; text: string | null }> = {
   1: { status: 'SUCCESS', text: null },
+  // the same text as PAUSED_ON_99FOOD in ./connect: the screen shows "Pausada" from it
   2: { status: 'PARTIAL', text: 'Loja pausada na 99Food' },
   3: { status: 'PARTIAL', text: 'Loja fechada na 99Food' },
   4: { status: 'FAILED', text: 'Loja desconectada da 99Food' },
@@ -102,6 +103,8 @@ async function orderNew(row: NinetynineEvent, appShopId: string | null, orderId:
   // The plan gate applies to new orders only: later events of an order already in Gastrux are always followed
   const found = await integrationOf(appShopId);
   if (!found) throw new Skip('loja da 99Food não ligada a nenhum restaurante');
+  // isActive is off only when the link is gone (disconnect, unbind); a pause never turns it off, so an order the
+  // 99Food still sends while paused comes in
   if (!found.isActive) throw new Skip('integração da 99Food desligada');
   if (!(await eligible(found.restaurantId))) throw new Skip('o plano do restaurante não recebe pedidos de plataformas');
   const integration = found as Linked;
@@ -244,7 +247,8 @@ async function shopStatus(row: NinetynineEvent) {
   const sub = Number((row.payload as any)?.data?.sub_biz_status);
   const s = SHOP_STATUS[sub];
   if (!s) throw new Skip(`sub_biz_status desconhecido: ${sub}`);
-  await prisma.deliveryIntegration.update({ where: { id: integ.id }, data: { syncStatus: s.status, syncError: s.text } });
+  // Online on the 99Food: a pause made from Gastrux is over (resumed in the 99Food app)
+  await prisma.deliveryIntegration.update({ where: { id: integ.id }, data: { syncStatus: s.status, syncError: s.text, ...(sub === 1 ? { pausedUntil: null } : {}) } });
 }
 
 const orderIdOf = (row: NinetynineEvent) => {

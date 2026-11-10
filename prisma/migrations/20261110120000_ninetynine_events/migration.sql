@@ -19,3 +19,10 @@ CREATE INDEX "ninetynine_events_processedAt_receivedAt_idx" ON "ninetynine_event
 
 -- CreateIndex
 CREATE INDEX "ninetynine_events_processedAt_nextAttemptAt_idx" ON "ninetynine_events"("processedAt", "nextAttemptAt");
+
+-- AlterTable: link requests the Gastrux staff confirms, and the hand pause (plan 2026-11-09 99food, Task 6)
+ALTER TABLE "delivery_integrations" ADD COLUMN "linkRequestStoreId" TEXT,
+ADD COLUMN "linkRequestStoreName" TEXT,
+ADD COLUMN "linkRequestedAt" TIMESTAMP(3),
+ADD COLUMN "linkRequestedBy" TEXT,
+ADD COLUMN "pausedUntil" TIMESTAMP(3);

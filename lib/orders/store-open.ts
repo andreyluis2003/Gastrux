@@ -44,7 +44,8 @@ export async function isStoreClosed(restaurantId: string, now = new Date()): Pro
 /**
  * Closing pauses a connected, active iFood store and remembers it; opening resumes iFood only when the close paused
  * it (an iFood paused by hand stays paused). A linked, active 99Food store is paused / put back online on the 99Food
- * too, after the change and best effort (plan 2026-11-09 99food, Task 6).
+ * too, after the change is saved and in the background: the toggle never waits for the 99Food (`ninetynine: 'pending'`)
+ * and a failure goes to the sino (plan 2026-11-09 99food, Task 6).
  */
 export async function setStoreClosed(member: RestaurantMember, closed: boolean) {
   const rid = member.restaurantId;

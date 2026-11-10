@@ -202,7 +202,17 @@ describe('99Food events', () => {
     expect(ext.platformData.disputeReasons).toEqual(base);
   });
 
-  it('unknown or paused store: not ingested, processed with a note', async () => {
+  it('a store paused (from Gastrux or on the 99Food) still takes the orders the 99Food sends', async () => {
+    const r = await restaurant({}, { pausedUntil: new Date(Date.now() + 3600_000), syncStatus: 'PARTIAL', syncError: 'Loja pausada na 99Food' });
+    const orderId = bigId();
+    const ev = await event('orderNew', r.appShopId, { order_id: orderId, order_info: orderInfo(orderId) });
+    await processPendingOnce();
+    expect((await rowOf(ev.id)).error).toBeNull();
+    expect(await extOf(orderId)).not.toBeNull();
+    expect(confirmOrder).toHaveBeenCalledWith(r.integ.id, orderId);
+  });
+
+  it('unknown or switched-off (isActive false) store: not ingested, processed with a note', async () => {
     const orderId = bigId();
     const unknown = await event('orderNew', bigId(), { order_id: orderId, order_info: orderInfo(orderId) });
     const r = await restaurant({}, { isActive: false });
@@ -376,7 +386,7 @@ describe('99Food events', () => {
   });
 
   it('shopStatus updates the integration status; unbind disconnects the store', async () => {
-    const r = await restaurant();
+    const r = await restaurant({}, { pausedUntil: new Date(Date.now() + 3600_000) });
     await event('shopStatus', r.appShopId, { biz_status: 2, sub_biz_status: 2 });
     await processPendingOnce();
     let integ = await prisma.deliveryIntegration.findUnique({ where: { id: r.integ.id } });
@@ -386,6 +396,8 @@ describe('99Food events', () => {
     integ = await prisma.deliveryIntegration.findUnique({ where: { id: r.integ.id } });
     expect(integ.syncStatus).toBe('SUCCESS');
     expect(integ.syncError).toBeNull();
+    // online on the 99Food: the pause made from Gastrux is over
+    expect(integ.pausedUntil).toBeNull();
 
     await event('shopBindStatus', null, { appShopIDList: [r.appShopId], bindStatus: 'unbind' });
     await processPendingOnce();
