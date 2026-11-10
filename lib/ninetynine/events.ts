@@ -121,6 +121,8 @@ async function orderNew(row: NinetynineEvent, appShopId: string | null, orderId:
     const res = await ingestDeliveryOrder({
       restaurantId: integration.restaurantId, integrationId: integration.id, platform: PLATFORM,
       input: m.input, extraNote: m.extraNote, platformData: m.platformData,
+      // the 5-minute confirm countdown and the 3-minute alert run from when the 99Food told us, not from a late retry
+      orderReceivedAt: row.receivedAt,
     });
     duplicate = res.duplicate;
   } catch (e) {

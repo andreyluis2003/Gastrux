@@ -129,6 +129,8 @@ export async function ingestDeliveryOrder(args: {
   extraNote?: string;
   platformData?: object;
   externalCustomerId?: string | null;
+  /** When the platform told us about the order (99Food: its event); the confirm countdown and alerts run from it. Default now */
+  orderReceivedAt?: Date;
 }): Promise<{ externalOrder: ExternalOrder; kitchenOrderId: string | null; duplicate: boolean }> {
   const { restaurantId, integrationId, input } = args;
   const key = { restaurantId_externalOrderId: { restaurantId, externalOrderId: input.codigo } };
@@ -151,6 +153,7 @@ export async function ingestDeliveryOrder(args: {
         items: externalItemsJson(input.itens),
         specialInstructions: [kitchenNote(input), args.extraNote].filter(Boolean).join('\n'),
         platformData: args.platformData as any, externalCustomerId: args.externalCustomerId ?? undefined,
+        orderReceivedAt: args.orderReceivedAt,
       },
     });
   } catch (e: any) {

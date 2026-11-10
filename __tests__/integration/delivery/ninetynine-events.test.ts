@@ -109,10 +109,12 @@ describe('99Food events', () => {
     const r = await restaurant();
     const orderId = bigId();
     getOrderDetail.mockResolvedValue({ order_id: orderId, order_info: orderInfo(orderId) });
-    await event('orderNew', r.appShopId, { order_id: orderId });
+    const ev = await event('orderNew', r.appShopId, { order_id: orderId });
     await processPendingOnce();
     expect(getOrderDetail).toHaveBeenCalledWith(r.integ.id, orderId);
     expect((await extOf(orderId)).status).toBe('CONFIRMED');
+    // the countdown runs from when the 99Food told us
+    expect((await extOf(orderId)).orderReceivedAt.getTime()).toBe(ev.receivedAt.getTime());
   });
 
   it('manual accept: not confirmed on 99Food, rings again at 3 minutes', async () => {
