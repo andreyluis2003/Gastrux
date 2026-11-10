@@ -222,8 +222,15 @@ export async function selectStore(member: RestaurantMember, appShopId: unknown) 
   await assertBusiness(member.restaurantId);
   assertConfigured();
   const id = typeof appShopId === 'string' || typeof appShopId === 'number' ? String(appShopId) : '';
-  const current = await prisma.deliveryIntegration.findUnique({ where: where(member.restaurantId), select: { storeId: true } });
+  const current = await prisma.deliveryIntegration.findUnique({
+    where: where(member.restaurantId), select: { storeId: true, ninetynineState: { select: { linkRequestStoreId: true, linkRequestStoreName: true, linkRequestedAt: true } } },
+  });
   if (current?.storeId) throw new NinetynineConnectError('A loja da 99Food já está conectada', 409);
+  // The same store asked again: the staff was already rung
+  const pending = current?.ninetynineState;
+  if (id && pending?.linkRequestStoreId === id) {
+    return { request: { appShopId: id, name: pending.linkRequestStoreName ?? '', requestedAt: pending.linkRequestedAt } };
+  }
   // Checked again now: the list on the screen may be old
   const store = id ? (await matchingShops(member.restaurantId)).find((s) => s.appShopId === id) : undefined;
   if (!store) throw new NinetynineConnectError('Escolha uma das lojas da lista');
@@ -256,6 +263,7 @@ export async function cancelRequest(member: RestaurantMember) {
  * order the 99Food still sends during the pause comes in normally.
  */
 export async function setPaused(member: RestaurantMember, paused: boolean) {
+  await assertBusiness(member.restaurantId);
   assertConfigured();
   const row = await prisma.deliveryIntegration.findUnique({ where: where(member.restaurantId), select: { id: true, storeId: true } });
   if (!row?.storeId) throw new NinetynineConnectError('Conecte a loja da 99Food primeiro', 409);

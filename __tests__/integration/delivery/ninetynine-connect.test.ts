@@ -126,6 +126,8 @@ describe('99Food connection', () => {
     expect(r.status).toBe(403);
     expect((await r.json()).upgradeUrl).toBe('/pricing');
     expect((await POST(req('POST', { action: 'stores' }))).status).toBe(403);
+    expect((await POST(req('POST', { action: 'pause' }))).status).toBe(403);
+    expect(setStoreStatus).not.toHaveBeenCalled();
   });
 
   it('without the app credentials the screen says so, pause is 409 and nothing is called', async () => {
@@ -204,6 +206,11 @@ describe('99Food connection', () => {
     expect(rung[0].actionUrl).toBe('/admin/platform/99food');
     expect(await prisma.notification.count({ where: { userId: adminUser.id } })).toBe(0);
     expect(await (await GET()).json()).toMatchObject({ connected: false, store: null, request: { appShopId: S.mine, name: 'Loja do Telefone' } });
+    // asking for the same store again does not ring the staff again
+    const again = await POST(req('POST', { action: 'select', appShopId: S.mine }));
+    expect(again.status).toBe(200);
+    expect((await again.json()).request).toMatchObject({ appShopId: S.mine, name: 'Loja do Telefone' });
+    expect(await prisma.notification.count({ where: { userId: staffUser.id, title: 'Pedido para ligar loja da 99Food' } })).toBe(1);
     expect(await prisma.auditLog.count({ where: { restaurantId: a.rid, entityId: row.id } })).toBeGreaterThan(0);
   });
 
