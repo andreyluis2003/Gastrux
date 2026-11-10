@@ -656,3 +656,24 @@ Nenhuma bloqueia (revisão final: "não precisa antes do merge").
 - Os cardápios públicos ficam em cache (QR 60 s, publico 300 s): logo depois de trocar a foto, a antiga pode aparecer quebrada por até 5 min.
 - Ordem 6 do artigo "Como coloco foto nos produtos?" repete outras ordens da categoria (já acontecia).
 - O 404 da rota antiga de item continua em inglês ("Menu item not found").
+
+## 99Food (no ar com c804ec3, esperando teste no homolog) — sobras e o que conferir
+
+Conferir no homolog com pedidos reais de teste (sem mudar código antes):
+- Assinatura das chamadas v3 (lista de lojas autorizadas): o exemplo da documentação da 99Food não bate com o próprio texto; seguimos a regra escrita.
+- `real_price` em pedido com entrega da 99Food (assumido líquido só das promoções da loja) e se o Caixa deve registrar o total ou o `shop_paid_money` no dinheiro recebido do entregador.
+- O formato do `base_reason_id` na recusa de devolução (enviado como texto, como diz a referência).
+- Se o proxy do Easypanel limita o tamanho do corpo das requisições.
+
+Sobras das revisões (nenhuma bloqueia):
+- Renovação do acesso: quem entra numa busca de acesso em andamento pode receber o acesso antigo uma vez (uma chamada falha, sem laço).
+- Arredondamento: o preço unitário pode perder 1 centavo por linha.
+- Os testes do processador usam o banco de teste compartilhado.
+- A rodada do processador pode passar dos 90 s na parte final; a liberação da trava é segura e o pedido não duplica.
+- O alerta de desistência de um evento sem pedido usa um id provisório.
+- O cancelamento parcial atualiza os valores do pedido da cozinha, não as linhas dos itens.
+- Mover à mão CONFIRMADO → EM ENTREGA → ENTREGUE em dois passos não manda "pronto" à 99Food.
+- O aviso de loja fechada pela 99Food pode tocar duas vezes se dois avisos chegarem juntos.
+- Pedidos com pedido do cliente aberto entram na primeira página fora da ordem e fora do total.
+- A visão em quadro de Pedidos de delivery não tem as caixas de responder; responde-se pela lista.
+- O site de vendas (faq-section, features-showcase) continua dizendo que a 99Food ainda não está conectada até a 99Food liberar o app de produção.
