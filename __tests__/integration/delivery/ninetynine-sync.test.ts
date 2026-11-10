@@ -186,6 +186,27 @@ describe('99Food platform sync', () => {
     expect(nn.orderDelivered.mock.calls).toEqual([[r.integ.id, own.orderId]]);
   });
 
+  it('a jump past Pronto (to Em Entrega or Entregue) says "ready" once; an order already Pronto does not say it again', async () => {
+    const r = await restaurant();
+    const jump = await ingest(r, { delivery_type: 2 });
+    const direct = await ingest(r, { delivery_type: 1 });
+    const viaReady = await ingest(r, { delivery_type: 2 });
+    as(r.owner);
+    expect((await prisma.externalOrder.findUnique({ where: { id: jump.id } })).status).toBe('CONFIRMED');
+    expect((await move(jump.id, 'PICKED_UP')).status).toBe(200);
+    expect(nn.orderReady.mock.calls).toEqual([[r.integ.id, jump.orderId]]);
+    expect((await move(jump.id, 'DELIVERED')).status).toBe(200);
+    expect(nn.orderReady).toHaveBeenCalledTimes(1);
+    expect((await move(direct.id, 'DELIVERED')).status).toBe(200);
+    expect(nn.orderReady.mock.calls.at(-1)).toEqual([r.integ.id, direct.orderId]);
+    expect(nn.orderReady).toHaveBeenCalledTimes(2);
+    await move(viaReady.id, 'READY');
+    expect(nn.orderReady).toHaveBeenCalledTimes(3);
+    expect((await move(viaReady.id, 'PICKED_UP')).status).toBe(200);
+    expect((await move(viaReady.id, 'DELIVERED')).status).toBe(200);
+    expect(nn.orderReady).toHaveBeenCalledTimes(3);
+  });
+
   async function dispute(o, kind, reasons = []) {
     const applyId = bigId();
     const ext = await prisma.externalOrder.findUnique({ where: { id: o.id } });

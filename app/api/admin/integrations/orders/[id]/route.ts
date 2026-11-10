@@ -96,13 +96,16 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   void notifyOrderStatus(order.id);
   // A step made by hand goes to the platform too, as when the kitchen makes it (dispatch only for the store's own
   // delivery). iFood's dispatch is "saiu para entrega"; 99Food's is "entregue ao cliente", sent when the order reaches
-  // Entregue (a jump to Entregue still says "pronto" first, as the kitchen does)
+  // Entregue (a jump to Saiu para entrega or Entregue from before Pronto still says "pronto" first, once, as the kitchen
+  // does; a READY order already said it)
   const toPlatform: Record<string, Record<string, PlatformChange>> = {
     ifood: { PREPARING: 'preparing', READY: 'ready', PICKED_UP: 'dispatch' },
     ninety_nine_food: { READY: 'ready', DELIVERED: 'dispatch' },
   };
   const change = platform ? toPlatform[platform][status] : undefined;
-  if (platform === 'ninety_nine_food' && status === 'DELIVERED' && ['CONFIRMED', 'PREPARING'].includes(order.status)) await pushPlatformStatus(order.id, 'ready');
+  if (platform === 'ninety_nine_food' && (status === 'PICKED_UP' || status === 'DELIVERED') && ['CONFIRMED', 'PREPARING'].includes(order.status)) {
+    await pushPlatformStatus(order.id, 'ready');
+  }
   if (change) await pushPlatformStatus(order.id, change);
   return NextResponse.json(await prisma.externalOrder.findUnique({ where: { id: order.id }, include: { deliveryLogs: { orderBy: { createdAt: 'desc' }, take: 5 } } }));
 }
