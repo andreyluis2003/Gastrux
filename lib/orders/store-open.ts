@@ -74,7 +74,15 @@ export async function setStoreClosed(member: RestaurantMember, closed: boolean) 
     return { closed, ifood: ifoodChange };
   });
   if (!result) return result;
-  const ninetynine = changed ? await followStoreToggle(rid, closed) : null;
+  let ninetynine: null | 'pending' = null;
+  if (changed) {
+    // The Gastrux state is saved: a failure to read the 99Food link must not turn the toggle into an error
+    try {
+      ninetynine = await followStoreToggle(rid, closed);
+    } catch (e) {
+      console.error('[99food] store toggle follow-up failed:', e);
+    }
+  }
   await recordAudit(member, { action: 'UPDATE', entityType: 'Restaurant', entityId: rid, changes: { loja: closed ? 'fechada' : 'aberta', ifood: result.ifood, ninetynine } });
   return { ...result, ninetynine };
 }

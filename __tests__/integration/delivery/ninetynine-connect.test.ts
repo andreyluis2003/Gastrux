@@ -336,6 +336,23 @@ describe('99Food connection', () => {
     await POST(req('POST', { action: 'resume' }));
   });
 
+  it('the store toggle never fails after the Gastrux state is saved, even when reading the 99Food link fails', async () => {
+    const real = appPrisma.deliveryIntegration.findUnique.bind(appPrisma.deliveryIntegration);
+    const spy = jest.spyOn(appPrisma.deliveryIntegration, 'findUnique').mockImplementation(((args: any) =>
+      args?.where?.restaurantId_platform?.platform === 'ninety_nine_food' ? Promise.reject(new Error('db down')) : real(args)) as any);
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(await setStoreClosed(a.member, true)).toMatchObject({ closed: true, ninetynine: null });
+      expect((await prisma.restaurant.findUnique({ where: { id: a.rid } })).ordersClosedAt).not.toBeNull();
+    } finally {
+      spy.mockRestore();
+      quiet.mockRestore();
+    }
+    await setStoreClosed(a.member, false);
+    await tick();
+    (setStoreStatus as jest.Mock).mockClear();
+  });
+
   it('disconnect clears the store and the token', async () => {
     as(a.owner);
     expect((await DELETE()).status).toBe(200);
