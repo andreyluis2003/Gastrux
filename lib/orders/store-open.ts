@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { hoursState } from '@/lib/orders/hours';
+import { followStoreToggle } from '@/lib/ninetynine/connect';
 
 /**
  * Loja aberta / fechada (spec 2026-11-07 quadro-de-pedidos §A). Closed: no new orders from customers outside the
@@ -42,14 +43,17 @@ export async function isStoreClosed(restaurantId: string, now = new Date()): Pro
 
 /**
  * Closing pauses a connected, active iFood store and remembers it; opening resumes iFood only when the close paused
- * it (an iFood paused by hand stays paused).
+ * it (an iFood paused by hand stays paused). A linked, active 99Food store is paused / put back online on the 99Food
+ * too, after the change and best effort (plan 2026-11-09 99food, Task 6).
  */
 export async function setStoreClosed(member: RestaurantMember, closed: boolean) {
   const rid = member.restaurantId;
+  let changed = false;
   const result = await prisma.$transaction(async (tx) => {
     const r = await tx.restaurant.findUnique({ where: { id: rid }, select: { ordersClosedAt: true, ordersClosedPausedIfood: true } });
     if (!r) return null;
     if (!!r.ordersClosedAt === closed) return { closed, ifood: null as null | 'paused' | 'resumed' };
+    changed = true;
     const ifood = await tx.deliveryIntegration.findUnique({
       where: { restaurantId_platform: { restaurantId: rid, platform: 'ifood' } },
       select: { id: true, storeId: true, isActive: true },
@@ -68,6 +72,8 @@ export async function setStoreClosed(member: RestaurantMember, closed: boolean) 
     await tx.restaurant.update({ where: { id: rid }, data: { ordersClosedAt: closed ? new Date() : null, ordersClosedPausedIfood: pausedIfood } });
     return { closed, ifood: ifoodChange };
   });
-  if (result) await recordAudit(member, { action: 'UPDATE', entityType: 'Restaurant', entityId: rid, changes: { loja: closed ? 'fechada' : 'aberta', ifood: result.ifood } });
-  return result;
+  if (!result) return result;
+  const ninetynine = changed ? await followStoreToggle(rid, closed) : null;
+  await recordAudit(member, { action: 'UPDATE', entityType: 'Restaurant', entityId: rid, changes: { loja: closed ? 'fechada' : 'aberta', ifood: result.ifood, ninetynine } });
+  return { ...result, ninetynine };
 }

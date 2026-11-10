@@ -39,7 +39,7 @@ export function StoreToggle({ state, onChange }: { state?: ToggleState | null; o
 
   const toggle = async () => {
     const next = !s.closed;
-    if (next && !window.confirm('Fechar a loja? O site de delivery, o WhatsApp, a API de pedidos e o iFood param de receber pedidos novos. O salão continua normal.')) return;
+    if (next && !window.confirm('Fechar a loja? O site de delivery, o WhatsApp, a API de pedidos, o iFood e a 99Food param de receber pedidos novos. O salão continua normal.')) return;
     setBusy(true);
     try {
       const res = await fetch('/api/pedidos/loja', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fechada: next }) });
@@ -49,7 +49,9 @@ export function StoreToggle({ state, onChange }: { state?: ToggleState | null; o
       setS(after);
       onChange?.(after);
       const ifood = body.ifood === 'paused' ? ' O iFood foi pausado.' : body.ifood === 'resumed' ? ' O iFood voltou.' : '';
-      toast.success((after.closed ? (after.reason === 'horario' ? `Loja fechada pelo horário${after.opens ? ` (abre ${after.opens})` : ''}.` : 'Loja fechada.') : 'Loja aberta.') + ifood);
+      const ninetynine = body.ninetynine === 'paused' ? ' A 99Food foi pausada.' : body.ninetynine === 'resumed' ? ' A 99Food voltou.' : '';
+      toast.success((after.closed ? (after.reason === 'horario' ? `Loja fechada pelo horário${after.opens ? ` (abre ${after.opens})` : ''}.` : 'Loja fechada.') : 'Loja aberta.') + ifood + ninetynine);
+      if (body.ninetynine === 'failed') toast.warning(after.closed ? 'A 99Food não recebeu a pausa da loja. Pause pela tela da 99Food.' : 'A 99Food não recebeu a abertura da loja. Retome pela tela da 99Food.');
     } finally {
       setBusy(false);
     }

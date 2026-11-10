@@ -56,6 +56,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/admin/modifiers': ['app/admin/modifiers/page.tsx'],
   '/admin/integrations/api': ['app/admin/integrations/api/page.tsx'],
   '/admin/integrations/ifood': ['app/admin/integrations/ifood/page.tsx'],
+  '/admin/integrations/99food': ['app/admin/integrations/99food/page.tsx'],
   '/admin/settings/ia': ['app/admin/settings/ia/page.tsx'],
   '/encomendas': ['app/encomendas/page.tsx'],
   '/pedidos': ['app/pedidos/page.tsx'],
