@@ -4,7 +4,7 @@ import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role
 import { prisma } from '@/lib/prisma';
 import { DeliveryOrderError, acceptDeliveryOrder, rejectDeliveryOrder } from '@/lib/delivery-orders/ingest';
 import { notifyOrderStatus } from '@/lib/delivery-orders/callback';
-import { answerDispute, cancelPlatformOrder, isPlatformOrder, pushPlatformStatus } from '@/lib/delivery-orders/platform-sync';
+import { PLATFORM_WORDS, answerDispute, cancelPlatformOrder, platformOf, pushPlatformStatus } from '@/lib/delivery-orders/platform-sync';
 import { DELIVERY_ROLES } from '@/lib/delivery-orders/roles';
 import { canMoveExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
 import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
@@ -30,6 +30,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
  * api-de-pedidos, Task 7): accepting creates the kitchen order once; rejecting needs a reason (iFood: one of its codes).
  * iFood only (plan 2026-10-24 ifood, Task 8): { action: 'cancel', cancelCode, reason } cancels an accepted order (a
  * manager, as in the kitchen); { action: 'dispute-accept' | 'dispute-reject' } answers the customer's cancel request.
+ * 99Food too (plan 2026-11-09 99food, Task 5); refusing its refund request takes { baseReasonId } from its list.
  */
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireRestaurantRole([...DELIVERY_ROLES], DENIED);
@@ -51,7 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ ok: true });
     }
     if (body?.action === 'dispute-accept' || body?.action === 'dispute-reject') {
-      await answerDispute(auth.member, params.id, body.action === 'dispute-accept' ? 'accept' : 'reject');
+      await answerDispute(auth.member, params.id, body.action === 'dispute-accept' ? 'accept' : 'reject', { baseReasonId: body?.baseReasonId });
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
@@ -74,10 +75,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
   if (order.status === 'PENDING') return NextResponse.json({ error: 'Use Aceitar ou Recusar neste pedido' }, { status: 409 });
   if (!canMoveExternalOrderStatus(order.status, status)) return NextResponse.json({ error: 'Este pedido não pode ir para esse status' }, { status: 409 });
-  // iFood cancels only with one of its reasons; a status change here would leave the order alive on iFood
-  const ifood = await isPlatformOrder(order.id);
-  if (ifood && (status === 'CANCELLED' || status === 'REJECTED')) {
-    return NextResponse.json({ error: 'Pedido do iFood: use "Cancelar Pedido" e escolha o motivo do iFood' }, { status: 409 });
+  // iFood and 99Food cancel only with one of their reasons; a status change here would leave the order alive there
+  const platform = await platformOf(order.id);
+  if (platform && (status === 'CANCELLED' || status === 'REJECTED')) {
+    const w = PLATFORM_WORDS[platform];
+    return NextResponse.json({ error: `Pedido ${w.of}: use "Cancelar Pedido" e escolha o motivo ${w.of}` }, { status: 409 });
   }
   // An accepted order has a kitchen order: cancelling only here left the kitchen cooking it
   if ((status === 'CANCELLED' || status === 'REJECTED') && order.internalOrderId) {
@@ -92,8 +94,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     data: { externalOrderId: order.id, eventType: 'STATUS_CHANGED', previousStatus: order.status, newStatus: status, message: 'Status mudado em Pedidos de delivery', eventTimestamp: new Date() },
   });
   void notifyOrderStatus(order.id);
-  // A step made by hand goes to iFood too, as when the kitchen makes it (dispatch only for the store's own delivery)
+  // A step made by hand goes to the platform too, as when the kitchen makes it (dispatch only for the store's own delivery)
   const toPlatform = { PREPARING: 'preparing', READY: 'ready', PICKED_UP: 'dispatch' } as const;
-  if (ifood && status in toPlatform) await pushPlatformStatus(order.id, toPlatform[status as keyof typeof toPlatform]);
+  if (platform && status in toPlatform) await pushPlatformStatus(order.id, toPlatform[status as keyof typeof toPlatform]);
   return NextResponse.json(await prisma.externalOrder.findUnique({ where: { id: order.id }, include: { deliveryLogs: { orderBy: { createdAt: 'desc' }, take: 5 } } }));
 }

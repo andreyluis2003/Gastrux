@@ -6,7 +6,8 @@ import { canMoveExternalOrderStatus } from '@/lib/delivery-integration/external-
 import { alertDeliveryProblem } from '@/lib/kds-integration';
 import { cancelOrder } from '@/lib/kds-cancel-order';
 import { DeliveryOrderError, acceptDeliveryOrder, externalItemsJson, ingestDeliveryOrder, itemsSubtotal } from '@/lib/delivery-orders/ingest';
-import { confirmOrder, getOrderDetail } from './client';
+import { pushPlatformStatus } from '@/lib/delivery-orders/platform-sync';
+import { getOrderDetail } from './client';
 import { mapNinetynineOrder } from './order-map';
 
 /**
@@ -76,32 +77,6 @@ const tsOf = (payload: any): number => {
   return t < 1e12 ? t * 1000 : t;
 };
 
-const CONFIRM_FAILED = '99Food não recebeu "confirm"';
-
-/**
- * Confirms on 99Food and records it (plan ledger: Task 5 swaps this for pushPlatformStatus). Never throws: a confirm
- * that fails is logged on the order once and retried by the next sweep while the 5 minutes last.
- */
-async function confirmNow(ext: { id: string; externalOrderId: string; status: any; integrationId: string }): Promise<boolean> {
-  try {
-    await confirmOrder(ext.integrationId, ext.externalOrderId);
-    await prisma.externalOrder.update({ where: { id: ext.id }, data: { platformConfirmedAt: new Date() } });
-    return true;
-  } catch (e: any) {
-    const logged = await prisma.deliveryLog.findFirst({ where: { externalOrderId: ext.id, message: { startsWith: CONFIRM_FAILED } }, select: { id: true } }).catch(() => null);
-    if (!logged) {
-      console.error('[99food] confirm failed:', e?.message ?? e);
-      await prisma.deliveryLog.create({
-        data: {
-          externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(),
-          message: `${CONFIRM_FAILED}: ${String(e?.message ?? e).slice(0, 300)}`,
-        },
-      }).catch(() => {});
-    }
-    return false;
-  }
-}
-
 async function moveForward(ext: { id: string; status: any }, target: any, message: string) {
   if (!canMoveExternalOrderStatus(ext.status, target)) return;
   const moved = await prisma.externalOrder.updateMany({ where: { id: ext.id, status: ext.status }, data: { status: target, ...(target === 'DELIVERED' ? { deliveredAt: new Date() } : {}) } });
@@ -154,8 +129,8 @@ async function orderNew(row: NinetynineEvent, appShopId: string | null, orderId:
     where: { restaurantId_externalOrderId: { restaurantId: integration.restaurantId, externalOrderId: orderId } },
     select: { id: true, externalOrderId: true, status: true, integrationId: true, platformConfirmedAt: true },
   });
-  // Accepted at once (auto-accept): 99Food hears "confirmed" now
-  if (ext && ext.status === 'CONFIRMED' && !ext.platformConfirmedAt) await confirmNow(ext);
+  // Accepted at once (auto-accept): the accept already told 99Food; a confirm that failed there is tried again here
+  if (ext && ext.status === 'CONFIRMED' && !ext.platformConfirmedAt) await pushPlatformStatus(ext.id, 'confirm');
   // Events of this order that came first and found nothing go back to the queue (the run picks them up next)
   await prisma.ninetynineEvent.updateMany({
     where: { orderId, type: { in: ORDER_EVENTS }, processedAt: { not: null }, error: { startsWith: NOT_IN_YET } },
@@ -375,7 +350,7 @@ async function afterRun() {
     where: { integrationId: { in: ids }, status: 'CONFIRMED', platformConfirmedAt: null, orderReceivedAt: { gte: new Date(now - CONFIRM_WINDOW_MS) } },
     select: { id: true, externalOrderId: true, status: true, integrationId: true },
   });
-  for (const o of unconfirmed) await confirmNow(o);
+  for (const o of unconfirmed) await pushPlatformStatus(o.id, 'confirm');
 
   const waiting = await prisma.externalOrder.findMany({
     where: { integrationId: { in: ids }, status: 'PENDING', orderReceivedAt: { lte: new Date(now - SECOND_ALERT_MS), gte: new Date(now - CONFIRM_WINDOW_MS) } },

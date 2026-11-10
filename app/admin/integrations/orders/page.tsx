@@ -43,13 +43,26 @@ interface ExternalOrder {
   };
   /** The Gastrux order API key that sent it (plan 2026-10-23 api-de-pedidos) */
   apiKeyName?: string | null;
-  /** iFood (plan 2026-10-24 ifood): displayId is the number the customer sees; a dispute is a cancel request to answer */
-  platformData?: { displayId?: string } | null;
+  /**
+   * iFood (plan 2026-10-24 ifood): displayId is the number the customer sees; a dispute is a cancel request to answer.
+   * 99Food (plan 2026-11-09 99food): orderIndex is its number; a dispute is a cancel or a refund request (disputeKind).
+   */
+  platformData?: {
+    displayId?: string;
+    orderIndex?: number;
+    deliveryType?: number;
+    payType?: number;
+    shopPaidMoney?: number | null;
+    cashConfirmedAt?: string;
+    disputeKind?: 'cancel' | 'refund';
+    disputeReason?: string | null;
+    disputeReasons?: Array<{ base_reason_id?: string | number; base_reason?: string }>;
+  } | null;
   disputeId?: string | null;
   disputeExpiresAt?: string | null;
 }
 
-/** The iFood reason picker: refusing a new order or cancelling an accepted one */
+/** The iFood or 99Food reason picker: refusing a new order or cancelling an accepted one */
 interface ReasonPick {
   order: ExternalOrder;
   mode: 'reject' | 'cancel';
@@ -69,18 +82,39 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: str
   REJECTED: { label: 'Rejeitado', color: 'text-red-700', bg: 'bg-red-50 border-red-200', icon: X },
 };
 
-// Only what works today (plan 2026-10-23 api-de-pedidos; iFood plan 2026-10-24). Keeta and 99Food come with part 2
-const PLATFORM_CONFIG: Record<string, { label: string; color: string; logo: string }> = {
+// Only what works today (plan 2026-10-23 api-de-pedidos; iFood plan 2026-10-24; 99Food plan 2026-11-09)
+const PLATFORM_CONFIG: Record<string, { label: string; color: string; logo: string; text?: string }> = {
   delivery_site: { label: 'Cardápio digital', color: 'bg-orange-600', logo: '🛒' },
   gastrux_api: { label: 'API do Gastrux', color: 'bg-slate-700', logo: '🔗' },
   ifood: { label: 'iFood', color: 'bg-red-600', logo: '🍔' },
+  ninety_nine_food: { label: '99Food', color: 'bg-yellow-400', logo: '🛵', text: 'text-gray-900' },
 };
 
 // The board columns in strong colors, readable from across the kitchen (2026-11-03)
 const COLUMN_COLOR: Record<string, string> = { novos: 'bg-orange-600', preparo: 'bg-amber-500', prontos: 'bg-green-600', entrega: 'bg-cyan-600' };
 
 const isIfood = (o: ExternalOrder) => o.integration.platform === 'ifood';
-const orderCode = (o: ExternalOrder) => (isIfood(o) && o.platformData?.displayId ? o.platformData.displayId : o.externalOrderId);
+const isNinetynine = (o: ExternalOrder) => o.integration.platform === 'ninety_nine_food';
+/** The platforms that cancel only with a reason of their own list and hear every change */
+const isPlatform = (o: ExternalOrder) => isIfood(o) || isNinetynine(o);
+const WORDS = {
+  ifood: { name: 'iFood', the: 'o iFood', of: 'do iFood', on: 'no iFood', to: 'ao iFood', The: 'O iFood' },
+  ninety_nine_food: { name: '99Food', the: 'a 99Food', of: 'da 99Food', on: 'na 99Food', to: 'à 99Food', The: 'A 99Food' },
+};
+const words = (o: ExternalOrder) => WORDS[o.integration.platform as keyof typeof WORDS] ?? WORDS.ifood;
+const orderCode = (o: ExternalOrder) => {
+  if (isIfood(o) && o.platformData?.displayId) return o.platformData.displayId;
+  if (isNinetynine(o) && o.platformData?.orderIndex) return String(o.platformData.orderIndex);
+  return o.externalOrderId;
+};
+/** 99Food asks for both on screen: its number and the order code */
+const orderTitle = (o: ExternalOrder) => (isNinetynine(o) ? `99Food #${orderCode(o)}` : `#${orderCode(o)}`);
+/** "Recebi o dinheiro": a cash order taken by 99Food's courier, accepted and not yet out */
+const cashToConfirm = (o: ExternalOrder) =>
+  isNinetynine(o) && o.platformData?.deliveryType === 1 && o.platformData?.payType === 2 && !o.platformData?.cashConfirmedAt
+  && ['CONFIRMED', 'PREPARING', 'READY'].includes(o.status);
+/** 99Food's "Outro motivo" goes only with a typed reason */
+const NEEDS_TEXT = '1080';
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'];
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -135,7 +169,7 @@ export default function DeliveryOrdersPage() {
   const playNotificationSound = useCallback(() => {
     if (soundEnabledRef.current) ringBell();
   }, []);
-  // A clock for the "Expira em" of the iFood orders
+  // A clock for the "Expira em" of the iFood and 99Food orders
   const [now, setNow] = useState(() => new Date());
 
   const fetchOrders = useCallback(async (showLoader = false) => {
@@ -181,14 +215,14 @@ export default function DeliveryOrdersPage() {
     return () => { document.title = base; };
   }, [pendingCount]);
 
-  /** "Expira em 07:42" on an iFood order waiting for "Aceitar" */
+  /** "Expira em 07:42" on an iFood or 99Food order waiting for "Aceitar" */
   const expiry = (order: ExternalOrder) => {
     const deadline = acceptDeadline(order);
     if (!deadline) return null;
     const c = countdown(deadline, now);
     return (
       <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${c.urgent ? 'bg-red-600 text-white' : 'bg-amber-100 text-amber-900'}`}>
-        <Clock className="h-3 w-3" /> {c.over ? 'Prazo do iFood acabou' : `Expira em ${c.label}`}
+        <Clock className="h-3 w-3" /> {c.over ? `Prazo ${words(order).of} acabou` : `Expira em ${c.label}`}
       </span>
     );
   };
@@ -201,6 +235,8 @@ export default function DeliveryOrdersPage() {
   }, [autoRefresh, fetchOrders]);
 
   const [reasonPick, setReasonPick] = useState<ReasonPick | null>(null);
+  // 99Food refund request: the reason (from 99Food's list) picked to refuse it, per order
+  const [refusal, setRefusal] = useState<Record<string, string>>({});
   // "Saiu para entrega": who takes it, for the driver settlement in the Caixa (spec 2026-10-26)
   const [dispatch, setDispatch] = useState<{ order: ExternalOrder; driver: string } | null>(null);
 
@@ -221,27 +257,46 @@ export default function DeliveryOrdersPage() {
     }
   };
 
-  // iFood takes a refusal or a cancel only with one of its reasons (plan 2026-10-24 ifood)
+  // iFood and 99Food take a refusal or a cancel only with one of their reasons (plan 2026-10-24 ifood, 2026-11-09 99food)
   const openReasons = async (order: ExternalOrder, mode: 'reject' | 'cancel') => {
     setReasonPick({ order, mode, reasons: null, code: '', text: '' });
     const res = await fetch(`/api/admin/integrations/orders/${order.id}/cancel-reasons`, { cache: 'no-store' });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) { toast.error(body.error || 'O iFood não mandou os motivos'); setReasonPick(null); return; }
+    if (!res.ok) { toast.error(body.error || `${words(order).The} não mandou os motivos`); setReasonPick(null); return; }
     setReasonPick((p) => (p && p.order.id === order.id ? { ...p, reasons: body.reasons } : p));
   };
 
   const confirmReason = async () => {
     if (!reasonPick) return;
     const { order, mode, code, reasons } = reasonPick;
-    const text = reasonPick.text.trim() || reasons?.find((r) => r.cancelCodeId === code)?.description || '';
-    const ok = await send(order.id, { action: mode, cancelCode: code, reason: text }, mode === 'reject' ? 'Pedido recusado no iFood' : 'Cancelamento enviado ao iFood');
+    const typed = reasonPick.text.trim();
+    // 99Food's "Outro motivo" needs the typed reason: its label is not one
+    const text = typed || (isNinetynine(order) && code === NEEDS_TEXT ? '' : reasons?.find((r) => r.cancelCodeId === code)?.description || '');
+    const w = words(order);
+    const ok = await send(order.id, { action: mode, cancelCode: code, reason: text }, mode === 'reject' ? `Pedido recusado ${w.on}` : `Cancelamento enviado ${w.to}`);
     if (ok) setReasonPick(null);
+  };
+
+  // "Recebi o dinheiro" (plan 2026-11-09 99food): the store got the cash from 99Food's courier
+  const confirmCash = async (order: ExternalOrder) => {
+    setUpdatingId(order.id);
+    try {
+      const res = await fetch(`/api/admin/integrations/orders/${order.id}/cash`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(body.error || 'Não foi possível confirmar o dinheiro'); return; }
+      toast.success('Pagamento em dinheiro confirmado na 99Food');
+      fetchOrders(false);
+    } catch {
+      toast.error('Sem conexão: tente de novo');
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   // Accept creates the kitchen order; reject needs a reason (plan 2026-10-23 api-de-pedidos)
   const act = async (orderId: string, action: 'accept' | 'reject') => {
     const order = orders.find((o) => o.id === orderId);
-    if (action === 'reject' && order && isIfood(order)) { openReasons(order, 'reject'); return; }
+    if (action === 'reject' && order && isPlatform(order)) { openReasons(order, 'reject'); return; }
     let reason: string | null = null;
     if (action === 'reject') {
       reason = window.prompt('Por que recusar este pedido? (o cliente ou o sistema de origem fica sabendo que foi cancelado)');
@@ -380,7 +435,8 @@ export default function DeliveryOrdersPage() {
               <Bell className="inline h-5 w-5 mr-2" />
               {pendingCount === 1 ? '1 pedido esperando o "Aceitar"' : `${pendingCount} pedidos esperando o "Aceitar"`}
             </span>
-            {orders.some((o) => acceptDeadline(o)) && <span className="block text-sm">Pedido do iFood sem resposta é cancelado pelo iFood em 8 minutos.</span>}
+            {orders.some((o) => isIfood(o) && acceptDeadline(o)) && <span className="block text-sm">Pedido do iFood sem resposta é cancelado pelo iFood em 8 minutos.</span>}
+            {orders.some((o) => isNinetynine(o) && acceptDeadline(o)) && <span className="block text-sm">Pedido da 99Food sem resposta é cancelado pela 99Food em 5 minutos.</span>}
           </button>
         )}
 
@@ -457,6 +513,7 @@ export default function DeliveryOrdersPage() {
             <option value="delivery_site">🛒 Cardápio digital</option>
             <option value="gastrux_api">🔗 API do Gastrux</option>
             <option value="ifood">🍔 iFood</option>
+            <option value="ninety_nine_food">🛵 99Food</option>
           </select>
         </div>
 
@@ -483,7 +540,7 @@ export default function DeliveryOrdersPage() {
                   return (
                     <Card key={order.id} className={`p-3 space-y-1.5 ${order.status === 'PENDING' ? 'ring-2 ring-amber-400' : ''}`}>
                       <div className="flex items-center justify-between gap-2 text-xs">
-                        <span title={platCfg.label}>{platCfg.logo} <span className="font-bold text-sm">#{orderCode(order)}</span></span>
+                        <span title={isNinetynine(order) ? `Código ${order.externalOrderId}` : platCfg.label}>{platCfg.logo} <span className="font-bold text-sm">{orderTitle(order)}</span></span>
                         <span className="text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />{timeSince(order.orderReceivedAt)}</span>
                       </div>
                       {expiry(order)}
@@ -554,7 +611,7 @@ export default function DeliveryOrdersPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${platCfg.color} text-white`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${platCfg.color} ${platCfg.text ?? 'text-white'}`}>
                             {platCfg.logo} {platCfg.label}{order.apiKeyName ? `: ${order.apiKeyName}` : ''}
                           </span>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${statusCfg.bg} ${statusCfg.color}`}>
@@ -568,9 +625,10 @@ export default function DeliveryOrdersPage() {
                           {expiry(order)}
                         </div>
                         <div className="mt-1.5 flex items-center gap-3">
-                          <span className="font-bold text-sm truncate max-w-[16rem]" title={order.externalOrderId}>#{orderCode(order)}</span>
+                          <span className="font-bold text-sm truncate max-w-[16rem]" title={order.externalOrderId}>{orderTitle(order)}</span>
                           <span className="text-sm">{order.customerName}</span>
                         </div>
+                        {isNinetynine(order) && <div className="text-xs text-muted-foreground">Código {order.externalOrderId}</div>}
                         <div className="text-xs text-muted-foreground mt-1 truncate">
                           {items.length > 0
                             ? items.map((i: any) => `${i.quantity || 1}x ${i.name || i.productName || 'Item'}`).join(', ')
@@ -609,21 +667,69 @@ export default function DeliveryOrdersPage() {
                       </div>
                     )}
 
-                    {/* iFood: the customer asked to cancel; the answer goes back to iFood */}
-                    {order.disputeId && (
+                    {/* iFood or 99Food: the customer asked to cancel; the answer goes back to the platform */}
+                    {order.disputeId && order.platformData?.disputeKind !== 'refund' && (
                       <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm space-y-2" onClick={(e) => e.stopPropagation()}>
                         <p className="font-medium text-red-800 flex items-center gap-1">
                           <AlertCircle className="h-4 w-4" /> O cliente pediu para cancelar este pedido
                           {order.disputeExpiresAt ? ` (responda até ${new Date(order.disputeExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` : ''}
                         </p>
+                        {order.platformData?.disputeReason && <p className="text-red-800">Motivo do cliente: {order.platformData.disputeReason}</p>}
                         <div className="flex gap-2">
-                          <Button size="sm" variant="destructive" disabled={isUpdating} onClick={() => send(order.id, { action: 'dispute-accept' }, 'Cancelamento aceito: o iFood cancela o pedido')}>
+                          <Button size="sm" variant="destructive" disabled={isUpdating} onClick={() => send(order.id, { action: 'dispute-accept' }, `Cancelamento aceito: ${words(order).the} cancela o pedido`)}>
                             Aceitar o cancelamento
                           </Button>
                           <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => send(order.id, { action: 'dispute-reject' }, 'Pedido mantido')}>
                             Manter o pedido
                           </Button>
                         </div>
+                      </div>
+                    )}
+
+                    {/* 99Food: the customer asked for money back; refusing needs one of 99Food's reasons */}
+                    {order.disputeId && order.platformData?.disputeKind === 'refund' && (
+                      <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm space-y-2" onClick={(e) => e.stopPropagation()}>
+                        <p className="font-medium text-red-800 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" /> Pedido de devolução
+                          {order.disputeExpiresAt ? ` (responda até ${new Date(order.disputeExpiresAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})` : ''}
+                        </p>
+                        {order.platformData?.disputeReason && <p className="text-red-800">Motivo do cliente: {order.platformData.disputeReason}</p>}
+                        <select
+                          aria-label="Motivo da recusa"
+                          value={refusal[order.id] ?? ''}
+                          onChange={(e) => setRefusal({ ...refusal, [order.id]: e.target.value })}
+                          className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
+                        >
+                          <option value="">Motivo para recusar (lista da 99Food)…</option>
+                          {(order.platformData?.disputeReasons ?? []).filter((r) => r?.base_reason_id != null).map((r) => (
+                            <option key={String(r.base_reason_id)} value={String(r.base_reason_id)}>{r.base_reason}</option>
+                          ))}
+                        </select>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="destructive" disabled={isUpdating} onClick={() => send(order.id, { action: 'dispute-accept' }, 'Devolução aceita')}>
+                            Aceitar a devolução
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isUpdating || !refusal[order.id]}
+                            onClick={() => send(order.id, { action: 'dispute-reject', baseReasonId: refusal[order.id] }, 'Devolução recusada')}
+                          >
+                            Recusar a devolução
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 99Food courier pays the store in cash: 99Food asks the store to confirm it */}
+                    {cashToConfirm(order) && (
+                      <div className="mt-3 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm flex items-center justify-between gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                        <span>
+                          {order.platformData?.shopPaidMoney != null
+                            ? <>Receber <strong>{formatBRL(order.platformData.shopPaidMoney)}</strong> do entregador</>
+                            : 'Dinheiro: a 99Food informa o valor quando o entregador for designado'}
+                        </span>
+                        <Button size="sm" disabled={isUpdating} onClick={() => confirmCash(order)}>Recebi o dinheiro</Button>
                       </div>
                     )}
                   </div>
@@ -692,12 +798,12 @@ export default function DeliveryOrdersPage() {
                         </Button>
                       )}
 
-                      {['CONFIRMED', 'PREPARING', 'READY'].includes(order.status) && (!isIfood(order) || canChangeSettings) && (
+                      {['CONFIRMED', 'PREPARING', 'READY'].includes(order.status) && (!isPlatform(order) || canChangeSettings) && (
                         <Button
                           size="sm"
                           variant="destructive"
                           disabled={isUpdating}
-                          onClick={() => (isIfood(order) ? openReasons(order, 'cancel') : updateStatus(order.id, 'CANCELLED'))}
+                          onClick={() => (isPlatform(order) ? openReasons(order, 'cancel') : updateStatus(order.id, 'CANCELLED'))}
                           className="w-full"
                         >
                           <X className="h-4 w-4 mr-1" />
@@ -749,13 +855,13 @@ export default function DeliveryOrdersPage() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setReasonPick(null)}>
           <Card className="w-full max-w-md p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
             <p className="font-medium">
-              {reasonPick.mode === 'reject' ? 'Recusar' : 'Cancelar'} o pedido iFood #{orderCode(reasonPick.order)}
+              {reasonPick.mode === 'reject' ? 'Recusar' : 'Cancelar'} o pedido {isNinetynine(reasonPick.order) ? orderTitle(reasonPick.order) : `iFood #${orderCode(reasonPick.order)}`}
             </p>
             {reasonPick.reasons === null ? (
-              <p className="text-sm text-muted-foreground">Buscando os motivos do iFood…</p>
+              <p className="text-sm text-muted-foreground">Buscando os motivos {words(reasonPick.order).of}…</p>
             ) : (
               <>
-                <label className="text-sm font-medium block">Motivo (lista do iFood)</label>
+                <label className="text-sm font-medium block">Motivo (lista {words(reasonPick.order).of})</label>
                 <select
                   value={reasonPick.code}
                   onChange={(e) => setReasonPick({ ...reasonPick, code: e.target.value })}
@@ -767,19 +873,24 @@ export default function DeliveryOrdersPage() {
                 <input
                   value={reasonPick.text}
                   maxLength={200}
-                  placeholder="Detalhe (opcional)"
+                  placeholder={isNinetynine(reasonPick.order) && reasonPick.code === NEEDS_TEXT ? 'Escreva o motivo' : 'Detalhe (opcional)'}
                   onChange={(e) => setReasonPick({ ...reasonPick, text: e.target.value })}
                   className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
                 />
                 {reasonPick.mode === 'cancel' && (
-                  <p className="text-xs text-muted-foreground">A cozinha cancela o pedido quando o iFood confirmar o cancelamento.</p>
+                  <p className="text-xs text-muted-foreground">A cozinha cancela o pedido quando {words(reasonPick.order).the} confirmar o cancelamento.</p>
                 )}
               </>
             )}
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="outline" onClick={() => setReasonPick(null)}>Voltar</Button>
-              <Button size="sm" variant="destructive" disabled={!reasonPick.code || updatingId === reasonPick.order.id} onClick={confirmReason}>
-                {reasonPick.mode === 'reject' ? 'Recusar no iFood' : 'Cancelar no iFood'}
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={!reasonPick.code || updatingId === reasonPick.order.id || (isNinetynine(reasonPick.order) && reasonPick.code === NEEDS_TEXT && !reasonPick.text.trim())}
+                onClick={confirmReason}
+              >
+                {reasonPick.mode === 'reject' ? 'Recusar' : 'Cancelar'} {words(reasonPick.order).on}
               </Button>
             </div>
           </Card>

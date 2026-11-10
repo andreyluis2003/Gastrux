@@ -8,7 +8,7 @@ import { findCustomerByPhone } from '@/lib/cashback/service';
 import { sanitizeCustomerNote } from '@/lib/delivery-payments/order-input';
 import type { OrderApiInput } from './input';
 import { notifyOrderStatus } from './callback';
-import { isPlatformOrder, pushPlatformStatus } from './platform-sync';
+import { PLATFORM_WORDS, checkPlatformReason, platformOf, pushPlatformStatus } from './platform-sync';
 
 /**
  * One pipeline for incoming delivery orders (plan 2026-10-23 api-de-pedidos, Task 4): the Gastrux order API now, the
@@ -82,11 +82,6 @@ async function kitchenOrderOf(externalOrderId: string): Promise<string | null> {
   return (await prisma.order.findUnique({ where: { externalOrderId }, select: { id: true } }))?.id ?? null;
 }
 
-/**
- * The answer to an order sent again (final review 2026-10-24): the code must be of this same integration (two senders
- * numbering their orders the same way must not swallow each other's orders), and an accepted order whose kitchen order
- * failed gets it now, so a resend recovers it.
- */
 const NO_ITEMS_ALERT: Partial<Record<DeliveryPlatform, (code: string) => { kind: string; title: string; message: string }>> = {
   ifood: (code) => ({
     kind: 'ifood-no-items', title: 'Pedido do iFood não foi confirmado',
@@ -112,6 +107,11 @@ export function itemsSubtotal(itens: OrderApiInput['itens']): number {
   return Math.round(sum * 100) / 100;
 }
 
+/**
+ * The answer to an order sent again (final review 2026-10-24): the code must be of this same integration (two senders
+ * numbering their orders the same way must not swallow each other's orders), and an accepted order whose kitchen order
+ * failed gets it now, so a resend recovers it.
+ */
 async function answerResend(existing: ExternalOrder, restaurantId: string, integrationId: string) {
   if (existing.integrationId !== integrationId) throw new DeliveryOrderError('Este código já é de outro pedido do restaurante: mande um código diferente', 409);
   let kitchenOrderId = await kitchenOrderOf(existing.id);
@@ -206,14 +206,15 @@ export async function acceptDeliveryOrder(restaurantId: string, externalOrderId:
 export async function rejectDeliveryOrder(member: RestaurantMember, externalOrderId: string, reason: unknown, cancelCode?: unknown): Promise<void> {
   const why = typeof reason === 'string' ? reason.trim() : '';
   if (why.length < 3 || why.length > 200) throw new DeliveryOrderError('Diga o motivo da recusa (de 3 a 200 letras)');
-  // iFood takes the refusal only with a reason of its own list (plan 2026-10-24 ifood)
-  const platform = await isPlatformOrder(externalOrderId);
+  // iFood and 99Food take the refusal only with a reason of their own list (plan 2026-10-24 ifood, 2026-11-09 99food)
+  const platform = await platformOf(externalOrderId);
   const code = typeof cancelCode === 'string' ? cancelCode.trim() : '';
   if (platform) {
-    if (!code) throw new DeliveryOrderError('Escolha o motivo do iFood');
+    const own = await prisma.externalOrder.findFirst({ where: { id: externalOrderId, restaurantId: member.restaurantId }, select: { platformData: true } });
+    checkPlatformReason(platform, own?.platformData ?? null, code, why);
     const pending = await prisma.externalOrder.count({ where: { id: externalOrderId, restaurantId: member.restaurantId, status: 'PENDING' } });
     if (pending && !(await pushPlatformStatus(externalOrderId, { cancel: { code, reason: why } }))) {
-      throw new DeliveryOrderError('O iFood não recebeu a recusa: tente de novo', 502);
+      throw new DeliveryOrderError(`${PLATFORM_WORDS[platform].The} não recebeu a recusa: tente de novo`, 502);
     }
   }
   const moved = await prisma.externalOrder.updateMany({ where: { id: externalOrderId, restaurantId: member.restaurantId, status: 'PENDING' }, data: { status: 'CANCELLED' } });

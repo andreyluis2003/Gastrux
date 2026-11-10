@@ -23,8 +23,8 @@ export interface CancelPayments {
 
 export type CancelOutcome =
   | { kind: 'not-found' }
-  /** An iFood order: cancelled only through Pedidos de delivery, with iFood's reason (plan 2026-10-24 ifood) */
-  | { kind: 'platform-cancel-required' }
+  /** An iFood or 99Food order: cancelled only through Pedidos de delivery, with the platform's reason (plan 2026-10-24 ifood, 2026-11-09 99food) */
+  | { kind: 'platform-cancel-required'; platform: 'ifood' | 'ninety_nine_food' }
   | { kind: 'already-cancelled'; order: any }
   | { kind: 'completed'; order: any }
   | { kind: 'cancelled'; order: any; loss: { recorded: boolean; ingredients: number; estimatedCost: number }; payments: CancelPayments };
@@ -49,7 +49,8 @@ export async function cancelOrder(
       where: { id: orderId, restaurantId: opts.restaurantId },
       select: { externalOrder: { select: { status: true, integration: { select: { platform: true } } } } },
     });
-    if (own?.externalOrder?.integration?.platform === 'ifood' && own.externalOrder.status !== 'CANCELLED') return { kind: 'platform-cancel-required' };
+    const platform = own?.externalOrder?.integration?.platform;
+    if ((platform === 'ifood' || platform === 'ninety_nine_food') && own?.externalOrder?.status !== 'CANCELLED') return { kind: 'platform-cancel-required', platform };
   }
   const result = await prisma.$transaction(async (tx) => {
     // Scoped to the caller's restaurant: another restaurant's order is "not found", never cancelled.

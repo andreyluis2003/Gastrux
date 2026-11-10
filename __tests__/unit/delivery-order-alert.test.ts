@@ -14,6 +14,10 @@ describe('new order alert (pedido novo que grita, 2026-11-03)', () => {
     expect(acceptDeadline(order())?.toISOString()).toBe('2026-11-03T12:08:00.000Z');
   });
 
+  it('a 99Food order must be answered in 5 minutes (plan 2026-11-09 99food)', () => {
+    expect(acceptDeadline(order({ platform: 'ninety_nine_food' }))?.toISOString()).toBe('2026-11-03T12:05:00.000Z');
+  });
+
   it('no deadline once accepted, nor for the other channels', () => {
     expect(acceptDeadline(order({ status: 'CONFIRMED' }))).toBeNull();
     expect(acceptDeadline(order({ platform: 'gastrux_api' }))).toBeNull();

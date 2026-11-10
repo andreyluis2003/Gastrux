@@ -167,7 +167,7 @@ export async function DELETE(
     }
     if (outcome.kind === 'platform-cancel-required') {
       return NextResponse.json(
-        { error: 'Cancele em Pedidos de delivery: o iFood pede o motivo', code: 'PLATFORM_CANCEL_REQUIRED' },
+        { error: `Cancele em Pedidos de delivery: ${outcome.platform === 'ninety_nine_food' ? 'a 99Food' : 'o iFood'} pede o motivo`, code: 'PLATFORM_CANCEL_REQUIRED' },
         { status: 409 }
       );
     }

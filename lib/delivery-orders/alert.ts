@@ -4,8 +4,10 @@
  * in the tab title. Pure, safe to import from the browser.
  */
 
-/** iFood cancels an order nobody confirmed in 8 minutes (same window as the alert of ingest.ts) */
+/** iFood cancels an order nobody confirmed in 8 minutes (same window as the alert of ingest.ts); 99Food in 5 */
 export const IFOOD_ACCEPT_WINDOW_MS = 8 * 60_000;
+export const NINETYNINE_ACCEPT_WINDOW_MS = 5 * 60_000;
+const ACCEPT_WINDOW_MS: Record<string, number> = { ifood: IFOOD_ACCEPT_WINDOW_MS, ninety_nine_food: NINETYNINE_ACCEPT_WINDOW_MS };
 const URGENT_MS = 2 * 60_000;
 
 interface AlertOrder {
@@ -15,10 +17,11 @@ interface AlertOrder {
   integration: { platform: string };
 }
 
-/** When iFood gives up on this order; null when nothing expires */
+/** When the platform (iFood, 99Food) gives up on this order; null when nothing expires */
 export function acceptDeadline(o: AlertOrder): Date | null {
-  if (o.status !== 'PENDING' || o.integration.platform !== 'ifood') return null;
-  return new Date(new Date(o.orderReceivedAt).getTime() + IFOOD_ACCEPT_WINDOW_MS);
+  const window = ACCEPT_WINDOW_MS[o.integration.platform];
+  if (o.status !== 'PENDING' || !window) return null;
+  return new Date(new Date(o.orderReceivedAt).getTime() + window);
 }
 
 export function countdown(deadline: Date, now: Date): { label: string; urgent: boolean; over: boolean } {
