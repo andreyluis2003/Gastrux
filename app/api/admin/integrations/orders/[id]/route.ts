@@ -4,7 +4,7 @@ import { MANAGER_ROLES, requireRestaurantRole } from '@/lib/auth/restaurant-role
 import { prisma } from '@/lib/prisma';
 import { DeliveryOrderError, acceptDeliveryOrder, rejectDeliveryOrder } from '@/lib/delivery-orders/ingest';
 import { notifyOrderStatus } from '@/lib/delivery-orders/callback';
-import { PLATFORM_WORDS, answerDispute, cancelPlatformOrder, platformOf, pushPlatformStatus } from '@/lib/delivery-orders/platform-sync';
+import { PLATFORM_WORDS, answerDispute, cancelPlatformOrder, platformOf, pushPlatformStatus, type PlatformChange } from '@/lib/delivery-orders/platform-sync';
 import { DELIVERY_ROLES } from '@/lib/delivery-orders/roles';
 import { canMoveExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
 import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
@@ -94,8 +94,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     data: { externalOrderId: order.id, eventType: 'STATUS_CHANGED', previousStatus: order.status, newStatus: status, message: 'Status mudado em Pedidos de delivery', eventTimestamp: new Date() },
   });
   void notifyOrderStatus(order.id);
-  // A step made by hand goes to the platform too, as when the kitchen makes it (dispatch only for the store's own delivery)
-  const toPlatform = { PREPARING: 'preparing', READY: 'ready', PICKED_UP: 'dispatch' } as const;
-  if (platform && status in toPlatform) await pushPlatformStatus(order.id, toPlatform[status as keyof typeof toPlatform]);
+  // A step made by hand goes to the platform too, as when the kitchen makes it (dispatch only for the store's own
+  // delivery). iFood's dispatch is "saiu para entrega"; 99Food's is "entregue ao cliente", sent when the order reaches
+  // Entregue (a jump to Entregue still says "pronto" first, as the kitchen does)
+  const toPlatform: Record<string, Record<string, PlatformChange>> = {
+    ifood: { PREPARING: 'preparing', READY: 'ready', PICKED_UP: 'dispatch' },
+    ninety_nine_food: { READY: 'ready', DELIVERED: 'dispatch' },
+  };
+  const change = platform ? toPlatform[platform][status] : undefined;
+  if (platform === 'ninety_nine_food' && status === 'DELIVERED' && ['CONFIRMED', 'PREPARING'].includes(order.status)) await pushPlatformStatus(order.id, 'ready');
+  if (change) await pushPlatformStatus(order.id, change);
   return NextResponse.json(await prisma.externalOrder.findUnique({ where: { id: order.id }, include: { deliveryLogs: { orderBy: { createdAt: 'desc' }, take: 5 } } }));
 }

@@ -44,17 +44,24 @@ async function callIfood(ext: PlatformOrder, change: PlatformChange): Promise<bo
   return true;
 }
 
+/** Adds keys to an order's platformData in one statement, so an event updating it at the same time is not lost */
+async function mergePlatformData(externalOrderId: string, patch: Record<string, unknown>): Promise<void> {
+  await prisma.$executeRaw`UPDATE "external_orders" SET "platformData" = COALESCE("platformData", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb WHERE "id" = ${externalOrderId}`;
+}
+
 async function callNinetynine(ext: PlatformOrder, change: PlatformChange): Promise<boolean> {
   const id = ext.integration.id;
-  const data = (ext.platformData ?? {}) as { deliveryType?: number };
+  const data = (ext.platformData ?? {}) as { deliveryType?: number; deliveredSentAt?: string };
   if (change === 'confirm') await ninetynine.confirmOrder(id, ext.externalOrderId);
   // 99Food has no "preparing" step
   else if (change === 'preparing') return false;
   else if (change === 'ready') await ninetynine.orderReady(id, ext.externalOrderId);
   else if (change === 'dispatch') {
-    // "Delivered" is the store's to say only on its own delivery (delivery_type 2); 99Food's couriers say it themselves
-    if (Number(data.deliveryType) !== 2) return false;
+    // 99Food's "delivered" means handed to the customer: sent once, when the order reaches Entregue, and only on the
+    // store's own delivery (delivery_type 2); 99Food's couriers say it themselves
+    if (Number(data.deliveryType) !== 2 || data.deliveredSentAt) return false;
     await ninetynine.orderDelivered(id, ext.externalOrderId);
+    await mergePlatformData(ext.id, { deliveredSentAt: new Date().toISOString() });
   } else await ninetynine.cancelOrder(id, ext.externalOrderId, Number(change.cancel.code), change.cancel.reason || undefined);
   return true;
 }
@@ -170,7 +177,8 @@ export async function answerDispute(member: RestaurantMember, externalOrderId: s
   const ext = await ownPlatformOrder(member, externalOrderId);
   const words = PLATFORM_WORDS[ext.platform];
   const disputeId = ext.disputeId;
-  if (!disputeId) throw new DeliveryOrderError('Este pedido não tem pedido de cancelamento aberto', 409);
+  const refund = ext.platform === 'ninety_nine_food' && (ext.platformData as NinetynineDispute | null)?.disputeKind === 'refund';
+  if (!disputeId) throw new DeliveryOrderError(`Este pedido não tem pedido de ${refund ? 'devolução' : 'cancelamento'} aberto`, 409);
   if (ext.disputeExpiresAt && ext.disputeExpiresAt.getTime() <= Date.now()) {
     throw new DeliveryOrderError(`O prazo para responder acabou: ${words.the} já decidiu este pedido`, 409);
   }
@@ -221,7 +229,7 @@ export async function confirmCash(member: RestaurantMember, externalOrderId: str
   } catch (e: any) {
     throw new DeliveryOrderError(`A 99Food não recebeu a confirmação do dinheiro: ${String(e?.message ?? e).slice(0, 200)}`, 502);
   }
-  await prisma.externalOrder.update({ where: { id: ext.id }, data: { platformData: { ...(data as object), cashConfirmedAt: new Date().toISOString() } } });
+  await mergePlatformData(ext.id, { cashConfirmedAt: new Date().toISOString() });
   await prisma.deliveryLog.create({
     data: { externalOrderId: ext.id, eventType: 'STATUS_CHANGED', previousStatus: ext.status, newStatus: ext.status, eventTimestamp: new Date(), message: 'Dinheiro confirmado na 99Food' },
   }).catch(() => {});

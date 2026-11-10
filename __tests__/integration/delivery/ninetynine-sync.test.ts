@@ -25,6 +25,7 @@ import { answerDispute, cancelPlatformOrder, confirmCash, platformCancelReasons,
 import { changeOrderStatus } from '../../../lib/kds/order-status';
 import { DELETE as KDS_CANCEL } from '../../../app/api/kds/orders/[id]/route';
 import { POST as CASH } from '../../../app/api/admin/integrations/orders/[id]/cash/route';
+import { PUT as MOVE } from '../../../app/api/admin/integrations/orders/[id]/route';
 import { GET as REASONS } from '../../../app/api/admin/integrations/orders/[id]/cancel-reasons/route';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -157,6 +158,34 @@ describe('99Food platform sync', () => {
     expect((await out.json()).error).toMatch(/Pedidos de delivery.*99Food/);
   });
 
+  const move = (id, status) => MOVE(new NextRequest('http://x', { method: 'PUT', body: JSON.stringify({ status }) }), { params: { id } });
+
+  it('manual steps: "delivered" goes on Entregue (not Em Entrega), once, only on store delivery', async () => {
+    const r = await restaurant();
+    const own = await ingest(r, { delivery_type: 2 });
+    const by99 = await ingest(r, { delivery_type: 1 });
+    as(r.owner);
+    for (const o of [own, by99]) {
+      expect((await move(o.id, 'READY')).status).toBe(200);
+      expect((await move(o.id, 'PICKED_UP')).status).toBe(200);
+    }
+    expect(nn.orderDelivered).not.toHaveBeenCalled();
+    for (const o of [own, by99]) expect((await move(o.id, 'DELIVERED')).status).toBe(200);
+    expect(nn.orderDelivered.mock.calls).toEqual([[r.integ.id, own.orderId]]);
+    expect(await pushPlatformStatus(own.id, 'dispatch')).toBe(true);
+    expect(nn.orderDelivered).toHaveBeenCalledTimes(1);
+    expect((await prisma.externalOrder.findUnique({ where: { id: own.id } })).platformData.deliveredSentAt).toBeTruthy();
+  });
+
+  it('a jump from Pronto to Entregue sends "delivered" on store delivery', async () => {
+    const r = await restaurant();
+    const own = await ingest(r, { delivery_type: 2 });
+    as(r.owner);
+    await move(own.id, 'READY');
+    expect((await move(own.id, 'DELIVERED')).status).toBe(200);
+    expect(nn.orderDelivered.mock.calls).toEqual([[r.integ.id, own.orderId]]);
+  });
+
   async function dispute(o, kind, reasons = []) {
     const applyId = bigId();
     const ext = await prisma.externalOrder.findUnique({ where: { id: o.id } });
@@ -178,6 +207,15 @@ describe('99Food platform sync', () => {
     await answerDispute(r.member, o.id, 'reject');
     expect(nn.answerCancelApply).toHaveBeenLastCalledWith(r.integ.id, o.orderId, applyId, false);
     expect(nn.answerRefundApply).not.toHaveBeenCalled();
+  });
+
+  it('a 99Food request past its deadline cannot be answered', async () => {
+    const r = await restaurant();
+    const o = await ingest(r);
+    await dispute(o, 'cancel');
+    await prisma.externalOrder.update({ where: { id: o.id }, data: { disputeExpiresAt: new Date(Date.now() - 1000) } });
+    await expect(answerDispute(r.member, o.id, 'accept')).rejects.toMatchObject({ status: 409, message: 'O prazo para responder acabou: a 99Food já decidiu este pedido' });
+    expect(nn.answerCancelApply).not.toHaveBeenCalled();
   });
 
   it('refund request: refusing needs one of the stored base reasons', async () => {
