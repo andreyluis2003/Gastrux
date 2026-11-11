@@ -13,7 +13,7 @@ import { formatPhone, normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone } from '@/lib/cashback/service';
 import { attachRedemption, checkCoupon, releaseRedemption, reserveCoupon } from '@/lib/coupons/service';
 import { clientAddress, takeCouponTry } from '@/lib/coupons/attempts';
-import { ownIntegration } from '@/lib/delivery-orders/integrations';
+import { writeSiteOrder } from '@/lib/delivery-site/write-order';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     }
 
     let subtotal = 0;
-    const orderItems: { recipeId: string; quantity: number; specialInstructions?: string }[] = [];
+    const orderItems: { recipeId: string; name: string; quantity: number; specialInstructions?: string }[] = [];
 
     for (const item of items) {
       const mi = menuMap.get(item.menuItemId);
@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       subtotal += price * quantity;
       orderItems.push({
         recipeId: mi.recipeId,
+        name: mi.name,
         quantity,
         specialInstructions: item.specialInstructions || undefined,
       });
@@ -213,59 +214,20 @@ export async function POST(req: NextRequest) {
     // The digital menu in the order pipeline (plan 2026-10-23 api-de-pedidos, Task 4b): the order is also an
     // ExternalOrder of the restaurant's "Cardápio digital", so it shows in Pedidos de delivery with its values and
     // its status. It is always accepted: an online payment attaches to the kitchen order created right below
-    const site = await ownIntegration(restaurantId, 'delivery_site');
-    const externalOrder = await prisma.externalOrder.create({
-      data: {
-        restaurantId, integrationId: site.id, externalOrderId: orderNumber, status: 'CONFIRMED',
-        totalAmount: total, subtotal, deliveryFee: safeDeliveryFee, discount: couponDiscount, platformFee: 0,
-        paymentMethod: choice.paymentMethod, paidOnline: false, customerId: customer?.id ?? null,
-        customerName: singleLine(customerName), customerPhone: phoneDigits ? formatPhone(phoneDigits) : singleLine(customerPhone),
-        customerEmail: customerEmail || null,
-        deliveryAddress: isPickup ? 'Retirada no local' : singleLine(deliveryAddress), deliveryCity: deliveryCity || null, deliveryZipcode: deliveryZipCode || null,
-        items: JSON.stringify(orderItems.map((oi) => ({ name: menuItems.find((m) => m.recipeId === oi.recipeId)?.name, quantity: oi.quantity }))),
-        specialInstructions: kitchenNote,
-      },
-      select: { id: true },
+    const written = await writeSiteOrder({
+      restaurantId, orderNumber, customerId: customer?.id ?? null,
+      customerName: singleLine(customerName), customerPhone: phoneDigits ? formatPhone(phoneDigits) : singleLine(customerPhone),
+      customerEmail: customerEmail || null, isPickup,
+      deliveryAddress: isPickup ? null : singleLine(deliveryAddress), deliveryCity, deliveryZipCode, kitchenNote,
+      items: orderItems, subtotal, deliveryFee: safeDeliveryFee, discount: couponDiscount, total,
+      paymentMethod: choice.paymentMethod, cashChangeFor: choice.changeFor, voucherBrand: choice.voucherBrand,
     });
-
-    let order;
-    try {
-      order = await prisma.order.create({
-        data: {
-          restaurantId,
-          orderNumber,
-          orderType: 'DELIVERY',
-          status: 'PENDING',
-          paymentStatus: 'PENDING',
-          totalItems: orderItems.reduce((acc, i) => acc + i.quantity, 0),
-          subtotal,
-          fees: safeDeliveryFee,
-          discount: couponDiscount,
-          total,
-          paymentMethod: choice.paymentMethod,
-          cashChangeFor: choice.changeFor,
-          voucherBrand: choice.voucherBrand,
-          // Only the server may write a line that starts with "Pagamento": every customer-supplied
-          // value is one line that begins with a fixed label (structural, not a word filter).
-          specialInstructions: kitchenNote,
-          customerId: customer?.id || undefined,
-          externalOrderId: externalOrder.id,
-          items: {
-            create: orderItems.map((oi) => ({
-              recipeId: oi.recipeId,
-              quantity: oi.quantity,
-              specialInstructions: oi.specialInstructions,
-            })),
-          },
-        },
-        include: { items: true },
-      });
-    } catch (error) {
-      // No kitchen order: the pipeline entry must not stay behind as a confirmed order without one
-      await prisma.externalOrder.delete({ where: { id: externalOrder.id } }).catch(() => {});
-      throw error;
-    }
-    await prisma.externalOrder.update({ where: { id: externalOrder.id }, data: { internalOrderId: order.id } });
+    const money = (n: number) => Math.round(n * 100) / 100; // the response used to read the stored 2-decimal values
+    const externalOrder = { id: written.externalOrderId };
+    const order = {
+      id: written.orderId, orderNumber, total: money(total), subtotal: money(subtotal), fees: money(safeDeliveryFee), status: 'PENDING',
+      totalItems: orderItems.reduce((acc, i) => acc + i.quantity, 0),
+    };
     if (coupon) await attachRedemption(coupon.redemptionId, externalOrder.id);
 
     // The plan counts sales per month and only warns (owner decision 2026-10-09)
