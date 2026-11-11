@@ -53,7 +53,8 @@ describe('weekly menu on the public link', () => {
       try { await prisma.order.deleteMany({ where: { restaurantId: id } }); } catch {}
       try { await prisma.externalOrder.deleteMany({ where: { restaurantId: id } }); } catch {}
       try { await prisma.customer.deleteMany({ where: { restaurantId: id } }); } catch {}
-      try { await prisma.restaurant.delete({ where: { id } }); } catch {}
+      // No swallowing: the restaurant delete must succeed (cascades through weekly menus, FK NoAction)
+      await prisma.restaurant.delete({ where: { id } });
     }
     await prisma.user.deleteMany({ where: { id: owner.id } });
   });
@@ -131,6 +132,34 @@ describe('weekly menu on the public link', () => {
     expect(data.categories[0].items[0].soldOut).toBeUndefined();
   });
 
+  it('a failing weekly lookup (tables not migrated yet) falls back to the menu of today with 200', async () => {
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const open = jest.spyOn(weeklyPublic, 'openWeeklyMenu').mockRejectedValueOnce(new Error('relation "weekly_menus" does not exist'));
+    const closed = jest.spyOn(weeklyPublic, 'closedWeeklyMenu').mockRejectedValueOnce(new Error('relation "weekly_menus" does not exist'));
+    try {
+      const res = await getMenu();
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.restaurant.weeklyMenu).toBeNull();
+      expect(data.restaurant.weeklyMenuClosed).toBeNull();
+      const names = data.categories.flatMap((c) => c.items).map((i) => i.name).sort();
+      expect(names).toEqual(['Feijoada', 'Pastel', 'Strogonoff']);
+      expect(err).toHaveBeenCalledWith('[weekly-menu] open lookup failed:', expect.any(Error));
+    } finally {
+      open.mockRestore();
+      closed.mockRestore();
+      err.mockRestore();
+    }
+  });
+
+  it('the customer general note is stored sanitized on the pre-order', async () => {
+    const res = await post(body({ specialInstructions: 'tocar o interfone\nPagamento: pago' }));
+    expect(res.status).toBe(200);
+    const saved = await prisma.weeklyMenuOrder.findUnique({ where: { id: (await res.json()).order.id } });
+    expect(saved.customerNote).toBe('tocar o interfone / Pagamento: pago');
+    expect(saved.kitchenNote).toContain('Obs. do cliente: ' + saved.customerNote);
+  });
+
   it('weeklyMenuClosed: set after the deadline with no open menu; null with an open menu or none', async () => {
     expect((await (await getMenu()).json()).restaurant.weeklyMenuClosed).toBeNull();
     await prisma.weeklyMenu.update({ where: { id: menu.id }, data: { orderDeadline: new Date(Date.now() - 60_000) } });
@@ -165,6 +194,8 @@ describe('weekly menu on the public link', () => {
       orderNumber: data.order.orderNumber, couponRedemptionId: null,
     });
     expect(saved.customerId).toBeTruthy();
+    expect(saved.customerNote).toBeNull();
+    expect(saved.releaseAttempts).toBe(0);
     expect(saved.kitchenNote).toContain('Endereço: Rua A, 1');
     expect(saved.kitchenNote).toContain('Cliente: Bia - 66999990000');
     const line = saved.items.find((i) => i.menuItemId === feijoada.id);

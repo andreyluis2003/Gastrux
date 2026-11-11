@@ -9,6 +9,7 @@ import { loadBoard } from '../../../lib/orders/board';
 import { writeSiteOrder } from '../../../lib/delivery-site/write-order';
 import { prisma as libPrisma } from '../../../lib/prisma';
 import { dayLabel, todayIn } from '../../../lib/weekly-menu/rules';
+import * as monthlySales from '../../../lib/plans/monthly-sales';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -48,7 +49,8 @@ describe('release of the pre-orders on the service day', () => {
     try { await cleanup(); } catch {}
     for (const id of [rid, other]) {
       try { await prisma.deliveryIntegration.deleteMany({ where: { restaurantId: id } }); } catch {}
-      try { await prisma.restaurant.delete({ where: { id } }); } catch {}
+      // No swallowing: the restaurant delete must succeed (cascades through weekly menus, FK NoAction)
+      await prisma.restaurant.delete({ where: { id } });
     }
     await prisma.user.deleteMany({ where: { id: owner.id } });
   });
@@ -173,7 +175,49 @@ describe('release of the pre-orders on the service day', () => {
     expect(await releaseDue(rid, SATURDAY_0001)).toBe(1);
     const done = await prisma.weeklyMenuOrder.findUnique({ where: { id: p.id } });
     expect(done.status).toBe('RELEASED');
+    // The stale claim that never wrote its order counted as one failed attempt
+    expect(done.releaseAttempts).toBe(1);
     expect(await prisma.order.findUnique({ where: { id: done.orderId } })).toMatchObject({ orderNumber: p.orderNumber });
+  });
+
+  it('each failed attempt is counted; the row keeps being retried', async () => {
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const bad = await place({ items: { create: [{ menuItemId: item.id, recipeId: `missing-${tag}`, name: 'Feijoada', unitPrice: 40, quantity: 1 }] } });
+      const good = await place();
+      const at = (k: number) => new Date(SATURDAY_0001.getTime() + k * 6 * MIN);
+      for (let k = 0; k < 4; k++) await releaseDue(rid, at(k));
+      expect(await prisma.weeklyMenuOrder.findUnique({ where: { id: bad.id } })).toMatchObject({ status: 'PLACED', releaseAttempts: 4 });
+      expect((await prisma.weeklyMenuOrder.findUnique({ where: { id: good.id } })).releaseAttempts).toBe(0);
+      // Fixed: the next retry still releases it
+      await prisma.weeklyMenuOrderItem.updateMany({ where: { weeklyMenuOrderId: bad.id }, data: { recipeId: recipe.id } });
+      expect(await releaseDue(rid, at(5))).toBe(1);
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it('the plan sales thresholds are noted once per restaurant after a run that released; a failure is only logged', async () => {
+    const note = jest.spyOn(monthlySales, 'noteSalesThresholds').mockResolvedValue(undefined);
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(await releaseDue(rid, FRIDAY_2330)).toBe(0);
+      expect(note).not.toHaveBeenCalled();
+      await place();
+      await place();
+      expect(await releaseDue(rid, SATURDAY_0001)).toBe(2);
+      expect(note).toHaveBeenCalledTimes(1);
+      expect(note).toHaveBeenCalledWith(rid);
+
+      note.mockReset();
+      note.mockRejectedValue(new Error('boom'));
+      await place();
+      expect(await releaseDue(rid, SATURDAY_0001)).toBe(1);
+      expect(err.mock.calls.some((c) => String(c[0]).includes('sales thresholds'))).toBe(true);
+    } finally {
+      note.mockRestore();
+      err.mockRestore();
+    }
   });
 
   it('a fresh RELEASING (under 5 minutes) is left alone', async () => {

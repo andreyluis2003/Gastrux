@@ -38,6 +38,7 @@ CREATE TABLE "weekly_menu_orders" (
     "deliveryCity" TEXT,
     "deliveryZipCode" TEXT,
     "kitchenNote" TEXT NOT NULL,
+    "customerNote" TEXT,
     "paymentMethod" "DeliveryPaymentMethod" NOT NULL,
     "cashChangeFor" DOUBLE PRECISION,
     "voucherBrand" TEXT,
@@ -51,6 +52,7 @@ CREATE TABLE "weekly_menu_orders" (
     "orderNumber" TEXT NOT NULL,
     "orderId" TEXT,
     "releasingAt" TIMESTAMP(3),
+    "releaseAttempts" INTEGER NOT NULL DEFAULT 0,
     "cancelReason" TEXT,
     "cancelledAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -112,7 +114,7 @@ ALTER TABLE "weekly_menu_items" ADD CONSTRAINT "weekly_menu_items_menuItemId_fke
 ALTER TABLE "weekly_menu_orders" ADD CONSTRAINT "weekly_menu_orders_restaurantId_fkey" FOREIGN KEY ("restaurantId") REFERENCES "restaurants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "weekly_menu_orders" ADD CONSTRAINT "weekly_menu_orders_weeklyMenuId_fkey" FOREIGN KEY ("weeklyMenuId") REFERENCES "weekly_menus"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "weekly_menu_orders" ADD CONSTRAINT "weekly_menu_orders_weeklyMenuId_fkey" FOREIGN KEY ("weeklyMenuId") REFERENCES "weekly_menus"("id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "weekly_menu_order_items" ADD CONSTRAINT "weekly_menu_order_items_weeklyMenuOrderId_fkey" FOREIGN KEY ("weeklyMenuOrderId") REFERENCES "weekly_menu_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;

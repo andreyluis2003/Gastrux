@@ -35,7 +35,11 @@ export async function GET(
 
     // Cardápio da semana (spec 2026-11-10 cardapio-da-semana): while one is open the link sells only its products,
     // whatever their weekdays or 'available' flag; 'active' and 'displayOnWeb' still count
-    const weekly = await openWeeklyMenu(params.restaurantId);
+    // Never break the normal link over the weekly lookup (e.g. Deploy before migrate deploy): fall back to no weekly menu
+    const weekly = await openWeeklyMenu(params.restaurantId).catch((e) => {
+      console.error('[weekly-menu] open lookup failed:', e);
+      return null;
+    });
 
     // Only what the ordering page shows (app/delivery/[restaurantId]/page.tsx): the whole rows used
     // to go out, with the recipe link and internal flags (isolation sweep, 2026-10-07)
@@ -76,7 +80,12 @@ export async function GET(
     const acceptsOnlinePayment = paymentOptions.online.pix;
     // With a weekly menu open only a closing by hand stops the link (the order is for another day)
     const closed = weekly ? store.reason === 'manual' : store.closed;
-    const weeklyMenuClosed = weekly ? null : await closedWeeklyMenu(params.restaurantId);
+    const weeklyMenuClosed = weekly
+      ? null
+      : await closedWeeklyMenu(params.restaurantId).catch((e) => {
+          console.error('[weekly-menu] closed lookup failed:', e);
+          return null;
+        });
     const weeklyMenu = weekly ? { id: weekly.id, serviceDate: weekly.serviceDate, banner: weekly.banner } : null;
 
     return NextResponse.json(

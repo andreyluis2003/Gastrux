@@ -2,6 +2,7 @@ import {
   todayIn,
   openMenuOf,
   isDue,
+  isReleaseStuck,
   remainingPortions,
   productionSummary,
   bannerText,
@@ -76,3 +77,13 @@ describe('weekly-menu rules', () => {
     expect(closedText('2026-11-14')).toBe('Pedidos encerrados para sábado, 14/11')
   })
 })
+
+describe('isReleaseStuck (final review 2026-11-10)', () => {
+  it('flags a PLACED pre-order with 3+ failed attempts on or after its day', () => {
+    expect(isReleaseStuck('PLACED', 3, '2026-11-14', '2026-11-14')).toBe(true);
+    expect(isReleaseStuck('PLACED', 5, '2026-11-14', '2026-11-15')).toBe(true);
+    expect(isReleaseStuck('PLACED', 2, '2026-11-14', '2026-11-14')).toBe(false);
+    expect(isReleaseStuck('PLACED', 3, '2026-11-14', '2026-11-13')).toBe(false);
+    expect(isReleaseStuck('RELEASED', 3, '2026-11-14', '2026-11-14')).toBe(false);
+  });
+});

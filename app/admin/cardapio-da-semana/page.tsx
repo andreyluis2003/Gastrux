@@ -56,6 +56,8 @@ export default function CardapioDaSemanaPage() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return toast.error(body.error || 'Não foi possível criar o cardápio da semana');
       toast.success('Cardápio da semana criado');
+      // Products deactivated since the source menu stay out of the copy
+      if (body.skipped > 0) toast.warning(`${body.skipped} produto(s) desativado(s) ficaram de fora`);
       router.push(`/admin/cardapio-da-semana/${body.id}`);
     } finally {
       setSaving(false);

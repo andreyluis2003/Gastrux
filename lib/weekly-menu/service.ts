@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { releaseRedemption } from '@/lib/coupons/service';
-import { productionSummary, remainingPortions, todayIn } from './rules';
+import { isReleaseStuck, productionSummary, remainingPortions, todayIn } from './rules';
 
 // Admin service for the weekly menu (spec 2026-11-10 cardapio-da-semana)
 
@@ -83,13 +83,17 @@ export async function createWeeklyMenu(restaurantId: string, input: NewWeeklyMen
   }
 
   let items: { menuItemId: string; portionLimit: number | null }[];
+  let skipped = 0;
   if (input.copyFromId) {
     const src = await prisma.weeklyMenu.findFirst({
       where: { id: input.copyFromId, restaurantId },
-      include: { items: true },
+      include: { items: { include: { menuItem: { select: { active: true, restaurantId: true } } } } },
     });
     if (!src) throw new CashRuleError('Cardápio de origem não encontrado', 404);
-    items = src.items.map((i) => ({ menuItemId: i.menuItemId, portionLimit: i.portionLimit }));
+    // A product deactivated since then stays out of the copy (counted in skipped) instead of failing it
+    const usable = src.items.filter((i) => i.menuItem.active && i.menuItem.restaurantId === restaurantId);
+    skipped = src.items.length - usable.length;
+    items = usable.map((i) => ({ menuItemId: i.menuItemId, portionLimit: i.portionLimit }));
   } else {
     items = cleanItems(input.items ?? []);
   }
@@ -101,10 +105,11 @@ export async function createWeeklyMenu(restaurantId: string, input: NewWeeklyMen
   });
   if (dup) throw new CashRuleError('Já existe um cardápio para esta data', 409);
   try {
-    return await prisma.weeklyMenu.create({
+    const created = await prisma.weeklyMenu.create({
       data: { restaurantId, serviceDate, orderDeadline, items: { create: items } },
       select: { id: true, serviceDate: true, orderDeadline: true },
     });
+    return { ...created, skipped };
   } catch (e: any) {
     if (e?.code === 'P2002') throw new CashRuleError('Já existe um cardápio para esta data', 409);
     throw e;
@@ -132,11 +137,11 @@ export async function updateWeeklyMenu(
       const found = await tx.menuItem.count({ where: { id: { in: added }, restaurantId, active: true } });
       if (found !== added.length) throw new CashRuleError('Produto não encontrado ou inativo', 400);
     }
-    // Dropping a product that already has a PLACED order is refused
+    // Dropping a product that already has a live order (the same set orderedByItem counts) is refused
     const removed = [...currentIds].filter((x) => !keep.has(x));
     for (const menuItemId of removed) {
       const n = await tx.weeklyMenuOrder.count({
-        where: { weeklyMenuId: id, status: 'PLACED', items: { some: { menuItemId } } },
+        where: { weeklyMenuId: id, status: { in: [...LIVE] }, items: { some: { menuItemId } } },
       });
       if (n > 0) throw new CashRuleError(`Já tem ${n} encomendas com este produto`, 409);
     }
@@ -200,8 +205,13 @@ export async function getWeeklyMenu(restaurantId: string, id: string) {
     };
   });
   const summary = productionSummary(live.flatMap((o) => o.items));
-  const { orders, items: _items, ...menuRow } = menu;
-  return { menu: menuRow, items, summary, orders };
+  // General notes of the customers, listed under "O que fazer"
+  const customerNotes = live.filter((o) => o.customerNote).map((o) => ({ orderId: o.id, customerName: o.customerName, note: o.customerNote! }));
+  const restaurant = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { timezone: true } });
+  const today = todayIn(restaurant?.timezone || 'America/Sao_Paulo');
+  const { orders: rawOrders, items: _items, ...menuRow } = menu;
+  const orders = rawOrders.map((o) => ({ ...o, releaseStuck: isReleaseStuck(o.status, o.releaseAttempts, menu.serviceDate, today) }));
+  return { menu: menuRow, items, summary, customerNotes, orders };
 }
 
 export async function cancelWeeklyOrder(restaurantId: string, menuId: string, orderId: string, reason: unknown) {
@@ -230,7 +240,7 @@ export async function deleteWeeklyMenu(restaurantId: string, id: string) {
   await prisma.$transaction(async (tx) => {
     const live = await tx.weeklyMenuOrder.count({ where: { weeklyMenuId: id, status: { not: 'CANCELLED' } } });
     if (live > 0) throw new CashRuleError('Este cardápio já tem encomendas; cancele-as antes de apagar', 409);
-    // FK is Restrict: cancelled orders (their items cascade) go first
+    // FK is NoAction: cancelled orders (their items cascade) go first
     await tx.weeklyMenuOrder.deleteMany({ where: { weeklyMenuId: id } });
     await tx.weeklyMenu.delete({ where: { id } });
   });

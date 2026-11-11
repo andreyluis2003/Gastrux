@@ -104,3 +104,11 @@ export function bannerText(serviceDate: string, deadline: Date | null, timeZone:
 export function closedText(serviceDate: string): string {
   return `Pedidos encerrados para ${dayLabel(serviceDate)}`
 }
+
+/** Failed release attempts after which the admin flags a pre-order (it is still retried) */
+export const STUCK_AFTER_ATTEMPTS = 3;
+
+/** A PLACED pre-order that failed to release 3+ times on/after its day: the admin asks to place it by the Balcão. */
+export function isReleaseStuck(status: string, releaseAttempts: number, serviceDate: string, today: string): boolean {
+  return status === 'PLACED' && releaseAttempts >= STUCK_AFTER_ATTEMPTS && isDue(serviceDate, today);
+}

@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { writeSiteOrder } from '@/lib/delivery-site/write-order';
 import { attachRedemption } from '@/lib/coupons/service';
+import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { dayLabel, isDue, todayIn } from './rules';
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -38,7 +39,8 @@ async function recoverStale(restaurantId: string | undefined, now: Date) {
         if (done.count && order.externalOrderId) await linkCoupon(p, order.externalOrderId);
       } else {
         // releasingAt stays old, so the due pass below may retry it right away
-        await prisma.weeklyMenuOrder.updateMany({ where: { id: p.id, status: 'RELEASING' }, data: { status: 'PLACED' } });
+        // A claim that never wrote its order counts as a failed attempt
+        await prisma.weeklyMenuOrder.updateMany({ where: { id: p.id, status: 'RELEASING' }, data: { status: 'PLACED', releaseAttempts: { increment: 1 } } });
       }
     } catch (e) {
       logError(`recovery of pre-order ${p.id} failed`, e);
@@ -69,6 +71,7 @@ export async function releaseDue(restaurantId?: string, now: Date = new Date()):
   });
 
   let released = 0;
+  const releasedIn = new Set<string>();
   for (const p of candidates) {
     try {
       const serviceDate = p.weeklyMenu.serviceDate;
@@ -111,8 +114,9 @@ export async function releaseDue(restaurantId?: string, now: Date = new Date()):
         logError(`release of pre-order ${p.id} (${p.orderNumber}) failed`, e);
         // Back to PLACED keeping releasingAt as the last attempt: retried after RETRY_MS. If this fails too,
         // the stale-claim recovery hands it back later.
+        // Each failed attempt is counted: from 3 on the admin flags the order (still retried)
         await prisma.weeklyMenuOrder
-          .updateMany({ where: { id: p.id, status: 'RELEASING' }, data: { status: 'PLACED' } })
+          .updateMany({ where: { id: p.id, status: 'RELEASING' }, data: { status: 'PLACED', releaseAttempts: { increment: 1 } } })
           .catch((e2) => logError(`revert of pre-order ${p.id} failed`, e2));
         continue;
       }
@@ -122,9 +126,14 @@ export async function releaseDue(restaurantId?: string, now: Date = new Date()):
       await prisma.weeklyMenuOrder.updateMany({ where: { id: p.id, status: 'RELEASING' }, data: { status: 'RELEASED', orderId: written.orderId } });
       await linkCoupon(p, written.externalOrderId);
       released++;
+      releasedIn.add(p.restaurantId);
     } catch (e) {
       logError(`release of pre-order ${p.id} failed`, e);
     }
+  }
+  // The plan counts sales per month, as after a normal site order (only warns); once per restaurant per run
+  for (const rid of releasedIn) {
+    await noteSalesThresholds(rid).catch((e) => logError(`sales thresholds of restaurant ${rid} failed`, e));
   }
   return released;
 }

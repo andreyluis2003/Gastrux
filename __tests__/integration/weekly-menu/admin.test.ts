@@ -39,9 +39,9 @@ describe('weekly menu admin', () => {
     (getCurrentRestaurantId as jest.Mock).mockResolvedValue(rid);
   }, 60000);
   afterAll(async () => {
-    try { await prisma.weeklyMenuOrder.deleteMany({ where: { restaurantId: rid } }); } catch {}
     try { await prisma.auditLog.deleteMany({ where: { restaurantId: { in: [rid, other] } } }); } catch {}
-    for (const id of [rid, other]) { try { await prisma.restaurant.delete({ where: { id } }); } catch {} }
+    // No swallowing: the restaurant delete must cascade through weekly menus and their orders (FK NoAction)
+    for (const id of [rid, other]) await prisma.restaurant.delete({ where: { id } });
     await prisma.user.deleteMany({ where: { id: { in: [owner.id, cook.id, cashier.id] } } });
   });
   beforeEach(async () => {
@@ -206,5 +206,63 @@ describe('weekly menu admin', () => {
     expect((await REMOVE(json('DELETE'), { params: { id } })).status).toBe(200);
     expect(await prisma.weeklyMenu.count({ where: { id } })).toBe(0);
     expect(await prisma.weeklyMenuOrder.count({ where: { id: o.id } })).toBe(0);
+  });
+
+  it('copy leaves out products deactivated since then and reports skipped', async () => {
+    const src = await mkMenu(iso(5));
+    await prisma.menuItem.update({ where: { id: b.id }, data: { active: false } });
+    try {
+      const res = await create({ serviceDate: iso(12), copyFromId: src, items: [] });
+      expect(res.status).toBe(201);
+      expect((await res.json()).skipped).toBe(1);
+      const copy = await prisma.weeklyMenu.findFirst({ where: { restaurantId: rid, serviceDate: iso(12) }, include: { items: true } });
+      expect(copy.items.map((i) => [i.menuItemId, i.portionLimit])).toEqual([[a.id, 10]]);
+    } finally {
+      await prisma.menuItem.update({ where: { id: b.id }, data: { active: true } });
+    }
+    const plain = await create({ serviceDate: iso(13), copyFromId: src, items: [] });
+    expect((await plain.json()).skipped).toBe(0);
+  });
+
+  it('removing a product held by a RELEASING or RELEASED order is also 409', async () => {
+    const id = await mkMenu();
+    await mkOrder(id, [[b, 1]], { status: 'RELEASED' });
+    await mkOrder(id, [[b, 1]], { status: 'RELEASING' });
+    await mkOrder(id, [[b, 1]], { status: 'CANCELLED' });
+    const res = await UPDATE(json('PUT', { items: [{ menuItemId: a.id }] }), { params: { id } });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('Já tem 2 encomendas com este produto');
+  });
+
+  it('detail returns customer notes (live orders only) and flags a stuck release', async () => {
+    const today = await mkMenu(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+    const o1 = await mkOrder(today, [[a, 1]], { customerName: 'Bia', customerNote: 'tocar o interfone', releaseAttempts: 3 });
+    const o2 = await mkOrder(today, [[a, 1]], { releaseAttempts: 2 });
+    await mkOrder(today, [[a, 1]], { customerName: 'Cal', customerNote: 'cancelado', status: 'CANCELLED' });
+    const d = await detail(today);
+    expect(d.customerNotes).toEqual([{ orderId: o1.id, customerName: 'Bia', note: 'tocar o interfone' }]);
+    expect(d.orders.find((o) => o.id === o1.id)).toMatchObject({ customerNote: 'tocar o interfone', releaseStuck: true });
+    expect(d.orders.find((o) => o.id === o2.id).releaseStuck).toBe(false);
+    // Before the service day nothing is flagged
+    const later = await mkMenu(iso(5));
+    const o3 = await mkOrder(later, [[a, 1]], { releaseAttempts: 5 });
+    expect((await detail(later)).orders.find((o) => o.id === o3.id).releaseStuck).toBe(false);
+  });
+
+  it('deleting a restaurant cascades through its weekly menus and orders', async () => {
+    const r = await prisma.restaurant.create({ data: { name: `WMD ${tag}`, ownerId: owner.id, status: 'ACTIVE' } });
+    const c = await prisma.menuCategory.create({ data: { restaurantId: r.id, name: 'C', position: 0, active: true } });
+    const mi = await prisma.menuItem.create({ data: { restaurantId: r.id, categoryId: c.id, name: 'P', price: 1, position: 0 } });
+    const m = await prisma.weeklyMenu.create({ data: { restaurantId: r.id, serviceDate: iso(5), items: { create: [{ menuItemId: mi.id }] } } });
+    await prisma.weeklyMenuOrder.create({
+      data: {
+        restaurantId: r.id, weeklyMenuId: m.id, customerName: 'X', customerPhone: '1', isPickup: true, kitchenNote: '',
+        paymentMethod: 'CASH', paymentNote: '', subtotal: 0, deliveryFee: 0, discount: 0, total: 0, orderNumber: `WMD-${tag}`,
+        items: { create: [{ menuItemId: mi.id, recipeId: 'r', name: 'P', unitPrice: 1, quantity: 1 }] },
+      },
+    });
+    await prisma.restaurant.delete({ where: { id: r.id } });
+    expect(await prisma.weeklyMenu.count({ where: { id: m.id } })).toBe(0);
+    expect(await prisma.weeklyMenuOrder.count({ where: { restaurantId: r.id } })).toBe(0);
   });
 });

@@ -214,6 +214,8 @@ async function postWeeklyOrder(req: NextRequest, body: any, isPickup: boolean) {
         customerEmail: customerEmail || null, isPickup,
         deliveryAddress: isPickup ? null : singleLine(deliveryAddress), deliveryCity: deliveryCity || null, deliveryZipCode: deliveryZipCode || null,
         kitchenNote: kitchenNoteOf(body, isPickup, paymentNote, coupon),
+        // The same sanitized text the kitchen note carries, without its label, for "O que fazer"
+        customerNote: sanitizeCustomerNote(body.specialInstructions).replace(/^Obs\. do cliente: /, '') || null,
         paymentMethod: choice.paymentMethod, cashChangeFor: choice.changeFor, voucherBrand: choice.voucherBrand, paymentNote,
         subtotal: money(subtotal), deliveryFee: money(safeDeliveryFee), discount: couponDiscount, total: money(total),
         couponRedemptionId: coupon?.redemptionId ?? null, couponCode: coupon?.code ?? null,

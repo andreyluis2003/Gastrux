@@ -5254,6 +5254,8 @@ model WeeklyMenuOrder {
   deliveryCity       String?
   deliveryZipCode    String?
   kitchenNote        String
+  /// Sanitized general note from the customer (spec 2026-11-10 cardapio-da-semana: "O que fazer")
+  customerNote       String?
   paymentMethod      DeliveryPaymentMethod
   cashChangeFor      Float?
   voucherBrand       String?
@@ -5268,12 +5270,14 @@ model WeeklyMenuOrder {
   orderId            String?               @unique
   /// Last release attempt (claim time); a stale claim is recovered, a failed one waits 5 min before the retry
   releasingAt        DateTime?
+  /// Failed release attempts; >= 3 on/after the service day is flagged in the admin
+  releaseAttempts    Int                   @default(0)
   cancelReason       String?
   cancelledAt        DateTime?
   createdAt          DateTime              @default(now())
 
   restaurant Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  weeklyMenu WeeklyMenu            @relation(fields: [weeklyMenuId], references: [id], onDelete: Restrict)
+  weeklyMenu WeeklyMenu            @relation(fields: [weeklyMenuId], references: [id], onDelete: NoAction)
   items      WeeklyMenuOrderItem[]
 
   @@index([weeklyMenuId, status])

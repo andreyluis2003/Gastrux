@@ -34,8 +34,9 @@ export function ProductPicker({
     const q = search.trim().toLowerCase();
     return (categories ?? [])
       .filter((c) => c.active !== false || c.items.some((i) => i.id in selected))
-      // A selected product stays listed even if it is now inactive/unavailable, so it can be unchecked
-      .map((c) => ({ ...c, items: c.items.filter((i) => (i.available !== false || i.id in selected) && (!q || i.name.toLowerCase().includes(q))) }))
+      // Unavailable products are listed too: the weekly menu sells them by design (spec 2026-11-10 cardapio-da-semana).
+      // Inactive ones never come from the endpoint
+      .map((c) => ({ ...c, items: c.items.filter((i) => !q || i.name.toLowerCase().includes(q)) }))
       .filter((c) => c.items.length > 0);
   }, [categories, search, selected]);
 
@@ -65,7 +66,8 @@ export function ProductPicker({
                   <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
                     <input type="checkbox" checked={checked} disabled={locked && checked} onChange={() => toggle(i.id)} />
                     <span className="truncate">{i.name}</span>
-                    {(i.available === false || c.active === false) && <span className="text-xs text-red-600">indisponível</span>}
+                    {i.available === false && <span className="text-xs text-amber-700">esgotado no cardápio normal</span>}
+                    {c.active === false && <span className="text-xs text-red-600">indisponível</span>}
                     <span className="text-muted-foreground">{money(Number(i.price))}</span>
                   </label>
                   {checked && (

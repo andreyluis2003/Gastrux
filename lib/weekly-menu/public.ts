@@ -127,6 +127,8 @@ export interface ValidatedWeeklyOrder {
   deliveryCity: string | null;
   deliveryZipCode: string | null;
   kitchenNote: string;
+  /** Sanitized general note of the customer (no label), shown in the admin */
+  customerNote: string | null;
   paymentMethod: DeliveryPaymentMethod;
   cashChangeFor: number | null;
   voucherBrand: string | null;

@@ -22,9 +22,11 @@ interface Detail {
   menu: { id: string; serviceDate: string; orderDeadline: string | null };
   items: { menuItemId: string; name: string; price: number; portionLimit: number | null; ordered: number; remaining: number | null }[];
   summary: { menuItemId: string; name: string; quantity: number; notes: { text: string; quantity: number }[] }[];
+  customerNotes: { orderId: string; customerName: string; note: string }[];
   orders: {
     id: string; orderNumber: string; status: string; customerName: string; customerPhone: string; isPickup: boolean;
     deliveryAddress: string | null; paymentNote: string; total: number; cancelReason: string | null;
+    customerNote: string | null; releaseStuck: boolean;
     items: { id: string; name: string; quantity: number; specialInstructions: string | null }[];
   }[];
 }
@@ -140,6 +142,14 @@ export default function CardapioDaSemanaDetalhe() {
             ))}
           </ul>
         )}
+        {data.customerNotes.length > 0 && (
+          <div className="space-y-1">
+            <p className="font-medium">Observações dos clientes</p>
+            {data.customerNotes.map((n) => (
+              <p key={n.orderId} className="text-sm text-muted-foreground pl-3">{n.customerName}: {n.note}</p>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card className="p-4 space-y-4">
@@ -167,7 +177,11 @@ export default function CardapioDaSemanaDetalhe() {
             <p className="text-muted-foreground">
               {o.isPickup ? 'Retirada no local' : `Entrega: ${o.deliveryAddress ?? ''}`} · {o.paymentNote} · {money(o.total)}
             </p>
+            {o.customerNote && <p>Obs.: {o.customerNote}</p>}
             {o.cancelReason && <p className="text-muted-foreground">Motivo: {o.cancelReason}</p>}
+            {o.releaseStuck && (
+              <p className="text-destructive font-medium">Não entrou no Quadro — confira o pedido e lance pelo Balcão</p>
+            )}
             {o.status === 'PLACED' && (
               <Button variant="outline" size="sm" onClick={() => { setCancelId(o.id); setReason(''); }}>Cancelar</Button>
             )}
