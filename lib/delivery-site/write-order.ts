@@ -28,23 +28,23 @@ export interface SiteOrderInput {
 
 export async function writeSiteOrder(input: SiteOrderInput): Promise<{ orderId: string; externalOrderId: string }> {
   const site = await ownIntegration(input.restaurantId, 'delivery_site');
-  const externalOrder = await prisma.externalOrder.create({
-    data: {
-      restaurantId: input.restaurantId, integrationId: site.id, externalOrderId: input.orderNumber, status: 'CONFIRMED',
-      totalAmount: input.total, subtotal: input.subtotal, deliveryFee: input.deliveryFee, discount: input.discount, platformFee: 0,
-      paymentMethod: input.paymentMethod, paidOnline: false, customerId: input.customerId,
-      customerName: input.customerName, customerPhone: input.customerPhone, customerEmail: input.customerEmail || null,
-      deliveryAddress: input.isPickup ? 'Retirada no local' : input.deliveryAddress ?? '',
-      deliveryCity: input.deliveryCity || null, deliveryZipcode: input.deliveryZipCode || null,
-      items: JSON.stringify(input.items.map((i) => ({ name: i.name, quantity: i.quantity }))),
-      specialInstructions: input.kitchenNote,
-    },
-    select: { id: true },
-  });
+  // One transaction: an ExternalOrder never stays behind without its kitchen Order
+  return prisma.$transaction(async (tx) => {
+    const externalOrder = await tx.externalOrder.create({
+      data: {
+        restaurantId: input.restaurantId, integrationId: site.id, externalOrderId: input.orderNumber, status: 'CONFIRMED',
+        totalAmount: input.total, subtotal: input.subtotal, deliveryFee: input.deliveryFee, discount: input.discount, platformFee: 0,
+        paymentMethod: input.paymentMethod, paidOnline: false, customerId: input.customerId,
+        customerName: input.customerName, customerPhone: input.customerPhone, customerEmail: input.customerEmail || null,
+        deliveryAddress: input.isPickup ? 'Retirada no local' : input.deliveryAddress ?? '',
+        deliveryCity: input.deliveryCity || null, deliveryZipcode: input.deliveryZipCode || null,
+        items: JSON.stringify(input.items.map((i) => ({ name: i.name, quantity: i.quantity }))),
+        specialInstructions: input.kitchenNote,
+      },
+      select: { id: true },
+    });
 
-  let order;
-  try {
-    order = await prisma.order.create({
+    const order = await tx.order.create({
       data: {
         restaurantId: input.restaurantId,
         orderNumber: input.orderNumber,
@@ -68,11 +68,7 @@ export async function writeSiteOrder(input: SiteOrderInput): Promise<{ orderId: 
       },
       select: { id: true },
     });
-  } catch (error) {
-    // No kitchen order: the pipeline entry must not stay behind as a confirmed order without one
-    await prisma.externalOrder.delete({ where: { id: externalOrder.id } }).catch(() => {});
-    throw error;
-  }
-  await prisma.externalOrder.update({ where: { id: externalOrder.id }, data: { internalOrderId: order.id } });
-  return { orderId: order.id, externalOrderId: externalOrder.id };
+    await tx.externalOrder.update({ where: { id: externalOrder.id }, data: { internalOrderId: order.id } });
+    return { orderId: order.id, externalOrderId: externalOrder.id };
+  });
 }

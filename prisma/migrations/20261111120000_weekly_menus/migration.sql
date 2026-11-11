@@ -50,6 +50,7 @@ CREATE TABLE "weekly_menu_orders" (
     "couponCode" TEXT,
     "orderNumber" TEXT NOT NULL,
     "orderId" TEXT,
+    "releasingAt" TIMESTAMP(3),
     "cancelReason" TEXT,
     "cancelledAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

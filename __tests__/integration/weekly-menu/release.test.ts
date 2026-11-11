@@ -6,6 +6,8 @@ import * as releaseModule from '../../../lib/weekly-menu/release';
 const { releaseDue } = releaseModule;
 import { startWeeklyMenuWorker } from '../../../lib/weekly-menu/worker';
 import { loadBoard } from '../../../lib/orders/board';
+import { writeSiteOrder } from '../../../lib/delivery-site/write-order';
+import { prisma as libPrisma } from '../../../lib/prisma';
 import { dayLabel, todayIn } from '../../../lib/weekly-menu/rules';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -15,6 +17,7 @@ const SERVICE = '2026-11-14';
 // 23:30 of the day before in Sao Paulo (UTC-3), then 00:01 of the service day
 const FRIDAY_2330 = new Date('2026-11-14T02:30:00Z');
 const SATURDAY_0001 = new Date('2026-11-14T03:01:00Z');
+const MIN = 60_000;
 
 describe('release of the pre-orders on the service day', () => {
   let owner, rid, other, item, recipe, menu, n = 0;
@@ -123,7 +126,78 @@ describe('release of the pre-orders on the service day', () => {
     spy.mockRestore();
 
     await prisma.weeklyMenuOrderItem.updateMany({ where: { weeklyMenuOrderId: p.id }, data: { recipeId: recipe.id } });
+    // Backoff: not retried within 5 minutes of the failed attempt, retried after
+    expect(await releaseDue(rid, new Date(SATURDAY_0001.getTime() + 4 * MIN))).toBe(0);
+    expect(await releaseDue(rid, new Date(SATURDAY_0001.getTime() + 5 * MIN + 1000))).toBe(1);
+  });
+
+  it('a failing row does not block a later due row in the same run, and is retried only after 5 minutes', async () => {
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const bad = await place({ items: { create: [{ menuItemId: item.id, recipeId: `missing-${tag}`, name: 'Feijoada', unitPrice: 40, quantity: 1 }] } });
+      const good = await place();
+      expect(await releaseDue(rid, SATURDAY_0001)).toBe(1);
+      expect((await prisma.weeklyMenuOrder.findUnique({ where: { id: good.id } })).status).toBe('RELEASED');
+      const after = await prisma.weeklyMenuOrder.findUnique({ where: { id: bad.id } });
+      expect(after).toMatchObject({ status: 'PLACED', releasingAt: SATURDAY_0001 });
+      expect(err.mock.calls.some((c) => String(c[0]).includes(bad.id))).toBe(true);
+
+      err.mockClear();
+      expect(await releaseDue(rid, new Date(SATURDAY_0001.getTime() + MIN))).toBe(0);
+      expect(err).not.toHaveBeenCalled();
+      expect(await releaseDue(rid, new Date(SATURDAY_0001.getTime() + 5 * MIN + 1000))).toBe(0);
+      expect(err.mock.calls.some((c) => String(c[0]).includes(bad.id))).toBe(true);
+    } finally {
+      err.mockRestore();
+    }
+  });
+
+  it('a stale RELEASING with its Order already written becomes RELEASED with orderId and the coupon linked', async () => {
+    const coupon = await prisma.coupon.create({ data: { restaurantId: rid, code: `S${tag}`.toUpperCase(), kind: 'FIXED', value: 800, usedCount: 1 } });
+    const redemption = await prisma.couponRedemption.create({ data: { couponId: coupon.id, restaurantId: rid, phoneDigits: '66999990000', discountCents: 800 } });
+    const p = await place({ status: 'RELEASING', releasingAt: new Date(SATURDAY_0001.getTime() - 6 * MIN), couponRedemptionId: redemption.id });
+    const written = await writeSiteOrder({
+      restaurantId: rid, orderNumber: p.orderNumber, customerId: null, customerName: 'Bia', customerPhone: '66999990000', customerEmail: null,
+      isPickup: true, deliveryAddress: null, deliveryCity: null, deliveryZipCode: null, kitchenNote: '',
+      items: [{ recipeId: recipe.id, name: 'Feijoada', quantity: 2 }], subtotal: 80, deliveryFee: 5, discount: 8, total: 77,
+      paymentMethod: 'CASH', cashChangeFor: null, voucherBrand: null,
+    });
+    await releaseDue(rid, SATURDAY_0001);
+    expect(await prisma.weeklyMenuOrder.findUnique({ where: { id: p.id } })).toMatchObject({ status: 'RELEASED', orderId: written.orderId });
+    expect(await prisma.order.count({ where: { restaurantId: rid } })).toBe(1);
+    expect((await prisma.couponRedemption.findUnique({ where: { id: redemption.id } })).externalOrderId).toBe(written.externalOrderId);
+  });
+
+  it('a stale RELEASING without an Order goes back to PLACED and is released', async () => {
+    const p = await place({ status: 'RELEASING', releasingAt: new Date(SATURDAY_0001.getTime() - 6 * MIN) });
     expect(await releaseDue(rid, SATURDAY_0001)).toBe(1);
+    const done = await prisma.weeklyMenuOrder.findUnique({ where: { id: p.id } });
+    expect(done.status).toBe('RELEASED');
+    expect(await prisma.order.findUnique({ where: { id: done.orderId } })).toMatchObject({ orderNumber: p.orderNumber });
+  });
+
+  it('a fresh RELEASING (under 5 minutes) is left alone', async () => {
+    const p = await place({ status: 'RELEASING', releasingAt: new Date(SATURDAY_0001.getTime() - 4 * MIN) });
+    expect(await releaseDue(rid, SATURDAY_0001)).toBe(0);
+    expect(await prisma.weeklyMenuOrder.findUnique({ where: { id: p.id } })).toMatchObject({ status: 'RELEASING', orderId: null });
+    expect(await prisma.order.count({ where: { restaurantId: rid } })).toBe(0);
+  });
+
+  it('the earliest service day goes first', async () => {
+    const earlier = await prisma.weeklyMenu.create({ data: { restaurantId: rid, serviceDate: '2026-11-13' } });
+    const late = await place();
+    const early = await place({}, earlier.id);
+    const findMany = jest.spyOn(libPrisma.weeklyMenuOrder, 'findMany');
+    try {
+      await releaseDue(rid, SATURDAY_0001);
+      const due = findMany.mock.calls.map((c) => c[0]).find((a) => a?.where?.status === 'PLACED');
+      expect(due.orderBy).toEqual([{ weeklyMenu: { serviceDate: 'asc' } }, { createdAt: 'asc' }]);
+    } finally {
+      findMany.mockRestore();
+    }
+    const a = await prisma.order.findFirst({ where: { orderNumber: early.orderNumber } });
+    const b = await prisma.order.findFirst({ where: { orderNumber: late.orderNumber } });
+    expect(a.createdAt.getTime()).toBeLessThanOrEqual(b.createdAt.getTime());
   });
 
   it('the coupon use is linked to the ExternalOrder', async () => {
@@ -194,10 +268,26 @@ describe('release of the pre-orders on the service day', () => {
     await new Promise((r) => setTimeout(r, 60));
     w.stop();
     expect(calls).toBeGreaterThan(1);
-    // A second start while running is a no-op
-    const a = startWeeklyMenuWorker(10_000, async () => {});
-    const b = startWeeklyMenuWorker(10_000, async () => { throw new Error('should not run'); });
+    // A second start while running is a no-op: its run never happens
+    const a = startWeeklyMenuWorker(10, async () => {});
+    const bRun = jest.fn(async () => {});
+    const b = startWeeklyMenuWorker(10, bRun);
+    await new Promise((r) => setTimeout(r, 50));
     b.stop();
     a.stop();
+    expect(bRun).not.toHaveBeenCalled();
+  });
+
+  it('the worker never runs two at a time, even when a run is slower than the interval', async () => {
+    let active = 0, maxActive = 0, calls = 0;
+    const w = startWeeklyMenuWorker(1, async () => {
+      calls++; active++; maxActive = Math.max(maxActive, active);
+      await new Promise((r) => setTimeout(r, 30));
+      active--;
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    w.stop();
+    expect(calls).toBeGreaterThan(1);
+    expect(maxActive).toBe(1);
   });
 });

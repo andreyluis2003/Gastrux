@@ -5266,6 +5266,8 @@ model WeeklyMenuOrder {
   couponCode         String?
   orderNumber        String                @unique
   orderId            String?               @unique
+  /// Last release attempt (claim time); a stale claim is recovered, a failed one waits 5 min before the retry
+  releasingAt        DateTime?
   cancelReason       String?
   cancelledAt        DateTime?
   createdAt          DateTime              @default(now())
