@@ -981,7 +981,7 @@ Você vende um dia só, ou um dia por semana (feijoada de sábado, por exemplo),
 4. Escolha os produtos. Em cada um, você pode pôr as **Porções**: quantas dá para fazer
 5. Salve
 
-Sem prazo, o cliente encomenda até o dia chegar. Sem porções, o produto não tem limite.
+Sem prazo, o cliente encomenda até o fim do dia do atendimento. Sem porções, o produto não tem limite.
 
 Para repetir uma semana, use **Copiar de uma semana anterior**. Você escolhe a data nova e confere os produtos.
 
@@ -1009,13 +1009,15 @@ O estoque, a ficha técnica e o cashback contam nesse dia. O preço fica o que e
 Abra o cardápio da semana:
 
 - **Produtos e limites**: dá para mudar as porções. Um produto que já tem encomenda não sai do cardápio
-- **O que fazer**: o total de cada produto para produzir, as observações dos clientes agrupadas e o botão **Imprimir**
+- **O que fazer**: o total de cada produto para produzir, as observações agrupadas, as **Observações dos clientes** (nome e recado) e o botão **Imprimir**
 - **Encomendas**: a lista de quem encomendou. Para cancelar, escolha o motivo. Depois que virou pedido, o cancelamento é pelo pedido, no Quadro
 
 ## Se der erro
 
 - **Já tem 3 encomendas com este produto**: você tentou tirar um produto que já foi encomendado. Deixe ele no cardápio
-- **Só restam 2 porções**: o cliente pediu mais do que o limite. Ele ajusta a quantidade`,
+- **Feijoada: só restam 2 porções**: o cliente pediu mais do que o limite. Ele ajusta a quantidade
+- **N produto(s) desativado(s) ficaram de fora**: ao copiar uma semana anterior, os produtos desativados desde então não entram. Confira a lista
+- **Não entrou no Quadro — confira o pedido e lance pelo Balcão**: a encomenda não virou pedido sozinha. Os dados dela continuam na tela; lance pelo Balcão`,
   },
   {
     categorySlug: 'cardapio-e-receitas',
