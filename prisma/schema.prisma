@@ -2116,29 +2116,30 @@ model MenuCategory {
 }
 
 model MenuItem {
-  id            String          @id @default(cuid())
-  restaurantId  String?
-  categoryId    String
-  name          String
-  description   String?
-  price         Decimal
-  recipeId      String?
-  available     Boolean         @default(true)
-  active        Boolean         @default(true)
-  position      Int             @default(0)
-  displayOnQR   Boolean         @default(true)
-  displayOnWeb  Boolean         @default(true)
+  id              String           @id @default(cuid())
+  restaurantId    String?
+  categoryId      String
+  name            String
+  description     String?
+  price           Decimal
+  recipeId        String?
+  available       Boolean          @default(true)
+  active          Boolean          @default(true)
+  position        Int              @default(0)
+  displayOnQR     Boolean          @default(true)
+  displayOnWeb    Boolean          @default(true)
   /// Product code other systems send in the Gastrux order API (unique per restaurant)
-  code          String?
+  code            String?
   /// Sold by weight (spec 2026-10-25 venda-por-peso): price is per kg and its ficha describes 1 kg
-  soldByWeight  Boolean         @default(false)
+  soldByWeight    Boolean          @default(false)
   /// Weekdays the customer channels offer it (0 = Sunday ... 6 = Saturday); empty = every day (spec 2026-11-06 cardapio-rapido)
-  availableDays Int[]           @default([])
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  images        MenuItemImage[]
-  category      MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  recipe        Recipe?         @relation("MenuItemRecipe", fields: [recipeId], references: [id], onDelete: SetNull)
+  availableDays   Int[]            @default([])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  images          MenuItemImage[]
+  weeklyMenuItems WeeklyMenuItem[]
+  category        MenuCategory     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  recipe          Recipe?          @relation("MenuItemRecipe", fields: [recipeId], references: [id], onDelete: SetNull)
 
   @@unique([restaurantId, code])
   @@index([categoryId])
@@ -2985,6 +2986,8 @@ model Restaurant {
   demandForecasts         DemandForecast[]
   expenseCategories       ExpenseCategory[]
   externalOrders          ExternalOrder[]
+  weeklyMenus             WeeklyMenu[]
+  weeklyMenuOrders        WeeklyMenuOrder[]
   coupons                 Coupon[]
   feedbackEntries         Feedback[]                @relation("RestaurantFeedback")
   guestProfiles           GuestProfile[]
@@ -5196,4 +5199,99 @@ model NinetynineEvent {
   @@index([processedAt, receivedAt])
   @@index([processedAt, nextAttemptAt])
   @@map("ninetynine_events")
+}
+
+// Weekly menu (spec 2026-11-10 cardapio-da-semana)
+enum WeeklyMenuOrderStatus {
+  PLACED
+  RELEASING
+  RELEASED
+  CANCELLED
+}
+
+model WeeklyMenu {
+  id            String    @id @default(cuid())
+  restaurantId  String
+  /// Service date in the restaurant's timezone, YYYY-MM-DD
+  serviceDate   String
+  orderDeadline DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  restaurant Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  items      WeeklyMenuItem[]
+  orders     WeeklyMenuOrder[]
+
+  @@unique([restaurantId, serviceDate])
+  @@map("weekly_menus")
+}
+
+model WeeklyMenuItem {
+  id           String @id @default(cuid())
+  weeklyMenuId String
+  menuItemId   String
+  portionLimit Int?
+
+  weeklyMenu WeeklyMenu @relation(fields: [weeklyMenuId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([weeklyMenuId, menuItemId])
+  @@index([menuItemId])
+  @@map("weekly_menu_items")
+}
+
+model WeeklyMenuOrder {
+  id                 String                @id @default(cuid())
+  restaurantId       String
+  weeklyMenuId       String
+  status             WeeklyMenuOrderStatus @default(PLACED)
+  customerId         String?
+  customerName       String
+  customerPhone      String
+  customerEmail      String?
+  isPickup           Boolean
+  deliveryAddress    String?
+  deliveryCity       String?
+  deliveryZipCode    String?
+  kitchenNote        String
+  paymentMethod      DeliveryPaymentMethod
+  cashChangeFor      Float?
+  voucherBrand       String?
+  paymentNote        String
+  subtotal           Float
+  deliveryFee        Float
+  discount           Float
+  total              Float
+  couponRedemptionId String?
+  couponCode         String?
+  orderNumber        String                @unique
+  orderId            String?               @unique
+  cancelReason       String?
+  cancelledAt        DateTime?
+  createdAt          DateTime              @default(now())
+
+  restaurant Restaurant            @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  weeklyMenu WeeklyMenu            @relation(fields: [weeklyMenuId], references: [id], onDelete: Restrict)
+  items      WeeklyMenuOrderItem[]
+
+  @@index([weeklyMenuId, status])
+  @@index([status])
+  @@index([restaurantId])
+  @@map("weekly_menu_orders")
+}
+
+model WeeklyMenuOrderItem {
+  id                  String  @id @default(cuid())
+  weeklyMenuOrderId   String
+  menuItemId          String
+  recipeId            String
+  name                String
+  unitPrice           Float
+  quantity            Int
+  specialInstructions String?
+
+  weeklyMenuOrder WeeklyMenuOrder @relation(fields: [weeklyMenuOrderId], references: [id], onDelete: Cascade)
+
+  @@index([weeklyMenuOrderId])
+  @@map("weekly_menu_order_items")
 }
