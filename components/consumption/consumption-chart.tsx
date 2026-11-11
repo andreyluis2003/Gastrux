@@ -17,6 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ChartLine, ChartBar, ChartPie } from 'lucide-react';
+import { ingredientShares } from '@/lib/consumption/shares';
 
 const COLORS = [
   '#3b82f6',
@@ -50,6 +51,7 @@ export function ConsumptionChart({
   trends = [],
   topIngredients = [],
 }: ConsumptionChartProps) {
+  const shares = ingredientShares(topIngredients);
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {trends.length > 0 && (
@@ -173,7 +175,7 @@ export function ConsumptionChart({
         </Card>
       )}
 
-      {topIngredients.length > 0 && (
+      {shares.items.length > 0 && (
         <Card className="p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-4">
             <ChartPie className="w-5 h-5 text-purple-600" />
@@ -181,38 +183,38 @@ export function ConsumptionChart({
               Distribuição por Ingrediente
             </h3>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
+          <p className="-mt-2 mb-2 text-xs text-slate-500">
+            {shares.basis === 'cost' ? 'Pelo custo de cada ingrediente' : 'Pela quantidade (sem custo cadastrado)'}
+          </p>
+          {/* Names go in the list below: labels around the pie were cut off and overlapped (2026-11-11) */}
+          <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie
-                data={topIngredients}
-                dataKey="totalQuantity"
-                nameKey="ingredientName"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label={(entry: any) => {
-                  const percent = (entry.percent ?? 0);
-                  const name = entry.payload?.ingredientName || 'Unknown';
-                  return `${name}: ${(percent * 100).toFixed(0)}%`;
-                }}
-              >
-                {topIngredients.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
+              <Pie data={shares.items} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={95} paddingAngle={1}>
+                {shares.items.map((s, index) => (
+                  <Cell key={s.name} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1e293b',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#fff',
-                }}
+                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                itemStyle={{ color: '#fff' }}
+                formatter={(value: any, name: any) => [
+                  shares.basis === 'cost'
+                    ? `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 }),
+                  name,
+                ]}
               />
             </PieChart>
           </ResponsiveContainer>
+          <ul className="mt-3 space-y-1.5">
+            {shares.items.map((s, index) => (
+              <li key={s.name} className="flex items-center gap-2 text-sm">
+                <span className="h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-300" title={s.name}>{s.name}</span>
+                <span className="shrink-0 font-medium tabular-nums text-slate-900 dark:text-white">{s.label}</span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
     </div>
