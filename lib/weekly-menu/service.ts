@@ -111,20 +111,24 @@ export async function updateWeeklyMenu(
   const orderDeadline = input.orderDeadline === undefined ? undefined : parseDeadline(input.orderDeadline);
   const keep = new Set(items.map((i) => i.menuItemId));
 
-  const current = await prisma.weeklyMenuItem.findMany({ where: { weeklyMenuId: id }, select: { menuItemId: true } });
-  const currentIds = new Set(current.map((c) => c.menuItemId));
-  await assertProducts(restaurantId, items.map((i) => i.menuItemId).filter((x) => !currentIds.has(x)));
-
-  // Dropping a product that already has a PLACED order is refused
-  const removed = [...currentIds].filter((x) => !keep.has(x));
-  for (const menuItemId of removed) {
-    const n = await prisma.weeklyMenuOrder.count({
-      where: { weeklyMenuId: id, status: 'PLACED', items: { some: { menuItemId } } },
-    });
-    if (n > 0) throw new CashRuleError(`Já tem ${n} encomendas com este produto`, 409);
-  }
-
   await prisma.$transaction(async (tx) => {
+    // Same per-menu lock the public ordering takes: placement and edits serialize
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'weekly-menu:' + id}))`;
+    const current = await tx.weeklyMenuItem.findMany({ where: { weeklyMenuId: id }, select: { menuItemId: true } });
+    const currentIds = new Set(current.map((c) => c.menuItemId));
+    const added = items.map((i) => i.menuItemId).filter((x) => !currentIds.has(x));
+    if (added.length) {
+      const found = await tx.menuItem.count({ where: { id: { in: added }, restaurantId, active: true } });
+      if (found !== added.length) throw new CashRuleError('Produto não encontrado ou inativo', 400);
+    }
+    // Dropping a product that already has a PLACED order is refused
+    const removed = [...currentIds].filter((x) => !keep.has(x));
+    for (const menuItemId of removed) {
+      const n = await tx.weeklyMenuOrder.count({
+        where: { weeklyMenuId: id, status: 'PLACED', items: { some: { menuItemId } } },
+      });
+      if (n > 0) throw new CashRuleError(`Já tem ${n} encomendas com este produto`, 409);
+    }
     if (orderDeadline !== undefined) await tx.weeklyMenu.update({ where: { id }, data: { orderDeadline } });
     if (removed.length) await tx.weeklyMenuItem.deleteMany({ where: { weeklyMenuId: id, menuItemId: { in: removed } } });
     for (const it of items) {
@@ -189,20 +193,23 @@ export async function getWeeklyMenu(restaurantId: string, id: string) {
   return { menu: menuRow, items, summary, orders };
 }
 
-export async function cancelWeeklyOrder(restaurantId: string, orderId: string, reason: unknown) {
+export async function cancelWeeklyOrder(restaurantId: string, menuId: string, orderId: string, reason: unknown) {
   const order = await prisma.weeklyMenuOrder.findFirst({
-    where: { id: orderId, restaurantId },
+    where: { id: orderId, weeklyMenuId: menuId, restaurantId },
     select: { id: true, couponRedemptionId: true },
   });
   if (!order) throw new CashRuleError('Encomenda não encontrada', 404);
   const text = typeof reason === 'string' ? reason.trim().slice(0, 300) : '';
-  // Conditional update: only a PLACED order is cancelled, and only once
-  const res = await prisma.weeklyMenuOrder.updateMany({
-    where: { id: order.id, status: 'PLACED' },
-    data: { status: 'CANCELLED', cancelReason: text || null, cancelledAt: new Date() },
+  // One transaction: the cancel and the coupon release succeed or fail together
+  await prisma.$transaction(async (tx) => {
+    // Conditional update: only a PLACED order is cancelled, and only once
+    const res = await tx.weeklyMenuOrder.updateMany({
+      where: { id: order.id, status: 'PLACED' },
+      data: { status: 'CANCELLED', cancelReason: text || null, cancelledAt: new Date() },
+    });
+    if (res.count === 0) throw new CashRuleError('Esta encomenda já virou pedido; cancele pelo pedido', 409);
+    if (order.couponRedemptionId) await releaseRedemption(order.couponRedemptionId, tx);
   });
-  if (res.count === 0) throw new CashRuleError('Esta encomenda já virou pedido; cancele pelo pedido', 409);
-  if (order.couponRedemptionId) await releaseRedemption(order.couponRedemptionId);
   return { id: order.id, status: 'CANCELLED' as const };
 }
 

@@ -11,7 +11,7 @@ export async function POST(req: Request, { params }: { params: { id: string; ord
   if (!auth.ok) return auth.response;
   const body = await req.json().catch(() => ({}));
   try {
-    return NextResponse.json(await cancelWeeklyOrder(auth.member.restaurantId, params.orderId, body?.reason));
+    return NextResponse.json(await cancelWeeklyOrder(auth.member.restaurantId, params.id, params.orderId, body?.reason));
   } catch (e) {
     if (e instanceof CashRuleError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;

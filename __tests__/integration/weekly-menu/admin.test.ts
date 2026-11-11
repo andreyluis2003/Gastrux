@@ -179,6 +179,16 @@ describe('weekly menu admin', () => {
     await prisma.coupon.delete({ where: { id: coupon.id } });
   });
 
+  it('cancel is scoped to the menu in the URL: order of another menu is 404', async () => {
+    const id1 = await mkMenu(iso(5));
+    const id2 = await mkMenu(iso(6));
+    const o = await mkOrder(id1, [[a, 1]]);
+    const res = await CANCEL(json('POST', { reason: 'x' }), { params: { id: id2, orderId: o.id } });
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('Encomenda não encontrada');
+    expect((await prisma.weeklyMenuOrder.findUnique({ where: { id: o.id } })).status).toBe('PLACED');
+  });
+
   it('cancelling a RELEASED order is 409 with the exact message', async () => {
     const id = await mkMenu();
     const o = await mkOrder(id, [[a, 1]], { status: 'RELEASED' });

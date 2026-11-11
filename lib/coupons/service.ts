@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { findCustomerByPhone } from '@/lib/cashback/service';
 import { couponLabel, discountFor, normalizeCode, refusal, type CouponKind, type CouponRules } from './rules';
@@ -67,11 +68,14 @@ export const attachRedemption = (redemptionId: string, externalOrderId: string) 
   prisma.couponRedemption.update({ where: { id: redemptionId }, data: { externalOrderId } });
 
 /** The order was not created: the use goes back */
-export async function releaseRedemption(redemptionId: string) {
-  await prisma.$transaction(async (tx) => {
+export async function releaseRedemption(redemptionId: string, outer?: Prisma.TransactionClient) {
+  const run = async (tx: Prisma.TransactionClient) => {
     const r = await tx.couponRedemption.findUnique({ where: { id: redemptionId }, select: { couponId: true } });
     if (!r) return;
     await tx.couponRedemption.delete({ where: { id: redemptionId } });
     await tx.coupon.update({ where: { id: r.couponId }, data: { usedCount: { decrement: 1 } } });
-  });
+  };
+  // With an outer tx the release commits or rolls back with the caller
+  if (outer) await run(outer);
+  else await prisma.$transaction(run);
 }
