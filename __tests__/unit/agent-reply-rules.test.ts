@@ -3,7 +3,7 @@
  * subjects go to the team, parsing and validating the AI output, the "quase igual" criterion, and prompts.
  */
 import {
-  pendingClientMessages, nonTextReason, parseReply, validReplyText, sameEnough,
+  pendingClientMessages, nonTextReason, parseReply, validReplyText, replyRejection, sameEnough,
   replySystemPrompt, replyUserPrompt, type ReplyMessage,
 } from '../../lib/agents/whatsapp/reply-rules';
 import type { ActivationSignals } from '../../lib/agents/activation/rules';
@@ -56,6 +56,22 @@ describe('parseReply', () => {
     expect(parseReply('{"tipo":"outro","texto":"x"}')).toBeNull();
   });
   it('trims fields', () => expect(parseReply('{"tipo":"sugestao","texto":"  oi  "}')).toEqual({ kind: 'SUGGESTION', text: 'oi' }));
+  it('finds the JSON object when the AI writes text around it (app 2026-11-10)', () => {
+    expect(parseReply('Aqui está:\n{"tipo":"sugestao","texto":"O Pro custa R$ 99"}\nEspero ter ajudado'))
+      .toEqual({ kind: 'SUGGESTION', text: 'O Pro custa R$ 99' });
+    expect(parseReply('Resposta: ```json\n{"tipo":"equipe","motivo":"Cobrança"}\n```')).toEqual({ kind: 'TEAM', reason: 'Cobrança' });
+  });
+});
+
+describe('replyRejection', () => {
+  it('names why a reply is refused, null when valid', () => {
+    expect(replyRejection('Cadastre em https://gastrux.com')).toBeNull();
+    expect(replyRejection('   ')).toBe('vazia');
+    expect(replyRejection('a'.repeat(701))).toBe('longa');
+    expect(replyRejection('Oi!\n\nEquipe Gastrux')).toBe('assinatura');
+    expect(replyRejection('https://gastrux.com e https://gastrux.com/pricing')).toBe('mais de um link');
+    expect(replyRejection('veja https://outro.com')).toBe('link de fora');
+  });
 });
 
 describe('validReplyText', () => {

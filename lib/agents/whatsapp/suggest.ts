@@ -12,7 +12,7 @@ import { loadActivationSignals } from '../activation/signals';
 import { WINDOW_MS } from './conversation';
 import { phoneKey } from './numbers';
 import {
-  nonTextReason, parseReply, pendingClientMessages, replySystemPrompt, replyUserPrompt, sameEnough, validReplyText,
+  nonTextReason, parseReply, pendingClientMessages, replyRejection, replySystemPrompt, replyUserPrompt, sameEnough,
   type ClientContext, type ReplyMessage,
 } from './reply-rules';
 
@@ -67,7 +67,10 @@ export async function getOrCreateSuggestion(
   }
 
   const client = getAnthropic();
-  if (!client) return { state: 'unavailable' };
+  if (!client) {
+    console.error('[agent-suggest] no AI client (ANTHROPIC_API_KEY missing?)');
+    return { state: 'unavailable' };
+  }
 
   const restaurantId = [...rows].reverse().find((m) => m.restaurantId)?.restaurantId;
   let ctx: ClientContext = { kind: 'visitor' };
@@ -95,12 +98,17 @@ export async function getOrCreateSuggestion(
     if (res.usage) costUsd = estimateCostUsd(model, res.usage);
     const raw = res.content.map((c) => (c.type === 'text' ? c.text : '')).join('');
     const parsed = parseReply(raw);
-    if (parsed?.kind === 'SUGGESTION' && validReplyText(parsed.text)) {
+    const rejected = parsed?.kind === 'SUGGESTION' ? replyRejection(parsed.text) : null;
+    if (parsed?.kind === 'SUGGESTION' && !rejected) {
       return view(await prisma.agentReplySuggestion.create({ data: { ...base, kind: 'SUGGESTION', text: parsed.text, model, costUsd, outcome: 'pending' } }));
     }
     if (parsed?.kind === 'TEAM') {
       return view(await prisma.agentReplySuggestion.create({ data: { ...base, kind: 'TEAM', reason: parsed.reason, model, costUsd, outcome: 'team' } }));
     }
+    // Only the reason and sizes go to the log, never the conversation text
+    console.error(parsed
+      ? `[agent-reply] suggestion refused: ${rejected} (${parsed.kind === 'SUGGESTION' ? parsed.text.length : 0} chars)`
+      : `[agent-reply] AI reply not in the expected format (${raw.length} chars, stop: ${res.stop_reason})`);
   } catch (e) {
     console.error('[agent-reply] suggestion failed', e);
   }

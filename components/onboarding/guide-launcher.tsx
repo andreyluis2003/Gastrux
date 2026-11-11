@@ -41,6 +41,8 @@ export function GuideLauncher({ withSidebar }: { withSidebar: boolean }) {
 
   // The home shows the same list in its card
   if (!guide?.active || hidden || touring || pathname === '/dashboard') return null;
+  // Platform-team screens are not the restaurant's setup, and the button covered "Responder" there (2026-11-10)
+  if (/^\/admin\/(agente|platform)(\/|$)/.test(pathname)) return null;
   // On a phone the comanda has a fixed bar at the bottom: the button would sit on it
   const onComanda = /^\/vender\/[^/]+$/.test(pathname);
 

@@ -36,7 +36,15 @@ export function parseReply(raw: string): ParsedReply {
   const fence = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
   if (fence) s = fence[1].trim();
   let data: unknown;
-  try { data = JSON.parse(s); } catch { return null; }
+  try {
+    data = JSON.parse(s);
+  } catch {
+    // The AI sometimes writes a sentence around the object (app 2026-11-10): take the outermost {...}
+    const start = s.indexOf('{');
+    const end = s.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    try { data = JSON.parse(s.slice(start, end + 1)); } catch { return null; }
+  }
   if (!data || typeof data !== 'object') return null;
   const d = data as Record<string, unknown>;
   if (d.tipo === 'sugestao' && typeof d.texto === 'string') {
@@ -63,9 +71,15 @@ const BARE_DOMAIN = /(?<![\w@.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,
 
 /** Non-empty, within the WhatsApp limit, at most one link (to gastrux.com or a subdomain, with or without scheme), no signature. */
 export function validReplyText(text: string): boolean {
+  return replyRejection(text) === null;
+}
+
+/** Why a reply breaks the rules above (for the log, never shown to clients); null when it is valid. */
+export function replyRejection(text: string): 'vazia' | 'longa' | 'assinatura' | 'mais de um link' | 'link de fora' | null {
   const t = text.trim();
-  if (!t || t.length > WHATSAPP_MAX) return false;
-  if (endsWithSignature(t)) return false;
+  if (!t) return 'vazia';
+  if (t.length > WHATSAPP_MAX) return 'longa';
+  if (endsWithSignature(t)) return 'assinatura';
   const hosts: (string | undefined)[] = [];
   const schemeLinks = t.match(/https?:\/\/[^\s]+/gi) ?? [];
   for (const raw of schemeLinks) {
@@ -75,8 +89,8 @@ export function validReplyText(text: string): boolean {
   // Scheme links are blanked out first so a bare domain inside one is not counted twice
   const rest = t.replace(/https?:\/\/[^\s]+/gi, ' ');
   for (const m of rest.matchAll(BARE_DOMAIN)) hosts.push(m[1].toLowerCase());
-  if (hosts.length > 1) return false;
-  return hosts.every((h) => !!h && isGastruxHost(h));
+  if (hosts.length > 1) return 'mais de um link';
+  return hosts.every((h) => !!h && isGastruxHost(h)) ? null : 'link de fora';
 }
 
 const normalise = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
