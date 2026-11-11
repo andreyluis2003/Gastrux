@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { releaseRedemption } from '@/lib/coupons/service';
@@ -6,7 +7,17 @@ import { productionSummary, remainingPortions, todayIn } from './rules';
 // Admin service for the weekly menu (spec 2026-11-10 cardapio-da-semana)
 
 // Orders that hold portions: everything but CANCELLED
-const LIVE = ['PLACED', 'RELEASING', 'RELEASED'] as const;
+export const LIVE = ['PLACED', 'RELEASING', 'RELEASED'] as const;
+
+/** Portions held per product of a weekly menu: quantities of its non-cancelled orders. */
+export async function orderedByItem(db: Prisma.TransactionClient | typeof prisma, weeklyMenuId: string): Promise<Map<string, number>> {
+  const rows = await db.weeklyMenuOrderItem.groupBy({
+    by: ['menuItemId'],
+    where: { weeklyMenuOrder: { weeklyMenuId, status: { in: [...LIVE] } } },
+    _sum: { quantity: true },
+  });
+  return new Map(rows.map((r) => [r.menuItemId, r._sum.quantity ?? 0]));
+}
 
 export interface WeeklyMenuItemInput {
   menuItemId: string;
@@ -174,8 +185,8 @@ export async function getWeeklyMenu(restaurantId: string, id: string) {
   if (!menu) throw new CashRuleError('Cardápio não encontrado', 404);
 
   const live = menu.orders.filter((o) => (LIVE as readonly string[]).includes(o.status));
-  const orderedBy = new Map<string, number>();
-  for (const o of live) for (const it of o.items) orderedBy.set(it.menuItemId, (orderedBy.get(it.menuItemId) ?? 0) + it.quantity);
+  // The same count the public link uses for the portions left
+  const orderedBy = await orderedByItem(prisma, menu.id);
 
   const items = menu.items.map((i) => {
     const ordered = orderedBy.get(i.menuItemId) ?? 0;
