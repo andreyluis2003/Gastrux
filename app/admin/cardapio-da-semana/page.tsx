@@ -64,12 +64,12 @@ export default function CardapioDaSemanaPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold">Cardápio da semana</h1>
           <p className="text-sm text-muted-foreground">Venda por encomenda para um dia: o cliente pede pelo link e o pedido entra no dia.</p>
         </div>
-        <Button onClick={startNew}><Plus className="h-4 w-4 mr-1" /> Novo cardápio da semana</Button>
+        <Button className="shrink-0 whitespace-nowrap" onClick={startNew}><Plus className="h-4 w-4 mr-1" /> Novo cardápio da semana</Button>
       </div>
 
       {creating && (

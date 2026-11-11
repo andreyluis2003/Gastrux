@@ -58,6 +58,8 @@ interface RestaurantInfo {
   opens?: string | null;
   /** Open weekly menu: orders are pre-orders for serviceDate (spec 2026-11-10 cardapio-da-semana) */
   weeklyMenu?: { id: string; serviceDate: string; banner: string } | null;
+  /** No open weekly menu but one past its deadline: "Pedidos encerrados para ..." */
+  weeklyMenuClosed?: { serviceDate: string; text: string } | null;
 }
 
 interface CartItem {
@@ -871,6 +873,9 @@ export default function DeliveryPage() {
         </div>
       </header>
 
+      {restaurant.weeklyMenuClosed && (
+        <div className="bg-gray-700 text-white text-center text-sm font-semibold px-4 py-2">{restaurant.weeklyMenuClosed.text}</div>
+      )}
       {restaurant.weeklyMenu && (
         <div className="bg-orange-600 text-white text-center text-sm font-semibold px-4 py-2">{restaurant.weeklyMenu.banner}</div>
       )}

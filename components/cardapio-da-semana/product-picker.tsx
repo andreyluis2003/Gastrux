@@ -33,10 +33,11 @@ export function ProductPicker({
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (categories ?? [])
-      .filter((c) => c.active !== false)
-      .map((c) => ({ ...c, items: c.items.filter((i) => i.available !== false && (!q || i.name.toLowerCase().includes(q))) }))
+      .filter((c) => c.active !== false || c.items.some((i) => i.id in selected))
+      // A selected product stays listed even if it is now inactive/unavailable, so it can be unchecked
+      .map((c) => ({ ...c, items: c.items.filter((i) => (i.available !== false || i.id in selected) && (!q || i.name.toLowerCase().includes(q))) }))
       .filter((c) => c.items.length > 0);
-  }, [categories, search]);
+  }, [categories, search, selected]);
 
   const toggle = (id: string) => {
     const next = { ...selected };
@@ -64,6 +65,7 @@ export function ProductPicker({
                   <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
                     <input type="checkbox" checked={checked} disabled={locked && checked} onChange={() => toggle(i.id)} />
                     <span className="truncate">{i.name}</span>
+                    {(i.available === false || c.active === false) && <span className="text-xs text-red-600">indisponível</span>}
                     <span className="text-muted-foreground">{money(Number(i.price))}</span>
                   </label>
                   {checked && (

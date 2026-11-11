@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { stateOf } from '@/lib/orders/store-open';
 import { offeredToday } from '@/lib/cardapio/days-server';
 import { getDeliveryPaymentOptions } from '@/lib/delivery-payments/settings-service';
-import { openWeeklyMenu } from '@/lib/weekly-menu/public';
+import { closedWeeklyMenu, openWeeklyMenu } from '@/lib/weekly-menu/public';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,11 +76,12 @@ export async function GET(
     const acceptsOnlinePayment = paymentOptions.online.pix;
     // With a weekly menu open only a closing by hand stops the link (the order is for another day)
     const closed = weekly ? store.reason === 'manual' : store.closed;
+    const weeklyMenuClosed = weekly ? null : await closedWeeklyMenu(params.restaurantId);
     const weeklyMenu = weekly ? { id: weekly.id, serviceDate: weekly.serviceDate, banner: weekly.banner } : null;
 
     return NextResponse.json(
       // Loja fechada shows on the page (spec 2026-11-07 quadro-de-pedidos); a short cache so closing shows soon
-      { restaurant: { ...publicInfo, closed, opens: closed ? store.opens : null, acceptsOnlinePayment, paymentOptions, weeklyMenu }, categories: filteredCategories },
+      { restaurant: { ...publicInfo, closed, opens: closed ? store.opens : null, acceptsOnlinePayment, paymentOptions, weeklyMenu, weeklyMenuClosed }, categories: filteredCategories },
       { headers: { 'Cache-Control': 'public, max-age=15' } }
     );
   } catch (error) {

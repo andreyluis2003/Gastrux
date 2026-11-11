@@ -50,6 +50,22 @@ export async function openWeeklyMenu(restaurantId: string, now: Date = new Date(
 }
 
 /**
+ * With no open menu: the earliest upcoming menu whose deadline has passed, as the "encerrado" notice
+ * (spec 2026-11-10 cardapio-da-semana, "Como o cliente usa" item 4). Null when none.
+ */
+export async function closedWeeklyMenu(restaurantId: string, now: Date = new Date()): Promise<{ serviceDate: string; text: string } | null> {
+  const tz = await timeZoneOf(prisma, restaurantId);
+  if (!tz) return null;
+  const today = todayIn(tz, now);
+  const m = await prisma.weeklyMenu.findFirst({
+    where: { restaurantId, serviceDate: { gte: today }, orderDeadline: { lte: now } },
+    orderBy: { serviceDate: 'asc' },
+    select: { serviceDate: true },
+  });
+  return m ? { serviceDate: m.serviceDate, text: closedText(m.serviceDate) } : null;
+}
+
+/**
  * Can this order go on this weekly menu now? The menu must be this restaurant's (404) and the open one (409 with the
  * closed text), every product on it (400) and within the portions left (409). Pass no lines to check only the menu.
  * Run without a lock as an early answer; placeWeeklyOrder runs it again under the per-menu lock.

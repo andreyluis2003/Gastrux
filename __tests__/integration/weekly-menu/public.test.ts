@@ -131,6 +131,15 @@ describe('weekly menu on the public link', () => {
     expect(data.categories[0].items[0].soldOut).toBeUndefined();
   });
 
+  it('weeklyMenuClosed: set after the deadline with no open menu; null with an open menu or none', async () => {
+    expect((await (await getMenu()).json()).restaurant.weeklyMenuClosed).toBeNull();
+    await prisma.weeklyMenu.update({ where: { id: menu.id }, data: { orderDeadline: new Date(Date.now() - 60_000) } });
+    const closed = (await (await getMenu()).json()).restaurant.weeklyMenuClosed;
+    expect(closed).toEqual({ serviceDate: iso(5), text: closedText(iso(5)) });
+    await prisma.weeklyMenu.delete({ where: { id: menu.id } });
+    expect((await (await getMenu()).json()).restaurant.weeklyMenuClosed).toBeNull();
+  });
+
   it('closed by the hours takes the pre-order; it creates no Order nor ExternalOrder; price is frozen', async () => {
     await prisma.restaurant.update({ where: { id: rid }, data: { businessHours: { ...allClosed, auto: true } } });
     // A normal order is still refused in the same state
