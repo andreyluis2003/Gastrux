@@ -677,3 +677,17 @@ Sobras das revisões (nenhuma bloqueia):
 - Pedidos com pedido do cliente aberto entram na primeira página fora da ordem e fora do total.
 - A visão em quadro de Pedidos de delivery não tem as caixas de responder; responde-se pela lista.
 - O site de vendas (faq-section, features-showcase) continua dizendo que a 99Food ainda não está conectada até a 99Food liberar o app de produção.
+
+## Cardápio da semana (pedido antecipado) — sobras das revisões (2026-11-10)
+
+Nenhuma bloqueia. Decisões e sobras:
+- Pedido "para agora" ainda é possível enquanto há cardápio da semana aberto, se uma página antiga (ou um pedido montado à mão) não mandar o cardápio da semana e a loja estiver aberta. Não corrigido: precisa de página velha e loja aberta.
+- Texto "só restam 1 porções" (plural errado quando sobra 1).
+- Uma queda do servidor no meio da soltura conta como tentativa falha da encomenda (aviso "Não entrou no Quadro" depois de 3).
+- O prazo é digitado e mostrado no fuso do navegador (ok enquanto a dona está no fuso do restaurante).
+- O campo de data do novo cardápio não tem mínimo (o servidor recusa data passada).
+- Produto desativado (não só esgotado) que já estava no cardápio da semana não aparece no seletor para desmarcar.
+- O pedido do link cria o cliente antes da conferência final (pode sobrar um cliente sem pedido).
+- A busca do pedido não olha "mostrar no site" (igual ao pedido normal).
+- O artigo "encomendas" (balcão) e o "cardápio da semana" não citam um ao outro.
+- Pagamento antecipado (Pix), lembrete na véspera e encomenda pelo robô do WhatsApp ficam para depois (spec).
