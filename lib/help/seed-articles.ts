@@ -964,6 +964,61 @@ Para tirar a foto, clique em **Remover**. Para trocar, clique em **Escolher foto
   },
   {
     categorySlug: 'cardapio-e-receitas',
+    slug: 'cardapio-da-semana',
+    title: 'Cardápio da semana: vender por encomenda para um dia',
+    summary: 'Em Cardápio e produtos > Cardápio da semana, você escolhe o dia, os produtos e as porções. O cliente encomenda pelo mesmo link e o pedido cai no Quadro à meia-noite do dia.',
+    keywords: 'cardápio da semana, encomenda, pré-venda, pedido para outro dia, porções, prazo, sábado, feijoada, quentinha, agendar',
+    order: 7,
+    content: `## Para que serve
+
+Você vende um dia só, ou um dia por semana (feijoada de sábado, por exemplo), e quer receber as encomendas antes. Em **Cardápio e produtos > Cardápio da semana**, você monta o cardápio daquele dia. O cliente encomenda pelo mesmo link de delivery. Só o dono e o gerente mexem nessa tela.
+
+## Criando um cardápio
+
+1. Clique em **Novo**
+2. Escolha a **data do atendimento**: o dia em que você vai entregar ou o cliente vai retirar
+3. Se quiser, coloque um **prazo**: a data e a hora em que as encomendas fecham
+4. Escolha os produtos. Em cada um, você pode pôr as **Porções**: quantas dá para fazer
+5. Salve
+
+Sem prazo, o cliente encomenda até o dia chegar. Sem porções, o produto não tem limite.
+
+Para repetir uma semana, use **Copiar de uma semana anterior**. Você escolhe a data nova e confere os produtos.
+
+## O que o cliente vê
+
+- No topo do cardápio: **Pedidos para sábado, 15/11 · encomende até quinta às 20h**
+- Só os produtos desse cardápio
+- Produto sem porções sobrando mostra **Esgotado**
+- Depois do prazo: **Pedidos encerrados para sábado, 15/11**. Se já existe a próxima semana pronta, ela aparece
+- O pagamento é na entrega ou na retirada. O Pix antecipado ainda não existe nesse recurso
+
+## Loja fechada
+
+- Loja fechada pelo **horário** não impede encomenda. O cliente encomenda para o dia mesmo de madrugada
+- Se você clicar em **Fechar a loja**, as encomendas ficam bloqueadas até reabrir
+
+## No dia
+
+À **meia-noite do dia do atendimento** (no horário do seu restaurante), as encomendas entram no **Quadro de pedidos** como pedidos normais. No topo da observação para a cozinha vem **ENCOMENDA do cardápio de sábado, 15/11**.
+
+O estoque, a ficha técnica e o cashback contam nesse dia. O preço fica o que era na hora da encomenda. O cupom também: o desconto não muda depois.
+
+## Acompanhando antes do dia
+
+Abra o cardápio da semana:
+
+- **Produtos e limites**: dá para mudar as porções. Um produto que já tem encomenda não sai do cardápio
+- **O que fazer**: o total de cada produto para produzir, as observações dos clientes agrupadas e o botão **Imprimir**
+- **Encomendas**: a lista de quem encomendou. Para cancelar, escolha o motivo. Depois que virou pedido, o cancelamento é pelo pedido, no Quadro
+
+## Se der erro
+
+- **Já tem 3 encomendas com este produto**: você tentou tirar um produto que já foi encomendado. Deixe ele no cardápio
+- **Só restam 2 porções**: o cliente pediu mais do que o limite. Ele ajusta a quantidade`,
+  },
+  {
+    categorySlug: 'cardapio-e-receitas',
     slug: 'venda-por-peso',
     title: 'Como vendo por peso (pão, frios, doces por kg)?',
     summary: 'Marque "Vendido por peso" no produto, com o preço por kg. No caixa, digite o peso que a balança mostra.',
