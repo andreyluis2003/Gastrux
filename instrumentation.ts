@@ -10,5 +10,8 @@ export async function register() {
     // The stored 99Food webhook events, every 5 seconds, only with NINETYNINE_FOOD_EVENTS=on (plan 2026-11-09 99food)
     const { startNinetynineWorkerIfEnabled } = await import('./lib/ninetynine/worker');
     startNinetynineWorkerIfEnabled();
+    // Weekly-menu pre-orders enter on the service day, checked every 60 seconds (spec 2026-11-10 cardapio-da-semana)
+    const { startWeeklyMenuWorker } = await import('./lib/weekly-menu/worker');
+    startWeeklyMenuWorker(60_000);
   }
 }

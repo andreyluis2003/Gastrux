@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { KITCHEN_VISIBLE_ORDER_WHERE } from '@/lib/kds-visibility';
+import { releaseDue } from '@/lib/weekly-menu/release';
 
 /**
  * Todos os pedidos (spec 2026-11-07 quadro-de-pedidos §B): every open order of every channel in one board, read
@@ -21,6 +22,12 @@ const extNumber = (e: { externalOrderId: string; platformData: unknown }) => {
 };
 
 export async function loadBoard(restaurantId: string, now = new Date()): Promise<BoardCard[]> {
+  // Due pre-orders enter before the read (spec 2026-11-10 cardapio-da-semana); a failure never breaks the board
+  try {
+    await releaseDue(restaurantId, now);
+  } catch (e: any) {
+    console.error('[weekly-menu] release on board load failed:', e?.message ?? e);
+  }
   const since = new Date(now.getTime() - WINDOW_MS);
   const [orders, externals] = await Promise.all([
     prisma.order.findMany({
