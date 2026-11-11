@@ -19,6 +19,8 @@ import {
 } from '@/components/delivery/payment-method-selector';
 import { PaymentReturn } from '@/components/delivery/payment-return';
 import type { DeliveryPaymentOptions } from '@/lib/delivery-payments/choice';
+import { dayLabel } from '@/lib/weekly-menu/rules';
+import { confirmationText } from '@/lib/weekly-menu/ui-helpers';
 import { readPaymentReturnParams, type PaymentReturnParams } from '@/lib/delivery-payments/return-params';
 
 interface MenuItem {
@@ -27,6 +29,8 @@ interface MenuItem {
   description?: string | null;
   price: string | number;
   available: boolean;
+  /** Weekly menu product that reached its portion limit (spec 2026-11-10 cardapio-da-semana) */
+  soldOut?: boolean;
   images: { id: string; imageUrl: string }[];
 }
 
@@ -52,6 +56,8 @@ interface RestaurantInfo {
   closed?: boolean;
   /** "hoje às 18:00" when closed by the business hours (spec 2026-11-08 loja-pelo-horario) */
   opens?: string | null;
+  /** Open weekly menu: orders are pre-orders for serviceDate (spec 2026-11-10 cardapio-da-semana) */
+  weeklyMenu?: { id: string; serviceDate: string; banner: string } | null;
 }
 
 interface CartItem {
@@ -343,6 +349,7 @@ export default function DeliveryPage() {
         : specialInstructions,
       deliveryFee,
       pickup,
+      weeklyMenuId: restaurant?.weeklyMenu?.id,
       couponCode: coupon?.code,
       ...payment.payload,
     };
@@ -393,7 +400,7 @@ export default function DeliveryPage() {
       } else {
         // Pay on delivery: nothing else to do online.
         setStep('success');
-        toast.success('Pedido enviado! O pagamento será feito na entrega.');
+        toast.success(data.order?.status === 'ENCOMENDA' ? 'Encomenda enviada!' : 'Pedido enviado! O pagamento será feito na entrega.');
       }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao criar pedido');
@@ -532,9 +539,10 @@ export default function DeliveryPage() {
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
         <Card className="p-8 text-center max-w-md w-full space-y-4">
           <CheckCircle className="h-16 w-16 mx-auto text-green-600" />
-          <h2 className="text-2xl font-bold text-green-800">{pixPaid ? 'Pedido Confirmado!' : 'Pedido Enviado!'}</h2>
+          <h2 className="text-2xl font-bold text-green-800">{orderData?.status === 'ENCOMENDA' ? 'Encomenda Enviada!' : pixPaid ? 'Pedido Confirmado!' : 'Pedido Enviado!'}</h2>
           <p className="text-gray-600">Seu pedido <span className="font-bold">#{orderData?.orderNumber}</span> foi recebido.</p>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-1">
+            {orderData?.status === 'ENCOMENDA' && orderData.serviceDate && <p className="text-sm font-semibold">{confirmationText(dayLabel(orderData.serviceDate))}</p>}
             <p className="text-sm"><span className="font-medium">Total:</span> {formatBRL(orderData?.total || 0)}</p>
             <p className="text-sm">{pickup ? <><span className="font-medium">Retirada no local</span>{restaurant.address ? `: ${restaurant.address}` : ''}</> : <><span className="font-medium">Entrega em:</span> {deliveryAddress}</>}</p>
             <p className="text-sm">{pixPaid ? <><span className="font-medium">Status:</span> Pagamento confirmado ✔</> : orderData?.paymentSummary || 'Pagamento na entrega'}</p>
@@ -863,6 +871,10 @@ export default function DeliveryPage() {
         </div>
       </header>
 
+      {restaurant.weeklyMenu && (
+        <div className="bg-orange-600 text-white text-center text-sm font-semibold px-4 py-2">{restaurant.weeklyMenu.banner}</div>
+      )}
+
       {/* Menu */}
       <main className="max-w-2xl mx-auto px-4 py-4 pb-28">
         {filteredCategories.length === 0 ? (
@@ -886,7 +898,9 @@ export default function DeliveryPage() {
                         {item.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.description}</p>}
                         <div className="flex items-center gap-2 mt-2">
                           <span className="font-bold text-orange-600">{formatBRL(Number(item.price))}</span>
-                          {inCart ? (
+                          {item.soldOut ? (
+                            <span className="ml-auto text-xs font-semibold text-red-600 border border-red-200 rounded-full px-2 py-0.5">Esgotado</span>
+                          ) : inCart ? (
                             <div className="flex items-center gap-1 ml-auto">
                               <button onClick={() => updateCartQuantity(item.id, -1)} className="h-7 w-7 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"><Minus className="h-3 w-3" /></button>
                               <span className="text-sm font-bold w-6 text-center">{inCart.quantity}</span>

@@ -18,6 +18,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/dashboard/pagamentos': ['app/dashboard/pagamentos/page.tsx'],
   '/contas-a-pagar': ['app/contas-a-pagar/page.tsx'],
   '/admin/cardapio': ['app/admin/cardapio/page.tsx'],
+  '/admin/cardapio-da-semana': ['app/admin/cardapio-da-semana/page.tsx'],
   '/receitas': [TR, "'recipes.title': 'Fichas técnicas'"],
   '/insumos': [TR, "'ingredients.title': 'Insumos'"],
   '/admin/tables/qrcodes': ['app/admin/tables/qrcodes/page.tsx'],

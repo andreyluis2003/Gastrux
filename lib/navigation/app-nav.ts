@@ -66,6 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Cardápio e produtos',
     links: [
       { label: 'Cardápio digital', href: '/admin/cardapio', roles: MANAGERS },
+      { label: 'Cardápio da semana', href: '/admin/cardapio-da-semana', roles: MANAGERS },
       { label: 'Adicionais', href: '/admin/modifiers', roles: MANAGERS },
       { label: 'Fichas técnicas', href: '/receitas', roles: [...MANAGERS, 'COOK'] },
       { label: 'Insumos', href: '/insumos', roles: [...MANAGERS, 'COOK'] },
