@@ -17,7 +17,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ChartLine, ChartBar, ChartPie } from 'lucide-react';
-import { ingredientShares } from '@/lib/consumption/shares';
+import { ingredientRanking, ingredientShares } from '@/lib/consumption/shares';
 
 const COLORS = [
   '#3b82f6',
@@ -52,6 +52,7 @@ export function ConsumptionChart({
   topIngredients = [],
 }: ConsumptionChartProps) {
   const shares = ingredientShares(topIngredients);
+  const ranking = ingredientRanking(topIngredients);
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {trends.length > 0 && (
@@ -135,41 +136,36 @@ export function ConsumptionChart({
         </Card>
       )}
 
-      {topIngredients.length > 0 && (
+      {ranking.items.length > 0 && (
         <Card className="p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-4">
             <ChartBar className="w-5 h-5 text-amber-600" />
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Top Ingredientes (Volume)
+              {ranking.basis === 'cost' ? 'Ingredientes que mais custaram' : 'Ingredientes mais usados'}
             </h3>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={topIngredients}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis
-                dataKey="ingredientName"
-                tick={{ fontSize: 11 }}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                stroke="#64748b"
-              />
-              <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
+          {ranking.basis === 'quantity' && (
+            <p className="-mt-2 mb-2 text-xs text-slate-500">Sem custo cadastrado: pela quantidade, cada um na sua unidade</p>
+          )}
+          {/* Horizontal bars: the names read whole on the left; quantities in different units are not compared by cost (2026-11-11) */}
+          <ResponsiveContainer width="100%" height={Math.max(160, ranking.items.length * 36 + 20)}>
+            <BarChart data={ranking.items} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11 }} stroke="#64748b"
+                tickFormatter={(v: number) => (ranking.basis === 'cost' ? `R$ ${v.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}` : v.toLocaleString('pt-BR'))} />
+              <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12 }} stroke="#64748b"
+                tickFormatter={(n: string) => (n.length > 16 ? `${n.slice(0, 15)}…` : n)} />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1e293b',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#fff',
-                }}
-                formatter={(value: any) => typeof value === 'number' ? value.toFixed(2) : String(value)}
+                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                itemStyle={{ color: '#fff' }}
+                formatter={(value: any, _n: any, item: any) => [
+                  ranking.basis === 'cost'
+                    ? `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} ${item?.payload?.unit ?? ''}`.trim(),
+                  ranking.basis === 'cost' ? 'Custo' : 'Quantidade',
+                ]}
               />
-              <Bar
-                dataKey="totalQuantity"
-                fill="#f59e0b"
-                name="Quantidade"
-                radius={[8, 8, 0, 0]}
-              />
+              <Bar dataKey="value" fill="#f59e0b" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>

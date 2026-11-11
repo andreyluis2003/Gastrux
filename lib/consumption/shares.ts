@@ -7,6 +7,22 @@ export interface IngredientRow {
   ingredientName: string;
   totalQuantity: number;
   totalCost: number;
+  unit?: string;
+}
+
+/** "Top Ingredientes" bars: by cost (biggest first), or by quantity with its unit when nothing has a cost */
+export function ingredientRanking(rows: IngredientRow[], max = 8): { basis: 'cost' | 'quantity'; items: { name: string; value: number; unit: string }[] } {
+  const basis = rows.some((r) => Number(r.totalCost) > 0) ? 'cost' : 'quantity';
+  const items = rows
+    .map((r) => ({
+      name: r.ingredientName || 'Sem nome',
+      value: Math.max(0, Number(basis === 'cost' ? r.totalCost : r.totalQuantity) || 0),
+      unit: r.unit ?? '',
+    }))
+    .filter((r) => r.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, max);
+  return { basis, items };
 }
 
 export interface Share {

@@ -1,4 +1,4 @@
-import { ingredientShares } from '../../../lib/consumption/shares';
+import { ingredientShares, ingredientRanking } from '../../../lib/consumption/shares';
 
 const row = (ingredientName: string, totalCost: number, totalQuantity = 1) => ({ ingredientName, totalCost, totalQuantity, unit: 'kg' });
 
@@ -24,5 +24,20 @@ describe('ingredientShares', () => {
   });
   it('empty when no values', () => {
     expect(ingredientShares([]).items).toEqual([]);
+  });
+});
+
+describe('ingredientRanking', () => {
+  it('ranks by cost, biggest first, at most 8', () => {
+    const rows = Array.from({ length: 10 }, (_, i) => row(`I${i}`, i + 1));
+    const r = ingredientRanking(rows);
+    expect(r.basis).toBe('cost');
+    expect(r.items).toHaveLength(8);
+    expect(r.items[0]).toMatchObject({ name: 'I9', value: 10 });
+  });
+  it('falls back to quantity with the unit when nothing has a cost', () => {
+    const r = ingredientRanking([row('Sal', 0, 3), row('Óleo', 0, 5)]);
+    expect(r.basis).toBe('quantity');
+    expect(r.items[0]).toMatchObject({ name: 'Óleo', value: 5, unit: 'kg' });
   });
 });
