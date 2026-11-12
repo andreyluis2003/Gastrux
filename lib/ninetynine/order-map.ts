@@ -179,3 +179,24 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     platformData: { orderIndex, orderId, deliveryType, fulfillmentMode, payType, payChannel, handoverCode, takeawayCode, shopPaidMoney, cashToCollect },
   };
 }
+
+/**
+ * The order's price block for the log, numbers only (no names, phones or addresses): which fees 99Food adds on top of
+ * what the store receives (homolog 2026-11-12: total R$ 186,00 but "Cobrar R$ 192,99" on a cash, store-delivery order).
+ */
+export function priceSummary(order: any): string {
+  const keep = (v: unknown, depth: number): unknown => {
+    if (typeof v === 'number' || (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v))) return v;
+    if (depth < 2 && v && typeof v === 'object' && !Array.isArray(v)) {
+      const out: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v)) {
+        const kept = keep(x, depth + 1);
+        if (kept !== undefined) out[k] = kept;
+      }
+      return out;
+    }
+    return undefined;
+  };
+  const head = { delivery_type: order?.delivery_type, fulfillment_mode: order?.fulfillment_mode, pay_type: order?.pay_type, pay_method: order?.pay_method, pay_channel: order?.pay_channel };
+  return JSON.stringify({ ...head, price: keep(order?.price ?? {}, 0) });
+}

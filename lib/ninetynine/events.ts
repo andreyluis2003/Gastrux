@@ -8,7 +8,7 @@ import { cancelOrder } from '@/lib/kds-cancel-order';
 import { DeliveryOrderError, acceptDeliveryOrder, externalItemsJson, ingestDeliveryOrder, itemsSubtotal } from '@/lib/delivery-orders/ingest';
 import { pushPlatformStatus } from '@/lib/delivery-orders/platform-sync';
 import { getOrderDetail } from './client';
-import { mapNinetynineOrder } from './order-map';
+import { mapNinetynineOrder, priceSummary } from './order-map';
 
 /**
  * The stored 99Food webhook events become delivery orders and status changes (plan 2026-11-09 99food, Task 4). The
@@ -116,6 +116,8 @@ async function orderNew(row: NinetynineEvent, appShopId: string | null, orderId:
   let info = data.order_info;
   if (!info || typeof info !== 'object') info = (await getOrderDetail(integration.id, orderId)).order_info;
   const m = mapNinetynineOrder({ ...info, order_id: orderId });
+  // Numbers only: which fees 99Food adds to what the store receives (cash to collect vs the order total)
+  console.log(`[99food] order ${orderId} price ${priceSummary(info)}`);
   let duplicate = true;
   try {
     const res = await ingestDeliveryOrder({

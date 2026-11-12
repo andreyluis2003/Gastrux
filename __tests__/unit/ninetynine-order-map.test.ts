@@ -172,3 +172,19 @@ describe('mapNinetynineOrder', () => {
     expect(mapNinetynineOrder(o).input.total).toBe(0);
   });
 });
+
+describe('priceSummary', () => {
+  it('keeps the price numbers and payment codes, nothing personal', () => {
+    const { priceSummary } = require('@/lib/ninetynine/order-map');
+    const s = priceSummary({ ...storeDelivery, price: { ...storeDelivery.price, note: 'Maria 11988887777 x' } });
+    const parsed = JSON.parse(s);
+    expect(parsed.price.real_price).toBe(4680700);
+    expect(parsed.price.customer_need_paying_money).toBe(4680700);
+    expect(parsed.price.others_fees).toEqual({ coupon_discount: 1040000 });
+    expect(parsed.pay_type).toBe(2);
+    expect(parsed.delivery_type).toBe(2);
+    expect(parsed.price.note).toBeUndefined();
+    expect(s).not.toContain('Maria');
+    expect(s).not.toContain('Flores');
+  });
+});
