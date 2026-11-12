@@ -10,6 +10,13 @@ export function monthlyLimit(tier: string | null | undefined): number | null {
   return t in AI_LIMITS ? AI_LIMITS[t] : AI_LIMITS.starter;
 }
 
+/**
+ * Output limit for the agents' short texts (WhatsApp suggestion, activation message). Haiku 5.5 thinks by default
+ * and its thinking counts inside max_tokens: with 600-700 the reply came back cut (app 2026-11-12, stop max_tokens,
+ * 203 chars). The reply itself stays short (the rules cap it at 700 chars); this only leaves room to think.
+ */
+export const AGENT_REPLY_MAX_TOKENS = 4000;
+
 /** The owner chose Haiku 5.5 / Sonnet 5.5 for cost (Anthropic's default is Opus 5.5); switchable by env */
 export function aiModels() {
   return {

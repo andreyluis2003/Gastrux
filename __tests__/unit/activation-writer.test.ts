@@ -93,6 +93,15 @@ describe('writeActivationMessage', () => {
     expect((await writeActivationMessage(signals, decision, 'WHATSAPP')).text).toContain('https://gastrux.com/admin/cardapio');
   });
 
+  it('a reply cut at the token limit falls back to the template; the limit leaves room for thinking (app 2026-11-12)', async () => {
+    const valid = 'Oi, Maria! Cadastre os produtos em https://gastrux.com/admin/cardapio\n\nEquipe Gastrux';
+    const create = jest.fn().mockResolvedValue({ content: [{ type: 'text', text: valid }], stop_reason: 'max_tokens', usage: { input_tokens: 1000, output_tokens: 4000 } });
+    (getAnthropic as jest.Mock).mockReturnValue({ messages: { create } });
+    const m = await writeActivationMessage(signals, decision, 'WHATSAPP');
+    expect(m.text).toBe(templateFor('cardapio_parado', 'WHATSAPP', { firstName: 'Maria', restaurantName: 'Pizzaria da Maria', link: 'https://gastrux.com/admin/cardapio', stepLabel: cardapio.label }).text);
+    expect(create.mock.calls[0][0].max_tokens).toBeGreaterThanOrEqual(4000);
+  });
+
   it('an AI error falls back to the template', async () => {
     (getAnthropic as jest.Mock).mockReturnValue({ messages: { create: jest.fn().mockRejectedValue(new Error('overloaded')) } });
     const m = await writeActivationMessage(signals, decision, 'WHATSAPP');

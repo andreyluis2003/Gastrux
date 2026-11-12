@@ -5,7 +5,7 @@
 import type { AgentReplySuggestion } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getAnthropic } from '@/lib/ai/client';
-import { aiModels, estimateCostUsd } from '@/lib/ai/config';
+import { AGENT_REPLY_MAX_TOKENS, aiModels, estimateCostUsd } from '@/lib/ai/config';
 import { KNOWLEDGE } from '@/lib/ai/knowledge';
 import { restaurantTier } from '@/lib/tier-guard';
 import { loadActivationSignals } from '../activation/signals';
@@ -91,7 +91,7 @@ export async function getOrCreateSuggestion(
   try {
     const res = await client.messages.create({
       model,
-      max_tokens: 700,
+      max_tokens: AGENT_REPLY_MAX_TOKENS,
       system: [{ type: 'text', text: replySystemPrompt(KNOWLEDGE), cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: replyUserPrompt(ctx, messages, now) }],
     }, { timeout: 30_000 });

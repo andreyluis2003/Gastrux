@@ -88,6 +88,14 @@ describe('suggested replies', () => {
     expect(rows[0].model).toBeTruthy();
   });
 
+  it('asks with room for the model to think before the reply (app 2026-11-12: cut at max_tokens)', async () => {
+    await clientIn('quanto custa?', HOUR);
+    const create = mockReply(sugestao('O Pro custa R$ 99'));
+    const out = await getOrCreateSuggestion(key, { now });
+    expect(out).toMatchObject({ state: 'ready', kind: 'SUGGESTION' });
+    expect(create.mock.calls[0][0].max_tokens).toBeGreaterThanOrEqual(4000);
+  });
+
   it('reopening returns the stored suggestion', async () => {
     await clientIn('oi', HOUR);
     const create = mockReply(sugestao('Olá!'));

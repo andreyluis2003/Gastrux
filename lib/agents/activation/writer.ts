@@ -5,7 +5,7 @@
  * always ready for the approval queue. Owner alerts are internal and always use the fixed text.
  */
 import { getAnthropic } from '@/lib/ai/client';
-import { aiModels, estimateCostUsd } from '@/lib/ai/config';
+import { AGENT_REPLY_MAX_TOKENS, aiModels, estimateCostUsd } from '@/lib/ai/config';
 import implantacao from '@/lib/ai/knowledge/implantacao';
 import videos from '@/lib/ai/knowledge/videos';
 import { SEGMENTS } from '@/lib/marketing/segments';
@@ -103,11 +103,16 @@ export async function writeActivationMessage(
     const model = aiModels().default;
     const res = await client.messages.create({
       model,
-      max_tokens: 600,
+      max_tokens: AGENT_REPLY_MAX_TOKENS,
       system: system(channel),
       messages: [{ role: 'user', content: prompt(s, d, ctx, now) }],
     });
     const costUsd = estimateCostUsd(model, res.usage);
+    // A reply cut at the limit can still look valid: never queue half a message
+    if (res.stop_reason === 'max_tokens') {
+      console.error('[agent-activation] AI reply cut at max_tokens; using the template');
+      return { ...fallback, costUsd };
+    }
     let text = res.content.map((c) => (c.type === 'text' ? c.text : '')).join('').trim();
     let subject: string | null = null;
     if (channel === 'EMAIL') {
