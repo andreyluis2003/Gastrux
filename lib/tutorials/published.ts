@@ -447,4 +447,17 @@ export const PUBLISHED: Record<string, { durationSec: number; steps: string[] }>
       "Dica: use no iFood o mesmo código PDV do código do produto no Cardápio digital. Assim o Gastrux reconhece cada item do pedido.",
     ],
   },
+  'cardapio-da-semana': {
+    durationSec: 76,
+    steps: [
+      "O Cardápio da semana serve para vender por encomenda para um dia. Por exemplo, a feijoada de sábado ou a marmita da semana. Fica em Cardápio e produtos, Cardápio da semana.",
+      "Clique em Novo cardápio da semana. Escolha a data do atendimento e o prazo para o cliente pedir.",
+      "Marque os pratos da semana. Em Porções, coloque quantos você consegue fazer. Depois clique em Criar cardápio.",
+      "O cliente pede pelo mesmo link de delivery. No alto, ele vê para qual dia é a encomenda e até quando pode pedir. Só aparecem os pratos da semana. Quando as porções acabam, o prato fica Esgotado.",
+      "No painel, abra o cardápio. O que fazer mostra quanto preparar de cada prato e as observações dos clientes. Imprimir leva essa lista para a cozinha.",
+      "Em Encomendas fica cada pedido, com o nome, o telefone e a forma de pagamento. Se precisar, dá para cancelar antes do dia.",
+      "À meia-noite do dia do atendimento, as encomendas entram sozinhas no Quadro de pedidos, como pedidos normais. Você não precisa lançar nada.",
+      "Na semana seguinte, volte à lista e clique em Copiar. Os pratos e as porções vêm junto. É só escolher a nova data.",
+    ],
+  },
 };

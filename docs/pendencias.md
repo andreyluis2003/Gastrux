@@ -122,6 +122,9 @@ Spec `docs/superpowers/specs/2026-10-25-venda-por-peso-design.md`. Ficou de fora
 ## Vídeos tutoriais, a área no sistema (2026-10-25)
 
 - Vídeo "Conectando o iFood" feito em 2026-11-06 (49 s, conexão simulada no navegador da gravação, sem credencial real).
+- Vídeo "Cardápio da semana" feito em 2026-11-12 (76 s). A demonstração foi refeita nesse dia (o banco de teste tinha sido apagado):
+  seed-demo.ts, seed-customers.ts e weekly-products.ts em .superpowers/demo; o restaurante ficou só com cardápio e mesas,
+  sem as vendas do dia que os vídeos antigos mostram. reset-weekly.ts apaga os cardápios da semana para gravar de novo.
 - O vídeo "nfce" foi refeito em 2026-10-26 com a configuração guiada (69 s). Os de CMV, Contagem de estoque,
   Desperdício e Engenharia de cardápio ainda mostram o "Início > Início" antigo.
 

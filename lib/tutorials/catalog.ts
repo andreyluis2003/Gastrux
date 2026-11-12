@@ -53,6 +53,7 @@ export const TUTORIALS: Tutorial[] = [
   t('pagamentos-online', 'Pagamentos online', 'caixa', ['/dashboard/pagamentos'], 'PIX e cartão pelo celular, e estornos.'),
   t('contas-a-pagar', 'Contas a pagar', 'caixa', ['/contas-a-pagar'], 'As contas do restaurante e os vencimentos.'),
   // Cardápio e produtos
+  t('cardapio-da-semana', 'Cardápio da semana', 'cardapio', ['/admin/cardapio-da-semana'], 'Vender por encomenda para um dia, como a feijoada de sábado.'),
   t('adicionais', 'Adicionais', 'cardapio', ['/admin/modifiers'], 'Ponto da carne, extras e opções dos produtos.'),
   t('qr-codes-das-mesas', 'QR Codes das mesas', 'cardapio', ['/admin/tables/qrcodes'], 'Imprimir o QR Code de cada mesa.'),
   // Estoque e compras
