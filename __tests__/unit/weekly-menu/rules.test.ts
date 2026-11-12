@@ -4,6 +4,7 @@ import {
   isDue,
   isReleaseStuck,
   remainingPortions,
+  portionsLeftText,
   productionSummary,
   bannerText,
   closedText,
@@ -85,5 +86,13 @@ describe('isReleaseStuck (final review 2026-11-10)', () => {
     expect(isReleaseStuck('PLACED', 2, '2026-11-14', '2026-11-14')).toBe(false);
     expect(isReleaseStuck('PLACED', 3, '2026-11-14', '2026-11-13')).toBe(false);
     expect(isReleaseStuck('RELEASED', 3, '2026-11-14', '2026-11-14')).toBe(false);
+  });
+});
+
+describe('portionsLeftText', () => {
+  it('singular, plural and sold out (homolog 2026-11-11: "só restam 1 porções")', () => {
+    expect(portionsLeftText('Suco', 1)).toBe('Suco: só resta 1 porção');
+    expect(portionsLeftText('Feijoada', 2)).toBe('Feijoada: só restam 2 porções');
+    expect(portionsLeftText('Feijoada', 0)).toBe('Feijoada esgotou');
   });
 });

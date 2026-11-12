@@ -1,7 +1,7 @@
 import type { DeliveryPaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { CashRuleError } from '@/lib/caixa/rules';
-import { bannerText, closedText, openMenuOf, remainingPortions, todayIn } from './rules';
+import { bannerText, closedText, openMenuOf, portionsLeftText, remainingPortions, todayIn } from './rules';
 import { orderedByItem } from './service';
 
 // Public side of the weekly menu: the link shows it and takes pre-orders (spec 2026-11-10 cardapio-da-semana)
@@ -99,7 +99,7 @@ export async function checkWeeklyOrder(
     const left = remainingPortions(item.portionLimit, ordered.get(menuItemId) ?? 0);
     if (left !== null && qty > left) {
       const name = item.menuItem.name;
-      throw new CashRuleError(left === 0 ? `${name} esgotou` : `${name}: só restam ${left} porções`, 409);
+      throw new CashRuleError(portionsLeftText(name, left), 409);
     }
   }
   return { serviceDate: menu.serviceDate };

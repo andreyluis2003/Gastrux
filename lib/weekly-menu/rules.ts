@@ -105,6 +105,12 @@ export function closedText(serviceDate: string): string {
   return `Pedidos encerrados para ${dayLabel(serviceDate)}`
 }
 
+/** The refusal when an order asks for more than is left */
+export function portionsLeftText(name: string, left: number): string {
+  if (left <= 0) return `${name} esgotou`
+  return left === 1 ? `${name}: só resta 1 porção` : `${name}: só restam ${left} porções`
+}
+
 /** Failed release attempts after which the admin flags a pre-order (it is still retried) */
 export const STUCK_AFTER_ATTEMPTS = 3;
 
