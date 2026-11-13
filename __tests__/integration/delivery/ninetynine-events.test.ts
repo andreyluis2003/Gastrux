@@ -117,6 +117,32 @@ describe('99Food events', () => {
     expect((await extOf(orderId)).orderReceivedAt.getTime()).toBe(ev.receivedAt.getTime());
   });
 
+  it('cash on store delivery: the 99Food service fee joins the order and the Caixa total (owner 2026-11-13)', async () => {
+    const r = await restaurant();
+    const orderId = bigId();
+    const info = orderInfo(orderId, {
+      delivery_type: 2, pay_type: 2, pay_method: 2, pay_channel: 153,
+      price: {
+        order_price: 6000, delivery_price: 100, store_charged_delivery_price: 100, items_discount: 900,
+        others_fees: { service_price: 699, coupon_discount: 900, small_order_price: 0 },
+        real_price: 5899, real_pay_price: 5899, customer_need_paying_money: 5899,
+      },
+    });
+    await event('orderNew', r.appShopId, { order_id: orderId, order_info: info });
+    await processPendingOnce();
+    const ext = await extOf(orderId);
+    // items 60 + delivery 1 - coupon 9 + service fee 6,99 = what the delivery person collects
+    expect(ext.totalAmount).toBeCloseTo(58.99, 2);
+    expect(ext.subtotal).toBeCloseTo(60, 2);
+    expect(ext.deliveryFee).toBeCloseTo(1, 2);
+    expect(ext.discount).toBeCloseTo(9, 2);
+    expect(ext.specialInstructions).toContain('Taxa de serviço da 99Food: R$ 6,99 (já no total)');
+    const kitchen = await prisma.order.findFirst({ where: { externalOrderId: ext.id } });
+    expect(Number(kitchen.fees)).toBeCloseTo(7.99, 2);
+    expect(Number(kitchen.discount)).toBeCloseTo(9, 2);
+    expect(Number(kitchen.total) - Number(kitchen.discount)).toBeCloseTo(58.99, 2);
+  });
+
   it('manual accept: not confirmed on 99Food, rings again at 3 minutes', async () => {
     const r = await restaurant({ deliveryAutoAccept: false });
     const orderId = bigId();

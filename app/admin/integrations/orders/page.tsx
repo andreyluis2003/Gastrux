@@ -27,6 +27,8 @@ interface ExternalOrder {
   driverName?: string | null;
   status: OrderStatus;
   totalAmount: number;
+  subtotal?: number;
+  discount?: number;
   deliveryFee: number;
   platformFee: number;
   customerName: string;
@@ -61,6 +63,10 @@ interface ExternalOrder {
   disputeId?: string | null;
   disputeExpiresAt?: string | null;
 }
+
+/** A platform fee the store collected with the order (99Food/iFood service fee): what the total has beyond items + delivery - discount */
+const serviceFeeOf = (o: ExternalOrder) =>
+  Math.max(0, Math.round((Number(o.totalAmount) - (Number(o.subtotal ?? 0) + Number(o.deliveryFee) - Number(o.discount ?? 0))) * 100) / 100);
 
 /** The iFood or 99Food reason picker: refusing a new order or cancelling an accepted one */
 interface ReasonPick {
@@ -781,8 +787,10 @@ export default function DeliveryOrdersPage() {
 
                       {/* Pricing */}
                       <div className="flex gap-4 text-sm">
-                        <span>Subtotal: <strong>{formatBRL(order.totalAmount - order.deliveryFee)}</strong></span>
+                        <span>Subtotal: <strong>{formatBRL(order.subtotal ? order.subtotal : order.totalAmount - order.deliveryFee)}</strong></span>
                         {order.deliveryFee > 0 && <span>Entrega: <strong>{formatBRL(order.deliveryFee)}</strong></span>}
+                        {!!order.subtotal && (order.discount ?? 0) > 0 && <span>Desconto: <strong>{formatBRL(order.discount)}</strong></span>}
+                        {!!order.subtotal && serviceFeeOf(order) > 0 && <span>Taxa de serviço: <strong>{formatBRL(serviceFeeOf(order))}</strong></span>}
                         {order.platformFee > 0 && <span>Taxa plataforma: <strong>{formatBRL(order.platformFee)}</strong></span>}
                         {order.driverName && <span>Entregador: <strong>{order.driverName}</strong></span>}
                       </div>

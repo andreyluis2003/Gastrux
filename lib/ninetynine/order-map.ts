@@ -103,14 +103,25 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     .map((p: any) => ({ discount: cents(p?.promo_discount), store: cents(p?.shop_subside_price) }))
     .filter((p: { discount: number; store: number }) => p.discount > 0 || p.store > 0);
   const storeShare = round2(promos.reduce((s, p) => s + p.store, 0));
-  // real_price = what the store receives (incl. delivery) without the promotions 99Food subsidises; absent on 99Food delivery
-  const target = Math.max(0, has(price.real_price) ? cents(price.real_price) : round2((has(price.order_price) ? cents(price.order_price) : subtotal) + taxaEntrega - storeShare));
-  const desconto = Math.max(0, round2(subtotal + taxaEntrega - target));
-  const total = Math.max(0, round2(subtotal + taxaEntrega - desconto));
-
   const cash = payType === 2;
   const form: OrderApiPaymentForm = cash ? 'DINHEIRO' : CHANNEL_FORM[payChannel] ?? 'OUTRO';
   const pago = payMethod === 1 && payType !== 2 && payType !== 3;
+  // store delivery and self-pickup are both paid to the store (at the door or at the counter)
+  const storePaid = storeDelivery || retirada;
+
+  // The fees 99Food charges the customer (homolog 2026-11-13: service_price 699 inside real_price 18399 = items 185 +
+  // delivery 1 - coupon 9 + 6,99). When the store collects the payment, the money comes with them, so they join the
+  // order's total (owner, 2026-11-13: "somar no total"); otherwise they are 99Food's and stay out of the sale.
+  const fees = price.others_fees ?? {};
+  const serviceFee = round2(cents(fees.service_price) + cents(fees.small_order_price));
+  const taxaServico = storePaid && !pago ? serviceFee : 0;
+  // real_price = what the store receives (incl. delivery and the customer's fees) without the promotions 99Food
+  // subsidises; absent on 99Food delivery
+  const target = Math.max(0, has(price.real_price)
+    ? round2(cents(price.real_price) - serviceFee)
+    : round2((has(price.order_price) ? cents(price.order_price) : subtotal) + taxaEntrega - storeShare));
+  const desconto = Math.max(0, round2(subtotal + taxaEntrega - target));
+  const total = Math.max(0, round2(subtotal + taxaEntrega - desconto + taxaServico));
   // no trocoPara: the kitchen note would compute the change from the store's sale, not from what the customer pays
   const pagamento: OrderApiInput['pagamento'] = { forma: form, pago };
 
@@ -134,6 +145,7 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     retirada,
     itens,
     taxaEntrega,
+    ...(taxaServico > 0 ? { taxaServico } : {}),
     desconto,
     total,
     pagamento,
@@ -144,8 +156,6 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
   const shopPaid = price.shop_paid_money;
   const shopPaidMoney = cash && deliveryType === 1 && has(shopPaid) ? cents(shopPaid) : null;
   const needPay = has(price.customer_need_paying_money) ? cents(price.customer_need_paying_money) : has(price.real_pay_price) ? cents(price.real_pay_price) : null;
-  // store delivery and self-pickup are both paid to the store (at the door or at the counter)
-  const storePaid = storeDelivery || retirada;
   const cashToCollect = cash && storePaid ? needPay : null;
   const collect = cashToCollect ?? total;
   const changeFor = cents(order?.change_for);
@@ -162,6 +172,7 @@ export function mapNinetynineOrder(order: any): { input: OrderApiInput; extraNot
     retirada ? 'Retirada' : storeDelivery ? 'Entrega própria' : 'Entrega 99Food',
     `Pagamento: ${payLabel} (${pago ? 'pago na 99Food' : 'a cobrar'})`,
     ...cashLines,
+    taxaServico > 0 ? `Taxa de serviço da 99Food: ${brl(taxaServico)} (já no total)` : '',
     ...promos.map((p) => {
       const parts = [p.store > 0 ? `${brl(p.store)} pago pela loja` : '', round2(p.discount - p.store) > 0 ? `${brl(round2(p.discount - p.store))} pago pela 99Food` : ''].filter(Boolean);
       return `Promoção ${brl(p.discount)} (${parts.join(', ') || 'pago pela 99Food'})`;

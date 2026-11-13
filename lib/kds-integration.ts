@@ -197,8 +197,12 @@ async function createKdsOrder(externalOrder: any, externalOrderId: string, order
   const orderNumber = await nextKdsOrderNumber();
   // The order's values (plan 2026-10-23 api-de-pedidos): without them the order counted R$ 0 in the Caixa and the DRE.
   // The DRE convention: total = items + delivery fee, the discount apart (it is deducted in Deduções)
-  const fees = Number(externalOrder.deliveryFee ?? 0);
-  const subtotal = Number(externalOrder.subtotal) > 0 ? Number(externalOrder.subtotal) : Math.max(0, Number(externalOrder.totalAmount ?? 0) - fees);
+  const deliveryFee = Number(externalOrder.deliveryFee ?? 0);
+  const subtotal = Number(externalOrder.subtotal) > 0 ? Number(externalOrder.subtotal) : Math.max(0, Number(externalOrder.totalAmount ?? 0) - deliveryFee);
+  // A platform's service fee the store collected (99Food/iFood, owner 2026-11-13) is in the total beyond items + delivery
+  // - discount: it joins the fees, so the Caixa expects the money the delivery person brings
+  const serviceFee = Math.max(0, Math.round((Number(externalOrder.totalAmount ?? 0) - (subtotal + deliveryFee - Number(externalOrder.discount ?? 0))) * 100) / 100);
+  const fees = Math.round((deliveryFee + serviceFee) * 100) / 100;
   return prisma.order.create({
     data: {
       restaurantId: externalOrder.restaurantId,

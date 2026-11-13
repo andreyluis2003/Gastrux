@@ -14,6 +14,8 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '0528f5c741935318ed0354273be4502fc9422c1b85f03d0c46665bd29ac294f2', // ligar-a-99food (before the service fee in the total, 2026-11-13)
+  '0d52b7df79472cfff5f8483419c21cd74994f9dd752fb9666c779dc547680256', // ligar-ifood (before the service fee in the total, 2026-11-13)
   'd1db3d750229161eea903bfafedc41491a25262a0b7eb169e3288168c1b82e89', // article that mentioned Keeta and 99Food as not connected (before the 99Food guide, 2026-11-10)
   'b4427f86d8d9b9876e2f993c3f0d59a66cd200ba8e633e7a5f6adc2c47b0e6f8', // como-criar-restaurante (before the guided first access, 2026-11-05)
   '28c9803ba55e00cc782640f747f4123f7ebfa8301b5ae69d0b91bbefd49928fb', // atalhos-balcao (before the order bell and the keys on the buttons, 2026-11-03)
@@ -821,6 +823,8 @@ Se a conta tem mais de uma loja, o Gastrux pergunta qual é a deste restaurante.
 
 Os pedidos chegam em **Vender > Pedidos de delivery** como "iFood #número" e vão para a cozinha quando são aceitos (sozinhos, com **Aceitar pedidos sozinho** ligado). O iFood cancela o pedido que ninguém aceita em 8 minutos. Em preparo, pronto e saiu para entrega (quando a entrega é da loja) voltam para o iFood.
 
+Quando a loja recebe o pagamento (entrega própria ou retirada, não pago no app), a **taxa de serviço** que o iFood cobra do cliente entra no total do pedido e aparece como **Taxa de serviço** em Pedidos de delivery, para o caixa bater com o dinheiro recebido.
+
 Para o Gastrux reconhecer cada item, use no iFood o mesmo **Código PDV** que o **Código do produto** do Cardápio digital. Item sem código é procurado pelo nome.
 
 Se nenhum produto do pedido for reconhecido, o Gastrux **não confirma sozinho**: o pedido fica em **Novos** e o sino avisa. Aceite e prepare pela lista, ou recuse, em até 8 minutos, porque depois disso o iFood cancela.
@@ -1455,6 +1459,7 @@ Os pedidos chegam sozinhos em **Vender > Pedidos de delivery** e na cozinha, com
 
 - **Entrega da 99Food** com pagamento em dinheiro: o pedido mostra quanto receber do entregador e o botão **Recebi o dinheiro**
 - **Entrega própria ou retirada** em dinheiro: o pedido mostra quanto cobrar e o troco
+- Quando a loja recebe o pagamento (entrega própria ou retirada, não pago no app), a **taxa de serviço** que a 99Food cobra do cliente entra no total do pedido, aparece como **Taxa de serviço** em Pedidos de delivery e o caixa espera esse valor junto. A 99Food acerta a taxa no repasse
 
 ## Recusar, cancelar e devolução
 

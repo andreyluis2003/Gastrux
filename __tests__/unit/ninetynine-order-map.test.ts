@@ -188,3 +188,49 @@ describe('priceSummary', () => {
     expect(s).not.toContain('Flores');
   });
 });
+
+describe('99Food service fee (homolog 2026-11-13)', () => {
+  const sandbox = (price: object) => ({
+    order_id: '5764700448078496530', order_index: 1, status: 100, delivery_type: 2, fulfillment_mode: 0,
+    pay_type: 2, pay_method: 2, pay_channel: 153, price,
+    receive_address: { first_name: 'Lucas', phone: '0623442164', street_name: 'Avenida T-2', street_number: '1918' },
+    order_items: [
+      { name: 'Pizza Margherita Especial', amount: 1, total_price: 6200 },
+      { name: 'Pizza Calabresa', amount: 1, total_price: 6400 },
+      { name: 'Pizza Atum', amount: 1, total_price: 5900 },
+    ],
+  });
+  const withCoupon = sandbox({
+    order_price: 18500, delivery_price: 100, store_charged_delivery_price: 100, items_discount: 900, delivery_discount: 0,
+    others_fees: { service_price: 699, coupon_discount: 900, total_tip_money: 0, small_order_price: 0 },
+    real_price: 18399, real_pay_price: 18399, customer_need_paying_money: 18399, commission_price: 0, refund_price: 0,
+  });
+  const noCoupon = sandbox({
+    order_price: 18500, delivery_price: 100, store_charged_delivery_price: 100, items_discount: 0, delivery_discount: 0,
+    others_fees: { service_price: 699, coupon_discount: 0, total_tip_money: 0, small_order_price: 0 },
+    real_price: 19299, real_pay_price: 19299, customer_need_paying_money: 19299,
+  });
+
+  it('cash on store delivery: the total is what the delivery person collects, with the fee and the real coupon', () => {
+    const m = mapNinetynineOrder(noCoupon);
+    expect(m.input.total).toBe(192.99);
+    expect(m.input.taxaServico).toBe(6.99);
+    expect(m.input.desconto).toBe(0);
+    expect(m.extraNote).toContain('Cobrar R$ 192,99 do cliente');
+    expect(m.extraNote).toContain('Taxa de serviço da 99Food: R$ 6,99 (já no total)');
+
+    const c = mapNinetynineOrder(withCoupon);
+    expect(c.input.total).toBe(183.99);
+    expect(c.input.desconto).toBe(9);
+    expect(c.input.taxaServico).toBe(6.99);
+    expect(c.input.taxaEntrega).toBe(1);
+  });
+
+  it('paid in the 99Food app: the fee is 99Food\'s and stays out of the sale', () => {
+    const m = mapNinetynineOrder({ ...withCoupon, pay_type: 1, pay_method: 1, pay_channel: 212 });
+    expect(m.input.taxaServico).toBeUndefined();
+    expect(m.input.desconto).toBe(9);
+    expect(m.input.total).toBe(177);
+    expect(m.extraNote).not.toContain('Taxa de serviço');
+  });
+});

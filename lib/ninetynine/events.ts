@@ -36,6 +36,8 @@ const LEASE_WHILE_RUNNING_MS = 120_000;
 /** The note of an order event that came before its orderNew: re-queued when the orderNew lands */
 const NOT_IN_YET = 'pedido ainda não está no Gastrux';
 const ORDER_EVENTS = ['orderConfirm', 'orderReady', 'orderFinish', 'orderCancel', 'orderPartialCancel', 'orderCancelApply', 'orderRefundApply'];
+/** The kitchen order's fees: delivery + the 99Food service fee the store collects (owner 2026-11-13) */
+const feesOf = (input: { taxaEntrega: number; taxaServico?: number }) => Math.round((input.taxaEntrega + (input.taxaServico ?? 0)) * 100) / 100;
 
 type Linked = { id: string; restaurantId: string; storeId: string };
 type Ext = { id: string; restaurantId: string; externalOrderId: string; status: any; platformData: unknown; integrationId: string; disputeId: string | null; specialInstructions: string | null; internalOrder: { id: string; status: string; specialInstructions: string | null } | null };
@@ -214,10 +216,10 @@ async function partialCancel(row: NinetynineEvent, ext: Ext) {
   });
   const kitchen = ext.internalOrder;
   if (kitchen && kitchen.status !== 'COMPLETED' && kitchen.status !== 'CANCELLED') {
-    // Same convention as the kitchen order's creation: total = items + delivery fee, the discount apart
+    // Same convention as the kitchen order's creation: total = items + delivery fee (+ the service fee the store collects), the discount apart
     await prisma.order.update({
       where: { id: kitchen.id },
-      data: { subtotal, fees: m.input.taxaEntrega, discount: m.input.desconto, total: subtotal + m.input.taxaEntrega, specialInstructions: withLine(kitchen.specialInstructions, line) },
+      data: { subtotal, fees: feesOf(m.input), discount: m.input.desconto, total: subtotal + feesOf(m.input), specialInstructions: withLine(kitchen.specialInstructions, line) },
     });
   }
   await alertDeliveryProblem(ext, {

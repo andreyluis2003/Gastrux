@@ -13,6 +13,8 @@ export interface OrderApiInput {
   retirada: boolean;
   itens: Array<{ codigo?: string; nome: string; quantidade: number; precoUnitario: number; adicionais?: Array<{ nome: string; preco: number }>; observacao?: string }>;
   taxaEntrega: number;
+  /** Platform fees the customer pays with the order and the store collects (99Food/iFood service fee); inside total. Never from the public API */
+  taxaServico?: number;
   desconto: number;
   total: number;
   pagamento: { forma: OrderApiPaymentForm; pago: boolean; trocoPara?: number };

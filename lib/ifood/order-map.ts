@@ -68,6 +68,10 @@ export function mapIfoodOrder(order: any): { input: OrderApiInput; extraNote: st
     pago: num(order?.payments?.pending) === 0,
     trocoPara: undefined,
   };
+  // iFood's fees on the customer (total.additionalFees, the service fee): when the store collects the payment (its own
+  // delivery or a pickup, not paid in the app) the money comes with them, so they join the total (owner, 2026-11-13)
+  const storeCollects = !pagamento.pago && (ownDelivery || !isDelivery);
+  const taxaServico = storeCollects ? round2(num(order?.total?.additionalFees)) : 0;
 
   const a = order?.delivery?.deliveryAddress ?? {};
   const entrega = isDelivery
@@ -86,8 +90,9 @@ export function mapIfoodOrder(order: any): { input: OrderApiInput; extraNote: st
     retirada: !isDelivery,
     itens,
     taxaEntrega,
+    ...(taxaServico > 0 ? { taxaServico } : {}),
     desconto,
-    total: round2(subtotal + taxaEntrega - desconto),
+    total: round2(subtotal + taxaEntrega - desconto + taxaServico),
     pagamento,
     ...(order?.orderTiming === 'SCHEDULED' && order?.schedule?.deliveryDateTimeStart ? { agendadoPara: new Date(order.schedule.deliveryDateTimeStart) } : {}),
   };
@@ -104,6 +109,7 @@ export function mapIfoodOrder(order: any): { input: OrderApiInput; extraNote: st
       return `Pagamento: ${label} (${m?.type === 'ONLINE' ? 'pago no iFood' : 'a cobrar'}) ${brl(round2(num(m?.value)))}`;
     }),
     changeLine,
+    taxaServico > 0 ? `Taxa de serviço do iFood: ${brl(taxaServico)} (já no total)` : '',
     ...shares.map((s: { by: string; value: number }) => `Cupom ${brl(s.value)} (${s.by === 'MERCHANT' ? 'pago pela loja' : s.by === 'IFOOD' ? 'pago pelo iFood' : `pago por ${s.by || 'parceiro'}`})`),
     doc ? `CPF/CNPJ na nota: ${doc}` : '',
     str(phone.number) ? `Telefone iFood: ${str(phone.number, 30)}${str(phone.localizer) ? ` (código ${str(phone.localizer, 20)})` : ''}` : '',

@@ -665,6 +665,9 @@ Nenhuma bloqueia (revisão final: "não precisa antes do merge").
 Conferir no homolog com pedidos reais de teste (sem mudar código antes):
 - Assinatura das chamadas v3 (lista de lojas autorizadas): o exemplo da documentação da 99Food não bate com o próprio texto; seguimos a regra escrita.
 - `real_price` em pedido com entrega da 99Food (assumido líquido só das promoções da loja) e se o Caixa deve registrar o total ou o `shop_paid_money` no dinheiro recebido do entregador.
+- ~~Taxa de serviço em pedido pago na loja~~ (resolvido 2026-11-13, decisão do dono "somar no total"): no homolog o `real_price` veio com a taxa de serviço da 99Food dentro (itens 185 + entrega 1 - cupom 9 + 6,99 = 183,99 = `customer_need_paying_money`). Quando a loja recebe o pagamento (entrega própria ou retirada, não pago no app), `others_fees.service_price` + `small_order_price` entram no total, aparecem como Taxa de serviço e somam às taxas do pedido da cozinha; pago no app, ficam fora da venda. O iFood segue a mesma regra com `total.additionalFees`.
+- Pedido do iFood pago em dinheiro com cupom pago pelo iFood: o cliente paga menos que o total da loja (o iFood devolve no repasse), então o caixa espera mais do que o entregador traz. Já era assim antes da taxa de serviço; decidir com o dono se o caixa deve tratar.
+- Pedido da 99Food com entrega da 99Food e pagamento online: conferir com um pedido real se o `real_price` também traz a taxa de serviço (o Gastrux tira a taxa do `real_price` em todos os casos).
 - O formato do `base_reason_id` na recusa de devolução (enviado como texto, como diz a referência).
 - Se o proxy do Easypanel limita o tamanho do corpo das requisições.
 

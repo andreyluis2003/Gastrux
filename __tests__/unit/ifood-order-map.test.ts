@@ -53,7 +53,10 @@ describe('mapIfoodOrder', () => {
     o.benefits = [{ value: 5, target: 'CART', sponsorshipValues: [{ name: 'IFOOD', value: 5 }] }];
     o.payments = { prepaid: 0, pending: 26, methods: [{ value: 26, currency: 'BRL', method: 'CASH', type: 'OFFLINE', cash: { changeFor: 50 } }] };
     const { input, extraNote } = mapIfoodOrder(o);
-    expect(input.total).toBe(30);
+    // the store collects: iFood's service fee joins the total (owner 2026-11-13); the iFood coupon iFood pays back
+    expect(input.total).toBe(31);
+    expect(input.taxaServico).toBe(1);
+    expect(extraNote.split('\n')).toContain('Taxa de serviço do iFood: R$ 1,00 (já no total)');
     expect(extraNote.split('\n')).toContain('Troco para R$ 50,00: levar R$ 24,00');
   });
 
