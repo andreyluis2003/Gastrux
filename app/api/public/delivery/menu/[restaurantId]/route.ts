@@ -26,6 +26,8 @@ export async function GET(
         businessHours: true,
         ordersClosedAt: true,
         timezone: true,
+        // The page shows it; the order route charges the same value (owner request 2026-11-14)
+        deliveryFee: true,
       },
     });
 

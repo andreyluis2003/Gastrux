@@ -7,6 +7,7 @@ import { BackButton } from '@/components/ui/back-button';
 import { Globe, Copy, ExternalLink, CheckCircle, Bike, Link2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { DeliveryFeeCard } from '@/components/delivery/delivery-fee-card';
 import { PaymentSettingsCard } from '@/components/delivery/payment-settings-card';
 import { WhatsAppMenuCard } from '@/components/delivery/whatsapp-menu-card';
 import { markGuideStep } from '@/lib/onboarding/guide-client';
@@ -91,6 +92,8 @@ export function DeliverySiteClient({ restaurantId, restaurantName, deliveryUrl }
       </Card>
 
       {deliveryUrl && <WhatsAppMenuCard restaurantName={restaurantName} url={deliveryUrl} />}
+
+      <DeliveryFeeCard />
 
       <PaymentSettingsCard />
     </div>

@@ -71,6 +71,10 @@ export default function AdminCardapioPage() {
   const [loading, setLoading] = useState(true);
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', emoji: '', description: '' });
+  // Rename / delete a category (owner request 2026-11-14)
+  const [renaming, setRenaming] = useState<{ id: string; name: string; emoji: string } | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
+  const [categoryBusy, setCategoryBusy] = useState(false);
   const [showNewItem, setShowNewItem] = useState<string | null>(null); // categoryId when open
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [photosEnabled, setPhotosEnabled] = useState<boolean | null>(null);
@@ -162,6 +166,54 @@ export default function AdminCardapioPage() {
       fetchCategories();
     } catch (err) {
       toast.error('Erro ao criar categoria');
+    }
+  };
+
+  const handleRenameCategory = async () => {
+    if (!renaming || categoryBusy) return;
+    if (!renaming.name.trim()) {
+      toast.error('Informe o nome da categoria');
+      return;
+    }
+    setCategoryBusy(true);
+    try {
+      const res = await fetch(`/api/cardapio/categorias/${renaming.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: renaming.name, emoji: renaming.emoji }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof json.error === 'string' ? json.error : 'Erro ao renomear a categoria');
+        return;
+      }
+      toast.success('Categoria renomeada');
+      setRenaming(null);
+      fetchCategories();
+    } catch {
+      toast.error('Erro ao renomear a categoria');
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (categoryBusy) return;
+    setCategoryBusy(true);
+    try {
+      const res = await fetch(`/api/cardapio/categorias/${id}`, { method: 'DELETE' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(typeof json.error === 'string' ? json.error : 'Erro ao apagar a categoria');
+        return;
+      }
+      toast.success('Categoria apagada');
+      setDeletingCategory(null);
+      fetchCategories();
+    } catch {
+      toast.error('Erro ao apagar a categoria');
+    } finally {
+      setCategoryBusy(false);
     }
   };
 
@@ -397,12 +449,68 @@ export default function AdminCardapioPage() {
                       onChange={(e) => toggleSelected(cat.items.map((i) => i.id), e.target.checked)}
                     />
                   )}
-                  {cat.emoji && <span>{cat.emoji}</span>}
-                  {cat.name}
-                  <span className="text-sm font-normal text-gray-500">
-                    ({cat.items.length})
-                  </span>
+                  {renaming?.id === cat.id ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Input
+                        className="h-8 w-[4.5rem]"
+                        placeholder="Emoji"
+                        aria-label="Emoji da categoria"
+                        value={renaming.emoji}
+                        maxLength={8}
+                        onChange={(e) => setRenaming({ ...renaming, emoji: e.target.value })}
+                      />
+                      <Input
+                        autoFocus
+                        className="h-8 w-48"
+                        aria-label="Nome da categoria"
+                        value={renaming.name}
+                        maxLength={60}
+                        onChange={(e) => setRenaming({ ...renaming, name: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleRenameCategory();
+                          if (e.key === 'Escape') setRenaming(null);
+                        }}
+                      />
+                      <Button size="sm" disabled={categoryBusy} onClick={handleRenameCategory}>Salvar</Button>
+                      <Button size="sm" variant="ghost" disabled={categoryBusy} onClick={() => setRenaming(null)}>Cancelar</Button>
+                    </span>
+                  ) : (
+                    <>
+                      {cat.emoji && <span>{cat.emoji}</span>}
+                      {cat.name}
+                      <span className="text-sm font-normal text-gray-500">
+                        ({cat.items.length})
+                      </span>
+                      <button
+                        type="button"
+                        className="text-gray-400 hover:text-gray-700"
+                        title="Renomear categoria"
+                        aria-label={`Renomear ${cat.name}`}
+                        onClick={() => { setDeletingCategory(null); setRenaming({ id: cat.id, name: cat.name, emoji: cat.emoji ?? '' }); }}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      {cat.items.length === 0 && (
+                        <button
+                          type="button"
+                          className="text-gray-400 hover:text-red-600"
+                          title="Apagar categoria vazia"
+                          aria-label={`Apagar ${cat.name}`}
+                          onClick={() => setDeletingCategory(cat.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
+                  )}
                 </h3>
+                {deletingCategory === cat.id && (
+                  <div className="flex w-full flex-wrap items-center gap-2 rounded-md bg-red-50 p-2 text-sm text-red-800">
+                    Apagar a categoria &quot;{cat.name}&quot;?
+                    <Button size="sm" variant="destructive" disabled={categoryBusy} onClick={() => handleDeleteCategory(cat.id)}>Apagar</Button>
+                    <Button size="sm" variant="ghost" disabled={categoryBusy} onClick={() => setDeletingCategory(null)}>Cancelar</Button>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   {cat.items.length > 0 && (
                     <Button

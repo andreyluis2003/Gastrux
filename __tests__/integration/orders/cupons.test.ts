@@ -41,7 +41,7 @@ describe('cupons', () => {
   beforeAll(async () => {
     owner = await prisma.user.create({ data: { email: `cp-${tag}@gastrux.test`, name: 'Ana', password: 'x', role: 'OWNER' } });
     cook = await prisma.user.create({ data: { email: `cp-c-${tag}@gastrux.test`, name: 'Zé', password: 'x', role: 'COOK' } });
-    rid = (await prisma.restaurant.create({ data: { name: `CP ${tag}`, ownerId: owner.id, status: 'ACTIVE', subscriptionTier: 'pro', subscriptionStatus: 'active', isInternal: false } })).id;
+    rid = (await prisma.restaurant.create({ data: { name: `CP ${tag}`, ownerId: owner.id, status: 'ACTIVE', subscriptionTier: 'pro', subscriptionStatus: 'active', isInternal: false, deliveryFee: 7 } })).id;
     await prisma.restaurantUser.create({ data: { restaurantId: rid, userId: cook.id, role: 'COOK', permissions: [], acceptedAt: new Date() } });
     const cat = await prisma.menuCategory.create({ data: { restaurantId: rid, name: 'Lanches', position: 0, active: true } });
     const recipe = await prisma.recipe.create({ data: { restaurantId: rid, code: `R${tag}`, name: 'X-Burger', baseYield: 1, yieldUnit: 'un', portionUnit: 'un' } });

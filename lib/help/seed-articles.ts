@@ -14,6 +14,8 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '58d227980b1034d97de603c73fde7f518cd0159c381739573b64bb05de404158', // site-de-delivery (before the delivery fee setting, 2026-11-14)
+  'a74740ac30db5876081f2f94e23911b2ac865a08e599543c5ef500f496390e79', // esgotar-e-editar-o-cardapio (before renaming a category, 2026-11-14)
   '0528f5c741935318ed0354273be4502fc9422c1b85f03d0c46665bd29ac294f2', // ligar-a-99food (before the service fee in the total, 2026-11-13)
   '0d52b7df79472cfff5f8483419c21cd74994f9dd752fb9666c779dc547680256', // ligar-ifood (before the service fee in the total, 2026-11-13)
   'd1db3d750229161eea903bfafedc41491a25262a0b7eb169e3288168c1b82e89', // article that mentioned Keeta and 99Food as not connected (before the 99Food guide, 2026-11-10)
@@ -698,13 +700,17 @@ A nota pode sair automaticamente ao fechar a conta. Uma nota rejeitada gera avis
     slug: 'site-de-delivery',
     title: 'Como recebo pedidos de delivery?',
     summary: 'Pelo site de delivery próprio do restaurante; os pedidos chegam na tela de pedidos.',
-    keywords: 'delivery, entrega, retirada, site, pedido online, ifood',
+    keywords: 'delivery, entrega, retirada, site, pedido online, ifood, taxa de entrega, entrega grátis, frete',
     order: 1,
     content: `## Site de delivery próprio
 
 Em **Clientes e marketing > Site de delivery** você configura o site do restaurante para pedidos de entrega e retirada, com o seu cardápio.
 
 No site, o cliente escolhe **Entregar** ou **Retirar no local** (sem endereço e sem taxa de entrega; a cozinha vê "RETIRADA NO LOCAL"). Mande o link do site pelo WhatsApp para o cliente pedir sozinho.
+
+## Taxa de entrega
+
+Na mesma tela, no quadro **Taxa de entrega**, digite o valor e toque em **Salvar**. Ela vale para todos os pedidos com entrega feitos pelo link, inclusive as encomendas do cardápio da semana. Para não cobrar entrega, toque em **Entrega grátis** (ou salve 0): o cliente vê "Entregar (grátis)" e a linha "Taxa de entrega: Grátis". Restaurante novo começa com R$ 5,00.
 
 Os pedidos chegam em **Vender > Pedidos de delivery**, com a origem de cada um (Cardápio digital ou API do Gastrux), e vão para a cozinha.
 
@@ -883,7 +889,7 @@ O cliente ainda não faz encomenda pelo site nem recebe aviso de "pronta" por Wh
     slug: 'esgotar-e-editar-o-cardapio',
     title: 'Como esgoto um item ou mudo vários preços de uma vez?',
     summary: 'No Cardápio digital: Esgotar em cada item, preço editável na lista, seleção em massa e dias da semana.',
-    keywords: 'esgotar, esgotado, acabou, indisponível, preço, reajuste, aumento, porcentagem, em massa, vários itens, dias da semana, só sábado, feijoada',
+    keywords: 'esgotar, esgotado, acabou, indisponível, preço, reajuste, aumento, porcentagem, em massa, vários itens, dias da semana, só sábado, feijoada, renomear categoria, apagar categoria, nome da categoria',
     order: 3,
     content: `## Esgotar
 
@@ -907,7 +913,13 @@ Marque a caixa de cada item, ou a caixa da categoria para marcar todos. Embaixo 
 
 ## Dias da semana
 
-Para um prato que só sai em alguns dias (a feijoada de sábado, por exemplo), escolha os dias no editar do produto ou pela barra. Fora desses dias o item some do QR Code, do site de delivery e do WhatsApp. No **Vender** ele continua aparecendo, com o aviso "Hoje não", porque a equipe decide. Na lista do cardápio aparece, por exemplo, "Só sáb e dom".`,
+Para um prato que só sai em alguns dias (a feijoada de sábado, por exemplo), escolha os dias no editar do produto ou pela barra. Fora desses dias o item some do QR Code, do site de delivery e do WhatsApp. No **Vender** ele continua aparecendo, com o aviso "Hoje não", porque a equipe decide. Na lista do cardápio aparece, por exemplo, "Só sáb e dom".
+
+## Renomear ou apagar uma categoria
+
+Toque no lápis ao lado do nome da categoria, troque o nome (e o emoji, se quiser) e toque em **Salvar**. Os produtos continuam nela, e o novo nome aparece no QR Code, no site de delivery e no cardápio da semana.
+
+A lixeira aparece só na categoria vazia. Para apagar uma categoria com produtos, mova os produtos para outra categoria antes (pela barra, em **Mover**).`,
   },
   {
     categorySlug: 'cardapio-e-receitas',

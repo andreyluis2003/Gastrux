@@ -2938,6 +2938,8 @@ model Restaurant {
   timezone                String                    @default("America/Sao_Paulo")
   /// Loja fechada: no new orders from the delivery site, WhatsApp, the order API or iFood; null = open (spec 2026-11-07 quadro-de-pedidos)
   ordersClosedAt          DateTime?
+  /// Delivery fee of the public ordering link; 0 = free delivery (owner request 2026-11-14)
+  deliveryFee             Float                     @default(5)
   /// The close paused iFood, so opening resumes it (an iFood paused by hand stays paused)
   ordersClosedPausedIfood Boolean                   @default(false)
   currency                String                    @default("BRL")

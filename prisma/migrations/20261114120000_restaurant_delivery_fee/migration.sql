@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "restaurants" ADD COLUMN "deliveryFee" DOUBLE PRECISION NOT NULL DEFAULT 5;

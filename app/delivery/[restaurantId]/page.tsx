@@ -60,6 +60,8 @@ interface RestaurantInfo {
   weeklyMenu?: { id: string; serviceDate: string; banner: string } | null;
   /** No open weekly menu but one past its deadline: "Pedidos encerrados para ..." */
   weeklyMenuClosed?: { serviceDate: string; text: string } | null;
+  /** The restaurant's delivery fee; 0 = free delivery (owner request 2026-11-14) */
+  deliveryFee?: number;
 }
 
 interface CartItem {
@@ -71,7 +73,6 @@ interface CartItem {
   image?: string;
 }
 
-const DELIVERY_FEE = 5.0;
 
 function formatBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -154,7 +155,8 @@ export default function DeliveryPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   // "Retirar no local" (owner request 2026-10-23): no address and no delivery fee
   const [pickup, setPickup] = useState(false);
-  const deliveryFee = pickup ? 0 : DELIVERY_FEE;
+  // The restaurant's fee (it was a fixed R$ 5); the server charges the same value
+  const deliveryFee = pickup ? 0 : restaurant?.deliveryFee ?? 0;
   const [deliveryNeighborhood, setDeliveryNeighborhood] = useState('');
   const [deliveryCity, setDeliveryCity] = useState('');
   const [deliveryZipCode, setDeliveryZipCode] = useState('');
@@ -661,7 +663,7 @@ export default function DeliveryPage() {
               ))}
               <div className="border-t pt-2 mt-2 space-y-1">
                 <div className="flex justify-between text-sm"><span>Subtotal</span><span>{formatBRL(cartTotal)}</span></div>
-                {!pickup && <div className="flex justify-between text-sm"><span>Taxa de entrega</span><span>{formatBRL(deliveryFee)}</span></div>}
+                {!pickup && <div className="flex justify-between text-sm"><span>Taxa de entrega</span><span className={deliveryFee === 0 ? 'text-green-700 font-medium' : ''}>{deliveryFee === 0 ? 'Grátis' : formatBRL(deliveryFee)}</span></div>}
                 {coupon && (
                   <div className="flex justify-between text-sm text-green-700">
                     <span>Cupom {coupon.code} ({coupon.label}) <button type="button" className="ml-1 underline text-gray-500" onClick={() => setCoupon(null)}>remover</button></span>
@@ -707,7 +709,7 @@ export default function DeliveryPage() {
 
           {/* Delivery or pickup */}
           <Card className="p-2 grid grid-cols-2 gap-2">
-            <Button type="button" variant={pickup ? 'outline' : 'default'} className={pickup ? '' : 'bg-orange-600 hover:bg-orange-700'} onClick={() => setPickup(false)}>Entregar</Button>
+            <Button type="button" variant={pickup ? 'outline' : 'default'} className={pickup ? '' : 'bg-orange-600 hover:bg-orange-700'} onClick={() => setPickup(false)}>{(restaurant.deliveryFee ?? 0) === 0 ? 'Entregar (grátis)' : 'Entregar'}</Button>
             <Button type="button" variant={pickup ? 'default' : 'outline'} className={pickup ? 'bg-orange-600 hover:bg-orange-700' : ''} onClick={() => setPickup(true)}>Retirar no local</Button>
           </Card>
           {pickup && restaurant.address && (

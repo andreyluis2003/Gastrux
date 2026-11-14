@@ -131,8 +131,8 @@ function kitchenNoteOf(body: any, isPickup: boolean, paymentNote: string, coupon
  * Pre-order on the weekly menu (spec 2026-11-10 cardapio-da-semana): the same customer, payment and coupon checks
  * as an order for now, but nothing reaches the kitchen yet: a WeeklyMenuOrder keeps all a later release needs.
  */
-async function postWeeklyOrder(req: NextRequest, body: any, isPickup: boolean) {
-  const { restaurantId, weeklyMenuId, customerName, customerPhone, customerEmail, deliveryAddress, deliveryCity, deliveryZipCode, items, deliveryFee = 0, couponCode } = body;
+async function postWeeklyOrder(req: NextRequest, body: any, isPickup: boolean, restaurantFee: number) {
+  const { restaurantId, weeklyMenuId, customerName, customerPhone, customerEmail, deliveryAddress, deliveryCity, deliveryZipCode, items, couponCode } = body;
   try {
     // The order is for another day: closed by the hours takes it, closed by hand does not
     if ((await storeState(restaurantId)).reason === 'manual') {
@@ -177,7 +177,7 @@ async function postWeeklyOrder(req: NextRequest, body: any, isPickup: boolean) {
       return { menuItemId: mi.id, recipeId: mi.recipeId!, name: mi.name, unitPrice, quantity: l.quantity, specialInstructions: l.specialInstructions };
     });
 
-    const safeDeliveryFee = isPickup ? 0 : Math.max(0, Number(deliveryFee) || 0);
+    const safeDeliveryFee = isPickup ? 0 : restaurantFee;
     const hasCoupon = typeof couponCode === 'string' && couponCode.trim() !== '';
     const couponPhone = normalizePhone(customerPhone) || '';
     let couponDiscount = 0;
@@ -261,7 +261,6 @@ export async function POST(req: NextRequest) {
       deliveryCity,
       deliveryZipCode,
       items,
-      deliveryFee = 0,
       pickup,
       couponCode,
     } = body;
@@ -282,7 +281,7 @@ export async function POST(req: NextRequest) {
     // Plans of 2026-10-18: no new customer orders while the plan is locked
     if (!(await restaurantAcceptsOrders(restaurantId))) return NextResponse.json(ORDER_REFUSAL, { status: 403 });
     // Cardápio da semana: a pre-order for a later day (spec 2026-11-10 cardapio-da-semana)
-    if (typeof body.weeklyMenuId === 'string' && body.weeklyMenuId) return await postWeeklyOrder(req, body, isPickup);
+    if (typeof body.weeklyMenuId === 'string' && body.weeklyMenuId) return await postWeeklyOrder(req, body, isPickup, restaurant.deliveryFee);
     // Loja fechada (spec 2026-11-07 quadro-de-pedidos)
     if (await isStoreClosed(restaurantId)) return NextResponse.json({ error: CLOSED_MESSAGE, code: 'STORE_CLOSED' }, { status: 409 });
 
@@ -339,10 +338,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // deliveryFee has no server-side source of truth to validate against
-    // (no delivery zone/fee config exists yet) - clamp it to non-negative
-    // so a client can't submit a negative value to reduce the order total.
-    const safeDeliveryFee = isPickup ? 0 : Math.max(0, Number(deliveryFee) || 0);
+    // The restaurant's own fee (owner request 2026-11-14): the deliveryFee the page sends is ignored
+    const safeDeliveryFee = isPickup ? 0 : restaurant.deliveryFee;
     // Cupom (spec 2026-11-08 cupons): checked here, reserved right before the order is written
     const hasCoupon = typeof couponCode === 'string' && couponCode.trim() !== '';
     const couponPhone = normalizePhone(customerPhone) || '';

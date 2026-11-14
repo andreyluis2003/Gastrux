@@ -5,11 +5,12 @@ import { normalizeQuantity } from '@/lib/delivery-payments/order-input';
 import { checkCoupon } from '@/lib/coupons/service';
 import { clientAddress, takeCouponTry } from '@/lib/coupons/attempts';
 import { offeredToday } from '@/lib/cardapio/days-server';
+import { restaurantDeliveryFee } from '@/lib/delivery/fee';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * POST /api/public/delivery/coupon { restaurantId, code, customerPhone, items, deliveryFee, pickup } - the coupon
+ * POST /api/public/delivery/coupon { restaurantId, code, customerPhone, items, pickup } - the coupon
  * preview on the delivery site (spec 2026-11-08 cupons §1): the subtotal comes from the menu prices, nothing is
  * written. The order creation checks everything again.
  */
@@ -26,7 +27,8 @@ export async function POST(req: NextRequest) {
   const price = new Map(menu.map((m) => [m.id, Number(m.price)]));
   let subtotal = 0;
   for (const i of body.items) if (price.has(i?.menuItemId)) subtotal += price.get(i.menuItemId)! * normalizeQuantity(i.quantity);
-  const fee = body.pickup === true ? 0 : Math.max(0, Number(body.deliveryFee) || 0);
+  // The restaurant's fee, not the one the page sends (owner request 2026-11-14)
+  const fee = body.pickup === true ? 0 : await restaurantDeliveryFee(restaurantId);
   // No phone rules here: an unauthenticated preview would tell whether a phone already ordered (security review
   // 2026-11-08). The order creation applies them.
   const r = await checkCoupon(restaurantId, body.code, '', Math.round(subtotal * 100), Math.round(fee * 100), new Date(), { phoneRules: false });
