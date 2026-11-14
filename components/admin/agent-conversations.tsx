@@ -5,6 +5,7 @@ import { ArrowLeft, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { LEAD_TEMPLATE } from '@/lib/agents/whatsapp/templates';
 import { shouldApplyResponse, shouldClearStaleDraft, shouldPrefill } from '@/lib/agents/whatsapp/draft-box';
 
 export interface Conversation {
@@ -51,6 +52,8 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
   const [busy, setBusy] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+  const [confirmingLead, setConfirmingLead] = useState(false);
+  const [sendingLead, setSendingLead] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   // Last client message a suggestion was requested for, so the 15 s poll does not ask again
   const requestedFor = useRef<string | null>(null);
@@ -182,6 +185,22 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
     }
   }
 
+  async function sendLeadTemplate() {
+    setSendingLead(true);
+    try {
+      const res = await fetch(`${url}/lead-template`, { method: 'POST' });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Não foi possível enviar o modelo');
+      toast.success('Modelo de boas-vindas enviado');
+      setConfirmingLead(false);
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSendingLead(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       <Button size="sm" variant="ghost" className="gap-1 -ml-2" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Conversas</Button>
@@ -242,9 +261,19 @@ function Thread({ conversation, onBack }: { conversation: Conversation; onBack: 
           </div>
         </div>
       ) : (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Passaram 24 horas desde a última mensagem do cliente. O WhatsApp só permite resposta livre até esse prazo; agora só um modelo aprovado pode ser enviado, pela fila.
-        </p>
+        <div className="space-y-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p>Passaram 24 horas desde a última mensagem do cliente. O WhatsApp só permite resposta livre até esse prazo; agora só um modelo aprovado pode ser enviado, pela fila.</p>
+          <p className="whitespace-pre-wrap rounded border border-amber-200 bg-white/60 px-2 py-1 text-xs">{LEAD_TEMPLATE.text}</p>
+          {confirmingLead ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Enviar este modelo para o cliente agora?</span>
+              <Button size="sm" disabled={sendingLead} onClick={sendLeadTemplate}>{sendingLead ? 'Enviando...' : 'Sim, enviar'}</Button>
+              <Button size="sm" variant="outline" disabled={sendingLead} onClick={() => setConfirmingLead(false)}>Cancelar</Button>
+            </div>
+          ) : (
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => setConfirmingLead(true)}><Send className="h-4 w-4" /> Enviar modelo de boas-vindas (pedido de informações)</Button>
+          )}
+        </div>
       )}
     </div>
   );

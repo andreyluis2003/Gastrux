@@ -51,3 +51,15 @@ export function renderTemplate(trigger: string, c: { firstName: string | null; r
     text: `${body.replace('{{1}}', name).replace('{{2}}', c.restaurantName)}\n\nEquipe Gastrux`,
   };
 }
+
+/**
+ * Lead template for people who clicked a Meta ad ("Posso ter mais informações sobre isso?") and are outside
+ * the 24-hour window. Marketing, pt_BR, no body variables, URL button https://gastrux.com/{{1}}.
+ * The text MUST match what Meta approved (body + footer "Equipe Gastrux"); change both together.
+ */
+export const LEAD_TEMPLATE: RenderedTemplate = {
+  name: 'pedido_informacoes',
+  bodyParams: [],
+  linkPath: 'auth/signup',
+  text: 'Oi! Aqui é a Equipe Gastrux. Vimos que você pediu informações sobre o Gastrux, o sistema para restaurantes: vendas e caixa, cardápio digital com QR Code, delivery, estoque e o custo de cada prato. Dá para testar 30 dias grátis, sem cartão. Responda esta mensagem que a gente te ajuda a começar.\n\nEquipe Gastrux',
+};

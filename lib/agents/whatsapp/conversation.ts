@@ -6,6 +6,7 @@
 import type { AgentWhatsAppMessage } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { platformTeam } from '../platform-team';
+import { sendTransactionalEmail } from '@/lib/email/transactional';
 import { sendPlatformText } from './client';
 import { phoneKey, phoneVariants } from './numbers';
 
@@ -56,11 +57,35 @@ export function inboundText(msg: any): string {
   return `[${msg.type}]`;
 }
 
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** E-mails every platform team member that a new conversation started. Never throws. */
+async function emailNewConversation(who: string, text: string) {
+  try {
+    const base = (process.env.NEXTAUTH_URL || 'https://gastrux.com').replace(/\/+$/, '');
+    const link = `${base}/admin/agente`;
+    const subject = `Nova conversa no WhatsApp: ${who}`.slice(0, 150);
+    const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937"><p><strong>${escapeHtml(who)}</strong> escreveu no WhatsApp oficial:</p><blockquote style="margin:0 0 14px;padding-left:12px;border-left:3px solid #d1d5db">${escapeHtml(text.slice(0, 300)).replace(/\n/g, '<br>')}</blockquote><p>Responda em até 24 horas pelo Gastrux.</p><p><a href="${link}">${link}</a></p></div>`;
+    for (const member of await platformTeam()) {
+      if (!member.email) continue;
+      try {
+        await sendTransactionalEmail({ to: member.email, subject, html, notificationId: 'agent-new-conversation' });
+      } catch (err: any) {
+        console.error('[agent-whatsapp] new conversation e-mail failed:', err?.message);
+      }
+    }
+  } catch (err: any) {
+    console.error('[agent-whatsapp] new conversation e-mail failed:', err?.message);
+  }
+}
+
 /** One message from a client. A number Meta delivers twice is recorded and handled once. */
 export async function handleInbound(msg: any, profileName?: string): Promise<void> {
   const waId = String(msg.from);
   const text = inboundText(msg).slice(0, 4000);
   const client = await clientOf(waId);
+  // Read before recording: no message in the last 24 h means a new conversation
+  const wasQuiet = (await prisma.agentWhatsAppMessage.count({ where: { phone: phoneKey(waId), createdAt: { gte: new Date(Date.now() - WINDOW_MS) } } })) === 0;
   const { count } = await prisma.agentWhatsAppMessage.createMany({
     data: [{ phone: phoneKey(waId), waId, userId: client?.user.id, restaurantId: client?.restaurant?.id, direction: 'IN', text, messageType: String(msg.type || 'text'), waMessageId: msg.id }],
     skipDuplicates: true,
@@ -77,6 +102,7 @@ export async function handleInbound(msg: any, profileName?: string): Promise<voi
     return;
   }
   await tellTeam(`WhatsApp de ${who}`, text.slice(0, 200), { phone: phoneKey(waId) });
+  if (wasQuiet) await emailNewConversation(who, text);
 }
 
 /** Delivered, read or failed. A failure the client never sees has to reach the team. */

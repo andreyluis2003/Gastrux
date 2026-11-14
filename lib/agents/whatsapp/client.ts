@@ -40,7 +40,8 @@ export function sendPlatformTemplate(to: string, t: { name: string; bodyParams: 
       name: t.name,
       language: { code: 'pt_BR' },
       components: [
-        { type: 'body', parameters: t.bodyParams.map((text) => ({ type: 'text', text })) },
+        // Meta rejects a body component without parameters for a template with no variables
+        ...(t.bodyParams.length ? [{ type: 'body', parameters: t.bodyParams.map((text) => ({ type: 'text', text })) }] : []),
         { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: t.linkPath }] },
       ],
     },
