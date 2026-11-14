@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { ChartLine, ChartBar, ChartPie } from 'lucide-react';
 import { ingredientRanking, ingredientShares } from '@/lib/consumption/shares';
+import { bucketTrends, type TrendGrain } from '@/lib/consumption/trends';
 
 const COLORS = [
   '#3b82f6',
@@ -45,17 +46,26 @@ interface ConsumptionChartProps {
     totalCost: number;
     unit: string;
   }[];
+  /** Days in the period: long periods are grouped by week or month */
+  periodDays?: number;
+  /** The unit every ingredient shares; null = mixed units, so no quantity chart */
+  unit?: string | null;
 }
+
+const GRAIN_LABEL: Record<TrendGrain, string> = { day: 'por dia', week: 'por semana', month: 'por mês' };
 
 export function ConsumptionChart({
   trends = [],
   topIngredients = [],
+  periodDays = 30,
+  unit = null,
 }: ConsumptionChartProps) {
   const shares = ingredientShares(topIngredients);
   const ranking = ingredientRanking(topIngredients);
+  const { grain, points } = bucketTrends(trends, periodDays);
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {trends.length > 0 && (
+      {points.length > 0 && unit && (
         <Card className="p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-4">
             <ChartLine className="w-5 h-5 text-blue-600" />
@@ -63,10 +73,11 @@ export function ConsumptionChart({
               Tendência de Consumo
             </h3>
           </div>
+          <p className="-mt-2 mb-2 text-xs text-slate-500">Quantidade em {unit}, {GRAIN_LABEL[grain]}</p>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trends}>
+            <LineChart data={points}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#64748b" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
               <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
               <Tooltip
                 contentStyle={{
@@ -85,25 +96,28 @@ export function ConsumptionChart({
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 activeDot={{ r: 5 }}
-                name="Quantidade (un)"
+                name={`Quantidade (${unit})`}
               />
             </LineChart>
           </ResponsiveContainer>
         </Card>
       )}
 
-      {trends.length > 0 && (
-        <Card className="p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+      {points.length > 0 && (
+        <Card className={`p-6 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 ${unit ? '' : 'lg:col-span-2'}`}>
           <div className="flex items-center gap-2 mb-4">
             <ChartLine className="w-5 h-5 text-emerald-600" />
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
               Custo de Consumo
             </h3>
           </div>
+          <p className="-mt-2 mb-2 text-xs text-slate-500">
+            Em reais, {GRAIN_LABEL[grain]}{unit ? '' : ' (os ingredientes têm unidades diferentes, então a soma é pelo custo)'}
+          </p>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trends}>
+            <LineChart data={points}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#64748b" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
               <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
               <Tooltip
                 contentStyle={{

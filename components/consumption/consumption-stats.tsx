@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { TrendingDown } from 'lucide-react';
+import { singleUnit } from '@/lib/consumption/trends';
 
 interface IngredientStat {
   ingredientId: string;
@@ -32,9 +33,12 @@ interface ConsumptionStatsProps {
     uniqueIngredients: number;
     totalMovements: number;
   };
+  /** Days in the period, for the daily average cost */
+  periodDays?: number;
 }
 
-export function ConsumptionStats({ stats, summary }: ConsumptionStatsProps) {
+export function ConsumptionStats({ stats, summary, periodDays = 30 }: ConsumptionStatsProps) {
+  const unit = singleUnit(stats);
   if (stats.length === 0) {
     return (
       <Card className="p-8 text-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
@@ -50,15 +54,16 @@ export function ConsumptionStats({ stats, summary }: ConsumptionStatsProps) {
     <div className="space-y-6">
       {summary && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {/* kg, litres and units cannot be added up: the quantity shows only when every ingredient shares a unit (2026-11-13) */}
           <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-0">
             <div className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
               Total Consumido
             </div>
             <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-              {summary.totalQuantity.toFixed(2)}
+              {unit ? summary.totalQuantity.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—'}
             </div>
             <div className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-              unidades
+              {unit ?? 'unidades diferentes: veja por ingrediente'}
             </div>
           </Card>
 
@@ -76,10 +81,10 @@ export function ConsumptionStats({ stats, summary }: ConsumptionStatsProps) {
 
           <Card className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-0">
             <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">
-              Média Diária
+              Custo Médio
             </div>
             <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-              {summary.averageDailyQuantity.toFixed(2)}
+              {formatBRL(summary.totalCost / Math.max(1, periodDays))}
             </div>
             <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
               por dia

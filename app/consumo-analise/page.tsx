@@ -13,6 +13,7 @@ import { ConsumptionFilters } from '@/components/consumption/consumption-filters
 import { ConsumptionChart } from '@/components/consumption/consumption-chart';
 import { ConsumptionStats } from '@/components/consumption/consumption-stats';
 import { ConsumptionExport } from '@/components/consumption/consumption-export';
+import { singleUnit } from '@/lib/consumption/trends';
 
 interface ConsumptionSummary {
   period: {
@@ -172,13 +173,19 @@ export default function ConsumoAnalisePage() {
                     <ConsumptionStats
                       stats={summary.byIngredient}
                       summary={summary.summary}
+                      periodDays={Number(filters.period) || 30}
                     />
                   </SlideIn>
                 )}
 
                 {trends.length > 0 && (
                   <SlideIn direction="up" delay={0.3}>
-                    <ConsumptionChart trends={trends} topIngredients={topIngredients} />
+                    <ConsumptionChart
+                      trends={trends}
+                      topIngredients={topIngredients}
+                      periodDays={Number(filters.period) || 30}
+                      unit={singleUnit(summary?.byIngredient ?? [])}
+                    />
                   </SlideIn>
                 )}
               </>
