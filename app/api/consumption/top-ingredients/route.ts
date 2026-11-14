@@ -37,8 +37,11 @@ export async function GET(request: NextRequest) {
       ? movementTypesParam.split(',')
       : ['AUTO_DEDUCTION', 'MANUAL_DEDUCTION', 'LOSS']; // what leaves the stock (sales were left out until 2026-10-19)
 
+    // The ingredient filter of the screen applies here too (2026-11-13: the bars and the pie kept every ingredient)
+    const ingredientIds = (searchParams.get('ingredients') || '').split(',').map((s) => s.trim()).filter(Boolean);
+
     // Build where clause
-    const where = {
+    const where: any = {
       ingredient: { restaurantId },
       createdAt: {
         gte: startDate,
@@ -47,6 +50,7 @@ export async function GET(request: NextRequest) {
       movementType: {
         in: movementTypes as MovementType[],
       },
+      ...(ingredientIds.length > 0 ? { ingredientId: { in: ingredientIds } } : {}),
     };
 
     // Get raw movements

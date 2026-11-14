@@ -49,4 +49,13 @@ describe('consumo de insumos', () => {
     const top = await (await TOP(new NextRequest('http://x/api/consumption/top-ingredients?period=30'))).json();
     expect(JSON.stringify(top)).toContain('Carne');
   });
+  it('the ingredient filter applies to the top ingredients too', async () => {
+    const other = await prisma.ingredient.create({ data: { restaurantId: rid, code: `O${tag}`, name: 'Cebola', categoryId: carne.categoryId, standardUnit: 'kg', purchaseUnit: 'kg', referenceCost: 5 } });
+    await prisma.stockMovement.create({ data: { restaurantId: rid, ingredientId: other.id, movementType: 'LOSS', quantity: 1, createdAt: new Date(Date.now() - 60_000) } });
+    const all = await (await TOP(new NextRequest('http://x/api/consumption/top-ingredients?period=30'))).json();
+    expect(JSON.stringify(all)).toContain('Cebola');
+    const only = await (await TOP(new NextRequest(`http://x/api/consumption/top-ingredients?period=30&ingredients=${carne.id}`))).json();
+    expect(JSON.stringify(only)).toContain('Carne');
+    expect(JSON.stringify(only)).not.toContain('Cebola');
+  });
 });
