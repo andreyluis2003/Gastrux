@@ -39,6 +39,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
   const [payments, setPayments] = useState<PanelPayment[]>([]);
   const [cpf, setCpf] = useState('');
   const [busy, setBusy] = useState(false);
+  const [couponText, setCouponText] = useState('');
+  const [couponError, setCouponError] = useState('');
   const [emittedDoc, setEmittedDoc] = useState<{ id: string; documentType?: string; documentNumber: number; accessKey?: string | null } | null>(null);
   const [nfceOpen, setNfceOpen] = useState(false);
   // What happened to the NFC-e, written on the closed bill: a toast alone was gone in seconds,
@@ -141,6 +143,31 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
     setBill(out);
   }
 
+  // Coupon on the comanda: the server checks the code and may close the bill when the payments already cover it
+  async function coupon(method: 'POST' | 'DELETE') {
+    setCouponError('');
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/comanda/sessions/${sessionId}/coupon`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: method === 'POST' ? JSON.stringify({ code: couponText.trim() }) : '{}',
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { setCouponError(out.error || 'Não foi possível usar o cupom'); return; }
+      setCouponText('');
+      setBill(out);
+      if (out.status === 'CLOSED') {
+        toast.success('Conta fechada', { action: { label: 'Imprimir cupom', onClick: () => printInHiddenFrame(`/imprimir/cupom/${sessionId}`) }, duration: 15000 });
+        onClosed();
+      }
+    } catch {
+      setCouponError('Sem resposta do servidor. Tente de novo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function refund(entryId: string) {
     const reason = window.prompt('Motivo do estorno deste pagamento:');
     if (!reason || reason.trim().length < 3) return;
@@ -217,6 +244,23 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
               − {brl(bill.cashbackUsedCents)}
               {!closed && <button className="text-xs underline" onClick={() => cashback('DELETE')}>tirar</button>}
             </span>
+          </div>
+        )}
+        {bill.couponCode && bill.couponDiscountCents > 0 && (
+          <div className="flex justify-between items-center text-emerald-700">
+            <span>Cupom {bill.couponCode} − {brl(bill.couponDiscountCents)}</span>
+            {!closed && <button className="text-xs underline" disabled={busy} onClick={() => coupon('DELETE')}>Tirar</button>}
+          </div>
+        )}
+        {!closed && !bill.couponCode && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Input className="h-8 flex-1 min-w-0 uppercase" placeholder="Cupom" aria-label="Cupom" value={couponText}
+                onChange={(e) => { setCouponText(e.target.value); setCouponError(''); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && couponText.trim() && !busy) coupon('POST'); }} />
+              <Button type="button" size="sm" variant="outline" disabled={busy || !couponText.trim()} onClick={() => coupon('POST')}>Aplicar</Button>
+            </div>
+            {couponError && <p role="alert" className="text-xs text-red-600">{couponError}</p>}
           </div>
         )}
         <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{brl(bill.totalCents)}</span></div>
