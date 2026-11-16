@@ -1913,6 +1913,10 @@ model OrderSession {
   customer               Customer?             @relation("OrderSessionCustomer", fields: [customerId], references: [id])
   /// Cashback used as a discount on this bill (lib/cashback/service.ts)
   cashbackUsedCents      Int                   @default(0)
+  /// Coupon discount on the comanda items, fixed when applied (lib/coupons/session.ts); 0 = no coupon
+  couponDiscountCents    Int                   @default(0)
+  /// The coupon code applied (one per comanda), shown as "Cupom PRIMEIRA10"
+  couponCode             String?
   /// When the customer picks up an encomenda (status ENCOMENDA, spec 2026-10-26 encomendas)
   pickupAt               DateTime?
   onlinePayments         Payment[]             @relation("OrderSessionOnlinePayments")
@@ -5175,11 +5179,16 @@ model CouponRedemption {
   restaurantId    String
   phoneDigits     String
   externalOrderId String?
+  /// The use belongs to a delivery-site order (externalOrderId) or to a comanda (orderSessionId)
+  orderSessionId  String?
+  /// Applied by the cashier past a rule (force): the report shows it apart
+  outOfRule       Boolean  @default(false)
   discountCents   Int
   createdAt       DateTime @default(now())
   coupon          Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
 
   @@index([couponId, phoneDigits])
+  @@index([orderSessionId])
   @@index([restaurantId])
   @@map("coupon_redemptions")
 }
