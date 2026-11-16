@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { comandaTotalCents } from '@/lib/caixa/sale';
 import { lockComanda } from '@/lib/comanda/add-item';
 import { discountFor, normalizeCode, type CouponKind, type CouponRules } from './rules';
-import { evaluateCoupon, FREE_DELIVERY_ON_COMANDA, INVALID, type Check } from './service';
+import { evaluateCoupon, INVALID, type Check } from './service';
 
 /**
  * Cupom na comanda (spec 2026-11-16 cupom-whatsapp-balcao): one coupon per comanda, on the comanda items (no service
@@ -49,7 +49,8 @@ export async function applyCouponToSession(
     discountCents = check.discountCents;
   } else {
     // Free delivery has nothing to discount on a comanda: forcing it would spend a use for R$ 0
-    if (!input.force || check.error === FREE_DELIVERY_ON_COMANDA) return { ok: false, error: check.error, status: 422 };
+    // (paused or not; check.error is already INVALID for a paused one, so its kind is not revealed)
+    if (!input.force || coupon.kind === 'FREE_DELIVERY') return { ok: false, error: check.error, status: 422 };
     const rules = { ...coupon, kind: coupon.kind as CouponKind } as CouponRules;
     discountCents = discountFor(rules, subtotalCents, 0);
     outOfRule = true;

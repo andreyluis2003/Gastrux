@@ -124,6 +124,18 @@ describe('cupom na comanda', () => {
     expect(await apply(s.id, 'PAUSADO', { force: true })).toMatchObject({ ok: true, outOfRule: true, discountCents: 400 });
   });
 
+  it('force never applies free delivery, paused or not (the paused one stays INVALID)', async () => {
+    const paused = await coupon({ code: 'FRETEPAUSADO', kind: 'FREE_DELIVERY', value: 0, active: false });
+    const live = await coupon({ code: 'FRETEATIVO', kind: 'FREE_DELIVERY', value: 0 });
+    const s = await comanda();
+    expect(await apply(s.id, 'FRETEPAUSADO', { force: true })).toEqual({ ok: false, status: 422, error: 'Cupom inválido ou fora do ar.' });
+    expect(await apply(s.id, 'FRETEATIVO', { force: true })).toEqual({ ok: false, status: 422, error: 'Este cupom é de entrega grátis e esta venda não tem taxa de entrega.' });
+    expect((await prisma.coupon.findUnique({ where: { id: paused.id } })).usedCount).toBe(0);
+    expect((await prisma.coupon.findUnique({ where: { id: live.id } })).usedCount).toBe(0);
+    expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).couponCode).toBeNull();
+    expect(await prisma.couponRedemption.count({ where: { orderSessionId: s.id } })).toBe(0);
+  });
+
   it('refuses a closed comanda and a comanda of another restaurant', async () => {
     await coupon({ code: 'FECHADA' });
     const closed = await comanda({ status: 'CLOSED', closedAt: new Date() });
