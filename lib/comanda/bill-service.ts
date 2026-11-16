@@ -194,20 +194,25 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
     await tx.orderSession.update({ where: { id: sessionId }, data: { serviceChargeWaived: waived } });
     await recordAudit(member, { action: 'UPDATE', entityType: 'OrderSession', entityId: sessionId, changes: { serviceChargeWaived: waived } });
     const after = (await loadBill(tx, member.restaurantId, sessionId))!;
-    // What was already paid covers the new total: the bill closes now (it would be stuck open with
-    // nothing left to receive — review of stage 2)
-    if (after.paidCents > 0 && after.remainingCents === 0 && after.status !== 'ENCOMENDA') {
-      await tx.orderSession.updateMany({
-        where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
-        data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents },
-      });
-      await settleSessionStock(tx, member.restaurantId, sessionId);
-      return (await loadBill(tx, member.restaurantId, sessionId))!;
-    }
-    return after;
+    return (await closeIfCovered(tx, member.restaurantId, sessionId, after)) ?? after;
   });
   if (bill.status === 'CLOSED') await emitClosedBill(member, sessionId, null, bill.customerName);
   return bill;
+}
+
+/**
+ * The total of an open bill went down (service charge taken off, coupon applied) and what was already paid covers
+ * it: the bill closes now (it would be stuck open with nothing left to receive — review of stage 2). Returns the
+ * closed bill, or null when it stays open. The caller issues the NFC-e after its transaction (emitClosedBill).
+ */
+export async function closeIfCovered(tx: Prisma.TransactionClient, restaurantId: string, sessionId: string, after: Bill): Promise<Bill | null> {
+  if (!(after.paidCents > 0 && after.remainingCents === 0 && after.status !== 'ENCOMENDA')) return null;
+  await tx.orderSession.updateMany({
+    where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
+    data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents },
+  });
+  await settleSessionStock(tx, restaurantId, sessionId);
+  return (await loadBill(tx, restaurantId, sessionId))!;
 }
 
 /**

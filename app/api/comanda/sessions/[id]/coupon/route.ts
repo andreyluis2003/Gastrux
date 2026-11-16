@@ -4,7 +4,8 @@ import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { CASHIER_PLUS } from '@/lib/caixa/roles';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { lockComanda } from '@/lib/comanda/add-item';
-import { loadBill } from '@/lib/comanda/bill-service';
+import { closeIfCovered, emitClosedBill, loadBill } from '@/lib/comanda/bill-service';
+import { onBillClosed } from '@/lib/cashback/bill';
 import { normalizePhone } from '@/lib/cashback/rules';
 import { takeCouponTry } from '@/lib/coupons/attempts';
 import { PHONE_NEEDED } from '@/lib/coupons/service';
@@ -41,9 +42,18 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       const r = await applyCouponToSession(tx, { restaurantId, sessionId: params.id, code: String(body?.code ?? ''), phoneDigits });
       // Only an existing, live coupon gets here (unknown and paused ones answer INVALID first)
       if (!r.ok && r.error === PHONE_NEEDED && !phoneDigits) return { ...r, error: 'Identifique o cliente pelo celular antes' };
-      return r;
+      if (!r.ok) return r;
+      // The total went down: what was already paid may now go over it (rolled back) or cover it (the bill closes)
+      const bill = (await loadBill(tx, restaurantId, params.id))!;
+      if (bill.paidCents > bill.totalCents) {
+        throw new CashRuleError('O cupom passa do que falta pagar: estorne um pagamento antes', 409, 'OVERPAID');
+      }
+      const closed = await closeIfCovered(tx, restaurantId, params.id, bill);
+      if (closed) await onBillClosed(tx, restaurantId, params.id);
+      return { ok: true as const, closed: !!closed, customerName: bill.customerName };
     });
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    if (result.closed) await emitClosedBill(auth.member, params.id, null, result.customerName);
     return NextResponse.json(await loadBill(prisma, restaurantId, params.id));
   } catch (e) {
     return fail(e);

@@ -407,6 +407,36 @@ describe('cupom na Conta (rotas)', () => {
     expect(await prisma.orderSession.findUnique({ where: { id: source } })).toMatchObject({ status: 'OPEN', couponCode: 'JUNTAB' });
   });
 
+  it('a coupon that goes past what is left to pay is refused and rolled back', async () => {
+    as(ownerId);
+    const c = await coupon({ code: 'PASSA' });
+    const sid = await newBill();
+    expect((await pay(sid, '38,00')).status).toBe(200);
+    const res = await APPLY(req('POST', { code: 'PASSA' }), p(sid));
+    expect([res.status, (await res.json()).error]).toEqual([409, 'O cupom passa do que falta pagar: estorne um pagamento antes']);
+    expect(await used(c.id)).toBe(0);
+    expect(await prisma.couponRedemption.count({ where: { orderSessionId: sid } })).toBe(0);
+    expect(await prisma.orderSession.findUnique({ where: { id: sid } })).toMatchObject({ status: 'OPEN', couponCode: null, couponDiscountCents: 0 });
+  });
+
+  it('a coupon that makes the bill paid closes it, as a normal close', async () => {
+    as(ownerId);
+    await prisma.cashbackSettings.upsert({ where: { restaurantId: rid }, create: { restaurantId: rid, enabled: true, percent: 10, minUseCents: 100 }, update: { enabled: true, percent: 10 } });
+    const c = await coupon({ code: 'FECHA' });
+    const sid = await newBill();
+    await ATTACH(req('PUT', { phone: '11955553333', name: 'Lia' }), p(sid));
+    const customer = await findCustomerByPhone(prisma, rid, '11955553333');
+    expect((await pay(sid, '36,00')).status).toBe(200);
+    const res = await APPLY(req('POST', { code: 'FECHA' }), p(sid));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: 'CLOSED', couponCode: 'FECHA', totalCents: 3600, remainingCents: 0 });
+    expect(await used(c.id)).toBe(1);
+    expect((await prisma.orderSession.findUnique({ where: { id: sid } })).closedAt).not.toBeNull();
+    // onBillClosed: 10% of 36,00 credited, the purchase counted
+    expect(await balanceCents(prisma, rid, customer.id)).toBe(360);
+    expect((await prisma.customer.findUnique({ where: { id: customer.id } })).totalOrders).toBe(1);
+  });
+
   // Last: it spends this user's tries for the minute
   it('too many tries: 429', async () => {
     as(ownerId);
