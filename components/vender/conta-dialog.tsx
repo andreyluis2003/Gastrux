@@ -61,6 +61,9 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
     else toast.error('Não foi possível carregar a conta');
   }, [sessionId]);
   useEffect(() => { load(); }, [load]);
+  // A stale apply error must not reappear when the coupon state changes (e.g. removed from another device)
+  const hasCoupon = !!bill?.couponCode;
+  useEffect(() => { setCouponError(''); }, [hasCoupon]);
 
   if (!bill) return <Shell onCancel={onCancel}><p>Carregando...</p></Shell>;
   const closed = bill.status === 'CLOSED';
@@ -154,7 +157,11 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         body: method === 'POST' ? JSON.stringify({ code: couponText.trim() }) : '{}',
       });
       const out = await res.json().catch(() => ({}));
-      if (!res.ok) { setCouponError(out.error || 'Não foi possível usar o cupom'); return; }
+      if (!res.ok) {
+        // Apply errors sit under the input; remove errors go to a toast (the input is not on screen then)
+        if (method === 'DELETE') { toast.error(out.error || 'Não foi possível tirar o cupom'); load(); } else setCouponError(out.error || 'Não foi possível usar o cupom');
+        return;
+      }
       setCouponText('');
       setBill(out);
       if (out.status === 'CLOSED') {
@@ -162,7 +169,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
         onClosed();
       }
     } catch {
-      setCouponError('Sem resposta do servidor. Tente de novo.');
+      if (method === 'DELETE') toast.error('Sem resposta do servidor. Tente de novo.');
+      else setCouponError('Sem resposta do servidor. Tente de novo.');
     } finally {
       setBusy(false);
     }
