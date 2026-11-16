@@ -15,7 +15,8 @@ const tag = crypto.randomBytes(4).toString('hex');
 const AT = new Date('2026-09-10T22:00:00Z');
 
 describe('cashback in the DRE and the NFC-e', () => {
-  let rid, ownerId, sid, configId;
+  let rid, ownerId, sid, couponSid, configId;
+  const AUG = new Date('2026-08-10T22:00:00Z');
   beforeAll(async () => {
     ownerId = (await prisma.user.create({ data: { email: `cbd-${tag}@gastrux.test`, name: 'Ana', password: 'x', role: 'OWNER' } })).id;
     rid = (await prisma.restaurant.create({ data: { name: `D ${tag}`, ownerId, status: 'ACTIVE' } })).id;
@@ -29,6 +30,12 @@ describe('cashback in the DRE and the NFC-e', () => {
         items: { create: [{ recipeId: a.id, quantity: 1, price: 10, addedAt: AT }, { recipeId: b.id, quantity: 1, price: 40, addedAt: AT }] } },
     })).id;
     await prisma.cashSessionEntry.create({ data: { restaurantId: rid, cashSessionId: shift.id, createdById: ownerId, type: 'RECEIPT', method: 'PIX', amountCents: 3000, orderSessionId: sid, createdAt: AT } });
+    // August: R$ 50,00 of items, R$ 5,00 coupon and R$ 10,00 cashback, R$ 35,00 paid
+    couponSid = (await prisma.orderSession.create({
+      data: { restaurantId: rid, userId: ownerId, status: 'CLOSED', closedAt: AUG, couponDiscountCents: 500, couponCode: 'CINCO', cashbackUsedCents: 1000,
+        items: { create: [{ recipeId: a.id, quantity: 1, price: 10, addedAt: AUG }, { recipeId: b.id, quantity: 1, price: 40, addedAt: AUG }] } },
+    })).id;
+    await prisma.cashSessionEntry.create({ data: { restaurantId: rid, cashSessionId: shift.id, createdById: ownerId, type: 'RECEIPT', method: 'PIX', amountCents: 3500, orderSessionId: couponSid, createdAt: AUG } });
     configId = (await prisma.nFeConfig.create({
       data: { restaurantId: rid, cnpj: `7${Date.now()}`.slice(0, 14), nfeApiKey: 'k', environment: 'sandbox', defaultNcm: '21069090', defaultCfop: '5102', defaultOrigin: '0', defaultCsosn: '102', crt: '1' },
     })).id;
@@ -61,5 +68,24 @@ describe('cashback in the DRE and the NFC-e', () => {
     const focus = (new FocusNFeClient('k', 'production') as any).buildNFCePayload(payload);
     expect(focus.items.map((i) => i.valor_desconto)).toEqual(['4.00', '16.00']);
     expect(focus.formas_pagamento[0].valor_pagamento).toBe('30.00');
+  });
+
+  it('DRE adds the coupon back to gross revenue and deducts it', async () => {
+    const { dre } = await computeDre(rid, '2026-08-01', '2026-08-31');
+    expect(dre.receitaBruta).toBeCloseTo(50, 2);
+    expect(dre.deducoes.cashback).toBeCloseTo(15, 2);
+    expect(dre.receitaLiquida).toBeCloseTo(35, 2);
+  });
+
+  it('NFC-e spreads the coupon over the items', async () => {
+    // A note of its own (the access key is unique)
+    fakeProvider.emitNFCe.mockImplementationOnce(async () => ({ ok: true, status: 'authorized', accessKey: '4'.repeat(44) }));
+    const out = await emitNFCeForSession({ restaurantId: rid, orderSessionId: couponSid, paymentMethod: 'pix' });
+    expect(out.httpStatus).toBeLessThan(300);
+    const payload = fakeProvider.emitNFCe.mock.calls[fakeProvider.emitNFCe.mock.calls.length - 1][0];
+    // Coupon + cashback = R$ 15,00 over R$ 10,00 and R$ 40,00
+    expect(payload.items.map((i) => i.discount)).toEqual([3, 12]);
+    expect(payload.totalAmount).toBeCloseTo(35, 2);
+    expect(payload.paymentAmount).toBeCloseTo(35, 2);
   });
 });

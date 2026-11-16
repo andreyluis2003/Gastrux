@@ -108,8 +108,9 @@ export default function ReceiptPage() {
           <span>{money(receipt.total)}</span>
         </div>
         {receipt.serviceCharge > 0 && <div className="row"><span>Taxa de serviço (fora da nota)</span><span>{money(receipt.serviceCharge)}</span></div>}
+        {receipt.couponDiscount > 0 && <div className="row"><span>Cupom {receipt.couponCode}</span><span>− {money(receipt.couponDiscount)}</span></div>}
         {receipt.cashbackUsed > 0 && <div className="row"><span>Cashback usado</span><span>- {money(receipt.cashbackUsed)}</span></div>}
-        {(receipt.serviceCharge > 0 || receipt.cashbackUsed > 0) && <div className="row big"><span>TOTAL PAGO</span><span>{money(receipt.grandTotal)}</span></div>}
+        {(receipt.serviceCharge > 0 || receipt.couponDiscount > 0 || receipt.cashbackUsed > 0) && <div className="row big"><span>TOTAL PAGO</span><span>{money(receipt.grandTotal)}</span></div>}
         {receipt.cashbackEarned > 0 && <div className="center">Você ganhou {money(receipt.cashbackEarned)} de cashback</div>}
         {receipt.paymentMethod && (
           <div className="row">

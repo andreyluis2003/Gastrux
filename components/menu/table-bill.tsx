@@ -270,6 +270,7 @@ export function TableBill({ qrToken, onClose, returning }: { qrToken: string; on
             <p className="text-xs text-gray-500">A taxa de serviço é opcional. Para retirar, fale com o garçom.</p>
           </>
         )}
+        {open.couponCents > 0 && <div className="flex justify-between text-emerald-700"><span>Cupom {open.couponCode}</span><span>− {reais(open.couponCents)}</span></div>}
         {open.cashbackCents > 0 && <div className="flex justify-between text-emerald-700"><span>Cashback</span><span>− {reais(open.cashbackCents)}</span></div>}
         <div className="flex justify-between font-bold text-base"><span>Total</span><span>{reais(open.totalCents)}</span></div>
         {open.paidCents > 0 && <div className="flex justify-between text-green-700"><span>Já pago</span><span>{reais(open.paidCents)}</span></div>}

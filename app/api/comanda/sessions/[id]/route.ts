@@ -18,6 +18,7 @@ import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 import { billTotals, serviceApplies } from '@/lib/comanda/bill';
 import { billHasPayments, billPaidCents } from '@/lib/comanda/bill-service';
 import { lockComanda } from '@/lib/comanda/add-item';
+import { sessionDiscountCents } from '@/lib/coupons/session';
 import { OPEN_STATUSES as KITCHEN_OPEN_STATUSES } from '@/lib/kds/order-status';
 
 export const dynamic = 'force-dynamic';
@@ -140,16 +141,16 @@ async function handlePUT(
           // Online payments of the table (pay at the table) count too
           if (await billHasPayments(tx, restaurantId, params.id)) throw new CashRuleError('Esta conta já tem pagamentos: feche pela tela Conta', 422, 'PARTIAL_PAYMENTS');
           const itemsTotal = await comandaTotalCents(tx, params.id);
-          const bill = await tx.orderSession.findUnique({
-            where: { id: params.id },
-            select: { serviceChargeEligible: true, cashbackUsedCents: true, restaurant: { select: { serviceChargePercent: true } } },
+          const bill = await tx.orderSession.findFirst({
+            where: { id: params.id, restaurantId },
+            select: { serviceChargeEligible: true, cashbackUsedCents: true, couponDiscountCents: true, restaurant: { select: { serviceChargePercent: true } } },
           });
           const { serviceCents } = billTotals(itemsTotal, bill?.restaurant.serviceChargePercent ?? 0, {
             applies: serviceApplies(bill ?? {}),
             waived: body?.serviceCharge !== true,
           });
-          // Cashback used on the bill screen is a discount (spec 2026-10-23 §7.1)
-          const total = Math.max(0, itemsTotal + serviceCents - (bill?.cashbackUsedCents ?? 0));
+          // Cashback used on the bill screen and the coupon are discounts (spec 2026-10-23 §7.1, 2026-11-16)
+          const total = Math.max(0, itemsTotal + serviceCents - (bill ? sessionDiscountCents(bill) : 0));
           // Legacy body (one paymentMethod, older devices): the whole total in that method
           const payments = read.legacy ? [{ method: read.payments[0].method, amount: (total / 100).toFixed(2) }] : read.payments;
           const settled = settlePayments(total, payments);

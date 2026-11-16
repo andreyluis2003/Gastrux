@@ -20,13 +20,13 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   // 1. RECEITA BRUTA - the Caixa criterion (owner 2026-10-16): paid comandas and counter sales,
   // pay at the table after refunds, and delivery orders without a comanda; the service charge is inside
   const sales = await salesInRange(restaurantId, start, endExclusive);
-  // Cashback used on the bills closed in the period (spec 2026-10-23 §8): the drawer got the total with the
-  // discount, so the gross revenue adds it back and the deductions take it out again
-  const cashbackUsed = await prisma.orderSession.aggregate({
-    where: { restaurantId, status: 'CLOSED', closedAt: { gte: start, lt: endExclusive }, cashbackUsedCents: { gt: 0 } },
-    _sum: { cashbackUsedCents: true },
+  // Cashback used and coupons on the bills closed in the period (spec 2026-10-23 §8, 2026-11-16): the drawer got
+  // the total with the discount, so the gross revenue adds it back and the deductions take it out again (one line)
+  const comandaDiscounts = await prisma.orderSession.aggregate({
+    where: { restaurantId, status: 'CLOSED', closedAt: { gte: start, lt: endExclusive }, OR: [{ cashbackUsedCents: { gt: 0 } }, { couponDiscountCents: { gt: 0 } }] },
+    _sum: { cashbackUsedCents: true, couponDiscountCents: true },
   });
-  const cashback = (cashbackUsed._sum.cashbackUsedCents ?? 0) / 100;
+  const cashback = ((comandaDiscounts._sum.cashbackUsedCents ?? 0) + (comandaDiscounts._sum.couponDiscountCents ?? 0)) / 100;
   const receitaBruta = sales.totalCents / 100 + cashback;
   const receitaDineIn = sales.salaoCents / 100 + cashback;
   const receitaDelivery = sales.deliveryCents / 100;

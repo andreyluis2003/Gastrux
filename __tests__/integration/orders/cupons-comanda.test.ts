@@ -9,6 +9,10 @@ import { PrismaClient } from '@prisma/client';
 import { lockComanda } from '../../../lib/comanda/add-item';
 import { evaluateCoupon, NOT_FOR_THIS_PHONE } from '../../../lib/coupons/service';
 import { applyCouponToSession, removeSessionCoupon } from '../../../lib/coupons/session';
+import { loadBill } from '../../../lib/comanda/bill-service';
+import { onBillClosed } from '../../../lib/cashback/bill';
+import { toPublicBill } from '../../../lib/comanda/public-bill';
+import { buildReceipt } from '../../../lib/print/tickets';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 const tag = crypto.randomBytes(4).toString('hex');
@@ -153,5 +157,75 @@ describe('cupom na comanda', () => {
     expect(await apply(s.id, 'PORCEL', { phoneDigits: digits })).toMatchObject({ ok: true });
     const other = await comanda();
     expect(await apply(other.id, 'PORCEL', { phoneDigits: digits })).toEqual({ ok: false, status: 422, error: NOT_FOR_THIS_PHONE });
+  });
+
+  describe('the coupon discount in the comanda totals', () => {
+    let shiftId;
+    beforeAll(async () => {
+      const reg = await prisma.cashRegister.create({ data: { restaurantId: rid, name: 'Caixa', isDefault: true } });
+      shiftId = (await prisma.cashSession.create({ data: { restaurantId: rid, cashRegisterId: reg.id, openedById: owner.id, openingFloatCents: 0, status: 'OPEN' } })).id;
+    });
+    afterAll(async () => {
+      await prisma.cashSessionEntry.deleteMany({ where: { restaurantId: rid } });
+      await prisma.cashSession.deleteMany({ where: { restaurantId: rid } });
+      await prisma.cashRegister.deleteMany({ where: { restaurantId: rid } });
+    });
+    const pay = (sessionId, amountCents) => prisma.cashSessionEntry.create({
+      data: { restaurantId: rid, cashSessionId: shiftId, type: 'RECEIPT', method: 'PIX', amountCents, orderSessionId: sessionId, createdById: owner.id },
+    });
+
+    it('bill total and remaining take the coupon out', async () => {
+      await coupon({ code: 'CONTA4', kind: 'FIXED', value: 400 });
+      const s = await comanda();
+      expect((await apply(s.id, 'CONTA4')).ok).toBe(true);
+      const bill = await loadBill(prisma, rid, s.id);
+      expect(bill).toMatchObject({ subtotalCents: 4000, serviceCents: 0, totalCents: 3600, couponDiscountCents: 400, couponCode: 'CONTA4' });
+      await pay(s.id, 2000);
+      expect((await loadBill(prisma, rid, s.id)).remainingCents).toBe(1600);
+      // The table sees it too
+      expect(toPublicBill(await loadBill(prisma, rid, s.id))).toMatchObject({ couponCents: 400, couponCode: 'CONTA4', totalCents: 3600, remainingCents: 1600 });
+    });
+
+    it('coupon and cashback together', async () => {
+      const s = await comanda({ couponDiscountCents: 400, couponCode: 'X', cashbackUsedCents: 600 });
+      expect((await loadBill(prisma, rid, s.id)).totalCents).toBe(3000);
+    });
+
+    it('the total never goes below zero when items leave after the coupon', async () => {
+      const s = await comanda({ couponDiscountCents: 3500, couponCode: 'X' });
+      await prisma.orderSessionItem.updateMany({ where: { sessionId: s.id }, data: { quantity: 1 } });
+      const bill = await loadBill(prisma, rid, s.id);
+      expect([bill.subtotalCents, bill.totalCents, bill.remainingCents]).toEqual([2000, 0, 0]);
+    });
+
+    it('the receipt takes the coupon out of what was paid', async () => {
+      const s = await comanda({ status: 'CLOSED', closedAt: new Date(), couponDiscountCents: 400, couponCode: 'DEZ', cashbackUsedCents: 100 });
+      const r = await buildReceipt(rid, s.id);
+      expect(r).toMatchObject({ total: 40, grandTotal: 35, couponDiscount: 4, couponCode: 'DEZ', cashbackUsed: 1 });
+    });
+
+    it('cashback earned counts what was paid', async () => {
+      // Cashback needs a Business plan: a restaurant of its own
+      const biz = (await prisma.restaurant.create({ data: { name: `CPCB ${tag}`, ownerId: owner.id, status: 'ACTIVE', subscriptionTier: 'business', subscriptionStatus: 'active', isInternal: false } })).id;
+      try {
+        await prisma.cashbackSettings.create({ data: { restaurantId: biz, enabled: true, percent: 10 } });
+        const digits = phone();
+        const customer = await prisma.customer.create({ data: { restaurantId: biz, name: 'Caio', phone: digits, phoneDigits: digits } });
+        const s = await prisma.orderSession.create({
+          data: { restaurantId: biz, userId: owner.id, status: 'CLOSED', closedAt: new Date(), customerId: customer.id, couponDiscountCents: 400, couponCode: 'DEZ' },
+        });
+        await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, quantity: 2, price: 20 } });
+        // 10% of 36,00 (items minus the coupon), not of 40,00
+        expect(await prisma.$transaction((tx) => onBillClosed(tx, biz, s.id))).toBe(360);
+        const after = await prisma.customer.findUnique({ where: { id: customer.id } });
+        expect([Number(after.totalSpent), after.totalOrders]).toEqual([36, 1]);
+      } finally {
+        await prisma.cashbackCredit.deleteMany({ where: { restaurantId: biz } });
+        await prisma.orderSession.deleteMany({ where: { restaurantId: biz } });
+        await prisma.customer.deleteMany({ where: { restaurantId: biz } });
+        await prisma.cashbackSettings.deleteMany({ where: { restaurantId: biz } });
+        await prisma.restaurant.delete({ where: { id: biz } });
+      }
+    });
   });
 });

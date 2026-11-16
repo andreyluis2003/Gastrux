@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { lineTotalCents } from '@/lib/comanda/line-total';
+import { sessionDiscountCents } from '@/lib/coupons/session';
 import { creditSale, recordPurchase, reverseForSession, undoPurchase } from './service';
 
 /**
@@ -8,28 +9,29 @@ import { creditSale, recordPurchase, reverseForSession, undoPurchase } from './s
  */
 type Tx = Prisma.TransactionClient;
 
-async function billNumbers(tx: Tx, sessionId: string) {
-  const s = await tx.orderSession.findUnique({
-    where: { id: sessionId },
+async function billNumbers(tx: Tx, restaurantId: string, sessionId: string) {
+  const s = await tx.orderSession.findFirst({
+    where: { id: sessionId, restaurantId },
     select: {
-      customerId: true, cashbackUsedCents: true, serviceChargeCents: true, closedAt: true,
+      customerId: true, cashbackUsedCents: true, couponDiscountCents: true, serviceChargeCents: true, closedAt: true,
       items: { select: { quantity: true, price: true, modifiers: { select: { priceAdjustment: true } } } },
     },
   });
   if (!s) return null;
   const subtotalCents = s.items.reduce((sum, i) => sum + lineTotalCents(i.price, i.quantity, i.modifiers.map((m) => m.priceAdjustment)), 0);
+  const discountCents = sessionDiscountCents(s);
   return {
     customerId: s.customerId,
     closedAt: s.closedAt ?? new Date(),
-    // Spec §4.b: what was paid for the items, without the service charge and without the cashback used
-    baseCents: Math.max(0, subtotalCents - s.cashbackUsedCents),
-    paidCents: Math.max(0, subtotalCents + s.serviceChargeCents - s.cashbackUsedCents),
+    // Spec §4.b: what was paid for the items, without the service charge and without the coupon and cashback used
+    baseCents: Math.max(0, subtotalCents - discountCents),
+    paidCents: Math.max(0, subtotalCents + s.serviceChargeCents - discountCents),
   };
 }
 
 /** The credit of the closed bill (0 without a customer, on Pro or with the cashback off); the CRM purchase */
 export async function onBillClosed(tx: Tx, restaurantId: string, sessionId: string): Promise<number> {
-  const n = await billNumbers(tx, sessionId);
+  const n = await billNumbers(tx, restaurantId, sessionId);
   if (!n?.customerId) return 0;
   await recordPurchase(tx, n.customerId, n.paidCents, n.closedAt);
   return creditSale(tx, { restaurantId, customerId: n.customerId, baseCents: n.baseCents, orderSessionId: sessionId });
@@ -37,7 +39,7 @@ export async function onBillClosed(tx: Tx, restaurantId: string, sessionId: stri
 
 /** A reopened or cancelled bill: credit taken back, cashback used returned, and the purchase undone if it had closed */
 export async function onBillReversed(tx: Tx, restaurantId: string, sessionId: string, wasClosed: boolean): Promise<{ notReversedCents: number }> {
-  const n = await billNumbers(tx, sessionId);
+  const n = await billNumbers(tx, restaurantId, sessionId);
   if (wasClosed && n?.customerId) await undoPurchase(tx, n.customerId, n.paidCents);
   return reverseForSession(tx, restaurantId, sessionId);
 }

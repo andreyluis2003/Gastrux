@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { lineTotalCents } from '@/lib/comanda/line-total';
+import { sessionDiscountCents } from '@/lib/coupons/session';
 import { sefazNumber } from '@/lib/nfe/access-key';
 
 /**
@@ -83,8 +84,11 @@ export interface Receipt {
   total: number;
   /** Service charge, outside the NFC-e (spec 2026-10-07, 4.5) */
   serviceCharge: number;
-  /** Items plus service charge minus cashback used: what the customer paid */
+  /** Items plus service charge minus the coupon and the cashback used: what the customer paid */
   grandTotal: number;
+  /** Coupon applied on the comanda (spec 2026-11-16) */
+  couponDiscount: number;
+  couponCode: string | null;
   /** Cashback used as a discount and earned on this bill (spec 2026-10-23) */
   cashbackUsed: number;
   cashbackEarned: number;
@@ -158,7 +162,9 @@ export async function buildReceipt(restaurantId: string, sessionId: string): Pro
     lines,
     total,
     serviceCharge: session.serviceChargeCents / 100,
-    grandTotal: Math.max(0, Math.round(total * 100) + session.serviceChargeCents - session.cashbackUsedCents) / 100,
+    grandTotal: Math.max(0, Math.round(total * 100) + session.serviceChargeCents - sessionDiscountCents(session)) / 100,
+    couponDiscount: session.couponDiscountCents / 100,
+    couponCode: session.couponCode,
     cashbackUsed: session.cashbackUsedCents / 100,
     cashbackEarned: (credit?.amountCents ?? 0) / 100,
     customerCPF: doc?.customerCPF ?? null,

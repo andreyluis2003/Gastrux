@@ -47,6 +47,7 @@ export default function PreBillPage() {
         <hr />
         <div className="row"><span>Subtotal</span><span>{money(bill.subtotalCents)}</span></div>
         {bill.serviceCents > 0 && <div className="row"><span>Taxa de serviço ({bill.percent}%)</span><span>{money(bill.serviceCents)}</span></div>}
+        {bill.couponDiscountCents > 0 && <div className="row"><span>Cupom {bill.couponCode}</span><span>− {money(bill.couponDiscountCents)}</span></div>}
         {bill.cashbackUsedCents > 0 && <div className="row"><span>Cashback</span><span>- {money(bill.cashbackUsedCents)}</span></div>}
         <div className="row big"><span>TOTAL</span><span>{money(bill.totalCents)}</span></div>
         {bill.paidCents > 0 && (

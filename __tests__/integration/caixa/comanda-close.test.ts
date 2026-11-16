@@ -72,6 +72,15 @@ describe('closing a comanda records the payments in the shift', () => {
     expect(lines).toHaveLength(3);
   });
 
+  it('the coupon on the comanda comes out of the one-request close total (cupom 2026-11-16)', async () => {
+    const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+    const s = await comanda([[30, 2]]); // 60,00
+    await prisma.orderSession.update({ where: { id: s.id }, data: { couponDiscountCents: 600, couponCode: 'DEZ' } });
+    // 54,00 is enough: the coupon took 6,00 out; 53,99 is not
+    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: '53.99' }] })).status).toBe(400);
+    expect((await put(s.id, { status: 'CLOSED', cashSessionId: session.id, payments: [{ method: 'pix', amount: '54.00' }] })).status).toBe(200);
+  });
+
   it('total with quantities and modifiers matches the comanda total (Review Focus 5)', async () => {
     const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
     const s = await comanda([[10.33, 3, 0.5]]); // 3 x (10,33 + 0,50) = 32,49

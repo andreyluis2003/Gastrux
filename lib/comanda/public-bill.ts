@@ -12,6 +12,9 @@ export interface PublicOpenBill {
   serviceApplies: boolean;
   /** Cashback the cashier applied (spec 2026-10-23): already out of totalCents */
   cashbackCents: number;
+  /** Coupon applied on the comanda (spec 2026-11-16): already out of totalCents */
+  couponCents: number;
+  couponCode: string | null;
   totalCents: number;
   paidCents: number;
   remainingCents: number;
@@ -30,6 +33,8 @@ export function toPublicBill(bill: Bill, names: Map<string, string> = new Map())
     servicePercent: bill.percent,
     serviceApplies: bill.applies && !bill.waived,
     cashbackCents: bill.cashbackUsedCents ?? 0,
+    couponCents: bill.couponDiscountCents ?? 0,
+    couponCode: bill.couponCode ?? null,
     totalCents: bill.totalCents,
     paidCents: bill.paidCents,
     remainingCents: bill.remainingCents,

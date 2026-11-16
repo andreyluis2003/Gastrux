@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getProvider } from '@/lib/nfe/provider';
 import { nfceQuantityFields } from '@/lib/nfe/session-line';
 import { apportionDiscount } from '@/lib/cashback/rules';
+import { sessionDiscountCents } from '@/lib/coupons/session';
 import { createDocumentWithNextNumber, findReusableRejected } from '@/lib/nfe/numbering';
 import { resolveItemsFiscalData } from '@/lib/nfe/fiscal-data';
 import { noteLabel } from './access-key';
@@ -96,8 +97,8 @@ export async function emitNFCeForSession(input: EmitSessionInput): Promise<EmitS
       position: idx,
     };
   });
-  // Cashback used on the bill is a discount on the note, spread over the items (spec 2026-10-23 §8)
-  const discounts = apportionDiscount(lines.map((l) => Math.round(l.totalPrice * 100)), orderSession.cashbackUsedCents ?? 0);
+  // Cashback used and the coupon of the bill are a discount on the note, spread over the items (spec 2026-10-23 §8, 2026-11-16)
+  const discounts = apportionDiscount(lines.map((l) => Math.round(l.totalPrice * 100)), sessionDiscountCents(orderSession));
   const totalAmount = (lines.reduce((sum, line) => sum + Math.round(line.totalPrice * 100), 0) - discounts.reduce((a, b) => a + b, 0)) / 100;
 
   const reusable = await findReusableRejected(orderSessionId);
