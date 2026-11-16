@@ -32,6 +32,9 @@ async function customerOrdered(db: any, restaurantId: string, phoneDigits: strin
   return site + comandas > 0;
 }
 
+/** A coupon with a per-phone rule and no phone given */
+export const PHONE_NEEDED = 'Informe o seu celular para usar este cupom.';
+
 /** One message for the per-phone rules: which one failed (used before, or not the first order) is not told */
 export const NOT_FOR_THIS_PHONE = 'Este cupom não vale para este celular.';
 
@@ -46,12 +49,14 @@ export async function evaluateCoupon(
   // Same message as a paused coupon: whether a code exists is not revealed (security review 2026-11-08)
   if (!c) return { ok: false, error: INVALID };
   if (opts.channel === 'comanda' && c.kind === 'FREE_DELIVERY') return { ok: false, error: c.active ? FREE_DELIVERY_ON_COMANDA : INVALID };
+  // A paused coupon answers before the per-phone rules too, so it never tells that it has one
+  if (!c.active) return { ok: false, error: INVALID };
   const [usesByCustomer, ordered] = await Promise.all([
     phoneRules && phoneDigits ? db.couponRedemption.count({ where: { couponId: c.id, phoneDigits } }) : Promise.resolve(0),
     phoneRules && c.firstOrderOnly && phoneDigits ? customerOrdered(db, restaurantId, phoneDigits) : Promise.resolve(false),
   ]);
   const hasPhoneRules = c.maxPerCustomer !== null || c.firstOrderOnly;
-  if (phoneRules && hasPhoneRules && !phoneDigits) return { ok: false, error: 'Informe o seu celular para usar este cupom.' };
+  if (phoneRules && hasPhoneRules && !phoneDigits) return { ok: false, error: PHONE_NEEDED };
   // The coupon rules first; the per-phone ones answer with one message
   const general = refusal(toRules(c), { subtotalCents, deliveryFeeCents, now, usesByCustomer: 0, customerOrdered: false });
   if (general) return { ok: false, error: general };

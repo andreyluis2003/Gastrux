@@ -15,7 +15,7 @@ export type ApplyResult =
   | { ok: false; error: string; status: number };
 
 /** Serialize the uses of one coupon (the same key as reserveCoupon on the delivery site) */
-const lockCoupon = (tx: Prisma.TransactionClient, couponId: string) =>
+export const lockCoupon = (tx: Prisma.TransactionClient, couponId: string) =>
   tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'coupon:' + couponId}))`;
 
 /**

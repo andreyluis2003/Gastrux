@@ -5,6 +5,7 @@ import { lockComanda } from '@/lib/comanda/add-item';
 import { CashRuleError } from '@/lib/caixa/rules';
 import { REVERSAL_PREFIXES } from '@/lib/caixa/sale';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
+import { lockCoupon } from '@/lib/coupons/session';
 import { billHasPayments, emitClosedBill, loadBill } from './bill-service';
 
 /**
@@ -99,7 +100,26 @@ async function lockBoth(tx: Prisma.TransactionClient, a: string, b: string) {
 }
 
 /**
- * Merge (spec 4.4): the source's lines, payments and kitchen orders move to the target; the source is
+ * The source's coupon (spec 2026-11-16 cupom-whatsapp-balcao) goes to the target with its use, at the discount fixed
+ * when it was applied. One coupon per comanda: two comandas with a coupon are not merged. Both comandas are locked.
+ */
+async function moveCoupon(tx: Prisma.TransactionClient, restaurantId: string, targetId: string, sourceId: string) {
+  const [target, source] = await Promise.all(
+    [targetId, sourceId].map((id) => tx.orderSession.findFirst({ where: { id, restaurantId }, select: { couponCode: true, couponDiscountCents: true } })),
+  );
+  if (!source?.couponCode) return;
+  if (target?.couponCode) throw new CashRuleError('As duas comandas têm cupom: tire um antes de juntar', 409, 'COUPON_BOTH');
+  const redemption = await tx.couponRedemption.findFirst({ where: { orderSessionId: sourceId, restaurantId }, select: { id: true, couponId: true } });
+  if (redemption) {
+    await lockCoupon(tx, redemption.couponId);
+    await tx.couponRedemption.update({ where: { id: redemption.id }, data: { orderSessionId: targetId } });
+  }
+  await tx.orderSession.update({ where: { id: targetId }, data: { couponCode: source.couponCode, couponDiscountCents: source.couponDiscountCents } });
+  await tx.orderSession.update({ where: { id: sourceId }, data: { couponCode: null, couponDiscountCents: 0 } });
+}
+
+/**
+ * Merge (spec 4.4):the source's lines, payments and kitchen orders move to the target; the source is
  * kept CANCELLED with mergedIntoId (history "juntada à mesa N") and its table is free. Payments keep
  * their cash shift: only the comanda they belong to changes, so the shift totals do not move.
  */
@@ -111,6 +131,7 @@ export async function mergeSessions(member: RestaurantMember, targetSessionId: s
     const source = await openSession(tx, member.restaurantId, sourceSessionId);
     await assertNotReopened(tx, member.restaurantId, [target.id, source.id]);
     await assertNoNote(tx, source.id);
+    await moveCoupon(tx, member.restaurantId, target.id, source.id);
     const items = await tx.orderSessionItem.updateMany({ where: { sessionId: source.id }, data: { sessionId: target.id } });
     const payments = await tx.cashSessionEntry.updateMany({ where: { orderSessionId: source.id, restaurantId: member.restaurantId }, data: { orderSessionId: target.id } });
     // Online payments of the table (pay at the table) follow too, applied or still pending, so their money

@@ -18,7 +18,7 @@ import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 import { billTotals, serviceApplies } from '@/lib/comanda/bill';
 import { billHasPayments, billPaidCents } from '@/lib/comanda/bill-service';
 import { lockComanda } from '@/lib/comanda/add-item';
-import { sessionDiscountCents } from '@/lib/coupons/session';
+import { removeSessionCoupon, sessionDiscountCents } from '@/lib/coupons/session';
 import { OPEN_STATUSES as KITCHEN_OPEN_STATUSES } from '@/lib/kds/order-status';
 
 export const dynamic = 'force-dynamic';
@@ -295,6 +295,8 @@ export async function DELETE(
           await reverseSaleEntries(tx, { restaurantId: member.restaurantId, orderSessionId: params.id, cashSessionId: String(body?.cashSessionId ?? ''), createdById: member.userId, reason, kind: 'cancel' });
         }
         await onBillReversed(tx, member.restaurantId, params.id, ownedSession.status === 'CLOSED');
+        // The coupon's use goes back with the cancel (spec 2026-11-16 cupom-whatsapp-balcao)
+        await removeSessionCoupon(tx, member.restaurantId, params.id);
       });
     } catch (error) {
       if (error instanceof CashRuleError) {
