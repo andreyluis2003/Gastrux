@@ -24,16 +24,19 @@ Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
   - **Venda balcão:** pode gravar uso "fora da regra" também numa venda feita com internet (o servidor não distingue
     com segurança venda na hora de venda reenviada). Não há limite de tentativas de cupom na venda balcão (só na
     prévia): testar códigos exigiria registrar vendas reais.
-  - **Tela de Cupons** ainda não lista os usos (só o total e o desconto dado), então não mostra a marca "fora da regra"
-    (`CouponRedemption.outOfRule`).
+  - **Tela de Cupons** ainda não lista os usos um a um: mostra o total, o desconto dado e "N fora da regra" no cartão
+    do cupom; quem forçou e em qual venda fica no registro de auditoria (OrderSession, `couponOutOfRule`).
   - **Tirar o cliente da conta não tira o cupom.**
   - **Reconferências automáticas** do cupom no balcão gastam tentativas (20 por minuto por usuário).
   - **Tirar a taxa de serviço** quando isso fecha a conta não dá cashback nem conta a compra no cadastro (já era
-    assim); a conferência de "pagou mais que os itens" ao tirar a taxa ignora cupom e cashback.
-  - **Conta 100% coberta** por cupom ou cashback (total R$ 0): sem caminho testado para fechar.
+    assim).
+  - **Mercado Pago** (conferência da mesa paga por PIX) compara com o total só dos itens: mesa com cupom pode gerar
+    alerta falso de "parte ainda não paga" (já era assim com cashback e taxa).
   - **WhatsApp:** cliente sem nome entra como "Cliente WhatsApp"; código de cupom igual a comando do robô (MENU,
-    PEDIDO, AJUDA) não pode ser digitado; "Não." com pontuação conta como código; tocar Confirmar num resumo velho não
-    responde nada; o robô pergunta mesmo quando os cupons ativos estão esgotados ou com pedido mínimo.
+    PEDIDO, AJUDA) não pode ser digitado; "Não." com pontuação conta como código; o robô pergunta mesmo quando os
+    cupons ativos estão esgotados ou com pedido mínimo.
+  - **WhatsApp sem botões:** a mensagem de texto diz "Digite *finalizar*", mas o robô não entende *finalizar* digitado
+    (só o botão Finalizar); por isso o aviso de resumo antigo manda digitar *carrinho* (já era assim).
   - **WhatsApp manda o celular sem o 9º dígito** (12 dígitos) em muitos casos; o cliente do site tem 11, então o mesmo
     cliente pode virar dois cadastros e o "primeiro pedido" pode não reconhecer (já era assim).
   - **Telas novas (Conta e balcão)** ainda não conferidas no navegador: conferir no homolog.

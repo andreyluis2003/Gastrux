@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { settleSessionStock } from '@/lib/stock/session-stock';
 import { noteSalesThresholds } from '@/lib/plans/monthly-sales';
 import { idempotent } from '@/lib/api/idempotency';
-import { requireRestaurantRole } from '@/lib/auth/restaurant-role';
+import { recordAudit, requireRestaurantRole } from '@/lib/auth/restaurant-role';
 import { addComandaItem, AddItemError, type AddItemInput } from '@/lib/comanda/add-item';
 import { sendSessionToKitchen } from '@/lib/kds/send-session';
 import { autoEmitNFCe } from '@/lib/nfe/emit-session';
@@ -30,8 +30,10 @@ const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
  * couponCode (spec 2026-11-16 cupom-whatsapp-balcao, parte 1b): the screen sends it only after a preview
  * (POST /api/comanda/coupon-preview). The discount never comes from the device: it is computed here, and a rule that
  * now refuses (the limit ran out, the sale waited offline) never fails the sale - the use is recorded out of rule
- * and the answer carries couponWarning. A code that no longer exists (or free delivery, nothing to discount) never
- * fails it either: the sale goes in without the discount and couponWarning says why. No try limit here (the preview has
+ * and the answer carries couponWarning (and an audit line, so the owner can see who forced it). A code that is not
+ * applied (it no longer exists, or free delivery: nothing to discount) gets no discount, so the payments the screen
+ * computed with the discount fall short and settlePayments refuses the sale ("Faltam ..."); coupons cannot be deleted,
+ * so the screen never gets there after a good preview. No try limit here (the preview has
  * it): a 429 would be stored under the Idempotency-Key and the outbox would keep a paid sale pending forever.
  *         (legacy: paymentMethod instead of payments, paid in full in the default register shift)
  * The device chooses the comanda id (clientId), so a replay finds the sale it already made. Prices
@@ -86,6 +88,7 @@ async function handlePOST(request: Request) {
   let primaryMethod: string | undefined;
   let couponDiscountCents = 0;
   let couponWarning: string | null = null;
+  let outOfRuleCoupon: { code: string; reason: string } | null = null;
 
   try {
     // All or nothing: the comanda, its lines and its cash entries
@@ -103,10 +106,11 @@ async function handlePOST(request: Request) {
       // The coupon goes on while the comanda is still open, with the server's discount (force: a rule never fails the sale)
       if (couponCode) {
         const applied = await applyCouponToSession(tx, { restaurantId: member.restaurantId, sessionId: clientId, code: couponCode, phoneDigits: phone ?? '', force: true });
-        // Not applied (the code no longer exists, free delivery): the sale goes in at full price, never lost on a replay
+        // Not applied (the code no longer exists, free delivery): no discount, so payments sent with it fall short below
         if (applied.ok) {
           couponDiscountCents = applied.discountCents;
           couponWarning = applied.warning ?? null;
+          if (applied.outOfRule) outOfRuleCoupon = { code: applied.code, reason: applied.warning ?? '' };
         } else {
           couponWarning = applied.error;
         }
@@ -129,6 +133,12 @@ async function handlePOST(request: Request) {
       return NextResponse.json({ error: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status });
     }
     throw error;
+  }
+
+  // A use out of rule (accepted so a live sale is never lost) leaves a trace: who, which sale, which code, why
+  const forced = outOfRuleCoupon as { code: string; reason: string } | null;
+  if (forced) {
+    await recordAudit(member, { action: 'UPDATE', entityType: 'OrderSession', entityId: clientId, changes: { couponOutOfRule: forced.code, reason: forced.reason } });
   }
 
   const shift = target as SaleTarget | null;

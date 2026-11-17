@@ -255,6 +255,33 @@ describe('WhatsApp bot: coupon question and customer on the comanda', () => {
     expect((await conv(bare, phone)).state).toBe('COMPLETED');
   });
 
+  it('Confirmar on an old summary answers instead of staying silent (final review 2026-11-16)', async () => {
+    const phone = phoneOf();
+    await conversation(bare, bareItemId, phone);
+    await say(bare, phone, { text: 'Bia' });
+    await say(bare, phone, { buttonId: 'BTN_CONFIRM_ORDER' });
+    const before = await prisma.orderSession.count({ where: { restaurantId: bare } });
+    // The order was made: the same summary tapped again later
+    await say(bare, phone, { buttonId: 'BTN_CONFIRM_ORDER' });
+    expect(last()).toBe('Este resumo é antigo. Digite *carrinho* para ver o pedido atualizado.');
+    expect(await prisma.orderSession.count({ where: { restaurantId: bare } })).toBe(before);
+  });
+
+  it('a name of spaces only falls back to "Cliente WhatsApp" (final review 2026-11-16)', async () => {
+    const phone = phoneOf();
+    await prisma.whatsAppConversation.create({
+      data: {
+        restaurantId: bare, phoneNumber: phone, state: 'CONFIRMING', orderType: 'PICKUP', customerName: '   ',
+        cart: [{ menuItemId: bareItemId, name: 'Pizza', quantity: 2, price: 40 }], cartTotal: 80,
+      },
+    });
+    await say(bare, phone, { buttonId: 'BTN_CONFIRM_ORDER' });
+    const comanda = await prisma.orderSession.findUnique({ where: { id: (await conv(bare, phone)).orderSessionId } });
+    expect(comanda).toBeTruthy();
+    const customer = await prisma.customer.findUnique({ where: { id: comanda.customerId } });
+    expect(customer.name).toBe('Cliente WhatsApp');
+  });
+
   it('order without coupon also links the customer', async () => {
     const phone = phoneOf();
     await conversation(bare, bareItemId, phone);

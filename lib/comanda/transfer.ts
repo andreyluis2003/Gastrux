@@ -119,7 +119,7 @@ async function moveCoupon(tx: Prisma.TransactionClient, restaurantId: string, ta
 }
 
 /**
- * Merge (spec 4.4):the source's lines, payments and kitchen orders move to the target; the source is
+ * Merge (spec 4.4): the source's lines, payments and kitchen orders move to the target; the source is
  * kept CANCELLED with mergedIntoId (history "juntada à mesa N") and its table is free. Payments keep
  * their cash shift: only the comanda they belong to changes, so the shift totals do not move.
  */

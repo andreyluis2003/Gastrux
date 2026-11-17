@@ -77,6 +77,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       : bill.remainingCents;
   const typed = amountText.trim() ? reaisToCents(amountText) : null;
   const dueNow = typed && typed > 0 ? Math.min(typed, bill.remainingCents) : suggested;
+  // A coupon (or coupon plus cashback) covered every item: nothing to receive, the bill just closes
+  const zeroLeft = !closed && bill.remainingCents === 0 && bill.subtotalCents > 0 && bill.status !== 'ENCOMENDA';
 
   async function toggleService(charge: boolean) {
     const res = await fetch(`/api/comanda/sessions/${sessionId}/bill`, {
@@ -89,14 +91,15 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
     setBill(out);
   }
 
-  async function receive() {
+  // closeOnly: nothing left to pay (a coupon covered the items), "Fechar conta" sends no payment
+  async function receive(closeOnly = false) {
     setBusy(true);
     try {
       const res = await fetch(`/api/comanda/sessions/${sessionId}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attemptKey.current },
         body: JSON.stringify({
-          payments: payments.map((p) => ({ method: p.method, amount: toApiAmount(p.amount) })),
+          payments: closeOnly ? [] : payments.map((p) => ({ method: p.method, amount: toApiAmount(p.amount) })),
           cashSessionId: shift.shiftId,
           customerCPF: cpf.replace(/\D/g, '') || undefined,
           // The share being paid now: the change shown on screen is counted against it
@@ -254,7 +257,8 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
             </span>
           </div>
         )}
-        {bill.couponCode && bill.couponDiscountCents > 0 && (
+        {/* Shown whenever a coupon is on the bill, even at R$ 0, so it can always be taken off */}
+        {bill.couponCode && (
           <div className="flex justify-between items-center text-emerald-700">
             <span>Cupom {bill.couponCode} − {brl(bill.couponDiscountCents)}</span>
             {!closed && <button className="text-xs underline" disabled={busy} onClick={() => coupon('DELETE')}>Tirar</button>}
@@ -349,8 +353,11 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
       <div className="sticky -bottom-5 -mx-5 -mb-5 flex flex-wrap gap-2 justify-end border-t bg-white px-5 py-3">
         {!closed && <Button variant="outline" className="gap-2 mr-auto" onClick={preBill}><Printer className="h-4 w-4" /> Pré-conta</Button>}
         <Button variant="ghost" onClick={onCancel}>Voltar</Button>
-        {!closed && online && (
-          <Button className="bg-green-600" disabled={busy || !shift.shiftId || dueNow <= 0 || !panelState(dueNow, payments).valid} onClick={receive}>
+        {!closed && online && zeroLeft && (
+          <Button className="bg-green-600" disabled={busy} onClick={() => receive(true)}>Fechar conta</Button>
+        )}
+        {!closed && online && !zeroLeft && (
+          <Button className="bg-green-600" disabled={busy || !shift.shiftId || dueNow <= 0 || !panelState(dueNow, payments).valid} onClick={() => receive()}>
             {/* An encomenda closes at the pickup, never here (spec 2026-10-26 encomendas) */}
             {bill.status === 'ENCOMENDA' ? `Receber sinal ${brl(dueNow)}` : dueNow >= bill.remainingCents ? 'Receber e fechar' : `Receber ${brl(dueNow)}`}
           </Button>

@@ -77,6 +77,20 @@ describe('cashback in the DRE and the NFC-e', () => {
     expect(dre.receitaLiquida).toBeCloseTo(35, 2);
   });
 
+  it('DRE adds back at most the items of the bill (fixed coupon over a smaller order, final review 2026-11-16)', async () => {
+    const JUL = new Date('2026-07-10T22:00:00Z');
+    const recipe = await prisma.recipe.findFirst({ where: { restaurantId: rid } });
+    // R$ 12,00 of items, a R$ 15,00 coupon: R$ 0,00 paid, only R$ 12,00 was discounted
+    await prisma.orderSession.create({
+      data: { restaurantId: rid, userId: ownerId, status: 'CLOSED', closedAt: JUL, couponDiscountCents: 1500, couponCode: 'QUINZE',
+        items: { create: [{ recipeId: recipe.id, quantity: 1, price: 12, addedAt: JUL }] } },
+    });
+    const { dre } = await computeDre(rid, '2026-07-01', '2026-07-31');
+    expect(dre.receitaBruta).toBeCloseTo(12, 2);
+    expect(dre.deducoes.cashback).toBeCloseTo(12, 2);
+    expect(dre.receitaLiquida).toBeCloseTo(0, 2);
+  });
+
   it('NFC-e spreads the coupon over the items', async () => {
     // A note of its own (the access key is unique)
     fakeProvider.emitNFCe.mockImplementationOnce(async () => ({ ok: true, status: 'authorized', accessKey: '4'.repeat(44) }));

@@ -25,6 +25,7 @@ import { PUT as SESSION_PUT, DELETE as SESSION_DELETE } from '../../../app/api/c
 import { PUT as ATTACH } from '../../../app/api/comanda/sessions/[id]/customer/route';
 import { POST as USE_CASHBACK } from '../../../app/api/comanda/sessions/[id]/cashback/route';
 import { POST as MERGE } from '../../../app/api/comanda/sessions/[id]/merge/route';
+import { PATCH as BILL_PATCH } from '../../../app/api/comanda/sessions/[id]/bill/route';
 import { balanceCents, findCustomerByPhone } from '../../../lib/cashback/service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -151,6 +152,15 @@ describe('cupom na comanda', () => {
     expect((await prisma.coupon.findUnique({ where: { id: live.id } })).usedCount).toBe(0);
     expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).couponCode).toBeNull();
     expect(await prisma.couponRedemption.count({ where: { orderSessionId: s.id } })).toBe(0);
+  });
+
+  it('refuses an empty comanda without spending a use (final review 2026-11-16)', async () => {
+    const c = await coupon({ code: 'VAZIA' });
+    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: owner.id, status: 'OPEN' } });
+    expect(await apply(s.id, 'VAZIA')).toEqual({ ok: false, status: 422, error: 'Adicione itens antes do cupom' });
+    expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(0);
+    expect(await prisma.couponRedemption.count({ where: { orderSessionId: s.id } })).toBe(0);
+    expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).couponCode).toBeNull();
   });
 
   it('refuses a closed comanda and a comanda of another restaurant', async () => {
@@ -427,14 +437,80 @@ describe('cupom na Conta (rotas)', () => {
     await ATTACH(req('PUT', { phone: '11955553333', name: 'Lia' }), p(sid));
     const customer = await findCustomerByPhone(prisma, rid, '11955553333');
     expect((await pay(sid, '36,00')).status).toBe(200);
+    // The table asked to pay with the waiter: closing answers it (as the PUT close does)
+    await prisma.orderSession.update({ where: { id: sid }, data: { payAtWaiterRequestedAt: new Date() } });
     const res = await APPLY(req('POST', { code: 'FECHA' }), p(sid));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ status: 'CLOSED', couponCode: 'FECHA', totalCents: 3600, remainingCents: 0 });
     expect(await used(c.id)).toBe(1);
-    expect((await prisma.orderSession.findUnique({ where: { id: sid } })).closedAt).not.toBeNull();
+    expect(await prisma.orderSession.findUnique({ where: { id: sid } })).toMatchObject({ closedAt: expect.any(Date), payAtWaiterRequestedAt: null });
     // onBillClosed: 10% of 36,00 credited, the purchase counted
     expect(await balanceCents(prisma, rid, customer.id)).toBe(360);
     expect((await prisma.customer.findUnique({ where: { id: customer.id } })).totalOrders).toBe(1);
+  });
+
+  it('a coupon that covers every item: "Fechar conta" closes it with no payment (final review 2026-11-16)', async () => {
+    as(ownerId);
+    await prisma.cashbackSettings.upsert({ where: { restaurantId: rid }, create: { restaurantId: rid, enabled: true, percent: 10, minUseCents: 100 }, update: { enabled: true, percent: 10 } });
+    const c = await coupon({ code: 'TUDO', kind: 'FIXED', value: 5000 });
+    const sid = await newBill();
+    await ATTACH(req('PUT', { phone: '11955552222', name: 'Teo' }), p(sid));
+    const customer = await findCustomerByPhone(prisma, rid, '11955552222');
+    const applied = await APPLY(req('POST', { code: 'TUDO' }), p(sid));
+    expect(applied.status).toBe(200);
+    // Nothing paid yet: the coupon alone never closes it
+    expect(await applied.json()).toMatchObject({ status: 'OPEN', totalCents: 0, remainingCents: 0, paidCents: 0 });
+    // A payment on R$ 0 is still refused
+    const extra = await pay(sid, '1,00');
+    expect([extra.status, (await extra.json()).code]).toEqual([422, 'ALREADY_PAID']);
+    await prisma.orderSession.update({ where: { id: sid }, data: { payAtWaiterRequestedAt: new Date() } });
+    const res = await PAY(req('POST', { payments: [], cashSessionId: shiftId }), p(sid));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ closed: true, changeCents: 0, bill: { status: 'CLOSED', totalCents: 0 } });
+    expect(await prisma.orderSession.findUnique({ where: { id: sid } })).toMatchObject({ status: 'CLOSED', closedAt: expect.any(Date), payAtWaiterRequestedAt: null });
+    // No cash entry; the use stays; the purchase is counted (R$ 0 paid: no cashback earned)
+    expect(await prisma.cashSessionEntry.count({ where: { orderSessionId: sid } })).toBe(0);
+    expect(await used(c.id)).toBe(1);
+    expect((await prisma.customer.findUnique({ where: { id: customer.id } })).totalOrders).toBe(1);
+    expect(await balanceCents(prisma, rid, customer.id)).toBe(0);
+    // A bill with something left still needs payments
+    const open = await newBill();
+    const none = await PAY(req('POST', { payments: [], cashSessionId: shiftId }), p(open));
+    expect([none.status, (await none.json()).error]).toEqual([400, 'Informe as formas de pagamento']);
+  });
+
+  it('coupon after cashback that would pass the items is refused (final review 2026-11-16)', async () => {
+    as(ownerId);
+    await prisma.cashbackSettings.upsert({ where: { restaurantId: rid }, create: { restaurantId: rid, enabled: true, percent: 10, minUseCents: 100 }, update: { enabled: true, percent: 10 } });
+    const c = await coupon({ code: 'DEPOIS', kind: 'FIXED', value: 3800 });
+    const sid = await newBill();
+    await ATTACH(req('PUT', { phone: '11955551111', name: 'Gil' }), p(sid));
+    const customer = await findCustomerByPhone(prisma, rid, '11955551111');
+    await prisma.cashbackCredit.create({ data: { restaurantId: rid, customerId: customer.id, amountCents: 500, remainingCents: 500, expiresAt: new Date(Date.now() + 30 * 864e5) } });
+    expect((await USE_CASHBACK(req('POST', { cents: 500 }), p(sid))).status).toBe(200);
+    // 38 + 5 > 40: refused, nothing written
+    const res = await APPLY(req('POST', { code: 'DEPOIS' }), p(sid));
+    expect([res.status, (await res.json()).error]).toEqual([409, 'Tire o cashback antes de aplicar o cupom']);
+    expect(await used(c.id)).toBe(0);
+    expect(await prisma.couponRedemption.count({ where: { orderSessionId: sid } })).toBe(0);
+    expect(await prisma.orderSession.findUnique({ where: { id: sid } })).toMatchObject({ couponCode: null, couponDiscountCents: 0, cashbackUsedCents: 500 });
+    // A coupon that fits with the cashback goes on
+    await coupon({ code: 'CABE', kind: 'FIXED', value: 3500 });
+    expect(await (await APPLY(req('POST', { code: 'CABE' }), p(sid))).json()).toMatchObject({ couponDiscountCents: 3500, cashbackUsedCents: 500, totalCents: 0 });
+  });
+
+  it('taking the service charge off compares what was paid with the items minus the coupon (final review 2026-11-16)', async () => {
+    as(ownerId);
+    // The restaurant keeps the default 10% service charge; only this comanda is eligible
+    await coupon({ code: 'TAXA4', kind: 'FIXED', value: 400 });
+    const s = await prisma.orderSession.create({ data: { restaurantId: rid, userId: ownerId, status: 'OPEN', serviceChargeEligible: true } });
+    await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId, price: 20, quantity: 2 } });
+    expect(await (await APPLY(req('POST', { code: 'TAXA4' }), p(s.id))).json()).toMatchObject({ serviceCents: 400, totalCents: 4000 });
+    // 39 paid; without the charge the bill is 36: refused instead of closing with R$ 3 paid over
+    expect((await pay(s.id, '39,00')).status).toBe(200);
+    const res = await BILL_PATCH(req('PATCH', { serviceChargeWaived: true }), p(s.id));
+    expect(res.status).toBe(409);
+    expect(await prisma.orderSession.findUnique({ where: { id: s.id } })).toMatchObject({ status: 'OPEN', serviceChargeWaived: false });
   });
 
   // Last: it spends this user's tries for the minute

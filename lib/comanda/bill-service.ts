@@ -188,7 +188,8 @@ export async function setServiceWaived(member: RestaurantMember, sessionId: stri
     const bill = await loadBill(tx, member.restaurantId, sessionId);
     if (!bill) throw new CashRuleError('Comanda não encontrada', 404);
     if (bill.status === 'CLOSED' || bill.status === 'CANCELLED') throw new CashRuleError('Comanda fechada ou cancelada', 409);
-    if (waived && bill.paidCents > bill.subtotalCents) {
+    // Without the charge the total is the items minus the coupon and the cashback used
+    if (waived && bill.paidCents > Math.max(0, bill.subtotalCents - sessionDiscountCents(bill))) {
       throw new CashRuleError('Já foi pago mais do que o total sem a taxa: estorne um pagamento antes de tirar a taxa', 409);
     }
     await tx.orderSession.update({ where: { id: sessionId }, data: { serviceChargeWaived: waived } });
@@ -209,7 +210,8 @@ export async function closeIfCovered(tx: Prisma.TransactionClient, restaurantId:
   if (!(after.paidCents > 0 && after.remainingCents === 0 && after.status !== 'ENCOMENDA')) return null;
   await tx.orderSession.updateMany({
     where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
-    data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents },
+    // The table's "pagar com o garçom" was answered, as on any other close
+    data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: after.serviceCents, payAtWaiterRequestedAt: null },
   });
   await settleSessionStock(tx, restaurantId, sessionId);
   return (await loadBill(tx, restaurantId, sessionId))!;
@@ -267,6 +269,19 @@ export async function recordBillPayment(
     if (!bill) throw new CashRuleError('Comanda não encontrada', 404);
     if (bill.status === 'CANCELLED') throw new CashRuleError('Comanda cancelada', 409);
     if (bill.status === 'CLOSED') throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
+    // Nothing left to pay and no payment sent (a coupon, or coupon plus cashback, covered every item): "Fechar
+    // conta" closes it with the same effects as a paid close, without a cash entry (final review, 2026-11-16)
+    const noPayments = !Array.isArray(input.payments) || input.payments.length === 0;
+    if (noPayments && bill.remainingCents === 0 && bill.subtotalCents > 0 && bill.status !== 'ENCOMENDA') {
+      const guard = await tx.orderSession.updateMany({
+        where: { id: sessionId, status: { notIn: ['CLOSED', 'CANCELLED'] } },
+        data: { status: 'CLOSED', closedAt: new Date(), serviceChargeCents: bill.serviceCents, payAtWaiterRequestedAt: null },
+      });
+      if (guard.count === 0) throw new CashRuleError('Esta conta já foi fechada', 422, 'ALREADY_CLOSED');
+      await settleSessionStock(tx, member.restaurantId, sessionId);
+      const cashbackEarnedCents = await onBillClosed(tx, member.restaurantId, sessionId);
+      return { closed: true, changeCents: 0, changeWarning: null as string | null, customerName: bill.customerName, cashbackEarnedCents };
+    }
     // The amount being paid now (one person's share) is what the change is counted against: the screen
     // showed change for that share, so the server must agree (review of stage 2)
     const due = Number.isInteger(input.dueCents) && (input.dueCents as number) > 0 ? Math.min(input.dueCents as number, bill.remainingCents) : bill.remainingCents;

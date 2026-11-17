@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
  * POST { payments: [{ method, amount }], cashSessionId, customerCPF?, dueCents? }: one payment towards
  * the bill; closes it when paid (spec 2026-10-07, 4.3). dueCents is the share being paid now (change is
  * counted against it). Needs the internet: never queued offline. With an Idempotency-Key, the same
- * payment sent twice (lost answer, a second tap) is recorded once.
+ * payment sent twice (lost answer, a second tap) is recorded once. With no payments and nothing left to pay (a
+ * coupon covered the items), it just closes the bill ("Fechar conta").
  */
 async function handlePOST(req: Request, { params }: { params: { id: string } }) {
   const auth = await requireRestaurantRole(CASHIER_PLUS, 'Receber exige o caixa');

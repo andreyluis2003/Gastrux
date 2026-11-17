@@ -657,6 +657,11 @@ async function handleShowConfirmation(ctx: BotContext) {
 }
 
 async function handleConfirmOrder(ctx: BotContext) {
+  // Confirmar on an old summary (the cart changed, or the order was already made): never silent. Two taps on the
+  // same summary both load the conversation while CONFIRMING; the claim below keeps the second one silent.
+  if (ctx.conversation.state !== 'CONFIRMING') {
+    return safeSendText(ctx, 'Este resumo é antigo. Digite *carrinho* para ver o pedido atualizado.');
+  }
   const cart = parseCart(ctx.conversation.cart);
   if (cart.length === 0) {
     return safeSendText(ctx, 'Seu carrinho está vazio.');
@@ -709,6 +714,8 @@ async function handleConfirmOrder(ctx: BotContext) {
   // refused now (its limit ran out after the summary) leaves no comanda and no customer behind.
   const phoneDigits = conversationPhoneDigits(ctx);
   const coupon = conversationCoupon(ctx);
+  // A name of spaces only is no name: it falls back instead of failing the customer upsert
+  const name = ctx.conversation.customerName?.trim() || ctx.conversation.profileName?.trim() || '';
   let created: { session: { id: string }; discountCents: number } | null;
   try {
     created = await prisma.$transaction(async (tx) => {
@@ -720,7 +727,7 @@ async function handleConfirmOrder(ctx: BotContext) {
       });
       if (claimed.count === 0) return null;
       const customer = phoneDigits
-        ? await upsertCustomerByPhone(tx, ctx.restaurantId, phoneDigits, ctx.conversation.customerName || ctx.conversation.profileName || 'Cliente WhatsApp')
+        ? await upsertCustomerByPhone(tx, ctx.restaurantId, phoneDigits, name || 'Cliente WhatsApp')
         : null;
       const session = await tx.orderSession.create({
         data: {
@@ -729,7 +736,7 @@ async function handleConfirmOrder(ctx: BotContext) {
           customerId: customer?.id ?? null,
           tableId,
           tableNumber: ctx.conversation.tableNumber || undefined,
-          customerName: ctx.conversation.customerName || ctx.conversation.profileName || undefined,
+          customerName: name || undefined,
           notes: `Pedido via WhatsApp (${ctx.conversation.phoneNumber})${
             ctx.conversation.orderType === 'DELIVERY' && ctx.conversation.deliveryAddress
               ? `\nEndereço: ${ctx.conversation.deliveryAddress}`

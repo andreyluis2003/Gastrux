@@ -6,6 +6,7 @@ import { soldByRecipe } from '@/lib/daily-count/sold';
 import { brtDayStart } from '@/lib/staff/commission-rules';
 import { dreLine, type PayableCategory } from '@/lib/payables/rules';
 import { recipeCostMap } from '@/lib/recipes/cost-map';
+import { lineTotalCents } from '@/lib/comanda/line-total';
 
 /**
  * The DRE of a period of Brasília days (startDate and endDate as AAAA-MM-DD, end included): the screen
@@ -21,12 +22,19 @@ export async function computeDre(restaurantId: string, startDate: string, endDat
   // pay at the table after refunds, and delivery orders without a comanda; the service charge is inside
   const sales = await salesInRange(restaurantId, start, endExclusive);
   // Cashback used and coupons on the bills closed in the period (spec 2026-10-23 §8, 2026-11-16): the drawer got
-  // the total with the discount, so the gross revenue adds it back and the deductions take it out again (one line)
-  const comandaDiscounts = await prisma.orderSession.aggregate({
+  // the total with the discount, so the gross revenue adds it back and the deductions take it out again (one line).
+  // Each bill adds back at most its items: a fixed coupon over a smaller order discounted only what was there
+  const discountedBills = await prisma.orderSession.findMany({
     where: { restaurantId, status: 'CLOSED', closedAt: { gte: start, lt: endExclusive }, OR: [{ cashbackUsedCents: { gt: 0 } }, { couponDiscountCents: { gt: 0 } }] },
-    _sum: { cashbackUsedCents: true, couponDiscountCents: true },
+    select: {
+      cashbackUsedCents: true, couponDiscountCents: true,
+      items: { select: { price: true, quantity: true, modifiers: { select: { priceAdjustment: true } } } },
+    },
   });
-  const cashback = ((comandaDiscounts._sum.cashbackUsedCents ?? 0) + (comandaDiscounts._sum.couponDiscountCents ?? 0)) / 100;
+  const cashback = discountedBills.reduce((sum, s) => {
+    const itemsCents = s.items.reduce((n, i) => n + lineTotalCents(i.price, i.quantity, i.modifiers.map((m) => m.priceAdjustment)), 0);
+    return sum + Math.min(s.cashbackUsedCents + s.couponDiscountCents, itemsCents);
+  }, 0) / 100;
   const receitaBruta = sales.totalCents / 100 + cashback;
   const receitaDineIn = sales.salaoCents / 100 + cashback;
   const receitaDelivery = sales.deliveryCents / 100;

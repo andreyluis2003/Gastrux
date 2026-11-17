@@ -16,6 +16,7 @@ import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { POST as quickSale } from '../../../app/api/comanda/quick-sale/route';
 import { POST as couponPreview } from '../../../app/api/comanda/coupon-preview/route';
+import { GET as listCoupons } from '../../../app/api/admin/coupons/route';
 import { INVALID } from '../../../lib/coupons/service';
 import { openSession, ensureDefaultRegister } from '../../../lib/caixa/sessions';
 
@@ -233,6 +234,15 @@ describe('counter sale records its payments in the shift', () => {
       expect(uses.map((u) => [u.discountCents, u.outOfRule])).toEqual([[400, true]]);
       expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(2);
       expect(await linesOf(clientId)).toHaveLength(1);
+
+      // Visible (final review 2026-11-16): the Cupons screen counts it, the audit log says who, which sale and why
+      const listed = await (await listCoupons()).json();
+      expect(listed.find((x) => x.id === c.id)).toMatchObject({ usedCount: 2, outOfRuleCount: 1 });
+      expect(listed.find((x) => x.code === `BA${tag}`.toUpperCase())).toMatchObject({ outOfRuleCount: 0 });
+      const audits = await prisma.auditLog.findMany({ where: { restaurantId: A.restaurantId, entityType: 'OrderSession', entityId: clientId } });
+      expect(audits).toHaveLength(1);
+      expect(audits[0].userId).toBe(A.ownerId);
+      expect(JSON.parse(audits[0].changes)).toMatchObject({ couponOutOfRule: c.code, reason: ruleText });
     });
 
     // Spec parte 1b: a code that no longer exists never fails the sale (it may have waited offline): full price, a warning

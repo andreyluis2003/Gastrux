@@ -769,14 +769,17 @@ O pedido chega em Pedidos de delivery e na cozinha com a linha do cupom.
 - Ele fica **fixo** no valor de quando você aplicou. Se tirar itens depois, o desconto não muda. Se mudar muito a conta, toque em **Tirar** e aplique de novo
 - Uma conta tem **um cupom** só
 - Se o cupom tem regra por cliente (usos por cliente ou primeiro pedido), identifique o cliente pelo celular antes. Sem isso, aparece "Identifique o cliente pelo celular antes"
+- Lance os itens antes: numa conta vazia aparece "Adicione itens antes do cupom"
 - Se a conta já tem pagamentos e o cupom passa do que falta pagar, o cupom é recusado. Estorne um pagamento antes. Se o cupom zera o que falta, a conta fecha
+- Se o cupom cobre todos os itens e não há nada a receber, toque em **Fechar conta**
+- Se a conta já usa cashback e o cupom mais o cashback passam do valor dos itens, aparece "Tire o cashback antes de aplicar o cupom". Tire o cashback, aplique o cupom e use o cashback de novo
 - **Cancelar a comanda** devolve o uso do cupom. **Reabrir** a comanda mantém o cupom
 - Ao **juntar comandas**, o cupom vai para a comanda de destino. Se as duas tiverem cupom, tire um antes
 
 ## Como funciona na venda balcão
 
 - Se faltar internet, aparece "Cupom precisa de internet". Se você mudar o carrinho sem internet, o cupom sai da venda
-- Uma venda guardada sem internet e enviada depois **nunca se perde**. Se o cupom já não valer (limite de usos, validade ou pausado), a venda entra **com o desconto** e o uso fica marcado como **fora da regra**. Se o código nem existir, a venda entra sem desconto, com um aviso
+- Uma venda guardada sem internet e enviada depois **nunca se perde**. Se o cupom já não valer (limite de usos, validade ou pausado), a venda entra **com o desconto** e o uso fica marcado como **fora da regra**. Em **Cupons**, o cartão do cupom mostra quantos usos foram fora da regra
 
 ## Cupom de entrega grátis
 
@@ -788,7 +791,7 @@ O "só no primeiro pedido" olha **todos os canais**: comandas fechadas e abertas
 
 ## Acompanhando
 
-Cada cupom mostra quantas vezes foi usado e quanto de desconto já deu. **Pausar** desliga o cupom sem apagar o histórico; **Ativar** liga de novo. Na DRE, o desconto aparece na linha **Cashback e cupons usados**.
+Cada cupom mostra quantas vezes foi usado, quanto de desconto já deu e, se houver, quantos usos foram **fora da regra**. **Pausar** desliga o cupom sem apagar o histórico; **Ativar** liga de novo. Na DRE, o desconto aparece na linha **Cashback e cupons usados**.
 
 ## O que ainda não tem
 

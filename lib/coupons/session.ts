@@ -28,19 +28,21 @@ export async function applyCouponToSession(
 ): Promise<ApplyResult> {
   const { restaurantId, sessionId, phoneDigits } = input;
   await lockComanda(tx, sessionId);
-  const session = await tx.orderSession.findFirst({ where: { id: sessionId, restaurantId }, select: { status: true, couponCode: true } });
+  const session = await tx.orderSession.findFirst({ where: { id: sessionId, restaurantId }, select: { status: true, couponCode: true, cashbackUsedCents: true } });
   if (!session) return { ok: false, error: 'Conta não encontrada.', status: 404 };
   if (session.status === 'CLOSED' || session.status === 'CANCELLED') return { ok: false, error: 'Esta conta já foi fechada.', status: 422 };
   if (session.couponCode) return { ok: false, error: 'Esta conta já tem cupom.', status: 409 };
 
   const code = normalizeCode(input.code);
   if (!code) return { ok: false, error: 'Digite o código do cupom.', status: 422 };
+  const subtotalCents = await comandaTotalCents(tx, sessionId);
+  // An empty comanda would spend a use for R$ 0 (final review, 2026-11-16)
+  if (subtotalCents <= 0) return { ok: false, error: 'Adicione itens antes do cupom', status: 422 };
   const coupon = await tx.coupon.findUnique({ where: { restaurantId_code: { restaurantId, code } } });
   // force never applies a code that does not exist; the answer does not tell it apart from a paused one
   if (!coupon) return { ok: false, error: INVALID, status: 422 };
   await lockCoupon(tx, coupon.id);
 
-  const subtotalCents = await comandaTotalCents(tx, sessionId);
   // Evaluated under the lock: usedCount is read again after the other cashier committed
   const check = await evaluateCoupon(tx, restaurantId, code, phoneDigits, subtotalCents, 0, new Date(), { channel: 'comanda', excludeSessionId: sessionId });
   let discountCents: number;
@@ -56,6 +58,11 @@ export async function applyCouponToSession(
     discountCents = discountFor(rules, subtotalCents, 0);
     outOfRule = true;
     warning = check.error;
+  }
+  // Coupon first, cashback on what is left (spec): with cashback already used, coupon plus cashback must fit in the
+  // items, or the cashback would be spent for nothing (and counted as a discount that never happened)
+  if (discountCents + session.cashbackUsedCents > subtotalCents) {
+    return { ok: false, error: 'Tire o cashback antes de aplicar o cupom', status: 409 };
   }
 
   await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });

@@ -24,6 +24,8 @@ interface Coupon {
   active: boolean;
   usedCount: number;
   discountGivenCents: number;
+  /** Uses accepted out of rule (a counter sale that waited offline) */
+  outOfRuleCount?: number;
 }
 
 const EMPTY = { code: '', kind: 'PERCENT' as CouponKind, value: '10', minOrder: '', validUntil: '', maxUses: '', maxPerCustomer: '1', firstOrderOnly: false };
@@ -157,6 +159,9 @@ export default function CuponsPage() {
                     {c.usedCount} {c.usedCount === 1 ? 'uso' : 'usos'}{c.maxUses ? ` de ${c.maxUses}` : ''} · {brl(c.discountGivenCents)} de desconto dado
                     {c.maxPerCustomer ? ` · ${c.maxPerCustomer} por cliente` : ''}{day(c.validUntil) ? ` · vale até ${day(c.validUntil)}` : ''}
                   </p>
+                  {(c.outOfRuleCount ?? 0) > 0 && (
+                    <p className="text-xs font-medium text-amber-700">{c.outOfRuleCount} fora da regra</p>
+                  )}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => toggle(c)}>{c.active ? 'Pausar' : 'Ativar'}</Button>
               </div>
