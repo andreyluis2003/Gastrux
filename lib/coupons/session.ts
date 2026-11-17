@@ -42,7 +42,7 @@ export async function applyCouponToSession(
 
   const subtotalCents = await comandaTotalCents(tx, sessionId);
   // Evaluated under the lock: usedCount is read again after the other cashier committed
-  const check = await evaluateCoupon(tx, restaurantId, code, phoneDigits, subtotalCents, 0, new Date(), { channel: 'comanda' });
+  const check = await evaluateCoupon(tx, restaurantId, code, phoneDigits, subtotalCents, 0, new Date(), { channel: 'comanda', excludeSessionId: sessionId });
   let discountCents: number;
   let outOfRule = false;
   let warning: string | undefined;

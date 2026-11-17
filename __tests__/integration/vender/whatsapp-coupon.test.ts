@@ -197,6 +197,64 @@ describe('WhatsApp bot: coupon question and customer on the comanda', () => {
     expect(c.context.coupon).toBeUndefined();
   });
 
+  it('first-order coupon: applies on the first comanda, refused while that comanda is open', async () => {
+    await prisma.coupon.create({ data: { restaurantId: rid, code: 'PRIMEIRO', kind: 'FIXED', value: 1000, firstOrderOnly: true, maxPerCustomer: null } });
+    // A phone that already has an open WhatsApp comanda (ordered without coupon)
+    const phone = phoneOf();
+    await conversation(rid, menuItemId, phone);
+    await say(rid, phone, { text: 'Bia' });
+    await say(rid, phone, { text: 'n' });
+    await say(rid, phone, { buttonId: 'BTN_CONFIRM_ORDER' });
+    const first = await prisma.orderSession.findUnique({ where: { id: (await conv(rid, phone)).orderSessionId } });
+    expect(first.status).not.toBe('CLOSED');
+    expect(first.couponCode).toBeNull();
+    // Ordering again: the coupon no longer counts it as a first order
+    await prisma.whatsAppConversation.updateMany({
+      where: { restaurantId: rid, phoneNumber: phone },
+      data: { state: 'COLLECTING_INFO', orderType: 'PICKUP', cart: [{ menuItemId, name: 'Pizza', quantity: 2, price: 40 }], cartTotal: 80, orderSessionId: null },
+    });
+    await say(rid, phone, { text: 'Bia' });
+    await say(rid, phone, { text: 'PRIMEIRO' });
+    expect(last()).toContain('Este cupom não vale para este celular.');
+    expect(last()).toContain(QUESTION);
+
+    // A new phone: the comanda the coupon goes on does not count as an earlier order
+    const fresh = phoneOf();
+    await conversation(rid, menuItemId, fresh);
+    await say(rid, fresh, { text: 'Leo' });
+    await say(rid, fresh, { text: 'PRIMEIRO' });
+    expect(last()).toContain('Cupom PRIMEIRO: −R$ 10,00');
+    await say(rid, fresh, { buttonId: 'BTN_CONFIRM_ORDER' });
+    const comanda = await prisma.orderSession.findUnique({ where: { id: (await conv(rid, fresh)).orderSessionId } });
+    expect(comanda.couponCode).toBe('PRIMEIRO');
+    expect(last()).toContain('Total: R$ 70,00');
+  });
+
+  it('a number outside Brazil (no 55) creates no customer link', async () => {
+    // 11 digits that the cashback phone rule alone would read as a Brazilian DDD + number
+    const phone = `1415${String(Date.now()).slice(-7)}`;
+    await conversation(bare, bareItemId, phone);
+    await say(bare, phone, { text: 'Tom' });
+    await say(bare, phone, { buttonId: 'BTN_CONFIRM_ORDER' });
+    const comanda = await prisma.orderSession.findUnique({ where: { id: (await conv(bare, phone)).orderSessionId } });
+    expect(comanda).toBeTruthy();
+    expect(comanda.customerId).toBeNull();
+    expect(await prisma.customer.count({ where: { restaurantId: bare, phoneDigits: phone } })).toBe(0);
+  });
+
+  it('two taps on Confirmar at once make one comanda', async () => {
+    const phone = phoneOf();
+    await conversation(bare, bareItemId, phone);
+    await say(bare, phone, { text: 'Rui' });
+    // A known customer: the race is not masked by a unique-key error on a new customer
+    await prisma.customer.create({ data: { restaurantId: bare, name: 'Rui', phoneDigits: phone.slice(2) } });
+    const before = await prisma.orderSession.count({ where: { restaurantId: bare } });
+    await Promise.all([say(bare, phone, { buttonId: 'BTN_CONFIRM_ORDER' }), say(bare, phone, { buttonId: 'BTN_CONFIRM_ORDER' })]);
+    expect(await prisma.orderSession.count({ where: { restaurantId: bare } })).toBe(before + 1);
+    expect(await prisma.customer.count({ where: { restaurantId: bare, phoneDigits: phone.slice(2) } })).toBe(1);
+    expect((await conv(bare, phone)).state).toBe('COMPLETED');
+  });
+
   it('order without coupon also links the customer', async () => {
     const phone = phoneOf();
     await conversation(bare, bareItemId, phone);

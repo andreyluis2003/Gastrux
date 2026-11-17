@@ -19,15 +19,22 @@ export const FREE_DELIVERY_ON_COMANDA = 'Este cupom é de entrega grátis e esta
 
 const toRules = (c: any): CouponRules => ({ ...c, kind: c.kind as CouponKind });
 
-/** Has this phone already bought here: a delivery-site order (not cancelled or refused) or a closed comanda? */
-async function customerOrdered(db: any, restaurantId: string, phoneDigits: string): Promise<boolean> {
+/**
+ * Has this phone already bought here? An earlier coupon use of this phone, a delivery-site order (not cancelled or
+ * refused) or any comanda not cancelled, open ones included (security review 2026-11-16: an open WhatsApp comanda let
+ * a "first order" coupon be used again). excludeSessionId: the comanda the coupon is being applied to does not count.
+ */
+async function customerOrdered(db: any, restaurantId: string, phoneDigits: string, excludeSessionId?: string): Promise<boolean> {
+  if ((await db.couponRedemption.count({ where: { restaurantId, phoneDigits } })) > 0) return true;
   const customer = await findCustomerByPhone(db, restaurantId, phoneDigits);
   if (!customer) return false;
   const [site, comandas] = await Promise.all([
     db.externalOrder.count({
       where: { restaurantId, customerId: customer.id, integration: { platform: 'delivery_site' }, status: { notIn: ['CANCELLED', 'REJECTED'] } },
     }),
-    db.orderSession.count({ where: { restaurantId, customerId: customer.id, status: 'CLOSED' } }),
+    db.orderSession.count({
+      where: { restaurantId, customerId: customer.id, status: { not: 'CANCELLED' }, ...(excludeSessionId ? { id: { not: excludeSessionId } } : {}) },
+    }),
   ]);
   return site + comandas > 0;
 }
@@ -40,7 +47,7 @@ export const NOT_FOR_THIS_PHONE = 'Este cupom não vale para este celular.';
 
 export async function evaluateCoupon(
   db: any, restaurantId: string, rawCode: unknown, phoneDigits: string, subtotalCents: number, deliveryFeeCents: number, now: Date,
-  opts: { phoneRules?: boolean; channel: 'site' | 'comanda' },
+  opts: { phoneRules?: boolean; channel: 'site' | 'comanda'; /** The comanda the coupon goes on: not an earlier order */ excludeSessionId?: string },
 ): Promise<Check> {
   const phoneRules = opts.phoneRules ?? true;
   const code = normalizeCode(rawCode);
@@ -53,7 +60,7 @@ export async function evaluateCoupon(
   if (!c.active) return { ok: false, error: INVALID };
   const [usesByCustomer, ordered] = await Promise.all([
     phoneRules && phoneDigits ? db.couponRedemption.count({ where: { couponId: c.id, phoneDigits } }) : Promise.resolve(0),
-    phoneRules && c.firstOrderOnly && phoneDigits ? customerOrdered(db, restaurantId, phoneDigits) : Promise.resolve(false),
+    phoneRules && c.firstOrderOnly && phoneDigits ? customerOrdered(db, restaurantId, phoneDigits, opts.excludeSessionId) : Promise.resolve(false),
   ]);
   const hasPhoneRules = c.maxPerCustomer !== null || c.firstOrderOnly;
   if (phoneRules && hasPhoneRules && !phoneDigits) return { ok: false, error: PHONE_NEEDED };

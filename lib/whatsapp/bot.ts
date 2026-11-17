@@ -86,8 +86,16 @@ function conversationCoupon(ctx: BotContext): ConversationCoupon | null {
   return c && typeof c.code === 'string' && Number.isInteger(c.discountCents) ? c : null;
 }
 
-/** DDD + number of the conversation's phone (Customer.phoneDigits), or '' */
-const conversationPhoneDigits = (ctx: BotContext) => phoneDigitsOf(ctx.conversation.phoneNumber) ?? '';
+/**
+ * DDD + number of the conversation's phone (Customer.phoneDigits), or ''. Only a Brazilian WhatsApp number (55 + 10 or
+ * 11 digits) gives one: a foreign number could otherwise read as a Brazilian customer's phone (security review
+ * 2026-11-16), so it gets no customer link and no per-phone coupon.
+ */
+function conversationPhoneDigits(ctx: BotContext): string {
+  const raw = String(ctx.conversation.phoneNumber ?? '');
+  if (!/^55\d{10,11}$/.test(raw)) return '';
+  return phoneDigitsOf(raw.slice(2)) ?? '';
+}
 
 /** Does the restaurant have a coupon a comanda can take now? (free delivery never applies to a comanda) */
 async function restaurantHasCoupon(restaurantId: string): Promise<boolean> {
@@ -701,9 +709,16 @@ async function handleConfirmOrder(ctx: BotContext) {
   // refused now (its limit ran out after the summary) leaves no comanda and no customer behind.
   const phoneDigits = conversationPhoneDigits(ctx);
   const coupon = conversationCoupon(ctx);
-  let created: { session: { id: string }; discountCents: number };
+  let created: { session: { id: string }; discountCents: number } | null;
   try {
     created = await prisma.$transaction(async (tx) => {
+      // Claim the conversation first: a second tap on Confirmar (or a stale summary) waits here and finds it taken,
+      // so one summary makes one comanda. A coupon refusal rolls this back too and the conversation stays CONFIRMING.
+      const claimed = await tx.whatsAppConversation.updateMany({
+        where: { id: ctx.conversation.id, restaurantId: ctx.restaurantId, state: 'CONFIRMING' },
+        data: { state: 'COMPLETED' },
+      });
+      if (claimed.count === 0) return null;
       const customer = phoneDigits
         ? await upsertCustomerByPhone(tx, ctx.restaurantId, phoneDigits, ctx.conversation.customerName || ctx.conversation.profileName || 'Cliente WhatsApp')
         : null;
@@ -746,6 +761,8 @@ async function handleConfirmOrder(ctx: BotContext) {
     await safeSendText(ctx, `😓 ${err.reason} Seu pedido segue sem o cupom.`);
     return handleShowConfirmation(ctx);
   }
+  // Already confirmed by another tap: nothing more to do
+  if (!created) return;
   const { session, discountCents } = created;
 
   // The kitchen order (KDS card and ticket) and each line marked sent: saving the comanda as
