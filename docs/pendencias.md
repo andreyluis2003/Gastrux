@@ -32,6 +32,8 @@ Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
     assim).
   - **Mercado Pago** (conferência da mesa paga por PIX) compara com o total só dos itens: mesa com cupom pode gerar
     alerta falso de "parte ainda não paga" (já era assim com cashback e taxa).
+  - **Conta zerada pelo cupom** fecha com "Fechar conta" e tenta emitir NFC-e de R$ 0 (pagamento em dinheiro): a SEFAZ
+    pode recusar a nota. O fechamento vale mesmo assim; conferir no homolog e, se recusar, não emitir nota de R$ 0.
   - **WhatsApp:** cliente sem nome entra como "Cliente WhatsApp"; código de cupom igual a comando do robô (MENU,
     PEDIDO, AJUDA) não pode ser digitado; "Não." com pontuação conta como código; o robô pergunta mesmo quando os
     cupons ativos estão esgotados ou com pedido mínimo.
