@@ -13,7 +13,6 @@ import { onBillClosed } from '@/lib/cashback/bill';
 import { normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone, upsertCustomerByPhone } from '@/lib/cashback/service';
 import { applyCouponToSession } from '@/lib/coupons/session';
-import { takeCouponTry } from '@/lib/coupons/attempts';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 
@@ -32,8 +31,8 @@ const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
  * (POST /api/comanda/coupon-preview). The discount never comes from the device: it is computed here, and a rule that
  * now refuses (the limit ran out, the sale waited offline) never fails the sale - the use is recorded out of rule
  * and the answer carries couponWarning. A code that no longer exists (or free delivery, nothing to discount) never
- * fails it either: the sale goes in without the discount and couponWarning says why. A live sale with a code counts as a
- * coupon try (429 over the limit, nothing written); a sale replayed from the offline queue (queuedAt) never does.
+ * fails it either: the sale goes in without the discount and couponWarning says why. No try limit here (the preview has
+ * it): a 429 would be stored under the Idempotency-Key and the outbox would keep a paid sale pending forever.
  *         (legacy: paymentMethod instead of payments, paid in full in the default register shift)
  * The device chooses the comanda id (clientId), so a replay finds the sale it already made. Prices
  * come from the menu. The sale is paid and closed at once: its payments and change enter the cash
@@ -79,9 +78,6 @@ async function handlePOST(request: Request) {
   // A sale made offline and replayed by the device queue carries the time it was made. Older devices
   // send the legacy one-method body: for them the Idempotency-Key of their queue marks a replay (spec §6.1)
   const couponCode = typeof body?.couponCode === 'string' && body.couponCode.trim() ? body.couponCode : null;
-  if (couponCode && !body?.queuedAt && !takeCouponTry('user:' + member.userId, member.restaurantId)) {
-    return NextResponse.json({ error: 'Muitas tentativas. Tente em um minuto.' }, { status: 429 });
-  }
   const replay = Boolean(body?.queuedAt) || (read.legacy && Boolean(request.headers.get('idempotency-key')));
   if (read.legacy) console.warn('[caixa] legacy one-method counter sale body', { restaurantId: member.restaurantId, clientId });
   let target: SaleTarget | null = null;

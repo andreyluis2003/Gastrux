@@ -17,7 +17,6 @@ import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { POST as quickSale } from '../../../app/api/comanda/quick-sale/route';
 import { POST as couponPreview } from '../../../app/api/comanda/coupon-preview/route';
 import { INVALID } from '../../../lib/coupons/service';
-import { takeCouponTry, TRIES_PER_MINUTE } from '../../../lib/coupons/attempts';
 import { openSession, ensureDefaultRegister } from '../../../lib/caixa/sessions';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -267,23 +266,25 @@ describe('counter sale records its payments in the shift', () => {
       expect((await unknown.json()).error).toBe(INVALID);
     });
 
-    // Last in this block: the tries of this user stay used up for a minute
-    it('a live sale with a code over the try limit is refused 429, nothing written; a queued replay is never limited', async () => {
-      const c = await coupon({ code: `TL${tag}`.toUpperCase() });
+    // A live sale (no queuedAt) whose answer was lost: the outbox sends it again with the same Idempotency-Key
+    it('a live sale with a coupon repeated with the same Idempotency-Key answers the same and records once', async () => {
+      const c = await coupon({ code: `RP${tag}`.toUpperCase() });
       const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
-      for (let i = 0; i < TRIES_PER_MINUTE; i++) takeCouponTry('user:' + A.ownerId, A.restaurantId);
-      const live = `bal-${crypto.randomUUID()}`;
-      const refused = await sale({ clientId: live, items: twoSodas(), couponCode: c.code, cashSessionId: session.id, payments: [{ method: 'pix', amount: 36 }] });
-      expect(refused.status).toBe(429);
-      expect((await refused.json()).error).toBe('Muitas tentativas. Tente em um minuto.');
-      expect(await prisma.orderSession.findUnique({ where: { id: live } })).toBeNull();
-      expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(0);
-
-      const queued = `bal-${crypto.randomUUID()}`;
-      const ok = await sale({ clientId: queued, items: twoSodas(), couponCode: c.code, cashSessionId: session.id, payments: [{ method: 'pix', amount: 36 }], queuedAt: new Date().toISOString() });
-      expect(ok.status).toBe(201);
-      expect((await ok.json()).couponDiscountCents).toBe(400);
-      expect((await prisma.orderSession.findUnique({ where: { id: queued } })).status).toBe('CLOSED');
+      const clientId = `bal-${crypto.randomUUID()}`;
+      const key = crypto.randomUUID();
+      const body = { clientId, items: twoSodas(), couponCode: c.code, cashSessionId: session.id, payments: [{ method: 'pix', amount: 36 }] };
+      const first = await sale(body, key);
+      expect(first.status).toBe(201);
+      const firstBody = await first.json();
+      const again = await sale(body, key);
+      expect(again.status).toBe(201);
+      expect(again.headers.get('Idempotent-Replayed')).toBe('true');
+      const againBody = await again.json();
+      expect([againBody.couponDiscountCents, againBody.couponWarning, againBody.session.id]).toEqual([firstBody.couponDiscountCents, firstBody.couponWarning, clientId]);
+      expect(firstBody.couponDiscountCents).toBe(400);
+      expect(await prisma.couponRedemption.count({ where: { orderSessionId: clientId } })).toBe(1);
+      expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(1);
+      expect(await linesOf(clientId)).toHaveLength(1);
     });
   });
 });
