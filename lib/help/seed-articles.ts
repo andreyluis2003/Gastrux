@@ -750,7 +750,7 @@ Em **Clientes e marketing > Cupons** (dono ou gerente), preencha:
 - **Tipo**: % de desconto, valor em reais ou **entrega grátis**
 - **Pedido mínimo**, **vale até** e **limite de usos no total**: opcionais
 - **Usos por cliente**: pelo celular do cliente; o padrão é 1
-- **Só no primeiro pedido do cliente**: para quem nunca pediu pelo seu site
+- **Só no primeiro pedido do cliente**: para quem nunca comprou no seu restaurante (em qualquer canal)
 
 Clique em **Criar cupom** e divulgue o código (Instagram, panfleto, WhatsApp).
 

@@ -7,8 +7,8 @@ commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e 
 
 Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
 
-- **Cancelamento não devolve o uso** (nem o limite por cliente): um cliente que teve o pedido cancelado não usa o
-  cupom de novo se o limite for 1.
+- **Cancelar pedido do site não devolve o uso** (nem o limite por cliente): um cliente que teve o pedido do site cancelado não usa o
+  cupom de novo se o limite for 1. (Cancelar uma comanda da Conta devolve o uso.)
 - **Plano:** cupons em todos os planos (confirmado pelo dono em 2026-11-08). Cashback continua só no Business.
 - **"Só no primeiro pedido"** passou a contar pedidos de todos os canais (2026-11-16): comandas fechadas e abertas e
   qualquer uso anterior de cupom no mesmo celular.
