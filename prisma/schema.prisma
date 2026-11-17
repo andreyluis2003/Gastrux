@@ -1553,6 +1553,14 @@ model ExternalOrder {
   /// The driver settlement that brought its money to the drawer; null = not settled
   settlementId          String?
   settlement            DeliverySettlement?    @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+  /// The registered driver chosen at "Saiu para entrega" (spec 2026-11-17 entregadores); null = only a typed name
+  driverId              String?
+  driver                Driver?                @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  /// When it went out for delivery: the driver's work day (diária) comes from it
+  dispatchedAt          DateTime?
+  /// The payment to the driver that covered this delivery; null = not paid to the driver yet
+  driverPaymentId       String?
+  driverPayment         DriverPayment?         @relation(fields: [driverPaymentId], references: [id], onDelete: SetNull)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   deliveryLogs          DeliveryLog[]
@@ -1565,6 +1573,8 @@ model ExternalOrder {
   @@index([status])
   @@index([orderReceivedAt])
   @@index([restaurantId, settlementId])
+  @@index([driverId])
+  @@index([driverPaymentId])
   @@map("external_orders")
 }
 
@@ -1919,6 +1929,12 @@ model OrderSession {
   couponCode             String?
   /// When the customer picks up an encomenda (status ENCOMENDA, spec 2026-10-26 encomendas)
   pickupAt               DateTime?
+  /// Delivery comanda: the registered driver who took it out, when, and the payment to the driver (spec 2026-11-17)
+  driverId               String?
+  driver                 Driver?               @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  dispatchedAt           DateTime?
+  driverPaymentId        String?
+  driverPayment          DriverPayment?        @relation(fields: [driverPaymentId], references: [id], onDelete: SetNull)
   onlinePayments         Payment[]             @relation("OrderSessionOnlinePayments")
   /// Every kitchen order of this comanda (orderId above keeps only the latest)
   kitchenOrders          Order[]               @relation("OrderComanda")
@@ -1937,6 +1953,8 @@ model OrderSession {
   @@index([userId])
   @@index([createdAt])
   @@index([restaurantId, status, pickupAt])
+  @@index([driverId])
+  @@index([driverPaymentId])
   @@map("order_sessions")
 }
 
@@ -2010,6 +2028,7 @@ model CashSession {
   entries             CashSessionEntry[]
   onlinePayments      Payment[]            @relation("CashSessionOnlinePayments")
   deliverySettlements DeliverySettlement[]
+  driverPayments      DriverPayment[]
 
   @@index([restaurantId])
   @@index([cashRegisterId])
@@ -2035,10 +2054,83 @@ model DeliverySettlement {
   createdAt         DateTime        @default(now())
   cashSession       CashSession     @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
   orders            ExternalOrder[]
+  driverPayments    DriverPayment[]
 
   @@index([restaurantId, createdAt])
   @@index([cashSessionId])
   @@map("delivery_settlements")
+}
+
+/// A delivery driver of the restaurant (spec docs/superpowers/specs/2026-11-17-entregadores-taxa-fixa-design.md):
+/// a daily rate and a per-delivery rate. Never deleted, only deactivated; the name is unique among the active ones
+/// of the restaurant (checked in lib/delivery/drivers.ts, no partial index).
+model Driver {
+  id               String          @id @default(cuid())
+  restaurantId     String
+  name             String
+  /// Digits only (DDD + number), as lib/cashback/rules normalizePhone gives
+  phone            String?
+  dailyRateCents   Int             @default(0)
+  perDeliveryCents Int             @default(0)
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  restaurant       Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  externalOrders   ExternalOrder[]
+  orderSessions    OrderSession[]
+  payments         DriverPayment[]
+  paidDays         DriverPaidDay[]
+
+  @@index([restaurantId])
+  @@map("drivers")
+}
+
+/// What the restaurant paid a driver from an open shift: deliveries and daily rates (spec 2026-11-17 rule 5).
+/// driverId null = a name typed without a registration (driverName keeps it).
+model DriverPayment {
+  id                   String              @id @default(cuid())
+  restaurantId         String
+  driverId             String?
+  driverName           String?
+  cashSessionId        String
+  /// The money settlement done together, if any
+  deliverySettlementId String?
+  deliveryCount        Int                 @default(0)
+  dailyCount           Int                 @default(0)
+  /// The rates used, frozen at payment time
+  dailyRateCents       Int                 @default(0)
+  perDeliveryCents     Int                 @default(0)
+  suggestedCents       Int                 @default(0)
+  paidCents            Int
+  createdById          String
+  createdAt            DateTime            @default(now())
+  driver               Driver?             @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  cashSession          CashSession         @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  deliverySettlement   DeliverySettlement? @relation(fields: [deliverySettlementId], references: [id], onDelete: SetNull)
+  externalOrders       ExternalOrder[]
+  orderSessions        OrderSession[]
+  paidDays             DriverPaidDay[]
+
+  @@index([restaurantId, createdAt])
+  @@index([driverId])
+  @@index([cashSessionId])
+  @@index([deliverySettlementId])
+  @@map("driver_payments")
+}
+
+/// One daily rate paid: the database refuses paying the same work day (turns at 05:00) twice to a driver
+model DriverPaidDay {
+  id              String        @id @default(cuid())
+  driverId        String
+  /// YYYY-MM-DD of the work day in the restaurant's time zone
+  workDay         String
+  driverPaymentId String
+  driver          Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverPayment   DriverPayment @relation(fields: [driverPaymentId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, workDay])
+  @@index([driverPaymentId])
+  @@map("driver_paid_days")
 }
 
 /// One ledger line of a shift: a sale payment, change, sangria, suprimento, despesa, estorno or ajuste.
@@ -2992,6 +3084,7 @@ model Restaurant {
   demandForecasts         DemandForecast[]
   expenseCategories       ExpenseCategory[]
   externalOrders          ExternalOrder[]
+  drivers                 Driver[]
   weeklyMenus             WeeklyMenu[]
   weeklyMenuOrders        WeeklyMenuOrder[]
   coupons                 Coupon[]

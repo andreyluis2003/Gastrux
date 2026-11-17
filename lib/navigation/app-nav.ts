@@ -56,6 +56,8 @@ export const NAV_GROUPS: NavGroup[] = [
     links: [
       { label: 'Caixa', href: '/caixa', roles: FRONT },
       { label: 'Histórico de caixas', href: '/caixa/historico', roles: MANAGERS },
+      // Spec 2026-11-17 entregadores: name, daily rate and per-delivery rate of each driver
+      { label: 'Entregadores', href: '/caixa/entregadores', roles: MANAGERS },
       { label: 'Pagamentos online', href: '/dashboard/pagamentos', roles: MANAGERS },
       // Spec 2026-10-18 contas a pagar: the list on every plan; alerts, series and NF-e boletos on Business
       { label: 'Contas a pagar', href: '/contas-a-pagar', roles: MANAGERS },
