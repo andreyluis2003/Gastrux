@@ -11,7 +11,7 @@ import { evaluateCoupon, INVALID, type Check } from './service';
  */
 
 export type ApplyResult =
-  | { ok: true; code: string; discountCents: number; outOfRule: boolean }
+  | { ok: true; code: string; discountCents: number; outOfRule: boolean; /** The rule the forced use broke */ warning?: string }
   | { ok: false; error: string; status: number };
 
 /** Serialize the uses of one coupon (the same key as reserveCoupon on the delivery site) */
@@ -45,6 +45,7 @@ export async function applyCouponToSession(
   const check = await evaluateCoupon(tx, restaurantId, code, phoneDigits, subtotalCents, 0, new Date(), { channel: 'comanda' });
   let discountCents: number;
   let outOfRule = false;
+  let warning: string | undefined;
   if (check.ok) {
     discountCents = check.discountCents;
   } else {
@@ -54,12 +55,13 @@ export async function applyCouponToSession(
     const rules = { ...coupon, kind: coupon.kind as CouponKind } as CouponRules;
     discountCents = discountFor(rules, subtotalCents, 0);
     outOfRule = true;
+    warning = check.error;
   }
 
   await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
   await tx.couponRedemption.create({ data: { couponId: coupon.id, restaurantId, phoneDigits, discountCents, orderSessionId: sessionId, outOfRule } });
   await tx.orderSession.update({ where: { id: sessionId }, data: { couponDiscountCents: discountCents, couponCode: coupon.code } });
-  return { ok: true, code: coupon.code, discountCents, outOfRule };
+  return { ok: true, code: coupon.code, discountCents, outOfRule, ...(warning ? { warning } : {}) };
 }
 
 /** Takes the coupon off the comanda and gives the use back; a comanda without a coupon is left as it is */

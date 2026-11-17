@@ -55,6 +55,12 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   // The customer for the cashback and the CRM (spec 2026-10-23 §7.2): earns, never uses; a new phone needs the name
   const [phone, setPhone] = useState('');
   const [customerName, setCustomerName] = useState('');
+  // Coupon (spec 2026-11-16 cupom-whatsapp-balcao, parte 1b): checked on the server (nothing written), needs internet;
+  // the sale sends only the code and the server computes the discount again
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<{ code: string; discountCents: number } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
   // Payments of the sale and this device's cash shift (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md §8.3)
   const [payments, setPayments] = useState<PanelPayment[]>([]);
   const shift = useDeviceShift();
@@ -77,9 +83,46 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
     () => menu.filter((m) => cart[m.id] > 0).map((m) => ({ entry: m, quantity: cart[m.id] })),
     [menu, cart]
   );
-  const total = (lines.reduce((sum, l) => sum + Math.round(priceOf(l.entry) * 100) * l.quantity, 0)
-    + weighed.reduce((sum, w) => sum + weightLineCents(priceOf(w.entry), w.grams), 0)) / 100;
+  const subtotalCents = lines.reduce((sum, l) => sum + Math.round(priceOf(l.entry) * 100) * l.quantity, 0)
+    + weighed.reduce((sum, w) => sum + weightLineCents(priceOf(w.entry), w.grams), 0);
+  const total = Math.max(0, subtotalCents - (coupon?.discountCents ?? 0)) / 100;
   const itemCount = lines.length + weighed.length;
+  const saleItems = () => [
+    ...lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
+    ...weighed.map((w) => ({ menuItemId: w.entry.id, weightGrams: w.grams })),
+  ];
+  const checkCoupon = async (code: string, quiet = false) => {
+    setCheckingCoupon(true);
+    try {
+      const res = await fetch('/api/comanda/coupon-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, customerPhone: phone.trim() || undefined, items: saleItems() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCoupon(null);
+        setCouponError(data.error || 'Não foi possível conferir o cupom');
+        return;
+      }
+      setCoupon({ code: data.code, discountCents: data.discountCents });
+      setCouponError('');
+      if (!quiet) setCouponInput('');
+    } catch {
+      // The connection dropped: an applied coupon stays (the server computes it again on the sale)
+      if (!quiet) setCouponError('Cupom precisa de internet');
+    } finally {
+      setCheckingCoupon(false);
+    }
+  };
+  // The items or the phone changed: the discount (a percent, the minimum, the per-phone rules) is checked again
+  const couponKey = JSON.stringify([saleItems(), phone.trim()]);
+  useEffect(() => {
+    if (!coupon || !online) return;
+    const t = setTimeout(() => (itemCount === 0 ? setCoupon(null) : checkCoupon(coupon.code, true)), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [couponKey]);
   const hint = finishHint(Math.round(total * 100), payments);
   const visible = menu.filter((m) => m.available !== false && m.name?.toLowerCase().includes(search.toLowerCase()));
   const change = (id: string, delta: number) =>
@@ -90,6 +133,8 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   }, [highlight, searchFocused]);
 
   const finish = async () => {
+    // The discount is being checked again (items or phone changed): wait for it, the total may still change
+    if (checkingCoupon) return;
     if (itemCount === 0) {
       toast.error('Adicione itens à venda');
       return;
@@ -108,15 +153,13 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       const result = await send({
         method: 'POST',
         url: '/api/comanda/quick-sale',
-        label: `Venda balcão ${brl(Math.round(total * 100))}`,
+        label: `Venda balcão ${brl(Math.round(total * 100))}${coupon ? ` (cupom ${coupon.code})` : ''}`,
         scope: 'counter-sale',
         queueable: true,
         body: {
           clientId,
-          items: [
-            ...lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
-            ...weighed.map((w) => ({ menuItemId: w.entry.id, weightGrams: w.grams })),
-          ],
+          items: saleItems(),
+          couponCode: coupon?.code,
           customerCPF: cpf.replace(/\D/g, '') || undefined,
           customerPhone: phone.trim() || undefined,
           customerName: customerName.trim() || undefined,
@@ -151,12 +194,17 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         }
         // Last, so it sits on top of the stack of notices
         if (data.changeWarning) toast.warning(data.changeWarning, { duration: 20000 });
+        // The coupon no longer met a rule when the sale arrived: it went in with the discount, marked out of rule
+        if (data.couponWarning) toast.warning(`Cupom aceito fora da regra: ${data.couponWarning}`, { duration: 20000 });
       }
       setCart({});
       setWeighed([]);
       setCpf('');
       setPhone('');
       setCustomerName('');
+      setCoupon(null);
+      setCouponInput('');
+      setCouponError('');
       setPayments([]);
       onDone?.();
     } finally {
@@ -276,6 +324,24 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
           <label htmlFor="counter-phone" className="text-sm font-semibold block mb-1">Celular do cliente (cashback)</label>
           <Input id="counter-phone" inputMode="tel" placeholder="Opcional" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
+        <div>
+          <label htmlFor="counter-coupon" className="text-sm font-semibold block mb-1">Cupom</label>
+          <div className="flex gap-2">
+            <Input
+              id="counter-coupon"
+              placeholder={online ? 'Opcional' : 'Cupom precisa de internet'}
+              value={couponInput}
+              disabled={!online || checkingCoupon}
+              onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && couponInput.trim() && itemCount > 0) { e.preventDefault(); checkCoupon(couponInput.trim()); } }}
+            />
+            <Button type="button" variant="outline" disabled={!online || checkingCoupon || !couponInput.trim() || itemCount === 0} onClick={() => checkCoupon(couponInput.trim())}>
+              {checkingCoupon ? 'Conferindo...' : 'Aplicar'}
+            </Button>
+          </div>
+          {!online && <p className="text-xs text-amber-700 mt-1">Cupom precisa de internet</p>}
+          {couponError && <p role="alert" className="text-xs text-red-600 mt-1">{couponError}</p>}
+        </div>
         {phone.trim() && (
           <div>
             <label htmlFor="counter-customer" className="text-sm font-semibold block mb-1">Nome (cliente novo)</label>
@@ -302,9 +368,15 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       {itemCount > 0 && shift.shiftId && hint && (
         <p className="text-sm text-amber-700 mt-3 text-right">{hint}</p>
       )}
+      {coupon && (
+        <div className="flex items-center justify-between gap-2 text-sm mt-3 border rounded-md p-2 bg-green-50">
+          <span>Cupom {coupon.code} − {brl(coupon.discountCents)}</span>
+          <Button size="sm" variant="ghost" className="text-red-600" disabled={saving} onClick={() => { setCoupon(null); setCouponError(''); }}>Tirar</Button>
+        </div>
+      )}
       <div className="flex items-center justify-between mt-4">
         <span className="text-2xl font-bold text-green-700">{brl(Math.round(total * 100))}</span>
-        <Button onClick={finish} disabled={saving || itemCount === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
+        <Button onClick={finish} disabled={saving || checkingCoupon || itemCount === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
           {saving ? 'Registrando...' : <>Finalizar venda<KeyHint k="Ctrl+Enter" /></>}
         </Button>
       </div>

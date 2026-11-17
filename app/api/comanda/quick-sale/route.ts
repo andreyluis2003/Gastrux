@@ -12,6 +12,7 @@ import { comandaTotalCents, readPayments, recordSaleEntries, resolveSaleShift, t
 import { onBillClosed } from '@/lib/cashback/bill';
 import { normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone, upsertCustomerByPhone } from '@/lib/cashback/service';
+import { applyCouponToSession } from '@/lib/coupons/session';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 
@@ -23,9 +24,13 @@ const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
  * POST /api/comanda/quick-sale - a counter sale ("venda balcão") in ONE request, so a device can
  * make it offline and send it later (the offline queue replays it with the same Idempotency-Key).
  * Body: { clientId, items: [{ menuItemId?, recipeId?, quantity?, modifierIds? }], customerCPF?,
- *         customerName?, customerPhone?, sendToKitchen?, cashSessionId, payments: [{ method, amount }], queuedAt? }
+ *         customerName?, customerPhone?, couponCode?, sendToKitchen?, cashSessionId, payments: [{ method, amount }], queuedAt? }
  * customerPhone identifies the customer for the cashback and the CRM (spec 2026-10-23 §7.2): it earns,
  * never uses (the sale can be made offline); a bad phone, or a new one without a name, never blocks the sale.
+ * couponCode (spec 2026-11-16 cupom-whatsapp-balcao, parte 1b): the screen sends it only after a preview
+ * (POST /api/comanda/coupon-preview). The discount never comes from the device: it is computed here, and a rule that
+ * now refuses (the limit ran out, the sale waited offline) never fails the sale - the use is recorded out of rule
+ * and the answer carries couponWarning. A code that does not exist is refused (422).
  *         (legacy: paymentMethod instead of payments, paid in full in the default register shift)
  * The device chooses the comanda id (clientId), so a replay finds the sale it already made. Prices
  * come from the menu. The sale is paid and closed at once: its payments and change enter the cash
@@ -76,6 +81,8 @@ async function handlePOST(request: Request) {
   let changeCents = 0;
   let changeWarning: string | null = null;
   let primaryMethod: string | undefined;
+  let couponDiscountCents = 0;
+  let couponWarning: string | null = null;
 
   try {
     // All or nothing: the comanda, its lines and its cash entries
@@ -90,7 +97,15 @@ async function handlePOST(request: Request) {
       for (const item of items) {
         await addComandaItem(tx, member.restaurantId, clientId, item);
       }
-      const total = await comandaTotalCents(tx, clientId);
+      // The coupon goes on while the comanda is still open, with the server's discount (force: a rule never fails the sale)
+      if (typeof body?.couponCode === 'string' && body.couponCode.trim()) {
+        const applied = await applyCouponToSession(tx, { restaurantId: member.restaurantId, sessionId: clientId, code: body.couponCode, phoneDigits: phone ?? '', force: true });
+        if (!applied.ok) throw new CashRuleError(applied.error, applied.status);
+        couponDiscountCents = applied.discountCents;
+        couponWarning = applied.warning ?? null;
+      }
+      // The counter sale never uses cashback (it earns only), so the coupon is the only discount
+      const total = Math.max(0, (await comandaTotalCents(tx, clientId)) - couponDiscountCents);
       const payments = read.legacy ? [{ method: read.payments[0].method, amount: (total / 100).toFixed(2) }] : read.payments;
       const settled = settlePayments(total, payments);
       if (target) {
@@ -138,7 +153,7 @@ async function handlePOST(request: Request) {
 
   // The plan counts sales per month and only warns (owner decision 2026-10-09)
   await noteSalesThresholds(member.restaurantId);
-  return NextResponse.json({ session, kitchen, nfce, changeCents, changeWarning, cashbackEarnedCents }, { status: 201 });
+  return NextResponse.json({ session, kitchen, nfce, changeCents, changeWarning, cashbackEarnedCents, couponDiscountCents, couponWarning }, { status: 201 });
 }
 
 // Replayable by the offline queue: the same Idempotency-Key never runs twice (lib/api/idempotency.ts)

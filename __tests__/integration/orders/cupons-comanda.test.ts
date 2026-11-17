@@ -128,7 +128,7 @@ describe('cupom na comanda', () => {
     const c = await coupon({ code: 'ESGOTADO', maxUses: 1, usedCount: 1 });
     const s = await comanda();
     expect(await apply(s.id, 'ESGOTADO')).toMatchObject({ ok: false, status: 422 });
-    expect(await apply(s.id, 'ESGOTADO', { force: true })).toEqual({ ok: true, code: 'ESGOTADO', discountCents: 400, outOfRule: true });
+    expect(await apply(s.id, 'ESGOTADO', { force: true })).toEqual({ ok: true, code: 'ESGOTADO', discountCents: 400, outOfRule: true, warning: 'Este cupom já foi usado o número máximo de vezes.' });
     expect(await prisma.couponRedemption.findFirst({ where: { orderSessionId: s.id } })).toMatchObject({ outOfRule: true, discountCents: 400 });
     expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(2);
   });

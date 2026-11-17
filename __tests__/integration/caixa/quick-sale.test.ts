@@ -15,6 +15,8 @@ jest.mock('../../../lib/nfe/provider', () => ({ getProvider: jest.fn(() => fakeP
 import { getServerSession } from 'next-auth';
 import { getCurrentRestaurantId } from '../../../lib/whatsapp/get-restaurant';
 import { POST as quickSale } from '../../../app/api/comanda/quick-sale/route';
+import { POST as couponPreview } from '../../../app/api/comanda/coupon-preview/route';
+import { INVALID } from '../../../lib/coupons/service';
 import { openSession, ensureDefaultRegister } from '../../../lib/caixa/sessions';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
@@ -165,5 +167,95 @@ describe('counter sale records its payments in the shift', () => {
     } finally {
       await prisma.recipeIngredient.deleteMany({ where: { recipeId: burger.id } });
     }
+  });
+  // Cupom na venda balcão (spec 2026-11-16 cupom-whatsapp-balcao, parte 1b)
+  describe('coupon', () => {
+    let soda;
+    const preview = (body) => couponPreview(new Request('http://x/api/comanda/coupon-preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }) as any);
+    const coupon = (data) => prisma.coupon.create({ data: { restaurantId: A.restaurantId, kind: 'PERCENT', value: 10, maxPerCustomer: null, ...data } });
+    // 2 x R$ 20
+    const twoSodas = () => [{ menuItemId: soda.id, quantity: 2 }];
+
+    beforeAll(async () => {
+      const cat = await prisma.menuCategory.create({ data: { restaurantId: A.restaurantId, name: `Cup ${tag}`, position: 9, active: true } });
+      soda = await prisma.menuItem.create({ data: { restaurantId: A.restaurantId, categoryId: cat.id, name: `Suco ${tag}`, price: 20, position: 0 } });
+    });
+
+    it('counter sale with coupon charges the discounted total', async () => {
+      const c = await coupon({ code: `BA${tag}`.toUpperCase() });
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      const short = `bal-${crypto.randomUUID()}`;
+      const refused = await sale({ clientId: short, items: twoSodas(), couponCode: c.code, cashSessionId: session.id, payments: [{ method: 'pix', amount: 35 }] });
+      expect(refused.status).toBe(400);
+      expect((await refused.json()).error).toMatch(/Faltam/);
+      expect(await prisma.orderSession.findUnique({ where: { id: short } })).toBeNull();
+      expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(0);
+
+      const clientId = `bal-${crypto.randomUUID()}`;
+      const res = await sale({ clientId, items: twoSodas(), couponCode: c.code.toLowerCase(), cashSessionId: session.id, payments: [{ method: 'pix', amount: 36 }] });
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.couponDiscountCents).toBe(400);
+      expect(body.couponWarning ?? null).toBeNull();
+      const s = await prisma.orderSession.findUnique({ where: { id: clientId } });
+      expect([s.status, s.couponCode, s.couponDiscountCents]).toEqual(['CLOSED', c.code, 400]);
+      expect((await linesOf(clientId)).map((l) => l.amountCents)).toEqual([3600]);
+      const uses = await prisma.couponRedemption.findMany({ where: { orderSessionId: clientId, restaurantId: A.restaurantId } });
+      expect(uses.map((u) => [u.discountCents, u.outOfRule])).toEqual([[400, false]]);
+    });
+
+    it('replay after the limit ran out records once, with the discount and outOfRule', async () => {
+      const c = await coupon({ code: `LI${tag}`.toUpperCase(), maxUses: 1 });
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      // Previewed online...
+      expect((await preview({ code: c.code, items: twoSodas() })).status).toBe(200);
+      // ...then another sale took the last use before this one reached the server
+      await prisma.coupon.update({ where: { id: c.id }, data: { usedCount: 1 } });
+      const ruleText = (await (await preview({ code: c.code, items: twoSodas() })).json()).error;
+      expect(ruleText).toBeTruthy();
+
+      const clientId = `bal-${crypto.randomUUID()}`;
+      const key = crypto.randomUUID();
+      const body = { clientId, items: twoSodas(), couponCode: c.code, cashSessionId: session.id, payments: [{ method: 'pix', amount: 36 }], queuedAt: new Date().toISOString() };
+      const first = await sale(body, key);
+      expect(first.status).toBe(201);
+      const firstBody = await first.json();
+      expect(firstBody.couponDiscountCents).toBe(400);
+      expect(firstBody.couponWarning).toBe(ruleText);
+      const again = await sale(body, key);
+      expect(again.status).toBe(201);
+      expect((await again.json()).couponWarning).toBe(ruleText);
+
+      expect(await prisma.orderSession.count({ where: { id: clientId } })).toBe(1);
+      const uses = await prisma.couponRedemption.findMany({ where: { orderSessionId: clientId } });
+      expect(uses.map((u) => [u.discountCents, u.outOfRule])).toEqual([[400, true]]);
+      expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(2);
+      expect(await linesOf(clientId)).toHaveLength(1);
+    });
+
+    it('unknown code is refused 422', async () => {
+      const { session } = await openSession(owner, { cashRegisterId: reg.id, openingFloat: 0 });
+      const clientId = `bal-${crypto.randomUUID()}`;
+      const res = await sale({ clientId, items: twoSodas(), couponCode: `NO${tag}`, cashSessionId: session.id, payments: [{ method: 'pix', amount: 36 }] });
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toBe(INVALID);
+      expect(await prisma.orderSession.findUnique({ where: { id: clientId } })).toBeNull();
+    });
+
+    it('preview never writes', async () => {
+      const c = await coupon({ code: `PV${tag}`.toUpperCase() });
+      const sessionsBefore = await prisma.orderSession.count({ where: { restaurantId: A.restaurantId } });
+      const res = await preview({ code: c.code.toLowerCase(), items: twoSodas() });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ code: c.code, discountCents: 400, label: '10% de desconto' });
+      expect((await prisma.coupon.findUnique({ where: { id: c.id } })).usedCount).toBe(0);
+      expect(await prisma.couponRedemption.count({ where: { couponId: c.id } })).toBe(0);
+      expect(await prisma.orderSession.count({ where: { restaurantId: A.restaurantId } })).toBe(sessionsBefore);
+      const unknown = await preview({ code: `NO${tag}`, items: twoSodas() });
+      expect(unknown.status).toBe(422);
+      expect((await unknown.json()).error).toBe(INVALID);
+    });
   });
 });
