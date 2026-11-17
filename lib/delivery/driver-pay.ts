@@ -53,7 +53,7 @@ export function parsePayKey(key: unknown): { driverId: string } | { driverName: 
 
 type Who = { driverId: string } | { driverName: string } | null;
 
-/** Orders out for delivery (or delivered), with a driver, not cancelled, not paid to the driver yet */
+/** Orders that went out ("Saiu para entrega" or delivered: dispatchedAt), with a driver, not cancelled, not paid to the driver yet */
 function orderWhere(restaurantId: string, who: Who, ids?: string[]): Prisma.ExternalOrderWhereInput {
   const driver: Prisma.ExternalOrderWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
@@ -63,12 +63,9 @@ function orderWhere(restaurantId: string, who: Who, ids?: string[]): Prisma.Exte
     ...(ids ? { id: { in: ids } } : {}),
     driverPaymentId: null,
     status: { notIn: ['CANCELLED', 'REJECTED'] },
-    AND: [
-      driver,
-      { OR: [{ dispatchedAt: { not: null } }, { status: { in: ['PICKED_UP', 'DELIVERED'] } }] },
-      // Before 2026-11-17 the driver was paid at the money settlement ("driverPay"): those orders are paid already
-      { OR: [{ settlementId: null }, { settlement: { is: { driverPayCents: 0 } } }] },
-    ],
+    // Only deliveries that went out with a dispatch time: orders from before this feature are not paid here
+    dispatchedAt: { not: null },
+    ...driver,
   };
 }
 
@@ -93,7 +90,7 @@ async function loadDeliveries(db: Db, restaurantId: string, who: Who, ids?: { or
   const [orders, comandas] = await Promise.all([
     db.externalOrder.findMany({
       where: orderWhere(restaurantId, who, ids?.orders),
-      select: { id: true, externalOrderId: true, customerName: true, driverId: true, driverName: true, dispatchedAt: true, orderReceivedAt: true, deliveryFee: true },
+      select: { id: true, externalOrderId: true, customerName: true, driverId: true, driverName: true, dispatchedAt: true, deliveryFee: true },
       orderBy: { orderReceivedAt: 'asc' },
       take: LIMIT,
     }),
@@ -107,7 +104,7 @@ async function loadDeliveries(db: Db, restaurantId: string, who: Who, ids?: { or
   const rows: Array<{ driverId: string | null; driverName: string | null; delivery: UnpaidDelivery }> = [
     ...orders.map((o) => ({
       driverId: o.driverId, driverName: o.driverName,
-      delivery: { kind: 'order' as const, id: o.id, label: `Pedido ${o.externalOrderId} · ${o.customerName}`, workDay: workDayOf(o.dispatchedAt ?? o.orderReceivedAt), deliveryFeeCents: cents(o.deliveryFee) },
+      delivery: { kind: 'order' as const, id: o.id, label: `Pedido ${o.externalOrderId} · ${o.customerName}`, workDay: workDayOf(o.dispatchedAt!), deliveryFeeCents: cents(o.deliveryFee) },
     })),
     // The WhatsApp robot charges no delivery fee: 0
     ...comandas.map((s) => ({

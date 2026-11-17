@@ -14,6 +14,8 @@ import { POST as close } from '../../../app/api/caixa/sessions/[id]/close/route'
 import { GET as pending, POST as settle } from '../../../app/api/caixa/sessions/[id]/acerto-entregador/route';
 import { ownIntegration } from '../../../lib/delivery-orders/integrations';
 import { workDayOf } from '../../../lib/delivery/driver-pay';
+import { PUT as moveOrder } from '../../../app/api/admin/integrations/orders/[id]/route';
+import { recordBillPayment } from '../../../lib/comanda/bill-service';
 
 const prisma = (global as any).__PRISMA__ || new PrismaClient();
 
@@ -54,6 +56,7 @@ describe('pagar o entregador no acerto', () => {
     const ids = [A.restaurantId, B.restaurantId];
     await prisma.externalOrder.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.orderSession.deleteMany({ where: { restaurantId: { in: ids } } });
+    await prisma.recipe.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.driverPayment.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.deliverySettlement.deleteMany({ where: { restaurantId: { in: ids } } });
     await prisma.driver.deleteMany({ where: { restaurantId: { in: ids } } });
@@ -209,6 +212,37 @@ describe('pagar o entregador no acerto', () => {
     const foreign = await prisma.driver.create({ data: { restaurantId: B.restaurantId, name: `Fora ${tag}`, dailyRateCents: 4000 } });
     expect((await post({ pay: { key: foreign.id, amount: '10,00' } })).status).toBe(404);
     expect(await post({})).toMatchObject({ status: 400, body: { error: 'Escolha os pedidos do acerto' } });
+  });
+
+  it('an old order without dispatchedAt is not in the pay quote; one jumping to DELIVERED gets dispatchedAt', async () => {
+    as(cashierId, A.restaurantId);
+    const d = await driver({});
+    await order({ driverId: d.id, driverName: d.name, dispatchedAt: null }); // before the feature: not paid here
+    expect(await quoteOf(d.id)).toBeUndefined();
+    const name = `Pulou ${tag}`;
+    const o = await order({ driverName: name, status: 'READY', dispatchedAt: null });
+    const before = Date.now();
+    expect((await moveOrder(req('http://x', 'PUT', { status: 'DELIVERED' }), { params: { id: o.id } })).status).toBe(200);
+    expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).dispatchedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(await quoteOf(`name:${name}`)).toMatchObject({ deliveryCount: 1, feeCapCents: 600 });
+  });
+
+  it('paying the driver while one of his open comandas is paid at the cash register: both succeed (no deadlock)', async () => {
+    as(cashierId, A.restaurantId);
+    const recipe = await prisma.recipe.create({ data: { restaurantId: A.restaurantId, code: `R${tag}`, name: 'Espeto', baseYield: 1, yieldUnit: 'un', portionUnit: 'un', sellingPrice: 30 } });
+    for (let i = 0; i < 3; i++) {
+      const d = await driver({});
+      const s = await comanda({ driverId: d.id, driverName: d.name, status: 'SENT_TO_KITCHEN' });
+      await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 30, quantity: 1 } });
+      const [pay, bill] = await Promise.allSettled([
+        post({ pay: { key: d.id, amount: '48,00' } }),
+        recordBillPayment({ userId: cashierId, restaurantId: A.restaurantId, role: 'CASHIER' }, s.id, { payments: [{ method: 'dinheiro', amount: '30,00' }], cashSessionId: shiftId }),
+      ]);
+      expect(pay.status).toBe('fulfilled');
+      expect(pay.value.status).toBe(201);
+      expect(bill.status).toBe('fulfilled');
+      expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).driverPaymentId).toBe(pay.value.body.payment.id);
+    }
   });
 
   it('closed shift is 409', async () => {

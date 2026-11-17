@@ -101,6 +101,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
     if (!order.dispatchedAt) driver.dispatchedAt = new Date();
   }
+  // Delivered without "Saiu para entrega" (step skipped): it still went out, so it counts for the driver's pay
+  if (status === 'DELIVERED' && !order.dispatchedAt) driver.dispatchedAt = new Date();
   const moved = await prisma.externalOrder.updateMany({ where: { id: order.id, status: order.status }, data: { status, ...driver } });
   if (moved.count === 0) return NextResponse.json({ error: 'O pedido mudou enquanto era atualizado. Atualize a tela.' }, { status: 409 });
   await prisma.deliveryLog.create({

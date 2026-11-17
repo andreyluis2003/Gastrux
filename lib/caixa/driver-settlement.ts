@@ -101,7 +101,14 @@ export interface SettleInput {
   pay?: unknown;
 }
 
-const ALREADY_PAID = 'Este entregador já foi pago agora. Atualize a tela.';
+/** P2002 on driver_paid_days (driverId, workDay): meta.target is the index name or its columns */
+function isPaidDayClash(e: Prisma.PrismaClientKnownRequestError): boolean {
+  const target = e.meta?.target;
+  const text = Array.isArray(target) ? target.join(',') : String(target ?? '');
+  return text.includes('driver_paid_days') || (text.includes('driverId') && text.includes('workDay'));
+}
+
+const ALREADY_PAID ='Este entregador já foi pago agora. Atualize a tela.';
 const OVER_FEES = 'Pagar ao entregador mais que as taxas de entrega exige um gerente';
 const OVER_QUOTE = 'Pagar ao entregador mais que o calculado exige um gerente';
 
@@ -109,7 +116,7 @@ const OVER_QUOTE = 'Pagar ao entregador mais que o calculado exige um gerente';
  * The acerto: with orderIds, brings the door money of those orders to this open shift (rule of 2026-10-26, unchanged);
  * with pay, pays the driver what he earned (daily rates + deliveries, any payment method) as a cash Despesa of this
  * shift, which may leave the expected cash negative. Both in one transaction.
- * Lock order (no deadlock with "Saiu para entrega"): cash session -> comandas by id -> external orders by id.
+ * Lock order (as the comanda bill and "Saiu para entrega"): comandas by id -> cash session -> external orders by id.
  */
 export async function settleDriver(member: RestaurantMember, sessionId: string, input: SettleInput) {
   const ids = Array.isArray(input.orderIds) ? [...new Set(input.orderIds.filter((x): x is string => typeof x === 'string'))] : [];
@@ -133,14 +140,17 @@ export async function settleDriver(member: RestaurantMember, sessionId: string, 
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<Array<{ status: string }>>`SELECT "status"::text AS "status" FROM "cash_sessions" WHERE "id" = ${session.id} FOR UPDATE`;
-      if (rows[0]?.status !== 'OPEN') throw new CashRuleError('Este caixa já foi fechado', 409);
-
-      // The driver's deliveries before the locks; recomputed after them (a swap or a payment meanwhile drops out)
+      // The driver's deliveries before the locks; recomputed after them (a swap or a payment meanwhile drops out).
+      // Comanda locks come BEFORE the shift lock: paying a comanda's bill takes the comanda lock, then the shift
+      // (FOR SHARE); the opposite order here would deadlock with it.
       const candidates = payIn ? (await deliveriesOf(tx, restaurantId, payIn.key)).deliveries : [];
       const payComandaIds = candidates.filter((d) => d.kind === 'comanda').map((d) => d.id).sort();
       const payOrderIds = candidates.filter((d) => d.kind === 'order').map((d) => d.id);
       for (const id of payComandaIds) await lockComanda(tx, id);
+
+      const rows = await tx.$queryRaw<Array<{ status: string }>>`SELECT "status"::text AS "status" FROM "cash_sessions" WHERE "id" = ${session.id} FOR UPDATE`;
+      if (rows[0]?.status !== 'OPEN') throw new CashRuleError('Este caixa já foi fechado', 409);
+
       const lockIds = [...new Set([...ids, ...payOrderIds])].sort();
       // Locks the orders: two settlements at once of the same order, the second finds it settled (or paid)
       if (lockIds.length) await tx.$queryRaw`SELECT "id" FROM "external_orders" WHERE "id" = ANY(${lockIds}) ORDER BY "id" FOR UPDATE`;
@@ -255,7 +265,8 @@ export async function settleDriver(member: RestaurantMember, sessionId: string, 
       payment: result.payment ? { id: result.payment.id, paidCents: result.payment.paidCents, quote: result.payment.quote } : null,
     };
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw new CashRuleError(ALREADY_PAID, 409);
+    // Only the one-daily-per-day index means "paid meanwhile"; any other unique violation is a real error
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002' && isPaidDayClash(e)) throw new CashRuleError(ALREADY_PAID, 409);
     throw e;
   }
 }
