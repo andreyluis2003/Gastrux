@@ -7,17 +7,36 @@ commit que resolveu. Os registros em `.superpowers/sdd/` não vão para o git e 
 
 Spec `docs/superpowers/specs/2026-11-08-cupons-design.md`.
 
-- **Só no site de delivery:** WhatsApp, Vender, QR da mesa e API de pedidos ainda não aceitam cupom.
 - **Cancelamento não devolve o uso** (nem o limite por cliente): um cliente que teve o pedido cancelado não usa o
   cupom de novo se o limite for 1.
 - **Plano:** cupons em todos os planos (confirmado pelo dono em 2026-11-08). Cashback continua só no Business.
-- **"Só no primeiro pedido"** olha pedidos do site deste restaurante pelo celular (cliente do CRM); quem já comprou
-  no salão ou no iFood ainda conta como primeiro pedido no site.
+- **"Só no primeiro pedido"** passou a contar pedidos de todos os canais (2026-11-16): comandas fechadas e abertas e
+  qualquer uso anterior de cupom no mesmo celular.
 - **Celular não conferido:** o limite por cliente e o "só no primeiro pedido" contam pelo celular digitado (sem código
   por SMS); quem digita outro número usa de novo. A tela e a ajuda avisam e indicam o limite de usos no total.
 - **Limite de tentativas** de cupom (20 por minuto por endereço e 300 por minuto por restaurante, no site e na criação
   do pedido) fica na memória do processo: um Deploy zera, e com mais de um servidor cada um conta o seu.
 - Cupom por produto ou categoria, cupons em lote e cupom na campanha: não feitos.
+- Cupom na Conta, na venda balcão e no WhatsApp feito em 2026-11-16. O que ficou:
+  - **QR da mesa e API de pedidos** ainda sem cupom.
+  - **Desconto fixo ao aplicar:** se tirar itens depois, o desconto não muda (o total nunca fica negativo); o caixa
+    pode contornar o pedido mínimo assim.
+  - **Venda balcão:** pode gravar uso "fora da regra" também numa venda feita com internet (o servidor não distingue
+    com segurança venda na hora de venda reenviada). Não há limite de tentativas de cupom na venda balcão (só na
+    prévia): testar códigos exigiria registrar vendas reais.
+  - **Tela de Cupons** ainda não lista os usos (só o total e o desconto dado), então não mostra a marca "fora da regra"
+    (`CouponRedemption.outOfRule`).
+  - **Tirar o cliente da conta não tira o cupom.**
+  - **Reconferências automáticas** do cupom no balcão gastam tentativas (20 por minuto por usuário).
+  - **Tirar a taxa de serviço** quando isso fecha a conta não dá cashback nem conta a compra no cadastro (já era
+    assim); a conferência de "pagou mais que os itens" ao tirar a taxa ignora cupom e cashback.
+  - **Conta 100% coberta** por cupom ou cashback (total R$ 0): sem caminho testado para fechar.
+  - **WhatsApp:** cliente sem nome entra como "Cliente WhatsApp"; código de cupom igual a comando do robô (MENU,
+    PEDIDO, AJUDA) não pode ser digitado; "Não." com pontuação conta como código; tocar Confirmar num resumo velho não
+    responde nada; o robô pergunta mesmo quando os cupons ativos estão esgotados ou com pedido mínimo.
+  - **WhatsApp manda o celular sem o 9º dígito** (12 dígitos) em muitos casos; o cliente do site tem 11, então o mesmo
+    cliente pode virar dois cadastros e o "primeiro pedido" pode não reconhecer (já era assim).
+  - **Telas novas (Conta e balcão)** ainda não conferidas no navegador: conferir no homolog.
 
 ## Todos os pedidos e loja aberta/fechada (2026-11-07)
 

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  'dbe6cc4b179596a4d724985b218aa801f597cf63d110f3ed63e33c9422a829ea', // cupons-de-desconto (before the coupon on the Conta, the counter sale and WhatsApp, 2026-11-16)
   '58d227980b1034d97de603c73fde7f518cd0159c381739573b64bb05de404158', // site-de-delivery (before the delivery fee setting, 2026-11-14)
   'a74740ac30db5876081f2f94e23911b2ac865a08e599543c5ef500f496390e79', // esgotar-e-editar-o-cardapio (before renaming a category, 2026-11-14)
   '0528f5c741935318ed0354273be4502fc9422c1b85f03d0c46665bd29ac294f2', // ligar-a-99food (before the service fee in the total, 2026-11-13)
@@ -737,9 +738,9 @@ O seu site, um bot de WhatsApp ou outro sistema podem mandar pedidos pela **API 
   {
     categorySlug: 'integracao-delivery',
     slug: 'cupons-de-desconto',
-    title: 'Como crio um cupom de desconto para o site de delivery?',
-    summary: 'Clientes e marketing > Cupons: % de desconto, valor fixo ou entrega grátis, com pedido mínimo, validade e limites.',
-    keywords: 'cupom, cupons, desconto, código, promoção, entrega grátis, frete grátis, primeiro pedido, primeira compra',
+    title: 'Como crio um cupom de desconto?',
+    summary: 'Clientes e marketing > Cupons: % de desconto, valor fixo ou entrega grátis. Vale no site, na conta (Vender), no balcão e no WhatsApp.',
+    keywords: 'cupom, cupons, desconto, código, promoção, entrega grátis, frete grátis, primeiro pedido, primeira compra, conta, comanda, balcão, whatsapp, fora da regra',
     order: 6,
     content: `## Criando
 
@@ -753,19 +754,45 @@ Em **Clientes e marketing > Cupons** (dono ou gerente), preencha:
 
 Clique em **Criar cupom** e divulgue o código (Instagram, panfleto, WhatsApp).
 
-## O cliente usando
+## Onde o cupom vale
 
-No site de delivery, ao **Finalizar pedido**, o cliente digita o código em **Tem cupom?** e toca em **Aplicar**. O desconto aparece no resumo e no total, inclusive no pagamento online. Se mudar o carrinho, ele aplica o cupom de novo.
+- **Site de delivery**: ao **Finalizar pedido**, o cliente digita o código em **Tem cupom?** e toca em **Aplicar**. O desconto aparece no resumo e no total, inclusive no pagamento online. Se mudar o carrinho, ele aplica o cupom de novo
+- **Conta (Vender)**: na comanda, digite o código no campo **Cupom** e toque em **Aplicar**. A conta mostra a linha "Cupom CÓDIGO − R$ x". Para desfazer, toque em **Tirar**. Só caixa, gerente e dono aplicam
+- **Venda balcão**: digite o código no campo **Cupom**, ao lado do celular. Precisa de internet
+- **WhatsApp**: se você tem algum cupom ativo, o robô pergunta "Tem cupom de desconto? Digite o código ou *não*." O resumo do pedido mostra "Cupom CÓDIGO: −R$ x"
 
-O pedido chega em Pedidos de delivery e na cozinha com a linha "Cupom CÓDIGO: -R$ x".
+O pedido chega em Pedidos de delivery e na cozinha com a linha do cupom.
+
+## Como funciona na Conta
+
+- O desconto vale sobre os **itens**, sem a taxa de serviço, e entra antes do cashback
+- Ele fica **fixo** no valor de quando você aplicou. Se tirar itens depois, o desconto não muda. Se mudar muito a conta, toque em **Tirar** e aplique de novo
+- Uma conta tem **um cupom** só
+- Se o cupom tem regra por cliente (usos por cliente ou primeiro pedido), identifique o cliente pelo celular antes. Sem isso, aparece "Identifique o cliente pelo celular antes"
+- Se a conta já tem pagamentos e o cupom passa do que falta pagar, o cupom é recusado. Estorne um pagamento antes. Se o cupom zera o que falta, a conta fecha
+- **Cancelar a comanda** devolve o uso do cupom. **Reabrir** a comanda mantém o cupom
+- Ao **juntar comandas**, o cupom vai para a comanda de destino. Se as duas tiverem cupom, tire um antes
+
+## Como funciona na venda balcão
+
+- Se faltar internet, aparece "Cupom precisa de internet". Se você mudar o carrinho sem internet, o cupom sai da venda
+- Uma venda guardada sem internet e enviada depois **nunca se perde**. Se o cupom já não valer (limite de usos, validade ou pausado), a venda entra **com o desconto** e o uso fica marcado como **fora da regra**. Se o código nem existir, a venda entra sem desconto, com um aviso
+
+## Cupom de entrega grátis
+
+Vale só no **site de delivery**. Na conta, no balcão e no WhatsApp ele não é aceito, porque ali não tem taxa de entrega. No WhatsApp, o robô só pergunta pelo cupom se você tem algum que não seja só de entrega grátis.
+
+## Primeiro pedido
+
+O "só no primeiro pedido" olha **todos os canais**: comandas fechadas e abertas, e qualquer uso anterior de cupom no mesmo celular.
 
 ## Acompanhando
 
-Cada cupom mostra quantas vezes foi usado e quanto de desconto já deu. **Pausar** desliga o cupom sem apagar o histórico; **Ativar** liga de novo.
+Cada cupom mostra quantas vezes foi usado e quanto de desconto já deu. **Pausar** desliga o cupom sem apagar o histórico; **Ativar** liga de novo. Na DRE, o desconto aparece na linha **Cashback e cupons usados**.
 
 ## O que ainda não tem
 
-O cupom vale só no **site de delivery**: ainda não no WhatsApp, no Vender, no QR Code da mesa nem na API de pedidos. Um pedido cancelado não devolve o uso do cupom.
+O cupom ainda não vale no **QR Code da mesa** nem na **API de pedidos**. Um pedido do site cancelado não devolve o uso do cupom.
 
 O limite por cliente e o "só no primeiro pedido" contam pelo celular digitado, que não é conferido: quem digitar outro número consegue usar de novo. Para um cupom de valor alto, use também o **limite de usos no total**.`,
   },

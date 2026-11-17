@@ -7,5 +7,5 @@ export default `## Cashback e clientes
 - Venda balcão: tem o celular; ganha crédito, não usa. Feita sem internet, credita quando chegar ao servidor.
 - Site de delivery: o cliente é reconhecido pelo celular do pedido e ganha crédito quando o pedido é concluído; o saldo ainda não é usado no site.
 - O crédito mais antigo é usado primeiro; vencido sai do saldo. Reabrir ou cancelar a conta desfaz o crédito dela e devolve o cashback que ela usou.
-- DRE: o cashback usado entra em Deduções como "Cashback usado" (a receita bruta soma o valor cheio). A NFC-e sai com o desconto repartido entre os itens.
+- DRE: o cashback usado e os cupons entram em Deduções, na linha "Cashback e cupons usados" (a receita bruta soma o valor cheio). A NFC-e sai com o desconto repartido entre os itens.
 - Clientes (CRM): busca por nome, celular ou e-mail; cadastro sem e-mail; total gasto, compras, ticket médio, segmento e, no Business, saldo e extrato do cashback. Segmento pelas compras dos últimos 90 dias: VIP com 10 ou mais, Regular de 3 a 9, Ocasional 1 ou 2, Inativo sem compra. No Pro o celular na conta já soma as compras no CRM.`;

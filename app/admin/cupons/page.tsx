@@ -30,7 +30,7 @@ const EMPTY = { code: '', kind: 'PERCENT' as CouponKind, value: '10', minOrder: 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : null);
 
 /**
- * Clientes e marketing > Cupons (spec 2026-11-08 cupons §5): create a coupon for the delivery site, see its uses and
+ * Clientes e marketing > Cupons (spec 2026-11-08 cupons §5): create a coupon (delivery site, Conta, counter sale, WhatsApp), see its uses and
  * the discount given, pause or turn it back on.
  */
 export default function CuponsPage() {
@@ -89,7 +89,7 @@ export default function CuponsPage() {
         <BackButton href="/dashboard" />
         <div>
           <h1 className="text-xl sm:text-3xl font-bold">Cupons</h1>
-          <p className="text-sm text-muted-foreground">Códigos de desconto que o cliente digita ao finalizar o pedido no site de delivery.</p>
+          <p className="text-sm text-muted-foreground">Códigos de desconto. Valem no site de delivery, na conta (Vender), na venda balcão e no WhatsApp. Entrega grátis vale só no site.</p>
         </div>
       </div>
 
