@@ -7,7 +7,10 @@ import { cashErrorResponse } from '@/lib/caixa/http';
 
 export const dynamic = 'force-dynamic';
 
-/** GET /api/caixa/sessions/[id]/acerto-entregador - what each driver brings back (spec 2026-10-26 acerto com o entregador) */
+/**
+ * GET /api/caixa/sessions/[id]/acerto-entregador - { drivers, driverNames, pay }: what each driver brings back (door
+ * money, spec 2026-10-26) and what each driver earned (daily rates + deliveries, spec 2026-11-17 entregadores).
+ */
 export async function GET(_request: Request) {
   const auth = await requireRestaurantRole(CASHIER_PLUS, 'Sem acesso ao caixa');
   if (!auth.ok) return auth.response;
@@ -18,7 +21,10 @@ export async function GET(_request: Request) {
   }
 }
 
-/** POST - { driverName, orderIds, receivedCash, driverPay?, reason? } brings their money to this open shift */
+/**
+ * POST - { driverName?, orderIds?, receivedCash?, driverPay?, reason?, pay?: { key, amount } }: orderIds brings the door
+ * money to this open shift; pay pays the driver (cash Despesa). driverPay is the old typed-name payment.
+ */
 async function handlePOST(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireRestaurantRole(CASHIER_PLUS, 'Sem acesso ao caixa');
   if (!auth.ok) return auth.response;
