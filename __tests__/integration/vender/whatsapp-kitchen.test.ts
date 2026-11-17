@@ -39,6 +39,8 @@ describe('WhatsApp order: confirmed order reaches the kitchen', () => {
   }, 60000);
   afterAll(async () => {
     try { await prisma.restaurant.delete({ where: { id: rid } }); } catch {}
+    // The confirmed order links the comanda to a customer (2026-11-16); customers have no cascade from the restaurant
+    try { await prisma.customer.deleteMany({ where: { restaurantId: rid } }); } catch {}
     try { await prisma.user.delete({ where: { id: ownerId } }); } catch {}
   });
 

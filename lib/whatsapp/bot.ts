@@ -12,6 +12,11 @@ import { ORDER_REFUSAL, restaurantAcceptsOrders } from '@/lib/billing/order-gate
 import { ensureMenuItemRecipes } from '@/lib/cardapio/product-recipe';
 import { MetaCloudClient, normalizePhone } from './meta-client';
 import { sendSessionToKitchen } from '@/lib/kds/send-session';
+import { applyCouponToSession, previewSessionCoupon } from '@/lib/coupons/session';
+import { takeCouponTry } from '@/lib/coupons/attempts';
+import { normalizePhone as phoneDigitsOf } from '@/lib/cashback/rules';
+import { upsertCustomerByPhone } from '@/lib/cashback/service';
+import { lineTotalCents } from '@/lib/comanda/line-total';
 import type { WhatsAppConversation, WhatsAppConfig } from '@prisma/client';
 
 type CartItem = {
@@ -50,6 +55,87 @@ function parseCart(raw: any): CartItem[] {
 
 function cartTotal(items: CartItem[]): number {
   return items.reduce((s, i) => s + i.price * i.quantity, 0);
+}
+
+/** The cart items in cents, the base of the coupon (the same as comandaTotalCents of the comanda it becomes; no delivery fee) */
+function cartSubtotalCents(items: CartItem[]): number {
+  return items.reduce((s, i) => s + lineTotalCents(i.price, i.quantity), 0);
+}
+
+// ===================== Cupom (spec 2026-11-16 cupom-whatsapp-balcao) =====================
+
+export const COUPON_QUESTION = 'Tem cupom de desconto? Digite o código ou *não*.';
+const COUPON_TRIES = 'Muitas tentativas. Tente em um minuto.';
+
+/** The coupon accepted in the conversation: the discount shown in the summary (applied again on the comanda at confirm) */
+type ConversationCoupon = { code: string; discountCents: number; label: string };
+
+function contextOf(ctx: BotContext): Record<string, any> {
+  const c = ctx.conversation.context;
+  return c && typeof c === 'object' && !Array.isArray(c) ? { ...(c as any) } : {};
+}
+
+/** The context without the coupon question and the coupon */
+function withoutCoupon(context: Record<string, any>): Record<string, any> {
+  const { couponStep: _step, coupon: _coupon, ...rest } = context;
+  return rest;
+}
+
+function conversationCoupon(ctx: BotContext): ConversationCoupon | null {
+  const c = contextOf(ctx).coupon;
+  return c && typeof c.code === 'string' && Number.isInteger(c.discountCents) ? c : null;
+}
+
+/** DDD + number of the conversation's phone (Customer.phoneDigits), or '' */
+const conversationPhoneDigits = (ctx: BotContext) => phoneDigitsOf(ctx.conversation.phoneNumber) ?? '';
+
+/** Does the restaurant have a coupon a comanda can take now? (free delivery never applies to a comanda) */
+async function restaurantHasCoupon(restaurantId: string): Promise<boolean> {
+  const now = new Date();
+  const found = await prisma.coupon.findFirst({
+    where: {
+      restaurantId,
+      active: true,
+      kind: { not: 'FREE_DELIVERY' },
+      AND: [
+        { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
+        { OR: [{ validUntil: null }, { validUntil: { gte: now } }] },
+      ],
+    },
+    select: { id: true },
+  });
+  return !!found;
+}
+
+const isNo = (text: string) =>
+  ['nao', 'n'].includes(text.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase());
+
+/** The answer to the coupon question: "não" or a code */
+async function handleCouponAnswer(ctx: BotContext, rawText: string) {
+  const answer = rawText.trim();
+  if (!answer) return safeSendText(ctx, COUPON_QUESTION);
+  if (isNo(answer)) {
+    await updateContext(ctx, withoutCoupon(contextOf(ctx)));
+    return handleShowConfirmation(ctx);
+  }
+  if (!takeCouponTry('wa:' + ctx.conversation.phoneNumber, ctx.restaurantId)) return safeSendText(ctx, COUPON_TRIES);
+  const check = await previewSessionCoupon(prisma, {
+    restaurantId: ctx.restaurantId,
+    code: answer,
+    phoneDigits: conversationPhoneDigits(ctx),
+    subtotalCents: cartSubtotalCents(parseCart(ctx.conversation.cart)),
+  });
+  if (!check.ok) return safeSendText(ctx, `${check.error}\n\n${COUPON_QUESTION}`);
+  const coupon: ConversationCoupon = { code: check.code, discountCents: check.discountCents, label: check.label };
+  await updateContext(ctx, { ...withoutCoupon(contextOf(ctx)), coupon });
+  return handleShowConfirmation(ctx);
+}
+
+/** A coupon refused while the comanda was being created (the transaction rolls back) */
+class CouponRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+  }
 }
 
 export async function handleInboundMessage(
@@ -210,6 +296,9 @@ async function route(ctx: BotContext, msg: InboundMessage) {
   }
 
   // Estado baseado em texto livre
+  if (ctx.conversation.state === 'CONFIRMING' && contextOf(ctx).couponStep === 'ASK') {
+    return handleCouponAnswer(ctx, msg.text || '');
+  }
   if (ctx.conversation.state === 'COLLECTING_INFO') {
     return handleCollectInfo(ctx, msg.text || '');
   }
@@ -228,6 +317,9 @@ async function route(ctx: BotContext, msg: InboundMessage) {
 }
 
 async function handleGreeting(ctx: BotContext) {
+  // A new start drops the coupon question and the coupon accepted
+  const context = contextOf(ctx);
+  if ('couponStep' in context || 'coupon' in context) await updateContext(ctx, withoutCoupon(context));
   await updateState(ctx, 'MENU_BROWSING');
   const greeting = ctx.config.greeting || 'Olá! 👋 Bem-vindo!';
   try {
@@ -513,13 +605,24 @@ async function handleCollectInfo(ctx: BotContext, rawText: string) {
     where: { id: ctx.conversation.id },
   });
 
+  // The coupon is asked again on each checkout (the cart may have changed), only when the restaurant has one
+  const context = withoutCoupon(contextOf(ctx));
+  if (await restaurantHasCoupon(ctx.restaurantId)) {
+    await updateContext(ctx, { ...context, couponStep: 'ASK' });
+    return safeSendText(ctx, COUPON_QUESTION);
+  }
+  await updateContext(ctx, context);
   return handleShowConfirmation(ctx);
 }
 
 async function handleShowConfirmation(ctx: BotContext) {
   const cart = parseCart(ctx.conversation.cart);
   const lines = cart.map((c) => `• ${c.quantity}x ${c.name} — ${fmtBRL(c.price * c.quantity)}`);
-  const total = cartTotal(cart);
+  const subtotalCents = cartSubtotalCents(cart);
+  const coupon = conversationCoupon(ctx);
+  const discountCents = coupon ? Math.min(coupon.discountCents, subtotalCents) : 0;
+  const couponLine = coupon ? `\nCupom ${coupon.code}: −${fmtBRL(discountCents / 100)}` : '';
+  const total = (subtotalCents - discountCents) / 100;
   const typeLabel =
     ctx.conversation.orderType === 'DELIVERY'
       ? `Delivery para: ${ctx.conversation.deliveryAddress || '—'}`
@@ -527,7 +630,7 @@ async function handleShowConfirmation(ctx: BotContext) {
       ? `Retirada no balcão`
       : `Consumir na Mesa ${ctx.conversation.tableNumber || '—'}`;
 
-  const summary = `📋 *Resumo do pedido*\n\nCliente: ${ctx.conversation.customerName || '—'}\n${typeLabel}\n\n${lines.join('\n')}\n\n*Total: ${fmtBRL(total)}*\n\nConfirmar?`;
+  const summary = `📋 *Resumo do pedido*\n\nCliente: ${ctx.conversation.customerName || '—'}\n${typeLabel}\n\n${lines.join('\n')}\n${couponLine}\n*Total: ${fmtBRL(total)}*\n\nConfirmar?`;
 
   try {
     await ctx.client.sendButtons({
@@ -594,32 +697,56 @@ async function handleConfirmOrder(ctx: BotContext) {
     tableId = table?.id || null;
   }
 
-  const session = await prisma.orderSession.create({
-    data: {
-      restaurantId: ctx.restaurantId,
-      userId: restaurant.ownerId,
-      tableId,
-      tableNumber: ctx.conversation.tableNumber || undefined,
-      customerName: ctx.conversation.customerName || ctx.conversation.profileName || undefined,
-      notes: `Pedido via WhatsApp (${ctx.conversation.phoneNumber})${
-        ctx.conversation.orderType === 'DELIVERY' && ctx.conversation.deliveryAddress
-          ? `\nEndereço: ${ctx.conversation.deliveryAddress}`
-          : ''
-      }`,
-      // Opened like any comanda, then sent below by the same send as the Vender screen
-      status: 'OPEN',
-      items: {
-        create: cart.map((c) => {
-          const mi = menuItems.find((m) => m.id === c.menuItemId)!;
-          return {
-            recipeId: mi.recipeId!,
-            quantity: c.quantity,
-            price: c.price,
-          };
-        }),
-      },
-    },
-  });
+  // The comanda always goes to the customer of this phone. The coupon is applied in the same transaction, so a coupon
+  // refused now (its limit ran out after the summary) leaves no comanda and no customer behind.
+  const phoneDigits = conversationPhoneDigits(ctx);
+  const coupon = conversationCoupon(ctx);
+  let created: { session: { id: string }; discountCents: number };
+  try {
+    created = await prisma.$transaction(async (tx) => {
+      const customer = phoneDigits
+        ? await upsertCustomerByPhone(tx, ctx.restaurantId, phoneDigits, ctx.conversation.customerName || ctx.conversation.profileName || 'Cliente WhatsApp')
+        : null;
+      const session = await tx.orderSession.create({
+        data: {
+          restaurantId: ctx.restaurantId,
+          userId: restaurant.ownerId,
+          customerId: customer?.id ?? null,
+          tableId,
+          tableNumber: ctx.conversation.tableNumber || undefined,
+          customerName: ctx.conversation.customerName || ctx.conversation.profileName || undefined,
+          notes: `Pedido via WhatsApp (${ctx.conversation.phoneNumber})${
+            ctx.conversation.orderType === 'DELIVERY' && ctx.conversation.deliveryAddress
+              ? `\nEndereço: ${ctx.conversation.deliveryAddress}`
+              : ''
+          }`,
+          // Opened like any comanda, then sent below by the same send as the Vender screen
+          status: 'OPEN',
+          items: {
+            create: cart.map((c) => {
+              const mi = menuItems.find((m) => m.id === c.menuItemId)!;
+              return {
+                recipeId: mi.recipeId!,
+                quantity: c.quantity,
+                price: c.price,
+              };
+            }),
+          },
+        },
+        select: { id: true },
+      });
+      if (!coupon) return { session, discountCents: 0 };
+      const applied = await applyCouponToSession(tx, { restaurantId: ctx.restaurantId, sessionId: session.id, code: coupon.code, phoneDigits });
+      if (!applied.ok) throw new CouponRefused(applied.error);
+      return { session, discountCents: applied.discountCents };
+    });
+  } catch (err) {
+    if (!(err instanceof CouponRefused)) throw err;
+    await updateContext(ctx, withoutCoupon(contextOf(ctx)));
+    await safeSendText(ctx, `😓 ${err.reason} Seu pedido segue sem o cupom.`);
+    return handleShowConfirmation(ctx);
+  }
+  const { session, discountCents } = created;
 
   // The kitchen order (KDS card and ticket) and each line marked sent: saving the comanda as
   // SENT_TO_KITCHEN alone never put the order on the kitchen screen (2026-10-08). If the send fails the
@@ -638,6 +765,7 @@ async function handleConfirmOrder(ctx: BotContext) {
     data: {
       orderSessionId: session.id,
       state: 'COMPLETED',
+      context: withoutCoupon(contextOf(ctx)),
       cart: [],
       cartTotal: 0,
       closedAt: new Date(),
@@ -648,7 +776,7 @@ async function handleConfirmOrder(ctx: BotContext) {
     data: { totalOrders: { increment: 1 } },
   });
 
-  const total = cartTotal(cart);
+  const total = (cartSubtotalCents(cart) - discountCents) / 100;
   await safeSendText(
     ctx,
     `✅ *Pedido confirmado!*\n\nNº: ${session.id.slice(-6).toUpperCase()}\nTotal: ${fmtBRL(total)}\n\n${inKitchen ? 'Seu pedido foi enviado para a cozinha.' : 'Seu pedido foi recebido pelo restaurante.'} Obrigado! 🙌\n\nDigite *menu* para fazer um novo pedido.`,
