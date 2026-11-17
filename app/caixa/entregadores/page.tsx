@@ -79,6 +79,7 @@ export default function EntregadoresPage() {
         <h1 className="text-2xl font-bold">Entregadores</h1>
         <div className="flex items-center gap-3">
           <Link href="/caixa" className="underline text-sm">Voltar ao caixa</Link>
+          {canEdit && <Link href="/caixa/entregadores/relatorio" className="underline text-sm">Relatório</Link>}
           {canEdit && !form && <Button onClick={() => setForm({ ...EMPTY })}>Novo entregador</Button>}
         </div>
       </div>

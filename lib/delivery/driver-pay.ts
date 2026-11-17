@@ -54,14 +54,14 @@ export function parsePayKey(key: unknown): { driverId: string } | { driverName: 
 type Who = { driverId: string } | { driverName: string } | null;
 
 /** Orders that went out ("Saiu para entrega" or delivered: dispatchedAt), with a driver, not cancelled, not paid to the driver yet */
-function orderWhere(restaurantId: string, who: Who, ids?: string[]): Prisma.ExternalOrderWhereInput {
+export function orderWhere(restaurantId: string, who: Who, ids?: string[], includePaid = false): Prisma.ExternalOrderWhereInput {
   const driver: Prisma.ExternalOrderWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
     : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: who.driverName };
   return {
     restaurantId,
     ...(ids ? { id: { in: ids } } : {}),
-    driverPaymentId: null,
+    ...(includePaid ? {} : { driverPaymentId: null }),
     status: { notIn: ['CANCELLED', 'REJECTED'] },
     // Only deliveries that went out with a dispatch time: orders from before this feature are not paid here
     dispatchedAt: { not: null },
@@ -70,14 +70,14 @@ function orderWhere(restaurantId: string, who: Who, ids?: string[]): Prisma.Exte
 }
 
 /** WhatsApp delivery comandas that went out ("Saiu para entrega"), not cancelled, not paid to the driver yet */
-function comandaWhere(restaurantId: string, who: Who, ids?: string[]): Prisma.OrderSessionWhereInput {
+export function comandaWhere(restaurantId: string, who: Who, ids?: string[], includePaid = false): Prisma.OrderSessionWhereInput {
   const driver: Prisma.OrderSessionWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
     : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: who.driverName };
   return {
     restaurantId,
     ...(ids ? { id: { in: ids } } : {}),
-    driverPaymentId: null,
+    ...(includePaid ? {} : { driverPaymentId: null }),
     dispatchedAt: { not: null },
     status: { not: 'CANCELLED' },
     ...driver,

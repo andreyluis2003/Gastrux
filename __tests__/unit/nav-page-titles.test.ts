@@ -16,6 +16,7 @@ const TITLE: Record<string, [string, string?]> = {
   '/caixa': ['app/caixa/page.tsx'],
   '/caixa/historico': ['app/caixa/historico/page.tsx'],
   '/caixa/entregadores': ['app/caixa/entregadores/page.tsx'],
+  '/caixa/entregadores/relatorio': ['app/caixa/entregadores/relatorio/page.tsx'],
   '/dashboard/pagamentos': ['app/dashboard/pagamentos/page.tsx'],
   '/contas-a-pagar': ['app/contas-a-pagar/page.tsx'],
   '/admin/cardapio': ['app/admin/cardapio/page.tsx'],
