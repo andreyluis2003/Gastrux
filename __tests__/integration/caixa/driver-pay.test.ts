@@ -13,7 +13,7 @@ import { GET as detail } from '../../../app/api/caixa/sessions/[id]/route';
 import { POST as close } from '../../../app/api/caixa/sessions/[id]/close/route';
 import { GET as pending, POST as settle } from '../../../app/api/caixa/sessions/[id]/acerto-entregador/route';
 import { ownIntegration } from '../../../lib/delivery-orders/integrations';
-import { workDayOf } from '../../../lib/delivery/driver-pay';
+import { workDayOf, payLimits } from '../../../lib/delivery/driver-pay';
 import { driverNameKey } from '../../../lib/delivery/driver-name';
 import { driverReport } from '../../../lib/delivery/driver-report';
 import { PUT as moveOrder } from '../../../app/api/admin/integrations/orders/[id]/route';
@@ -322,6 +322,55 @@ describe('pagar o entregador no acerto', () => {
       expect(bill.status).toBe('fulfilled');
       expect((await prisma.orderSession.findUnique({ where: { id: s.id } })).driverPaymentId).toBe(pay.value.body.payment.id);
     }
+  });
+
+  it('the list is complete per driver: a pool bigger than the cap still pays each driver (201)', async () => {
+    as(cashierId, A.restaurantId);
+    const before = payLimits.perDriver;
+    payLimits.perDriver = 2; // the restaurant already has many more unpaid deliveries than this from the tests above
+    try {
+      const x = await driver({});
+      const y = await driver({});
+      const t = Date.now();
+      // y went out before x: with a cap across drivers, y would be past the cut
+      await order({ driverId: y.id, driverName: y.name, dispatchedAt: new Date(t - 3600_000) });
+      const xOld = await order({ driverId: x.id, driverName: x.name, dispatchedAt: new Date(t - 60_000) });
+      const xMid = await order({ driverId: x.id, driverName: x.name, dispatchedAt: new Date(t - 30_000) });
+      const xNew = await order({ driverId: x.id, driverName: x.name, dispatchedAt: new Date(t - 10_000) });
+      expect(await quoteOf(y.id)).toMatchObject({ deliveryCount: 1 });
+      const body = await payOf(x.id, '56,00');
+      expect(body.expected).toEqual({ orders: [xMid.id, xNew.id].sort(), comandas: [] });
+      const res = await post({ pay: body });
+      expect(res.status).toBe(201);
+      expect((await prisma.externalOrder.findUnique({ where: { id: xOld.id } })).driverPaymentId).toBeNull();
+      // The older one comes next time
+      expect(await quoteOf(x.id)).toMatchObject({ deliveryCount: 1 });
+      expect((await post({ pay: await payOf(y.id, '48,00') })).status).toBe(201);
+    } finally {
+      payLimits.perDriver = before;
+    }
+  });
+
+  it('typed name is matched literally: "_" and "%" are not wildcards', async () => {
+    as(cashierId, A.restaurantId);
+    const joao = await order({ driverName: `João ${tag}` });
+    const joao2 = await order({ driverName: `Joao ${tag}` });
+    const jo = await order({ driverName: `Jo_o ${tag}` });
+    const other = await order({ driverName: `Qualquer ${tag}` });
+    const pct = await order({ driverName: '%' });
+    const key = `name:jo_o ${tag}`;
+    expect(await quoteOf(key)).toMatchObject({ deliveryCount: 1 });
+    const paid = await post({ pay: await payOf(key, '6,00') });
+    expect(paid.status).toBe(201);
+    expect((await prisma.externalOrder.findUnique({ where: { id: jo.id } })).driverPaymentId).toBe(paid.body.payment.id);
+    for (const o of [joao, joao2]) expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).driverPaymentId).toBeNull();
+
+    expect(await quoteOf('name:%')).toMatchObject({ deliveryCount: 1 });
+    const p2 = await post({ pay: await payOf('name:%', '6,00') });
+    expect(p2.status).toBe(201);
+    expect(p2.body.payment.quote.deliveryCount).toBe(1);
+    expect((await prisma.externalOrder.findUnique({ where: { id: pct.id } })).driverPaymentId).toBe(p2.body.payment.id);
+    for (const o of [joao, joao2, other]) expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).driverPaymentId).toBeNull();
   });
 
   it('closed shift is 409', async () => {

@@ -2,7 +2,7 @@ import { Prisma, type CashMethod, type DeliveryPaymentMethod } from '@prisma/cli
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { lockComanda } from '@/lib/comanda/add-item';
-import { deliveriesOf, deliveryIds, payList, quoteFor, PAY_LIMIT, type PayQuote } from '@/lib/delivery/driver-pay';
+import { deliveriesOf, deliveryIds, payList, quoteFor, payLimits, type PayQuote } from '@/lib/delivery/driver-pay';
 import { normalizeDriverName } from '@/lib/delivery/driver-name';
 import { CashRuleError, parseAmountCents, parseCountedCents } from './rules';
 import { isManager } from './roles';
@@ -119,7 +119,7 @@ const LIST_CHANGED = 'A lista de entregas mudou. Atualize a tela.';
 /** pay.expected = { orders: string[], comandas: string[] } from the GET; missing or malformed = the list changed (409) */
 function parseExpected(value: unknown): { orders: string[]; comandas: string[] } {
   const v = value && typeof value === 'object' ? (value as { orders?: unknown; comandas?: unknown }) : null;
-  const list = (x: unknown) => (Array.isArray(x) && x.length <= PAY_LIMIT && x.every((s) => typeof s === 'string') ? [...new Set(x as string[])].sort() : null);
+  const list = (x: unknown) => (Array.isArray(x) && x.length <= payLimits.perDriver && x.every((s) => typeof s === 'string') ? [...new Set(x as string[])].sort() : null);
   const orders = v ? list(v.orders) : null;
   const comandas = v ? list(v.comandas) : null;
   if (!orders || !comandas) throw new CashRuleError(LIST_CHANGED, 409);
@@ -166,7 +166,10 @@ export async function settleDriver(member: RestaurantMember, sessionId: string, 
       // Comanda locks (advisory, then the rows) come BEFORE the shift lock: paying a comanda's bill takes the comanda
       // lock, then the shift (FOR SHARE), and reopening a comanda takes the row, then the shift; the opposite order
       // here would deadlock with them.
-      const payComandaIds = expected?.comandas ?? [];
+      // Only comandas of this restaurant are locked (a foreign id in expected still fails the set check below)
+      const payComandaIds = expected?.comandas.length
+        ? (await tx.orderSession.findMany({ where: { id: { in: expected.comandas }, restaurantId }, select: { id: true } })).map((s) => s.id).sort()
+        : [];
       for (const id of payComandaIds) await lockComanda(tx, id);
       if (payComandaIds.length) {
         await tx.$queryRaw`SELECT "id" FROM "order_sessions" WHERE "id" = ANY(${payComandaIds}) AND "restaurantId" = ${restaurantId} ORDER BY "id" FOR UPDATE`;

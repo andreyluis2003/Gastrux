@@ -53,11 +53,14 @@ export function parsePayKey(key: unknown): { driverId: string } | { driverName: 
 
 type Who = { driverId: string } | { driverName: string } | null;
 
+/** Prisma's case-insensitive equals is an ILIKE on Postgres: escape its wildcards so a typed name matches literally */
+const literal = (name: string) => name.replace(/[\\%_]/g, (c) => `\\${c}`);
+
 /** Orders that went out ("Saiu para entrega" or delivered: dispatchedAt), with a driver, not cancelled, not paid to the driver yet */
 export function orderWhere(restaurantId: string, who: Who, ids?: string[], includePaid = false): Prisma.ExternalOrderWhereInput {
   const driver: Prisma.ExternalOrderWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
-    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: { equals: who.driverName, mode: 'insensitive' } };
+    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: { equals: literal(who.driverName), mode: 'insensitive' } };
   return {
     restaurantId,
     ...(ids ? { id: { in: ids } } : {}),
@@ -73,7 +76,7 @@ export function orderWhere(restaurantId: string, who: Who, ids?: string[], inclu
 export function comandaWhere(restaurantId: string, who: Who, ids?: string[], includePaid = false): Prisma.OrderSessionWhereInput {
   const driver: Prisma.OrderSessionWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
-    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: { equals: who.driverName, mode: 'insensitive' } };
+    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: { equals: literal(who.driverName), mode: 'insensitive' } };
   return {
     restaurantId,
     ...(ids ? { id: { in: ids } } : {}),
@@ -84,25 +87,32 @@ export function comandaWhere(restaurantId: string, who: Who, ids?: string[], inc
   };
 }
 
-/** Most deliveries of each kind in one list (newest first, so a recent delivery is never dropped) */
-export const PAY_LIMIT = 2000;
+/**
+ * Most deliveries of each kind for ONE driver (newest first, so a recent delivery is never dropped). The GET (all
+ * drivers) applies it per driver after grouping, so its list of a driver is exactly what the POST reads again.
+ * An object so a test can lower it.
+ */
+export const payLimits = { perDriver: 2000 };
 /** Only deliveries that went out in the last 45 days are paid at the acerto; older unpaid ones stay in the report */
 export const PAY_WINDOW_DAYS = 45;
 
 async function loadDeliveries(db: Db, restaurantId: string, who: Who, ids?: { orders: string[]; comandas: string[] }) {
   const recent = { gte: new Date(Date.now() - PAY_WINDOW_DAYS * 86400_000) };
+  // One driver: his newest perDriver of each kind. All drivers: no cap here (the 45-day window bounds it), the
+  // per-driver cap is applied in group()
+  const take = who ? payLimits.perDriver : undefined;
   const [orders, comandas] = await Promise.all([
     db.externalOrder.findMany({
       where: { ...orderWhere(restaurantId, who, ids?.orders), dispatchedAt: recent },
       select: { id: true, externalOrderId: true, customerName: true, driverId: true, driverName: true, dispatchedAt: true, deliveryFee: true },
       orderBy: [{ dispatchedAt: 'desc' }, { id: 'asc' }],
-      take: PAY_LIMIT,
+      take,
     }),
     db.orderSession.findMany({
       where: { ...comandaWhere(restaurantId, who, ids?.comandas), dispatchedAt: recent },
       select: { id: true, customerName: true, driverId: true, driverName: true, dispatchedAt: true },
       orderBy: [{ dispatchedAt: 'desc' }, { id: 'asc' }],
-      take: PAY_LIMIT,
+      take,
     }),
   ]);
   const rows: Array<{ driverId: string | null; driverName: string | null; delivery: UnpaidDelivery }> = [
@@ -121,9 +131,15 @@ async function loadDeliveries(db: Db, restaurantId: string, who: Who, ids?: { or
 
 function group(rows: Awaited<ReturnType<typeof loadDeliveries>>, names: Map<string, string>): DriverDeliveries[] {
   const out = new Map<string, DriverDeliveries>();
+  const counts = new Map<string, number>();
+  // rows come newest first within each kind (as the POST reads them): keep the driver's first perDriver of each kind
   for (const r of rows) {
     const key = r.driverId ?? driverNameKey(r.driverName);
     if (!key) continue;
+    const kindKey = `${r.delivery.kind}|${key}`;
+    const n = counts.get(kindKey) ?? 0;
+    if (n >= payLimits.perDriver) continue;
+    counts.set(kindKey, n + 1);
     let g = out.get(key);
     if (!g) {
       g = { key, driverId: r.driverId, driverName: (r.driverId && names.get(r.driverId)) || r.driverName, deliveries: [] };
