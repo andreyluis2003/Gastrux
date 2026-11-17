@@ -15,6 +15,7 @@ import { isProductRecipe } from '@/lib/cardapio/is-product-recipe';
 import { ImportFromLink } from '@/components/cardapio/import-from-link';
 import { BulkBar } from '@/components/cardapio/bulk-bar';
 import { DayPicker } from '@/components/cardapio/day-picker';
+import { EmojiChoices } from '@/components/cardapio/emoji-choices';
 import { daysLabel } from '@/lib/cardapio/days';
 import { Plus, Trash2, Edit2, ChefHat, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -396,7 +397,7 @@ export default function AdminCardapioPage() {
                 placeholder="🍔"
                 value={newCategory.emoji}
                 onChange={(e) => setNewCategory({ ...newCategory, emoji: e.target.value })}
-                maxLength={2}
+                maxLength={8}
               />
             </div>
             <div className="sm:col-span-2">
@@ -408,6 +409,7 @@ export default function AdminCardapioPage() {
               />
             </div>
           </div>
+          <EmojiChoices value={newCategory.emoji} onChange={(emoji) => setNewCategory({ ...newCategory, emoji })} />
           <div>
             <Label>Descrição</Label>
             <Input
@@ -473,6 +475,9 @@ export default function AdminCardapioPage() {
                       />
                       <Button size="sm" disabled={categoryBusy} onClick={handleRenameCategory}>Salvar</Button>
                       <Button size="sm" variant="ghost" disabled={categoryBusy} onClick={() => setRenaming(null)}>Cancelar</Button>
+                      <span className="basis-full text-base font-normal">
+                        <EmojiChoices value={renaming.emoji} onChange={(emoji) => setRenaming({ ...renaming, emoji })} />
+                      </span>
                     </span>
                   ) : (
                     <>

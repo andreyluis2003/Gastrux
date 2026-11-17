@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '820b67ddb0285a56690bd42e93bcd419cce60e37de551383ea475058773f2a1b', // esgotar-e-editar-o-cardapio (before the emoji choices, 2026-11-17)
   '9a65824cae477c6c39420294b2cdebfb87f727e00906c1ce8d12c6c1b1e4cdc1', // acerto-entregador (before the driver registry and the payment, 2026-11-17)
   'dbe6cc4b179596a4d724985b218aa801f597cf63d110f3ed63e33c9422a829ea', // cupons-de-desconto (before the coupon on the Conta, the counter sale and WhatsApp, 2026-11-16)
   '58d227980b1034d97de603c73fde7f518cd0159c381739573b64bb05de404158', // site-de-delivery (before the delivery fee setting, 2026-11-14)
@@ -964,7 +965,7 @@ Para um prato que só sai em alguns dias (a feijoada de sábado, por exemplo), e
 
 ## Renomear ou apagar uma categoria
 
-Toque no lápis ao lado do nome da categoria, troque o nome (e o emoji, se quiser) e toque em **Salvar**. Os produtos continuam nela, e o novo nome aparece no QR Code, no site de delivery e no cardápio da semana.
+Toque no lápis ao lado do nome da categoria, troque o nome (e o emoji, se quiser: toque num dos emojis de comida e bebida que aparecem embaixo, ou cole outro no campo) e toque em **Salvar**. A mesma lista de emojis aparece em **Nova Categoria**. Os produtos continuam nela, e o novo nome aparece no QR Code, no site de delivery e no cardápio da semana.
 
 A lixeira aparece só na categoria vazia. Para apagar uma categoria com produtos, mova os produtos para outra categoria antes (pela barra, em **Mover**).`,
   },
