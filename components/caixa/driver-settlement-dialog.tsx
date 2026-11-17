@@ -10,6 +10,9 @@ import type { DriverGroup } from '@/lib/caixa/driver-settlement';
 
 const METHOD: Record<string, string> = { CASH: 'Dinheiro', CREDIT_ON_DELIVERY: 'Crédito', DEBIT_ON_DELIVERY: 'Débito', VOUCHER_ON_DELIVERY: 'Vale' };
 const newKey = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `k${Date.now()}${Math.random().toString(36).slice(2)}`);
+type PayEntry = { key: string; driverId: string | null; driverName: string | null; quote: { deliveryCount: number; suggestedCents: number | null; feeCapCents: number; text: string } };
+type Card = { id: string; name: string | null; door: DriverGroup | null; pay: PayEntry | null };
+const sameName = (a: string | null, b: string | null) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 const toInput = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
 
 /**
@@ -17,7 +20,7 @@ const toInput = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
  * brought, optionally pay him. The money goes to this open shift.
  */
 export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }: { sessionId: string; isManager: boolean; onClose: () => void; onDone: () => void }) {
-  const [drivers, setDrivers] = useState<DriverGroup[] | null>(null);
+  const [cards, setCards] = useState<Card[] | null>(null);
   const [pick, setPick] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [received, setReceived] = useState('');
@@ -31,28 +34,40 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(body.error || 'Não foi possível carregar os pedidos');
-        setDrivers(body.drivers);
+        const doors: DriverGroup[] = body.drivers ?? [];
+        const pays: PayEntry[] = body.pay ?? [];
+        const used = new Set<PayEntry>();
+        const list: Card[] = doors.map((door, i) => {
+          const pe = pays.find((x) => !used.has(x) && sameName(x.driverName, door.driverName)) ?? null;
+          if (pe) used.add(pe);
+          return { id: `d${i}`, name: door.driverName, door, pay: pe };
+        });
+        pays.filter((x) => !used.has(x)).forEach((pe) => list.push({ id: `p${pe.key}`, name: pe.driverName, door: null, pay: pe }));
+        list.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+        setCards(list);
       })
-      .catch((e) => { toast.error(e.message); setDrivers([]); });
+      .catch((e) => { toast.error(e.message); setCards([]); });
   }, [sessionId]);
 
   const choose = (i: number) => {
-    const g = drivers![i];
+    const c = cards![i];
     setPick(i);
-    setSelected(new Set(g.orders.map((o) => o.id)));
-    setReceived(toInput(g.cashCents));
-    setPay('');
+    setSelected(new Set(c.door ? c.door.orders.map((o) => o.id) : []));
+    setReceived(c.door ? toInput(c.door.cashCents) : '');
+    const sug = c.pay?.quote.suggestedCents;
+    setPay(sug ? toInput(sug) : '');
     setReason('');
     setKey(newKey());
   };
 
-  const group = pick === null || !drivers ? null : drivers[pick];
+  const card = pick === null || !cards ? null : cards[pick];
+  const group = card?.door ?? null;
+  const payEntry = card?.pay ?? null;
   const chosen = group ? group.orders.filter((o) => selected.has(o.id)) : [];
   const sum = (m: string) => chosen.filter((o) => o.paymentMethod === m).reduce((s, o) => s + o.totalCents, 0);
   const cashCents = sum('CASH');
   const cardCents = sum('CREDIT_ON_DELIVERY') + sum('DEBIT_ON_DELIVERY');
   const otherCents = sum('VOUCHER_ON_DELIVERY');
-  const feeCents = chosen.reduce((s, o) => s + o.deliveryFeeCents, 0);
   const receivedCents = received.trim() === '' ? 0 : reaisToCents(received, { allowZero: true });
   const difference = receivedCents === null ? 0 : receivedCents - cashCents;
 
@@ -62,23 +77,29 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
     setSelected(next);
   };
 
+  const payCents = pay.trim() === '' ? 0 : reaisToCents(pay, { allowZero: true });
+  const doorPart = !!group && chosen.length > 0;
+  const payPart = !!payEntry && pay.trim() !== '' && payCents !== null && payCents > 0;
+
   const submit = async () => {
-    if (!group || !chosen.length) return toast.error('Escolha os pedidos do acerto');
-    if (receivedCents === null) return toast.error('Informe o dinheiro recebido');
-    if (difference !== 0 && reason.trim().length < 3) return toast.error('O dinheiro não bate: informe o motivo da diferença');
+    if (!card) return;
+    if (payEntry && pay.trim() !== '' && payCents === null) return toast.error('Valor do pagamento inválido');
+    if (!doorPart && !payPart) return toast.error('Escolha os pedidos do acerto ou informe o pagamento');
+    if (doorPart && receivedCents === null) return toast.error('Informe o dinheiro recebido');
+    if (doorPart && difference !== 0 && reason.trim().length < 3) return toast.error('O dinheiro não bate: informe o motivo da diferença');
     setSaving(true);
     try {
       const res = await fetch(`/api/caixa/sessions/${sessionId}/acerto-entregador`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
         body: JSON.stringify({
-          driverName: group.driverName, orderIds: chosen.map((o) => o.id), receivedCash: (receivedCents / 100).toFixed(2),
-          driverPay: pay.trim() ? ((reaisToCents(pay) ?? 0) / 100).toFixed(2) : undefined, reason: reason.trim() || undefined,
+          ...(doorPart ? { driverName: group!.driverName, orderIds: chosen.map((o) => o.id), receivedCash: ((receivedCents ?? 0) / 100).toFixed(2), reason: reason.trim() || undefined } : {}),
+          ...(payPart ? { pay: { key: payEntry!.key, amount: ((payCents ?? 0) / 100).toFixed(2) } } : {}),
         }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) { toast.error(body.error || 'Não foi possível fazer o acerto'); setKey(newKey()); return; }
-      toast.success(`Acerto de ${group.driverName ?? 'entregador sem nome'} lançado no caixa`);
+      toast.success(`Acerto de ${card.name ?? 'entregador sem nome'} lançado no caixa`);
       onDone();
       onClose();
     } finally {
@@ -94,21 +115,23 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
           <p className="text-sm text-gray-600">Pedidos de delivery pagos na entrega que já saíram. O dinheiro e o cartão entram neste caixa.</p>
         </div>
 
-        {drivers === null && <p className="text-sm text-gray-500">Carregando…</p>}
-        {drivers && drivers.length === 0 && <p className="text-sm text-gray-600">Nenhum pedido pago na entrega esperando acerto.</p>}
+        {cards === null && <p className="text-sm text-gray-500">Carregando…</p>}
+        {cards && cards.length === 0 && <p className="text-sm text-gray-600">Nenhum entregador com acerto pendente.</p>}
 
-        {drivers && drivers.length > 0 && (
+        {cards && cards.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {drivers.map((d, i) => (
-              <Button key={d.driverName ?? '-'} size="sm" variant={pick === i ? 'default' : 'outline'} onClick={() => choose(i)}>
-                {d.driverName ?? 'Sem nome'} · {d.orders.length}
+            {cards.map((d, i) => (
+              <Button key={d.id} size="sm" variant={pick === i ? 'default' : 'outline'} onClick={() => choose(i)}>
+                {d.name ?? 'Sem nome'} · {d.door ? d.door.orders.length : d.pay?.quote.deliveryCount ?? 0}
               </Button>
             ))}
           </div>
         )}
 
-        {group && (
+        {card && (
           <>
+            {group && (<>
+            <p className="text-sm font-semibold">Dinheiro dos pedidos</p>
             <ul className="divide-y border rounded-md">
               {group.orders.map((o) => (
                 <li key={o.id} className="flex items-center gap-3 p-2 text-sm">
@@ -144,19 +167,24 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
                 <Input id="acerto-reason" maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: cliente pagou a menos, troco errado" />
               </div>
             )}
-            <div>
-              <label htmlFor="acerto-pay" className="text-sm font-medium">Pagar ao entregador agora (opcional)</label>
-              <Input id="acerto-pay" inputMode="decimal" value={pay} onChange={(e) => setPay(e.target.value)} placeholder={feeCents ? `Taxas de entrega: ${toInput(feeCents)}` : '0,00'} />
-              <p className="text-xs text-gray-500 mt-1">
-                Sai da gaveta como despesa "Entregador".{!isManager && feeCents > 0 ? ` Acima de ${brl(feeCents)} (as taxas de entrega), só um gerente.` : ''}
-              </p>
-            </div>
+            </>)}
+            {payEntry && (
+              <div className="space-y-1 border-t pt-3">
+                <p className="text-sm font-semibold">Pagamento</p>
+                {payEntry.quote.text && <p className="text-sm text-gray-700">{payEntry.quote.text}</p>}
+                <label htmlFor="acerto-pay" className="text-sm font-medium">Valor a pagar ao entregador</label>
+                <Input id="acerto-pay" inputMode="decimal" value={pay} onChange={(e) => setPay(e.target.value)} placeholder={payEntry.quote.suggestedCents === null && payEntry.quote.feeCapCents > 0 ? `até ${brl(payEntry.quote.feeCapCents)} (taxas de entrega)` : '0,00'} />
+                <p className="text-xs text-gray-500">
+                  Sai da gaveta como despesa "Entregador". Pode deixar o caixa negativo.{!isManager ? ' Acima do calculado (ou das taxas de entrega, se o nome foi digitado), só um gerente.' : ''}
+                </p>
+              </div>
+            )}
           </>
         )}
 
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={onClose}>Voltar</Button>
-          {group && <Button disabled={saving || !chosen.length} onClick={submit}>Lançar acerto</Button>}
+          {card && <Button disabled={saving || (!doorPart && !payPart)} onClick={submit}>Confirmar acerto</Button>}
         </div>
       </Card>
     </div>
