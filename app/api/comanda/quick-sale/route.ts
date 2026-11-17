@@ -13,6 +13,7 @@ import { onBillClosed } from '@/lib/cashback/bill';
 import { normalizePhone } from '@/lib/cashback/rules';
 import { findCustomerByPhone, upsertCustomerByPhone } from '@/lib/cashback/service';
 import { applyCouponToSession } from '@/lib/coupons/session';
+import { takeCouponTry } from '@/lib/coupons/attempts';
 import { toNfcePaymentMethod } from '@/lib/caixa/payment-methods';
 import { alertLateEntry, alertSaleWithoutShift } from '@/lib/caixa/alerts';
 
@@ -30,7 +31,9 @@ const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
  * couponCode (spec 2026-11-16 cupom-whatsapp-balcao, parte 1b): the screen sends it only after a preview
  * (POST /api/comanda/coupon-preview). The discount never comes from the device: it is computed here, and a rule that
  * now refuses (the limit ran out, the sale waited offline) never fails the sale - the use is recorded out of rule
- * and the answer carries couponWarning. A code that does not exist is refused (422).
+ * and the answer carries couponWarning. A code that no longer exists (or free delivery, nothing to discount) never
+ * fails it either: the sale goes in without the discount and couponWarning says why. A live sale with a code counts as a
+ * coupon try (429 over the limit, nothing written); a sale replayed from the offline queue (queuedAt) never does.
  *         (legacy: paymentMethod instead of payments, paid in full in the default register shift)
  * The device chooses the comanda id (clientId), so a replay finds the sale it already made. Prices
  * come from the menu. The sale is paid and closed at once: its payments and change enter the cash
@@ -75,6 +78,10 @@ async function handlePOST(request: Request) {
   if (!read) return NextResponse.json({ error: 'Informe as formas de pagamento' }, { status: 400 });
   // A sale made offline and replayed by the device queue carries the time it was made. Older devices
   // send the legacy one-method body: for them the Idempotency-Key of their queue marks a replay (spec §6.1)
+  const couponCode = typeof body?.couponCode === 'string' && body.couponCode.trim() ? body.couponCode : null;
+  if (couponCode && !body?.queuedAt && !takeCouponTry('user:' + member.userId, member.restaurantId)) {
+    return NextResponse.json({ error: 'Muitas tentativas. Tente em um minuto.' }, { status: 429 });
+  }
   const replay = Boolean(body?.queuedAt) || (read.legacy && Boolean(request.headers.get('idempotency-key')));
   if (read.legacy) console.warn('[caixa] legacy one-method counter sale body', { restaurantId: member.restaurantId, clientId });
   let target: SaleTarget | null = null;
@@ -98,11 +105,15 @@ async function handlePOST(request: Request) {
         await addComandaItem(tx, member.restaurantId, clientId, item);
       }
       // The coupon goes on while the comanda is still open, with the server's discount (force: a rule never fails the sale)
-      if (typeof body?.couponCode === 'string' && body.couponCode.trim()) {
-        const applied = await applyCouponToSession(tx, { restaurantId: member.restaurantId, sessionId: clientId, code: body.couponCode, phoneDigits: phone ?? '', force: true });
-        if (!applied.ok) throw new CashRuleError(applied.error, applied.status);
-        couponDiscountCents = applied.discountCents;
-        couponWarning = applied.warning ?? null;
+      if (couponCode) {
+        const applied = await applyCouponToSession(tx, { restaurantId: member.restaurantId, sessionId: clientId, code: couponCode, phoneDigits: phone ?? '', force: true });
+        // Not applied (the code no longer exists, free delivery): the sale goes in at full price, never lost on a replay
+        if (applied.ok) {
+          couponDiscountCents = applied.discountCents;
+          couponWarning = applied.warning ?? null;
+        } else {
+          couponWarning = applied.error;
+        }
       }
       // The counter sale never uses cashback (it earns only), so the coupon is the only discount
       const total = Math.max(0, (await comandaTotalCents(tx, clientId)) - couponDiscountCents);

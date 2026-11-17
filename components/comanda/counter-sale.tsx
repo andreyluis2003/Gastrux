@@ -58,7 +58,7 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
   // Coupon (spec 2026-11-16 cupom-whatsapp-balcao, parte 1b): checked on the server (nothing written), needs internet;
   // the sale sends only the code and the server computes the discount again
   const [couponInput, setCouponInput] = useState('');
-  const [coupon, setCoupon] = useState<{ code: string; discountCents: number } | null>(null);
+  const [coupon, setCoupon] = useState<{ code: string; discountCents: number; /** the items + phone it was computed for */ key: string } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [checkingCoupon, setCheckingCoupon] = useState(false);
   // Payments of the sale and this device's cash shift (spec docs/superpowers/specs/2026-10-04-caixa-turnos-design.md §8.3)
@@ -91,7 +91,12 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
     ...lines.map((l) => ({ menuItemId: l.entry.id, quantity: l.quantity })),
     ...weighed.map((w) => ({ menuItemId: w.entry.id, weightGrams: w.grams })),
   ];
+  // The items and phone a discount was computed for: a coupon whose key is not the current one is stale (fix round 1:
+  // a stale discount made the server's total differ from the payments, and a queued sale failed on replay)
+  const couponKey = JSON.stringify([saleItems(), phone.trim()]);
+  const couponStale = !!coupon && coupon.key !== couponKey;
   const checkCoupon = async (code: string, quiet = false) => {
+    const key = couponKey;
     setCheckingCoupon(true);
     try {
       const res = await fetch('/api/comanda/coupon-preview', {
@@ -105,24 +110,34 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         setCouponError(data.error || 'Não foi possível conferir o cupom');
         return;
       }
-      setCoupon({ code: data.code, discountCents: data.discountCents });
+      setCoupon({ code: data.code, discountCents: data.discountCents, key });
       setCouponError('');
       if (!quiet) setCouponInput('');
     } catch {
-      // The connection dropped: an applied coupon stays (the server computes it again on the sale)
-      if (!quiet) setCouponError('Cupom precisa de internet');
+      // The connection dropped: a coupon that could not be checked again for this cart leaves the sale
+      if (quiet) setCoupon(null);
+      setCouponError('Cupom precisa de internet');
     } finally {
       setCheckingCoupon(false);
     }
   };
-  // The items or the phone changed: the discount (a percent, the minimum, the per-phone rules) is checked again
-  const couponKey = JSON.stringify([saleItems(), phone.trim()]);
+  // The items or the phone changed: the discount (a percent, the minimum, the per-phone rules) is checked again online;
+  // offline it cannot be, so the coupon leaves the sale (never sent with a discount computed for another cart)
   useEffect(() => {
-    if (!coupon || !online) return;
-    const t = setTimeout(() => (itemCount === 0 ? setCoupon(null) : checkCoupon(coupon.code, true)), 400);
+    if (!coupon || !couponStale) return;
+    if (!online) {
+      setCoupon(null);
+      setCouponError('Cupom precisa de internet');
+      return;
+    }
+    if (itemCount === 0) {
+      setCoupon(null);
+      return;
+    }
+    const t = setTimeout(() => checkCoupon(coupon.code, true), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [couponKey]);
+  }, [couponKey, online, coupon?.key]);
   const hint = finishHint(Math.round(total * 100), payments);
   const visible = menu.filter((m) => m.available !== false && m.name?.toLowerCase().includes(search.toLowerCase()));
   const change = (id: string, delta: number) =>
@@ -134,7 +149,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
 
   const finish = async () => {
     // The discount is being checked again (items or phone changed): wait for it, the total may still change
-    if (checkingCoupon) return;
+    if (checkingCoupon || couponStale) {
+      toast.info('Conferindo o cupom...');
+      return;
+    }
     if (itemCount === 0) {
       toast.error('Adicione itens à venda');
       return;
@@ -195,7 +213,10 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
         // Last, so it sits on top of the stack of notices
         if (data.changeWarning) toast.warning(data.changeWarning, { duration: 20000 });
         // The coupon no longer met a rule when the sale arrived: it went in with the discount, marked out of rule
-        if (data.couponWarning) toast.warning(`Cupom aceito fora da regra: ${data.couponWarning}`, { duration: 20000 });
+        // (or it was not applied at all: the code no longer exists, the sale went in at full price)
+        if (data.couponWarning) {
+          toast.warning(`${data.couponDiscountCents > 0 ? 'Cupom aceito fora da regra' : 'Cupom não aplicado'}: ${data.couponWarning}`, { duration: 20000 });
+        }
       }
       setCart({});
       setWeighed([]);
@@ -370,13 +391,13 @@ export function CounterSale({ onDone }: { onDone?: () => void }) {
       )}
       {coupon && (
         <div className="flex items-center justify-between gap-2 text-sm mt-3 border rounded-md p-2 bg-green-50">
-          <span>Cupom {coupon.code} − {brl(coupon.discountCents)}</span>
+          <span>Cupom {coupon.code} − {brl(coupon.discountCents)}{couponStale && <span className="text-slate-500"> (conferindo...)</span>}</span>
           <Button size="sm" variant="ghost" className="text-red-600" disabled={saving} onClick={() => { setCoupon(null); setCouponError(''); }}>Tirar</Button>
         </div>
       )}
       <div className="flex items-center justify-between mt-4">
         <span className="text-2xl font-bold text-green-700">{brl(Math.round(total * 100))}</span>
-        <Button onClick={finish} disabled={saving || checkingCoupon || itemCount === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
+        <Button onClick={finish} disabled={saving || checkingCoupon || couponStale || itemCount === 0 || !shift.shiftId || !panelState(Math.round(total * 100), payments).valid} className="bg-green-600">
           {saving ? 'Registrando...' : <>Finalizar venda<KeyHint k="Ctrl+Enter" /></>}
         </Button>
       </div>
