@@ -7,7 +7,8 @@ import { notifyOrderStatus } from '@/lib/delivery-orders/callback';
 import { PLATFORM_WORDS, answerDispute, cancelPlatformOrder, platformOf, pushPlatformStatus, type PlatformChange } from '@/lib/delivery-orders/platform-sync';
 import { DELIVERY_ROLES } from '@/lib/delivery-orders/roles';
 import { canMoveExternalOrderStatus } from '@/lib/delivery-integration/external-order-status';
-import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
+import { resolveDispatchDriver } from '@/lib/delivery/drivers';
+import { CashRuleError } from '@/lib/caixa/rules';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,13 +64,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 /**
- * PUT /api/admin/integrations/orders/[id] { status } - moves an accepted order forward (ready, out for delivery,
+ * PUT /api/admin/integrations/orders/[id] { status, driverId?, driverName? } - moves an accepted order forward (ready, out for delivery,
  * delivered). Leaving "Novo" goes through accept or reject: a status change alone skipped the kitchen order.
  */
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireRestaurantRole([...DELIVERY_ROLES], DENIED);
   if (!auth.ok) return auth.response;
-  const { status, driverName } = await request.json().catch(() => ({}));
+  const { status, driverId, driverName } = await request.json().catch(() => ({}));
   if (!status || !Object.values(ExternalOrderStatus).includes(status)) return NextResponse.json({ error: 'Status inválido' }, { status: 400 });
   const order = await prisma.externalOrder.findFirst({ where: { id: params.id, restaurantId: auth.member.restaurantId } });
   if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
@@ -86,8 +87,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const kitchen = await prisma.order.findUnique({ where: { id: order.internalOrderId }, select: { status: true } });
     if (kitchen && kitchen.status !== 'CANCELLED') return NextResponse.json({ error: 'Este pedido já está na cozinha: cancele pela tela da cozinha (exige um gerente)' }, { status: 409 });
   }
-  // "Saiu para entrega" takes who took it, for the driver settlement in the Caixa (spec 2026-10-26)
-  const driver = status === 'PICKED_UP' && driverName !== undefined ? { driverName: normalizeDriverName(driverName) } : {};
+  // "Saiu para entrega" takes who took it, for the driver settlement in the Caixa (spec 2026-10-26): a registered driver
+  // (driverId, its name copied) or a typed name (driverId null); and when it went out, for the driver's pay (spec 2026-11-17)
+  let driver: { driverId?: string | null; driverName?: string | null; dispatchedAt?: Date } = {};
+  if (status === 'PICKED_UP') {
+    if (driverId !== undefined || driverName !== undefined) {
+      try {
+        driver = await resolveDispatchDriver(auth.member.restaurantId, { driverId, driverName });
+      } catch (e) {
+        if (e instanceof CashRuleError) return NextResponse.json({ error: e.message }, { status: e.status });
+        throw e;
+      }
+    }
+    if (!order.dispatchedAt) driver.dispatchedAt = new Date();
+  }
   const moved = await prisma.externalOrder.updateMany({ where: { id: order.id, status: order.status }, data: { status, ...driver } });
   if (moved.count === 0) return NextResponse.json({ error: 'O pedido mudou enquanto era atualizado. Atualize a tela.' }, { status: 409 });
   await prisma.deliveryLog.create({

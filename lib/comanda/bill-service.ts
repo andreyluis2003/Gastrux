@@ -48,6 +48,13 @@ export interface Bill {
   couponCode: string | null;
   /** The customer identified by phone; balanceCents is the cashback left to use */
   customer: { id: string; name: string; phone: string | null; balanceCents: number } | null;
+  /** A WhatsApp delivery comanda (spec 2026-11-17 entregadores): it can go "Saiu para entrega" */
+  isDelivery: boolean;
+  /** Who took it out: a registered driver (id) or a typed name (id null); null = not out yet */
+  driver: { id: string | null; name: string } | null;
+  dispatchedAt: string | null;
+  /** The driver was already paid for this delivery: the driver can no longer change */
+  driverPaid: boolean;
 }
 
 /** The description of a partial refund, also how a payment is known to be refunded already */
@@ -62,6 +69,8 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
       serviceChargeCents: true, serviceChargeWaived: true, serviceChargeEligible: true, preBillPrintedAt: true,
       table: { select: { number: true } },
       restaurant: { select: { serviceChargePercent: true } },
+      driverId: true, driverName: true, dispatchedAt: true, driverPaymentId: true,
+      whatsappConversation: { select: { orderType: true } },
       items: {
         select: { id: true, quantity: true, weightGrams: true, price: true, recipe: { select: { name: true } }, modifiers: { select: { priceAdjustment: true } } },
         orderBy: { addedAt: 'asc' },
@@ -155,6 +164,10 @@ export async function loadBill(db: Db, restaurantId: string, sessionId: string):
     customer: s.customer
       ? { ...s.customer, balanceCents: await balanceCents(db, restaurantId, s.customer.id) }
       : null,
+    isDelivery: s.whatsappConversation?.orderType === 'DELIVERY',
+    driver: s.driverName ? { id: s.driverId, name: s.driverName } : null,
+    dispatchedAt: s.dispatchedAt?.toISOString() ?? null,
+    driverPaid: s.driverPaymentId !== null,
   };
 }
 

@@ -1932,6 +1932,8 @@ model OrderSession {
   /// Delivery comanda: the registered driver who took it out, when, and the payment to the driver (spec 2026-11-17)
   driverId               String?
   driver                 Driver?               @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  /// The driver's name: the registered one's, or typed under "Outro" (driverId null)
+  driverName             String?
   dispatchedAt           DateTime?
   driverPaymentId        String?
   driverPayment          DriverPayment?        @relation(fields: [driverPaymentId], references: [id], onDelete: SetNull)

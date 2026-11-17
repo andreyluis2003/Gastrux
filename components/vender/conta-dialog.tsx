@@ -222,6 +222,7 @@ export function ContaDialog({ sessionId, onClosed, onCancel }: { sessionId: stri
   return (
     <Shell onCancel={onCancel}>
       <h2 className="text-xl font-bold">{bill.label} · Conta</h2>
+      {bill.isDelivery && bill.status !== 'CANCELLED' && <DriverBox bill={bill} onBill={setBill} />}
 
       <ul className="text-sm space-y-1 max-h-48 overflow-y-auto">
         {bill.items.map((i) => (
@@ -423,6 +424,90 @@ function CustomerBox({ bill, onBill, useCashback }: { bill: Bill; onBill: (b: Bi
         <Button variant="outline" disabled={saving || phone.replace(/[^0-9]/g, '').length < 10 || (needName && !name.trim())} onClick={attach}>OK</Button>
       </div>
       {needName && <Input autoFocus placeholder="Cliente novo: nome" value={name} onChange={(e) => setName(e.target.value)} />}
+    </div>
+  );
+}
+
+const OTHER_DRIVER = '__other__';
+
+/**
+ * "Saiu para entrega" of a WhatsApp delivery comanda (spec 2026-11-17 entregadores): a registered driver or "Outro
+ * (digitar nome)". Once out it shows who took it, with "Trocar" until the driver is paid for this delivery.
+ */
+function DriverBox({ bill, onBill }: { bill: Bill; onBill: (b: Bill) => void }) {
+  const [open, setOpen] = useState(false);
+  const [drivers, setDrivers] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [pick, setPick] = useState('');
+  const [typed, setTyped] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function start() {
+    setOpen(true);
+    setPick(bill.driver?.id ?? (bill.driver ? OTHER_DRIVER : ''));
+    setTyped(bill.driver && !bill.driver.id ? bill.driver.name : '');
+    fetch('/api/delivery/drivers', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { drivers: [] }))
+      .then((b) => setDrivers((b.drivers ?? []).map((d: { id: string; name: string }) => ({ id: d.id, name: d.name }))))
+      .catch(() => setDrivers([]));
+  }
+
+  const typing = drivers !== null && (drivers.length === 0 || pick === OTHER_DRIVER);
+  const registered = drivers?.some((d) => d.id === pick) ?? false;
+  const ready = registered || (typing && typed.trim() !== '');
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/comanda/sessions/${bill.sessionId}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registered ? { driverId: pick } : { driverName: typed }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(out.error || 'Não foi possível marcar a saída'); return; }
+      setOpen(false);
+      onBill(out);
+      toast.success(`Saiu para entrega com ${out.driver?.name ?? 'o entregador'}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    if (!bill.driver) {
+      return <Button variant="outline" className="w-full" onClick={start}>Saiu para entrega</Button>;
+    }
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-md border p-3 text-sm">
+        <span className="min-w-0 truncate">
+          Entregador: <strong>{bill.driver.name}</strong>
+          {bill.dispatchedAt ? ` · saiu ${new Date(bill.dispatchedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}
+        </span>
+        {bill.driverPaid
+          ? <span className="text-xs text-slate-500 shrink-0">já pago</span>
+          : <button className="text-xs underline shrink-0" onClick={start}>Trocar</button>}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border p-3 text-sm space-y-2">
+      <p className="font-medium">Quem vai levar?</p>
+      {drivers === null && <p className="text-slate-500">Carregando...</p>}
+      {drivers !== null && drivers.length > 0 && (
+        <div role="radiogroup" aria-label="Entregador" className="space-y-1 max-h-48 overflow-y-auto">
+          {[...drivers, { id: OTHER_DRIVER, name: 'Outro (digitar nome)' }].map((d) => (
+            <label key={d.id} className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer ${pick === d.id ? 'border-cyan-600 bg-cyan-50' : ''}`}>
+              <input type="radio" name="comanda-driver" checked={pick === d.id} onChange={() => setPick(d.id)} />
+              <span className="truncate">{d.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      {typing && <Input autoFocus maxLength={60} aria-label="Nome do entregador" placeholder="Nome do entregador" value={typed} onChange={(e) => setTyped(e.target.value)} />}
+      <div className="flex gap-2 justify-end">
+        <Button size="sm" variant="outline" onClick={() => setOpen(false)}>Voltar</Button>
+        <Button size="sm" disabled={saving || !ready} onClick={save}>{bill.driver ? 'Trocar entregador' : 'Saiu para entrega'}</Button>
+      </div>
     </div>
   );
 }

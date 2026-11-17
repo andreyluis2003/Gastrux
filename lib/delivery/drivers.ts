@@ -88,3 +88,22 @@ export async function updateDriver(restaurantId: string, id: string, input: Driv
   if (active && (name !== driver.name || !driver.active)) await assertNameFree(restaurantId, name, driver.id);
   return prisma.driver.update({ where: { id: driver.id }, data });
 }
+
+/**
+ * Who takes an order out ("Saiu para entrega", spec 2026-11-17): a registered active driver of the restaurant (its name
+ * is copied, so the settlement by name keeps working), or a typed name under "Outro" (driverId null). A driver of
+ * another restaurant, inactive or unknown is "not found" (422).
+ */
+export async function resolveDispatchDriver(
+  restaurantId: string,
+  input: { driverId?: unknown; driverName?: unknown },
+): Promise<{ driverId: string | null; driverName: string | null }> {
+  if (input.driverId !== undefined && input.driverId !== null && input.driverId !== '') {
+    const driver = typeof input.driverId === 'string'
+      ? await prisma.driver.findFirst({ where: { id: input.driverId, restaurantId, active: true }, select: { id: true, name: true } })
+      : null;
+    if (!driver) throw new CashRuleError('Entregador não encontrado', 422);
+    return { driverId: driver.id, driverName: driver.name };
+  }
+  return { driverId: null, driverName: normalizeDriverName(input.driverName) };
+}

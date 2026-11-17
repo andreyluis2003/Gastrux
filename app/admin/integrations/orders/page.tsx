@@ -25,6 +25,8 @@ interface ExternalOrder {
   externalOrderId: string;
   /** Who took it out (spec 2026-10-26 acerto com o entregador) */
   driverName?: string | null;
+  /** The registered driver, when one was picked (spec 2026-11-17 entregadores) */
+  driverId?: string | null;
   status: OrderStatus;
   totalAmount: number;
   subtotal?: number;
@@ -98,6 +100,9 @@ const PLATFORM_CONFIG: Record<string, { label: string; color: string; logo: stri
 
 // The board columns in strong colors, readable from across the kitchen (2026-11-03)
 const COLUMN_COLOR: Record<string, string> = { novos: 'bg-orange-600', preparo: 'bg-amber-500', prontos: 'bg-green-600', entrega: 'bg-cyan-600' };
+
+/** "Outro (digitar nome)" in the "Saiu para entrega" choice: a name typed without a registration */
+const OTHER_DRIVER = '__other__';
 
 const isIfood = (o: ExternalOrder) => o.integration.platform === 'ifood';
 const isNinetynine = (o: ExternalOrder) => o.integration.platform === 'ninety_nine_food';
@@ -245,8 +250,23 @@ export default function DeliveryOrdersPage() {
   const [reasonPick, setReasonPick] = useState<ReasonPick | null>(null);
   // 99Food refund request: the reason (from 99Food's list) picked to refuse it, per order
   const [refusal, setRefusal] = useState<Record<string, string>>({});
-  // "Saiu para entrega": who takes it, for the driver settlement in the Caixa (spec 2026-10-26)
-  const [dispatch, setDispatch] = useState<{ order: ExternalOrder; driver: string } | null>(null);
+  // "Saiu para entrega": who takes it, for the driver settlement in the Caixa (spec 2026-10-26). pick: a registered
+  // driver's id, OTHER (a typed name, as before the registry) or '' (no one chosen); spec 2026-11-17 entregadores
+  const [dispatch, setDispatch] = useState<{ order: ExternalOrder; pick: string; driver: string } | null>(null);
+  const [drivers, setDrivers] = useState<Array<{ id: string; name: string }>>([]);
+  // The active registered drivers, loaded with the page and again at each "Saiu para entrega" (a driver registered
+  // meanwhile); without access or none registered, only the typed name (as before)
+  const loadDrivers = useCallback(() => {
+    fetch('/api/delivery/drivers', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { drivers: [] }))
+      .then((b) => setDrivers((b.drivers ?? []).map((d: { id: string; name: string }) => ({ id: d.id, name: d.name }))))
+      .catch(() => setDrivers([]));
+  }, []);
+  useEffect(() => { loadDrivers(); }, [loadDrivers]);
+  const openDispatch = (order: ExternalOrder) => {
+    setDispatch({ order, pick: order.driverId ?? (order.driverName ? OTHER_DRIVER : ''), driver: order.driverId ? '' : order.driverName ?? '' });
+    loadDrivers();
+  };
 
   const send = async (orderId: string, payload: Record<string, unknown>, done: string) => {
     setUpdatingId(orderId);
@@ -335,17 +355,19 @@ export default function DeliveryOrdersPage() {
     toast.success(value ? 'Os pedidos vão direto para a cozinha' : 'Cada pedido espera o "Aceitar"');
   };
 
-  const updateStatus = async (orderId: string, newStatus: OrderStatus, driverName?: string) => {
+  const updateStatus = async (orderId: string, newStatus: OrderStatus, driver?: { driverId: string } | { driverName: string }) => {
     setUpdatingId(orderId);
     try {
       const res = await fetch(`/api/admin/integrations/orders/${orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(driverName === undefined ? { status: newStatus } : { status: newStatus, driverName }),
+        body: JSON.stringify({ status: newStatus, ...driver }),
       });
-      if (!res.ok) { const body = await res.json().catch(() => ({})); toast.error(body.error || 'Erro ao atualizar pedido'); return; }
-      const driver = driverName === undefined ? {} : { driverName: driverName.trim() || null };
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, ...driver } : o));
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(body.error || 'Erro ao atualizar pedido'); return; }
+      // The saved driver (a registered one's name is copied by the server)
+      const saved = driver ? { driverId: body.driverId ?? null, driverName: body.driverName ?? null } : {};
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, ...saved } : o));
       toast.success(`Pedido atualizado para: ${STATUS_CONFIG[newStatus].label}`);
     } catch {
       toast.error('Erro ao atualizar pedido');
@@ -572,7 +594,7 @@ export default function DeliveryOrdersPage() {
                           size="sm"
                           className="w-full"
                           disabled={isUpdating}
-                          onClick={() => (nextStatus === 'PICKED_UP' ? setDispatch({ order, driver: order.driverName ?? '' }) : updateStatus(order.id, nextStatus))}
+                          onClick={() => (nextStatus === 'PICKED_UP' ? openDispatch(order) : updateStatus(order.id, nextStatus))}
                         >
                           <ArrowRight className="h-4 w-4 mr-1" /> {STATUS_CONFIG[nextStatus].label}
                         </Button>
@@ -800,7 +822,7 @@ export default function DeliveryOrdersPage() {
                         <Button
                           size="sm"
                           disabled={isUpdating}
-                          onClick={() => (nextStatus === 'PICKED_UP' ? setDispatch({ order, driver: order.driverName ?? '' }) : updateStatus(order.id, nextStatus))}
+                          onClick={() => (nextStatus === 'PICKED_UP' ? openDispatch(order) : updateStatus(order.id, nextStatus))}
                           className="w-full"
                         >
                           <ArrowRight className="h-4 w-4 mr-1" />
@@ -833,26 +855,47 @@ export default function DeliveryOrdersPage() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => setDispatch(null)}>
           <Card role="dialog" aria-label="Saiu para entrega" className="w-full max-w-sm p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-semibold">Saiu para entrega</h2>
-            <label htmlFor="driver-name" className="text-sm text-muted-foreground block">Quem vai levar? (opcional: serve para o acerto no Caixa)</label>
-            <input
-              id="driver-name"
-              list="driver-names"
-              autoFocus
-              maxLength={60}
-              value={dispatch.driver}
-              onChange={(e) => setDispatch({ ...dispatch, driver: e.target.value })}
-              placeholder="Nome do entregador"
-              className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
-            />
-            <datalist id="driver-names">
-              {[...new Set(orders.map((o) => o.driverName).filter(Boolean))].map((n) => <option key={n as string} value={n as string} />)}
-            </datalist>
+            <p className="text-sm text-muted-foreground">Quem vai levar? (opcional: serve para o acerto e o pagamento no Caixa)</p>
+            {drivers.length > 0 && (
+              <div role="radiogroup" aria-label="Entregador" className="space-y-1 max-h-56 overflow-y-auto">
+                {[...drivers, { id: OTHER_DRIVER, name: 'Outro (digitar nome)' }].map((d) => (
+                  <label key={d.id} className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm cursor-pointer ${dispatch.pick === d.id ? 'border-cyan-600 bg-cyan-50 dark:bg-cyan-950' : ''}`}>
+                    <input type="radio" name="driver-pick" checked={dispatch.pick === d.id} onChange={() => setDispatch({ ...dispatch, pick: d.id })} />
+                    <span className="truncate">{d.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {(drivers.length === 0 || dispatch.pick === OTHER_DRIVER) && (
+              <>
+                <input
+                  id="driver-name"
+                  aria-label="Nome do entregador"
+                  list="driver-names"
+                  autoFocus
+                  maxLength={60}
+                  value={dispatch.driver}
+                  onChange={(e) => setDispatch({ ...dispatch, driver: e.target.value })}
+                  placeholder="Nome do entregador"
+                  className="w-full px-3 py-2 border rounded-md text-sm bg-white dark:bg-gray-800"
+                />
+                <datalist id="driver-names">
+                  {[...new Set(orders.map((o) => o.driverName).filter(Boolean))].map((n) => <option key={n as string} value={n as string} />)}
+                </datalist>
+              </>
+            )}
             <div className="flex gap-2 justify-end">
               <Button size="sm" variant="outline" onClick={() => setDispatch(null)}>Voltar</Button>
               <Button
                 size="sm"
                 disabled={updatingId === dispatch.order.id}
-                onClick={async () => { const d = dispatch; setDispatch(null); await updateStatus(d.order.id, 'PICKED_UP', d.driver); }}
+                onClick={async () => {
+                  const d = dispatch;
+                  setDispatch(null);
+                  const registered = drivers.some((x) => x.id === d.pick);
+                  const typing = drivers.length === 0 || d.pick === OTHER_DRIVER;
+                  await updateStatus(d.order.id, 'PICKED_UP', registered ? { driverId: d.pick } : typing ? { driverName: d.driver } : undefined);
+                }}
               >
                 Saiu para entrega
               </Button>
