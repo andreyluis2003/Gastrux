@@ -52,7 +52,7 @@ export default function EntregadoresRelatorioPage() {
   return (
     <main className="max-w-4xl mx-auto p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Entregadores</h1>
+        <h1 className="text-2xl font-bold">Relatório de entregadores</h1>
         <Link href="/caixa/entregadores" className="underline text-sm">Cadastro de entregadores</Link>
       </div>
       <p className="text-sm text-gray-600">

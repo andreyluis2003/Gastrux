@@ -110,7 +110,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // Spec 2026-10-16 contas de consumo: bills on every plan, indicators from Pro
       { label: 'Contas de consumo', href: '/dashboard/financeiro/contas', roles: MANAGERS },
       // Spec 2026-11-17 entregadores: deliveries, dailies, paid and to pay by driver and period
-      { label: 'Entregadores', href: '/caixa/entregadores/relatorio', roles: MANAGERS },
+      { label: 'Relatório de entregadores', href: '/caixa/entregadores/relatorio', roles: MANAGERS },
       { label: 'Relatório executivo (PDF)', href: '/relatorios', roles: MANAGERS },
     ],
   },

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 
 /** sha256 of every default content this file ever wrote (version of 2026-10-11, live until 2026-10-17) */
 const LEGACY_DEFAULT_HASHES = new Set([
+  '9a65824cae477c6c39420294b2cdebfb87f727e00906c1ce8d12c6c1b1e4cdc1', // acerto-entregador (before the driver registry and the payment, 2026-11-17)
   'dbe6cc4b179596a4d724985b218aa801f597cf63d110f3ed63e33c9422a829ea', // cupons-de-desconto (before the coupon on the Conta, the counter sale and WhatsApp, 2026-11-16)
   '58d227980b1034d97de603c73fde7f518cd0159c381739573b64bb05de404158', // site-de-delivery (before the delivery fee setting, 2026-11-14)
   'a74740ac30db5876081f2f94e23911b2ac865a08e599543c5ef500f496390e79', // esgotar-e-editar-o-cardapio (before renaming a category, 2026-11-14)
@@ -413,27 +414,43 @@ No computador, cada botão mostra a sua tecla: **F2** na busca, **1** a **4** na
     categorySlug: 'integracao-delivery',
     slug: 'acerto-entregador',
     title: 'Como faço o acerto com o entregador?',
-    summary: 'O dinheiro e o cartão dos pedidos pagos na entrega entram no caixa pelo botão Acerto do entregador.',
-    keywords: 'entregador, motoboy, acerto, delivery, pago na entrega, dinheiro, troco, cartão na entrega, taxa de entrega',
+    summary: 'Cadastre os entregadores, escolha quem leva cada pedido e, no Acerto do entregador, confira o dinheiro e pague a diária e as entregas.',
+    keywords: 'entregador, motoboy, acerto, delivery, pago na entrega, dinheiro, troco, cartão na entrega, taxa de entrega, diária, valor por entrega, pagamento do entregador, relatório de entregadores',
     order: 3,
     content: `## Para que serve
 
-Num pedido de delivery pago na entrega (dinheiro, ou cartão e vale passados pelo entregador), a venda já conta no faturamento, mas o dinheiro só chega à gaveta quando o entregador volta. O acerto põe esse dinheiro no caixa e mostra se ficou faltando algo.
+Num pedido de delivery pago na entrega (dinheiro, ou cartão e vale passados pelo entregador), a venda já conta no faturamento, mas o dinheiro só chega à gaveta quando o entregador volta. O acerto põe esse dinheiro no caixa e mostra se ficou faltando algo. Ele também calcula e paga o que você deve ao entregador.
+
+## Cadastro dos entregadores
+
+Em **Caixa e pagamentos > Entregadores** (dono e gerente), cadastre cada entregador: nome, celular (opcional), **diária** e **valor por entrega**. A diária e o valor por entrega são opcionais: 0 significa que você não paga aquilo. Entregador não se apaga: você desativa. O nome não pode se repetir entre os ativos.
 
 ## Quem levou cada pedido
 
-Em **Vender > Pedidos de delivery**, ao avançar o pedido para **Em Entrega**, o Gastrux pergunta quem vai levar. Escreva o nome do entregador (os nomes já usados aparecem como sugestão). É opcional: pedidos sem nome ficam em "Sem nome" no acerto.
+Em **Vender > Pedidos de delivery**, ao marcar **Saiu para entrega**, escolha o entregador na lista, ou **Outro (digitar nome)**. Pedido marcado direto como Entregue também conta. Na comanda de entrega do WhatsApp, use o botão **Saiu para entrega** na Conta, com a mesma lista. Dá para trocar o entregador enquanto o pagamento dele não foi feito.
 
 ## Fazendo o acerto
 
 1. Com o caixa aberto, toque em **Acerto do entregador** (Caixa e pagamentos > Caixa).
-2. Escolha o entregador. Aparecem os pedidos pagos na entrega que já saíram e ainda não foram acertados, com o total em dinheiro, cartão e vale.
-3. Desmarque o pedido que ele ainda não trouxe, se for o caso.
-4. Digite o dinheiro que ele entregou. Se não bater, o Gastrux mostra quanto falta ou sobra e pede o motivo.
-5. Se você paga o entregador na hora, informe o valor em **Pagar ao entregador**: sai da gaveta como despesa "Entregador". O caixa paga até a soma das taxas de entrega; acima disso, só o gerente.
-6. Toque em **Lançar acerto**.
+2. Cada entregador tem duas partes: **Dinheiro dos pedidos** e **Pagamento**.
+3. Em **Dinheiro dos pedidos** aparecem os pedidos pagos na entrega que já saíram e ainda não foram acertados, com o total em dinheiro, cartão e vale. Desmarque o que ele ainda não trouxe, digite o dinheiro entregue e, se não bater, informe o motivo da diferença.
+4. Em **Pagamento** aparecem todas as entregas ainda não pagas a ele, pagas na porta ou online, inclusive do WhatsApp. O valor é calculado, por exemplo: 2 diárias × R$ 40,00 + 14 entregas × R$ 8,00 = R$ 192,00.
+5. Toque em **Lançar acerto**.
 
-O dinheiro entra no esperado da gaveta, o cartão no esperado do crédito e do débito, e a diferença fica como ajuste, com o motivo. A venda não conta de novo: ela já está no faturamento desde o pedido.
+O dinheiro dos pedidos entra no esperado da gaveta, o cartão no esperado do crédito e do débito, e a diferença fica como ajuste, com o motivo. A venda não conta de novo: ela já está no faturamento desde o pedido.
+
+## Como o pagamento é calculado
+
+- O dia de trabalho vira às 05:00. A noite que passa da meia-noite conta como uma diária só.
+- A diária nunca é paga duas vezes no mesmo dia.
+- O caixa paga até o valor calculado. Acima disso, só o gerente.
+- Entregador só com nome digitado não tem cálculo: o teto é a soma das taxas de entrega.
+- O pagamento sai como despesa em dinheiro do caixa e pode deixar o caixa negativo.
+- Só contam as entregas que saíram depois que esta função foi ao ar. Entregas antigas não entram.
+
+## Relatório de entregadores
+
+Em **Relatórios > Relatório de entregadores**, escolha o período (padrão: mês atual). Para cada entregador aparecem as entregas, as diárias, o total pago (o que saiu do caixa no período) e as entregas ainda a pagar.
 
 > **Dica**: o troco que o entregador leva sai e volta para a gaveta, então não precisa lançar. Faça os acertos antes de fechar o caixa.`,
   },
