@@ -1,4 +1,4 @@
-# Cadastro de entregadores com diária e valor por entrega
+# Cadastro de entregadores com diária e valor por entrega (aprovado em 2026-11-17)
 
 Data: 2026-11-17. Pedido do dono: "Cadastro de entregadores com taxa fixa por entrega", seguindo o que o mercado
 pratica. Abordagem escolhida pelo dono: **A** (dentro do Acerto do entregador que já existe).
