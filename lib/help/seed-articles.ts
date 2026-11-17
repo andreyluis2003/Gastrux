@@ -434,7 +434,7 @@ Em **Vender > Pedidos de delivery**, ao marcar **Saiu para entrega**, escolha o 
 1. Com o caixa aberto, toque em **Acerto do entregador** (Caixa e pagamentos > Caixa).
 2. Cada entregador tem duas partes: **Dinheiro dos pedidos** e **Pagamento**.
 3. Em **Dinheiro dos pedidos** aparecem os pedidos pagos na entrega que já saíram e ainda não foram acertados, com o total em dinheiro, cartão e vale. Desmarque o que ele ainda não trouxe, digite o dinheiro entregue e, se não bater, informe o motivo da diferença.
-4. Em **Pagamento** aparecem todas as entregas ainda não pagas a ele, pagas na porta ou online, inclusive do WhatsApp. O valor é calculado, por exemplo: 2 diárias × R$ 40,00 + 14 entregas × R$ 8,00 = R$ 192,00.
+4. Em **Pagamento** aparecem as entregas dos últimos 45 dias ainda não pagas a ele, pagas na porta ou online, inclusive do WhatsApp. O valor é calculado, por exemplo: 2 diárias × R$ 40,00 + 14 entregas × R$ 8,00 = R$ 192,00.
 5. Toque em **Lançar acerto**.
 
 O dinheiro dos pedidos entra no esperado da gaveta, o cartão no esperado do crédito e do débito, e a diferença fica como ajuste, com o motivo. A venda não conta de novo: ela já está no faturamento desde o pedido.
@@ -446,7 +446,7 @@ O dinheiro dos pedidos entra no esperado da gaveta, o cartão no esperado do cr�
 - O caixa paga até o valor calculado. Acima disso, só o gerente.
 - Entregador só com nome digitado não tem cálculo: o teto é a soma das taxas de entrega.
 - O pagamento sai como despesa em dinheiro do caixa e pode deixar o caixa negativo.
-- Só contam as entregas que saíram depois que esta função foi ao ar. Entregas antigas não entram.
+- Só contam as entregas que saíram depois que esta função foi ao ar. Entregas antigas não entram. Entregas não pagas há mais de 45 dias saem do acerto, mas continuam no relatório.
 
 ## Relatório de entregadores
 

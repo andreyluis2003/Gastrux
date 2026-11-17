@@ -22,7 +22,7 @@ export async function GET(_request: Request) {
 }
 
 /**
- * POST - { driverName?, orderIds?, receivedCash?, driverPay?, reason?, pay?: { key, amount } }: orderIds brings the door
+ * POST - { driverName?, orderIds?, receivedCash?, driverPay?, reason?, pay?: { key, amount, expected: { orders, comandas } } }: orderIds brings the door
  * money to this open shift; pay pays the driver (cash Despesa). driverPay is the old typed-name payment.
  */
 async function handlePOST(request: Request, { params }: { params: { id: string } }) {

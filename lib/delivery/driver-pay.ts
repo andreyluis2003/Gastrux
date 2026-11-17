@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { CashRuleError } from '@/lib/caixa/rules';
-import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
+import { driverNameKey, normalizeDriverName } from '@/lib/delivery/driver-name';
 
 /**
  * O que cada entregador ganhou (spec docs/superpowers/specs/2026-11-17-entregadores-taxa-fixa-design.md): every
@@ -40,7 +40,7 @@ const cents = (reais: number) => Math.round(reais * 100);
 // Plain space after "R$" (toLocaleString uses a non-breaking one)
 export const brl = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/ /g, ' ');
 
-/** Key of a driver: the registered driver's id, or 'name:' + the typed name */
+/** Key of a driver: the registered driver's id, or 'name:' + the typed name (matched ignoring case and extra spaces) */
 export function parsePayKey(key: unknown): { driverId: string } | { driverName: string } {
   if (typeof key !== 'string' || !key) throw new CashRuleError('Escolha o entregador');
   if (key.startsWith('name:')) {
@@ -57,7 +57,7 @@ type Who = { driverId: string } | { driverName: string } | null;
 export function orderWhere(restaurantId: string, who: Who, ids?: string[], includePaid = false): Prisma.ExternalOrderWhereInput {
   const driver: Prisma.ExternalOrderWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
-    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: who.driverName };
+    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: { equals: who.driverName, mode: 'insensitive' } };
   return {
     restaurantId,
     ...(ids ? { id: { in: ids } } : {}),
@@ -73,7 +73,7 @@ export function orderWhere(restaurantId: string, who: Who, ids?: string[], inclu
 export function comandaWhere(restaurantId: string, who: Who, ids?: string[], includePaid = false): Prisma.OrderSessionWhereInput {
   const driver: Prisma.OrderSessionWhereInput = !who
     ? { OR: [{ driverId: { not: null } }, { driverName: { not: null } }] }
-    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: who.driverName };
+    : 'driverId' in who ? { driverId: who.driverId } : { driverId: null, driverName: { equals: who.driverName, mode: 'insensitive' } };
   return {
     restaurantId,
     ...(ids ? { id: { in: ids } } : {}),
@@ -84,21 +84,25 @@ export function comandaWhere(restaurantId: string, who: Who, ids?: string[], inc
   };
 }
 
-const LIMIT = 2000;
+/** Most deliveries of each kind in one list (newest first, so a recent delivery is never dropped) */
+export const PAY_LIMIT = 2000;
+/** Only deliveries that went out in the last 45 days are paid at the acerto; older unpaid ones stay in the report */
+export const PAY_WINDOW_DAYS = 45;
 
 async function loadDeliveries(db: Db, restaurantId: string, who: Who, ids?: { orders: string[]; comandas: string[] }) {
+  const recent = { gte: new Date(Date.now() - PAY_WINDOW_DAYS * 86400_000) };
   const [orders, comandas] = await Promise.all([
     db.externalOrder.findMany({
-      where: orderWhere(restaurantId, who, ids?.orders),
+      where: { ...orderWhere(restaurantId, who, ids?.orders), dispatchedAt: recent },
       select: { id: true, externalOrderId: true, customerName: true, driverId: true, driverName: true, dispatchedAt: true, deliveryFee: true },
-      orderBy: { orderReceivedAt: 'asc' },
-      take: LIMIT,
+      orderBy: [{ dispatchedAt: 'desc' }, { id: 'asc' }],
+      take: PAY_LIMIT,
     }),
     db.orderSession.findMany({
-      where: comandaWhere(restaurantId, who, ids?.comandas),
+      where: { ...comandaWhere(restaurantId, who, ids?.comandas), dispatchedAt: recent },
       select: { id: true, customerName: true, driverId: true, driverName: true, dispatchedAt: true },
-      orderBy: { dispatchedAt: 'asc' },
-      take: LIMIT,
+      orderBy: [{ dispatchedAt: 'desc' }, { id: 'asc' }],
+      take: PAY_LIMIT,
     }),
   ]);
   const rows: Array<{ driverId: string | null; driverName: string | null; delivery: UnpaidDelivery }> = [
@@ -118,7 +122,8 @@ async function loadDeliveries(db: Db, restaurantId: string, who: Who, ids?: { or
 function group(rows: Awaited<ReturnType<typeof loadDeliveries>>, names: Map<string, string>): DriverDeliveries[] {
   const out = new Map<string, DriverDeliveries>();
   for (const r of rows) {
-    const key = r.driverId ?? `name:${r.driverName}`;
+    const key = r.driverId ?? driverNameKey(r.driverName);
+    if (!key) continue;
     let g = out.get(key);
     if (!g) {
       g = { key, driverId: r.driverId, driverName: (r.driverId && names.get(r.driverId)) || r.driverName, deliveries: [] };
@@ -175,7 +180,17 @@ export async function deliveriesOf(db: Db, restaurantId: string, key: unknown, i
     if (!driver) throw new CashRuleError('Entregador não encontrado', 404);
   }
   const rows = await loadDeliveries(db, restaurantId, who, ids);
-  return { driver, driverName: driver?.name ?? ('driverName' in who ? who.driverName : null), deliveries: rows.map((r) => r.delivery) };
+  // A typed name as the cashier wrote it on the newest delivery (the key is in lower case)
+  const typed = 'driverName' in who ? normalizeDriverName(rows[0]?.driverName) ?? who.driverName : null;
+  return { driver, driverName: driver?.name ?? typed, deliveries: rows.map((r) => r.delivery) };
+}
+
+/** The ids a set of deliveries was computed from (sorted): the GET sends them, the POST must match them */
+export function deliveryIds(deliveries: UnpaidDelivery[]): { orders: string[]; comandas: string[] } {
+  return {
+    orders: deliveries.filter((d) => d.kind === 'order').map((d) => d.id).sort(),
+    comandas: deliveries.filter((d) => d.kind === 'comanda').map((d) => d.id).sort(),
+  };
 }
 
 export async function payQuote(db: Db, restaurantId: string, key: string): Promise<PayQuote> {
@@ -191,7 +206,7 @@ export async function payList(db: Db, restaurantId: string) {
     (ids.length ? await db.driver.findMany({ where: { id: { in: ids }, restaurantId }, select: { id: true, dailyRateCents: true, perDeliveryCents: true } }) : []).map((d) => [d.id, d]),
   );
   return Promise.all(groups.map(async (g) => ({
-    key: g.key, driverId: g.driverId, driverName: g.driverName, deliveries: g.deliveries,
+    key: g.key, driverId: g.driverId, driverName: g.driverName, deliveries: g.deliveries, expected: deliveryIds(g.deliveries),
     quote: await quoteFor(db, g.driverId ? drivers.get(g.driverId) ?? null : null, g.deliveries),
   })));
 }

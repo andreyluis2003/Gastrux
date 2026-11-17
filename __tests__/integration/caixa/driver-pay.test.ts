@@ -14,6 +14,8 @@ import { POST as close } from '../../../app/api/caixa/sessions/[id]/close/route'
 import { GET as pending, POST as settle } from '../../../app/api/caixa/sessions/[id]/acerto-entregador/route';
 import { ownIntegration } from '../../../lib/delivery-orders/integrations';
 import { workDayOf } from '../../../lib/delivery/driver-pay';
+import { driverNameKey } from '../../../lib/delivery/driver-name';
+import { driverReport } from '../../../lib/delivery/driver-report';
 import { PUT as moveOrder } from '../../../app/api/admin/integrations/orders/[id]/route';
 import { recordBillPayment } from '../../../lib/comanda/bill-service';
 
@@ -39,6 +41,8 @@ describe('pagar o entregador no acerto', () => {
   const get = async () => json(await pending(req(`http://x/api/caixa/sessions/${shiftId}/acerto-entregador`), { params: { id: shiftId } }));
   const post = async (body, id = shiftId) => json(await settle(req(`http://x/api/caixa/sessions/${id}/acerto-entregador`, 'POST', body), { params: { id } }));
   const quoteOf = async (key) => (await get()).body.pay.find((p) => p.key === key)?.quote;
+  // The body the screen sends: the key, the amount and the deliveries the GET showed
+  const payOf = async (key, amount) => ({ key, amount, expected: (await get()).body.pay.find((p) => p.key === key)?.expected ?? { orders: [], comandas: [] } });
 
   beforeAll(async () => {
     const s = await createMultiRestaurantScenario();
@@ -91,17 +95,91 @@ describe('pagar o entregador no acerto', () => {
     expect(workDayOf(new Date('2026-11-10T08:30:00Z'))).toBe('2026-11-10'); // 05:30: a new work day
     as(cashierId, A.restaurantId);
     const d = await driver({});
-    await order({ driverId: d.id, driverName: d.name, dispatchedAt: new Date('2026-11-10T01:30:00Z') });
-    await order({ driverId: d.id, driverName: d.name, dispatchedAt: new Date('2026-11-10T04:30:00Z') });
+    // Two days ago (inside the 45-day pay window whatever the date the suite runs)
+    const day = new Date(Date.now() - 2 * 86400_000).toISOString().slice(0, 10);
+    const night = new Date(`${day}T01:30:00Z`);
+    await order({ driverId: d.id, driverName: d.name, dispatchedAt: night });
+    await order({ driverId: d.id, driverName: d.name, dispatchedAt: new Date(`${day}T04:30:00Z`) });
     const q = await quoteOf(d.id);
-    expect(q).toMatchObject({ dailyCount: 1, workDays: ['2026-11-09'], deliveryCount: 2, suggestedCents: 5600 });
+    expect(q).toMatchObject({ dailyCount: 1, workDays: [workDayOf(night)], deliveryCount: 2, suggestedCents: 5600 });
+  });
+
+  it('a delivery that went out after the screen loaded: 409, nothing paid; with the fresh list, 201', async () => {
+    as(cashierId, A.restaurantId);
+    const d = await driver({});
+    const first = await order({ driverId: d.id, driverName: d.name });
+    const stale = await payOf(d.id, '48,00');
+    expect(stale.expected).toEqual({ orders: [first.id], comandas: [] });
+    const late = await comanda({ driverId: d.id, driverName: d.name }); // dispatched between the GET and the POST
+    expect(await post({ pay: stale })).toMatchObject({ status: 409, body: { error: 'A lista de entregas mudou. Atualize a tela.' } });
+    expect(await prisma.driverPayment.count({ where: { driverId: d.id } })).toBe(0);
+    expect(await prisma.driverPaidDay.count({ where: { driverId: d.id } })).toBe(0);
+    expect((await prisma.externalOrder.findUnique({ where: { id: first.id } })).driverPaymentId).toBeNull();
+    expect(await prisma.cashSessionEntry.count({ where: { cashSessionId: shiftId, description: { contains: d.name } } })).toBe(0);
+
+    const fresh = await payOf(d.id, '56,00');
+    expect(fresh.expected).toEqual({ orders: [first.id], comandas: [late.id] });
+    const ok = await post({ pay: fresh });
+    expect(ok.status).toBe(201);
+    expect(ok.body.payment.quote).toMatchObject({ deliveryCount: 2, dailyCount: 1, suggestedCents: 5600 });
+    expect((await prisma.orderSession.findUnique({ where: { id: late.id } })).driverPaymentId).toBe(ok.body.payment.id);
+  });
+
+  it('a screen without the expected list (old cached page) is 409, nothing paid', async () => {
+    as(cashierId, A.restaurantId);
+    const d = await driver({});
+    const o = await order({ driverId: d.id, driverName: d.name });
+    expect(await post({ pay: { key: d.id, amount: '48,00' } })).toMatchObject({ status: 409, body: { error: 'A lista de entregas mudou. Atualize a tela.' } });
+    expect(await post({ pay: { key: d.id, amount: '48,00', expected: { orders: 'x' } } })).toMatchObject({ status: 409 });
+    expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).driverPaymentId).toBeNull();
+    expect(await prisma.driverPayment.count({ where: { driverId: d.id } })).toBe(0);
+  });
+
+  it('a delivery older than 45 days is not in the quote; the report still counts it', async () => {
+    as(cashierId, A.restaurantId);
+    const d = await driver({});
+    const oldAt = new Date(Date.now() - 46 * 86400_000);
+    const old = await order({ driverId: d.id, driverName: d.name, dispatchedAt: oldAt });
+    expect(await quoteOf(d.id)).toBeUndefined();
+    const recent = await order({ driverId: d.id, driverName: d.name });
+    const body = await payOf(d.id, '48,00');
+    expect(body.expected).toEqual({ orders: [recent.id], comandas: [] });
+    expect(await quoteOf(d.id)).toMatchObject({ deliveryCount: 1, dailyCount: 1 });
+    expect((await post({ pay: body })).status).toBe(201);
+    expect((await prisma.externalOrder.findUnique({ where: { id: old.id } })).driverPaymentId).toBeNull();
+    const day = workDayOf(oldAt);
+    const rows = await driverReport(A.restaurantId, day, day);
+    expect(rows.find((r) => r.key === d.id)).toMatchObject({ deliveries: 1, unpaidDeliveries: 1 });
+  });
+
+  it('typed name: one driver whatever the case and spaces', async () => {
+    as(cashierId, A.restaurantId);
+    const name = `Maria Souza ${tag}`;
+    const a = await order({ driverName: name });
+    const b = await order({ driverName: name.toUpperCase() });
+    const c = await comanda({ driverName: name.toLowerCase() });
+    const key = `name:${name.toLowerCase()}`;
+    const entries = (await get()).body.pay.filter((p) => p.key.startsWith('name:maria souza'));
+    expect(entries.map((p) => p.key)).toEqual([key]);
+    expect(entries[0].quote.deliveryCount).toBe(3);
+    // The door group of the typed name pairs with the same key on the screen
+    expect(driverNameKey(`  ${name.toUpperCase()}`)).toBe(key);
+    // The POST normalizes the key too: another spelling of the same name pays the same deliveries
+    const { expected } = await payOf(key, '12,00');
+    const paid = await post({ pay: { key: `name:  ${name.toUpperCase().replace(' ', '   ')} `, amount: '12,00', expected } });
+    expect(paid.status).toBe(201);
+    const p = await prisma.driverPayment.findUnique({ where: { id: paid.body.payment.id } });
+    expect(p).toMatchObject({ driverId: null, deliveryCount: 3 });
+    expect(p.driverName.toLowerCase()).toBe(name.toLowerCase());
+    for (const o of [a, b]) expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).driverPaymentId).toBe(p.id);
+    expect((await prisma.orderSession.findUnique({ where: { id: c.id } })).driverPaymentId).toBe(p.id);
   });
 
   it('second settlement same work day pays new deliveries, no second daily', async () => {
     as(cashierId, A.restaurantId);
     const d = await driver({});
     const first = await order({ driverId: d.id, driverName: d.name });
-    const paid = await post({ pay: { key: d.id, amount: '48,00' } });
+    const paid = await post({ pay: await payOf(d.id, '48,00') });
     expect(paid.status).toBe(201);
     expect(paid.body.payment.quote).toMatchObject({ dailyCount: 1, deliveryCount: 1, suggestedCents: 4800 });
     expect((await prisma.externalOrder.findUnique({ where: { id: first.id } })).driverPaymentId).toBe(paid.body.payment.id);
@@ -110,7 +188,7 @@ describe('pagar o entregador no acerto', () => {
     await order({ driverId: d.id, driverName: d.name });
     const q = await quoteOf(d.id);
     expect(q).toMatchObject({ dailyCount: 0, deliveryCount: 1, suggestedCents: 800, text: '1 entrega × R$ 8,00 = R$ 8,00' });
-    expect((await post({ pay: { key: d.id, amount: '8,00' } })).status).toBe(201);
+    expect((await post({ pay: await payOf(d.id, '8,00') })).status).toBe(201);
     expect(await prisma.driverPaidDay.count({ where: { driverId: d.id } })).toBe(1);
     const payments = await prisma.driverPayment.findMany({ where: { driverId: d.id }, orderBy: { createdAt: 'asc' } });
     expect(payments.map((p) => [p.dailyCount, p.deliveryCount, p.suggestedCents, p.paidCents])).toEqual([[1, 1, 4800, 4800], [0, 1, 800, 800]]);
@@ -129,10 +207,10 @@ describe('pagar o entregador no acerto', () => {
     as(cashierId, A.restaurantId);
     const d = await driver({});
     await order({ driverId: d.id, driverName: d.name });
-    const over = await post({ pay: { key: d.id, amount: '48,01' } });
+    const over = await post({ pay: await payOf(d.id, '48,01') });
     expect(over).toMatchObject({ status: 403, body: { error: 'Pagar ao entregador mais que o calculado exige um gerente' } });
     as(A.ownerId, A.restaurantId);
-    const ok = await post({ pay: { key: d.id, amount: '50,00' } });
+    const ok = await post({ pay: await payOf(d.id, '50,00') });
     expect(ok.status).toBe(201);
     expect((await prisma.driverPayment.findUnique({ where: { id: ok.body.payment.id } })).paidCents).toBe(5000);
     as(cashierId, A.restaurantId);
@@ -143,7 +221,7 @@ describe('pagar o entregador no acerto', () => {
     const d = await driver({});
     await order({ driverId: d.id, driverName: d.name });
     await comanda({ driverId: d.id, driverName: d.name });
-    const results = await Promise.all([post({ pay: { key: d.id, amount: '56,00' } }), post({ pay: { key: d.id, amount: '56,00' } })]);
+    const results = await Promise.all([post({ pay: await payOf(d.id, '56,00') }), post({ pay: await payOf(d.id, '56,00') })]);
     expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
     expect(results.find((r) => r.status === 409).body.error).toBe('Este entregador já foi pago agora. Atualize a tela.');
     expect(await prisma.driverPayment.count({ where: { driverId: d.id } })).toBe(1);
@@ -157,6 +235,7 @@ describe('pagar o entregador no acerto', () => {
     // Another shift paid the day meanwhile (the unique (driverId, workDay) catches it even without the shift lock)
     const other = await prisma.driverPayment.create({ data: { restaurantId: A.restaurantId, driverId: d.id, cashSessionId: shiftId, paidCents: 0, createdById: cashierId } });
     const workDay = workDayOf(o.dispatchedAt);
+    const body = { pay: await payOf(d.id, '48,00') };
     // Simulates the race: the day row appears between the quote and the insert
     const spy = jest.spyOn(require('../../../lib/delivery/driver-pay'), 'quoteFor');
     spy.mockImplementationOnce(async (...args) => {
@@ -164,7 +243,7 @@ describe('pagar o entregador no acerto', () => {
       await prisma.driverPaidDay.create({ data: { driverId: d.id, workDay, driverPaymentId: other.id } });
       return real;
     });
-    const res = await post({ pay: { key: d.id, amount: '48,00' } });
+    const res = await post(body);
     spy.mockRestore();
     expect(res).toMatchObject({ status: 409, body: { error: 'Este entregador já foi pago agora. Atualize a tela.' } });
     expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).driverPaymentId).toBeNull();
@@ -175,7 +254,7 @@ describe('pagar o entregador no acerto', () => {
     as(cashierId, A.restaurantId);
     const d = await driver({});
     await order({ driverId: d.id, driverName: d.name, paymentMethod: 'ONLINE_PIX', paidOnline: true });
-    const res = await post({ pay: { key: d.id, amount: '48,00' } });
+    const res = await post({ pay: await payOf(d.id, '48,00') });
     expect(res.status).toBe(201);
     const view = (await json(await detail(req(`http://x/api/caixa/sessions/${shiftId}`), { params: { id: shiftId } }))).body.view;
     // Opening float 0, no cash came in: the cash out leaves the expected cash below zero (expected is computed at close)
@@ -194,11 +273,11 @@ describe('pagar o entregador no acerto', () => {
     const a = await order({ driverName: name, deliveryFee: 6 });
     const b = await order({ driverName: name, deliveryFee: 7, paymentMethod: 'ONLINE_PIX', paidOnline: true });
     const c = await comanda({ driverName: name });
-    const key = `name:${name}`;
+    const key = `name:${name.toLowerCase()}`;
     const q = await quoteOf(key);
     expect(q).toMatchObject({ deliveryCount: 3, suggestedCents: null, feeCapCents: 1300, dailyCount: 0, text: '' });
-    expect(await post({ pay: { key, amount: '13,01' } })).toMatchObject({ status: 403, body: { error: 'Pagar ao entregador mais que as taxas de entrega exige um gerente' } });
-    const ok = await post({ pay: { key, amount: '13,00' } });
+    expect(await post({ pay: await payOf(key, '13,01') })).toMatchObject({ status: 403, body: { error: 'Pagar ao entregador mais que as taxas de entrega exige um gerente' } });
+    const ok = await post({ pay: await payOf(key, '13,00') });
     expect(ok.status).toBe(201);
     const pay = await prisma.driverPayment.findUnique({ where: { id: ok.body.payment.id } });
     expect(pay).toMatchObject({ driverId: null, driverName: name, deliveryCount: 3, dailyCount: 0, paidCents: 1300 });
@@ -210,7 +289,7 @@ describe('pagar o entregador no acerto', () => {
   it('a driver of another restaurant cannot be paid; no orders and no pay is 400', async () => {
     as(cashierId, A.restaurantId);
     const foreign = await prisma.driver.create({ data: { restaurantId: B.restaurantId, name: `Fora ${tag}`, dailyRateCents: 4000 } });
-    expect((await post({ pay: { key: foreign.id, amount: '10,00' } })).status).toBe(404);
+    expect((await post({ pay: await payOf(foreign.id, '10,00') })).status).toBe(404);
     expect(await post({})).toMatchObject({ status: 400, body: { error: 'Escolha os pedidos do acerto' } });
   });
 
@@ -224,7 +303,7 @@ describe('pagar o entregador no acerto', () => {
     const before = Date.now();
     expect((await moveOrder(req('http://x', 'PUT', { status: 'DELIVERED' }), { params: { id: o.id } })).status).toBe(200);
     expect((await prisma.externalOrder.findUnique({ where: { id: o.id } })).dispatchedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
-    expect(await quoteOf(`name:${name}`)).toMatchObject({ deliveryCount: 1, feeCapCents: 600 });
+    expect(await quoteOf(`name:${name.toLowerCase()}`)).toMatchObject({ deliveryCount: 1, feeCapCents: 600 });
   });
 
   it('paying the driver while one of his open comandas is paid at the cash register: both succeed (no deadlock)', async () => {
@@ -235,7 +314,7 @@ describe('pagar o entregador no acerto', () => {
       const s = await comanda({ driverId: d.id, driverName: d.name, status: 'SENT_TO_KITCHEN' });
       await prisma.orderSessionItem.create({ data: { sessionId: s.id, recipeId: recipe.id, price: 30, quantity: 1 } });
       const [pay, bill] = await Promise.allSettled([
-        post({ pay: { key: d.id, amount: '48,00' } }),
+        post({ pay: await payOf(d.id, '48,00') }),
         recordBillPayment({ userId: cashierId, restaurantId: A.restaurantId, role: 'CASHIER' }, s.id, { payments: [{ method: 'dinheiro', amount: '30,00' }], cashSessionId: shiftId }),
       ]);
       expect(pay.status).toBe('fulfilled');
@@ -250,6 +329,6 @@ describe('pagar o entregador no acerto', () => {
     const d = await driver({});
     await order({ driverId: d.id, driverName: d.name });
     expect((await close(req(`http://x/api/caixa/sessions/${shiftId}/close`, 'POST', { counted: { CASH: 0 } }), { params: { id: shiftId } })).status).toBe(200);
-    expect(await post({ pay: { key: d.id, amount: '48,00' } })).toMatchObject({ status: 409, body: { error: 'Este caixa já foi fechado' } });
+    expect(await post({ pay: await payOf(d.id, '48,00') })).toMatchObject({ status: 409, body: { error: 'Este caixa já foi fechado' } });
   });
 });

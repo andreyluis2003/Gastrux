@@ -65,6 +65,15 @@ describe('cadastro de entregadores', () => {
     expect((await post({ name: 'Ana', phone: '123' })).body.error).toBe('Celular inválido: use DDD e número');
     expect((await post({ name: 'Ana', dailyRate: 'abc' })).status).toBe(400);
     expect((await post({ name: '   ' })).status).toBe(400);
+    // Rates up to R$ 1.000,00 each (a typo like "4000" for "40,00" is refused)
+    expect(await post({ name: 'Ana', dailyRate: '1000,01' })).toMatchObject({ status: 400, body: { error: 'Valor muito alto: até R$ 1.000,00' } });
+    expect(await post({ name: 'Ana', perDelivery: '4000' })).toMatchObject({ status: 400, body: { error: 'Valor muito alto: até R$ 1.000,00' } });
+    const top = await post({ name: 'Ana Teto', dailyRate: '1000', perDelivery: '1000,00' });
+    expect(top.status).toBe(201);
+    expect(top.body.driver).toMatchObject({ dailyRateCents: 100000, perDeliveryCents: 100000 });
+    expect(await patch(top.body.driver.id, { perDelivery: '1000,01' })).toMatchObject({ status: 400, body: { error: 'Valor muito alto: até R$ 1.000,00' } });
+    await prisma.auditLog.deleteMany({ where: { entityId: top.body.driver.id } });
+    await prisma.driver.delete({ where: { id: top.body.driver.id } }); // keeps the list of the GET test below
   });
 
   it('duplicate active name is refused', async () => {

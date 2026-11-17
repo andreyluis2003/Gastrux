@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { CashRuleError } from '@/lib/caixa/rules';
-import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
+import { normalizeDriverName } from '@/lib/delivery/driver-name';
 import { comandaWhere, orderWhere, workDayOf } from '@/lib/delivery/driver-pay';
 
 /**

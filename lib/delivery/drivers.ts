@@ -1,7 +1,7 @@
 import type { Driver, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { CashRuleError, parseCountedCents } from '@/lib/caixa/rules';
-import { normalizeDriverName } from '@/lib/caixa/driver-settlement';
+import { normalizeDriverName } from '@/lib/delivery/driver-name';
 import { normalizePhone } from '@/lib/cashback/rules';
 
 /**
@@ -41,10 +41,15 @@ function parsePhone(value: unknown): string | null {
   return phone;
 }
 
-/** Empty = 0; otherwise reais with up to 2 decimals, as the cash register reads them */
+/** A rate above this is a typo (R$ 4.000 for R$ 40,00): refused */
+const MAX_RATE_CENTS = 100_000;
+
+/** Empty = 0; otherwise reais with up to 2 decimals, as the cash register reads them; at most R$ 1.000,00 */
 function parseRate(value: unknown, field: string): number {
   if (value === undefined || value === null || String(value).trim() === '') return 0;
-  return parseCountedCents(value, field);
+  const cents = parseCountedCents(value, field);
+  if (cents > MAX_RATE_CENTS) throw new CashRuleError('Valor muito alto: até R$ 1.000,00');
+  return cents;
 }
 
 /** Refuses a second active driver with the same name (case and accents as typed, case-insensitive) */

@@ -2,7 +2,8 @@ import { Prisma, type CashMethod, type DeliveryPaymentMethod } from '@prisma/cli
 import { prisma } from '@/lib/prisma';
 import { recordAudit, type RestaurantMember } from '@/lib/auth/restaurant-role';
 import { lockComanda } from '@/lib/comanda/add-item';
-import { deliveriesOf, payList, quoteFor, type PayQuote } from '@/lib/delivery/driver-pay';
+import { deliveriesOf, deliveryIds, payList, quoteFor, PAY_LIMIT, type PayQuote } from '@/lib/delivery/driver-pay';
+import { normalizeDriverName } from '@/lib/delivery/driver-name';
 import { CashRuleError, parseAmountCents, parseCountedCents } from './rules';
 import { isManager } from './roles';
 
@@ -26,13 +27,13 @@ const pendingWhere = (restaurantId: string): Prisma.ExternalOrderWhereInput => (
 
 const cents = (reais: number) => Math.round(reais * 100);
 
-export function normalizeDriverName(value: unknown): string | null {
-  const name = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 60) : '';
-  return name || null;
-}
+// Moved to a pure module (no import cycle with driver-pay); re-exported for the callers that import it from here
+export { normalizeDriverName };
 
 export interface DriverGroup {
   driverName: string | null;
+  /** The registered driver of every order of the group; null for a typed name (or a mix) */
+  driverId: string | null;
   orders: Array<{ id: string; number: string; customerName: string; paymentMethod: string; status: string; totalCents: number; deliveryFeeCents: number }>;
   cashCents: number;
   creditCents: number;
@@ -60,7 +61,7 @@ export async function pendingByDriver(restaurantId: string): Promise<{ drivers: 
   const [orders, names, pay] = await Promise.all([
     prisma.externalOrder.findMany({
       where: pendingWhere(restaurantId),
-      select: { id: true, externalOrderId: true, customerName: true, paymentMethod: true, status: true, totalAmount: true, deliveryFee: true, driverName: true, orderReceivedAt: true },
+      select: { id: true, externalOrderId: true, customerName: true, paymentMethod: true, status: true, totalAmount: true, deliveryFee: true, driverId: true, driverName: true, orderReceivedAt: true },
       orderBy: { orderReceivedAt: 'asc' },
       take: 500,
     }),
@@ -78,6 +79,7 @@ export async function pendingByDriver(restaurantId: string): Promise<{ drivers: 
   const drivers = [...groups.entries()]
     .map(([driverName, list]) => ({
       driverName,
+      driverId: list[0].driverId && list.every((o) => o.driverId === list[0].driverId) ? list[0].driverId : null,
       orders: list.map((o) => ({
         id: o.id, number: o.externalOrderId, customerName: o.customerName, paymentMethod: o.paymentMethod as string, status: o.status,
         totalCents: cents(o.totalAmount), deliveryFeeCents: cents(o.deliveryFee),
@@ -97,7 +99,10 @@ export interface SettleInput {
   /** Legacy (before 2026-11-17): pay a typed-name driver at the money settlement, up to the delivery fees */
   driverPay?: unknown;
   reason?: unknown;
-  /** Pay the driver what he earned (spec 2026-11-17 entregadores): key = driverId or 'name:' + typed name */
+  /**
+   * Pay the driver what he earned (spec 2026-11-17 entregadores): { key, amount, expected: { orders, comandas } };
+   * key = driverId or 'name:' + typed name; expected = the delivery ids of the GET (another set now = 409)
+   */
   pay?: unknown;
 }
 
@@ -108,7 +113,20 @@ function isPaidDayClash(e: Prisma.PrismaClientKnownRequestError): boolean {
   return text.includes('driver_paid_days') || (text.includes('driverId') && text.includes('workDay'));
 }
 
-const ALREADY_PAID ='Este entregador já foi pago agora. Atualize a tela.';
+const ALREADY_PAID = 'Este entregador já foi pago agora. Atualize a tela.';
+const LIST_CHANGED = 'A lista de entregas mudou. Atualize a tela.';
+
+/** pay.expected = { orders: string[], comandas: string[] } from the GET; missing or malformed = the list changed (409) */
+function parseExpected(value: unknown): { orders: string[]; comandas: string[] } {
+  const v = value && typeof value === 'object' ? (value as { orders?: unknown; comandas?: unknown }) : null;
+  const list = (x: unknown) => (Array.isArray(x) && x.length <= PAY_LIMIT && x.every((s) => typeof s === 'string') ? [...new Set(x as string[])].sort() : null);
+  const orders = v ? list(v.orders) : null;
+  const comandas = v ? list(v.comandas) : null;
+  if (!orders || !comandas) throw new CashRuleError(LIST_CHANGED, 409);
+  return { orders, comandas };
+}
+
+const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const OVER_FEES = 'Pagar ao entregador mais que as taxas de entrega exige um gerente';
 const OVER_QUOTE = 'Pagar ao entregador mais que o calculado exige um gerente';
 
@@ -116,13 +134,16 @@ const OVER_QUOTE = 'Pagar ao entregador mais que o calculado exige um gerente';
  * The acerto: with orderIds, brings the door money of those orders to this open shift (rule of 2026-10-26, unchanged);
  * with pay, pays the driver what he earned (daily rates + deliveries, any payment method) as a cash Despesa of this
  * shift, which may leave the expected cash negative. Both in one transaction.
- * Lock order (as the comanda bill and "Saiu para entrega"): comandas by id -> cash session -> external orders by id.
+ * Lock order (as the comanda bill and "Saiu para entrega"): comandas by id (advisory, then rows) -> cash session ->
+ * external orders by id.
  */
 export async function settleDriver(member: RestaurantMember, sessionId: string, input: SettleInput) {
   const ids = Array.isArray(input.orderIds) ? [...new Set(input.orderIds.filter((x): x is string => typeof x === 'string'))] : [];
   if (ids.length > 200) throw new CashRuleError('Escolha os pedidos do acerto');
-  const payIn = input.pay && typeof input.pay === 'object' ? (input.pay as { key?: unknown; amount?: unknown }) : null;
+  const payIn = input.pay && typeof input.pay === 'object' ? (input.pay as { key?: unknown; amount?: unknown; expected?: unknown }) : null;
   if (!ids.length && !payIn) throw new CashRuleError('Escolha os pedidos do acerto');
+  // The deliveries the screen showed: without them (an old screen) the payment could cover deliveries never shown
+  const expected = payIn ? parseExpected(payIn.expected) : null;
 
   const settling = ids.length > 0;
   const receivedCashCents = settling ? parseCountedCents(input.receivedCash, 'Dinheiro recebido') : 0;
@@ -140,21 +161,31 @@ export async function settleDriver(member: RestaurantMember, sessionId: string, 
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // The driver's deliveries before the locks; recomputed after them (a swap or a payment meanwhile drops out).
-      // Comanda locks come BEFORE the shift lock: paying a comanda's bill takes the comanda lock, then the shift
-      // (FOR SHARE); the opposite order here would deadlock with it.
-      const candidates = payIn ? (await deliveriesOf(tx, restaurantId, payIn.key)).deliveries : [];
-      const payComandaIds = candidates.filter((d) => d.kind === 'comanda').map((d) => d.id).sort();
-      const payOrderIds = candidates.filter((d) => d.kind === 'order').map((d) => d.id);
+      // Locks the deliveries the screen showed (expected); after the locks the driver's list is read again and must be
+      // the same set, so a delivery that went out after the screen loaded is never marked paid unseen.
+      // Comanda locks (advisory, then the rows) come BEFORE the shift lock: paying a comanda's bill takes the comanda
+      // lock, then the shift (FOR SHARE), and reopening a comanda takes the row, then the shift; the opposite order
+      // here would deadlock with them.
+      const payComandaIds = expected?.comandas ?? [];
       for (const id of payComandaIds) await lockComanda(tx, id);
+      if (payComandaIds.length) {
+        await tx.$queryRaw`SELECT "id" FROM "order_sessions" WHERE "id" = ANY(${payComandaIds}) AND "restaurantId" = ${restaurantId} ORDER BY "id" FOR UPDATE`;
+      }
 
       const rows = await tx.$queryRaw<Array<{ status: string }>>`SELECT "status"::text AS "status" FROM "cash_sessions" WHERE "id" = ${session.id} FOR UPDATE`;
       if (rows[0]?.status !== 'OPEN') throw new CashRuleError('Este caixa já foi fechado', 409);
 
-      const lockIds = [...new Set([...ids, ...payOrderIds])].sort();
+      const lockIds = [...new Set([...ids, ...(expected?.orders ?? [])])].sort();
       // Locks the orders: two settlements at once of the same order, the second finds it settled (or paid)
-      if (lockIds.length) await tx.$queryRaw`SELECT "id" FROM "external_orders" WHERE "id" = ANY(${lockIds}) ORDER BY "id" FOR UPDATE`;
-      if (payComandaIds.length) await tx.$queryRaw`SELECT "id" FROM "order_sessions" WHERE "id" = ANY(${payComandaIds}) ORDER BY "id" FOR UPDATE`;
+      if (lockIds.length) await tx.$queryRaw`SELECT "id" FROM "external_orders" WHERE "id" = ANY(${lockIds}) AND "restaurantId" = ${restaurantId} ORDER BY "id" FOR UPDATE`;
+
+      // The driver's deliveries now: nothing left = paid meanwhile; another set = the list changed since the screen
+      const fresh = payIn ? await deliveriesOf(tx, restaurantId, payIn.key) : null;
+      if (fresh && expected) {
+        if (!fresh.deliveries.length) throw new CashRuleError(ALREADY_PAID, 409);
+        const now = deliveryIds(fresh.deliveries);
+        if (!sameIds(now.orders, expected.orders) || !sameIds(now.comandas, expected.comandas)) throw new CashRuleError(LIST_CHANGED, 409);
+      }
 
       const lines: Prisma.CashSessionEntryCreateManyInput[] = [];
       let settlement: { id: string } | null = null;
@@ -206,9 +237,7 @@ export async function settleDriver(member: RestaurantMember, sessionId: string, 
       }
 
       let payment: { id: string; paidCents: number; quote: PayQuote; driverName: string | null } | null = null;
-      if (payIn) {
-        const fresh = await deliveriesOf(tx, restaurantId, payIn.key, { orders: payOrderIds, comandas: payComandaIds });
-        if (!fresh.deliveries.length) throw new CashRuleError(ALREADY_PAID, 409);
+      if (fresh) {
         const quote = await quoteFor(tx, fresh.driver, fresh.deliveries);
         const cap = quote.suggestedCents ?? quote.feeCapCents;
         if (payAmountCents > cap && !isManager(member.role)) throw new CashRuleError(quote.suggestedCents === null ? OVER_FEES : OVER_QUOTE, 403);

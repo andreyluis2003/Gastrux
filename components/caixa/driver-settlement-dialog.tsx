@@ -1,18 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { reaisToCents, brl } from './money';
 import type { DriverGroup } from '@/lib/caixa/driver-settlement';
+import { driverNameKey } from '@/lib/delivery/driver-name';
 
 const METHOD: Record<string, string> = { CASH: 'Dinheiro', CREDIT_ON_DELIVERY: 'Crédito', DEBIT_ON_DELIVERY: 'Débito', VOUCHER_ON_DELIVERY: 'Vale' };
 const newKey = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `k${Date.now()}${Math.random().toString(36).slice(2)}`);
-type PayEntry = { key: string; driverId: string | null; driverName: string | null; quote: { deliveryCount: number; suggestedCents: number | null; feeCapCents: number; text: string } };
+type PayEntry = {
+  key: string; driverId: string | null; driverName: string | null;
+  quote: { deliveryCount: number; suggestedCents: number | null; feeCapCents: number; text: string };
+  /** The deliveries this quote was computed from: sent back, the server refuses (409) if the list changed */
+  expected: { orders: string[]; comandas: string[] };
+};
 type Card = { id: string; name: string | null; door: DriverGroup | null; pay: PayEntry | null };
-const sameName = (a: string | null, b: string | null) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+/** The payment of a door group: the registered driver by id, a typed name by the same key as the server */
+const pairs = (pe: PayEntry, door: DriverGroup) => (door.driverId ? pe.key === door.driverId : !pe.driverId && pe.key === driverNameKey(door.driverName));
 const toInput = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
 
 /**
@@ -29,7 +36,7 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
   const [saving, setSaving] = useState(false);
   const [key, setKey] = useState(newKey);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch(`/api/caixa/sessions/${sessionId}/acerto-entregador`, { cache: 'no-store' })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
@@ -38,7 +45,7 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
         const pays: PayEntry[] = body.pay ?? [];
         const used = new Set<PayEntry>();
         const list: Card[] = doors.map((door, i) => {
-          const pe = pays.find((x) => !used.has(x) && sameName(x.driverName, door.driverName)) ?? null;
+          const pe = pays.find((x) => !used.has(x) && pairs(x, door)) ?? null;
           if (pe) used.add(pe);
           return { id: `d${i}`, name: door.driverName, door, pay: pe };
         });
@@ -48,6 +55,18 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
       })
       .catch((e) => { toast.error(e.message); setCards([]); });
   }, [sessionId]);
+  useEffect(load, [load]);
+
+  /** After a 409 (list changed, paid meanwhile, settled meanwhile): load the list again, the dialog stays open */
+  const reload = () => {
+    setCards(null);
+    setPick(null);
+    setSelected(new Set());
+    setReceived('');
+    setPay('');
+    setReason('');
+    load();
+  };
 
   const choose = (i: number) => {
     const c = cards![i];
@@ -94,11 +113,16 @@ export function DriverSettlementDialog({ sessionId, isManager, onClose, onDone }
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
         body: JSON.stringify({
           ...(doorPart ? { driverName: group!.driverName, orderIds: chosen.map((o) => o.id), receivedCash: ((receivedCents ?? 0) / 100).toFixed(2), reason: reason.trim() || undefined } : {}),
-          ...(payPart ? { pay: { key: payEntry!.key, amount: ((payCents ?? 0) / 100).toFixed(2) } } : {}),
+          ...(payPart ? { pay: { key: payEntry!.key, amount: ((payCents ?? 0) / 100).toFixed(2), expected: payEntry!.expected } } : {}),
         }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) { toast.error(body.error || 'Não foi possível fazer o acerto'); setKey(newKey()); return; }
+      if (!res.ok) {
+        toast.error(body.error || 'Não foi possível fazer o acerto');
+        setKey(newKey());
+        if (res.status === 409) reload();
+        return;
+      }
       toast.success(`Acerto de ${card.name ?? 'entregador sem nome'} lançado no caixa`);
       onDone();
       onClose();

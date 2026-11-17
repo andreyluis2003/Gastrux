@@ -99,9 +99,8 @@ Spec `docs/superpowers/specs/2026-10-26-acerto-entregador-design.md`. Ficou de f
   - Entregas antigas (antes desta função) e nomes digitados antes não entram no pagamento; nomes antigos não se juntam ao cadastro.
   - O acerto não avisa antes que o pagamento vai deixar o caixa negativo (o fechamento cego esconde o esperado).
   - Dois gerentes cadastrando o mesmo nome ao mesmo tempo podem criar dois (a conferência é só no servidor).
-  - Valores muito altos na diária ou por entrega dão erro genérico em vez de mensagem clara.
   - Relatório: sem exportar CSV; corta em 20.000 linhas por consulta sem avisar; entregador sem movimento no período não aparece.
-  - Depois de um 409 no acerto ("já pago agora"), a tela não recarrega sozinha: fechar e abrir de novo.
+  - Entregas não pagas há mais de 45 dias saem do acerto (continuam no relatório); não há 'marcar como pago por fora'.
 - Acerto desfeito: não há "desfazer". Errou? Um gerente lança um ajuste no caixa; os pedidos continuam acertados.
 - Pedidos do iFood entregues pelo iFood não são pagos na entrega para a loja; os de entrega própria pagos na porta
   entram no acerto se o iFood informar o pagamento como na entrega (não testado sem as credenciais do iFood).
